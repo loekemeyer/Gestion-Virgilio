@@ -41,6 +41,10 @@ function _adsRpc(name, args) {
   try { return Promise.resolve(sb.rpc(name, args || {})).catch(function (e) { return { data: null, error: e }; }); }
   catch (e) { return Promise.resolve({ data: null, error: e }); }
 }
+// v28.59 (Luis, 08/10): «No existe 58, sólo 058» (regla v16.23): el código se muestra con el cero adelante.
+// stocks_carga_rapida guarda la clave normalizada (norm_cod saca los ceros); esto es sólo cómo se escribe.
+// Espejo de cod mostrar de index.html y de public.gv_cod_mostrar().
+function _adsCod(c) { var s = String(c == null ? "" : c).toUpperCase().trim(), m = s.match(/^([0-9]+)(.*)$/); return m ? (m[1].length < 3 ? ("000" + m[1]).slice(-3) : m[1]) + m[2] : s; }
 function _adsEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 function _adsN(v, dec) { var n = Number(v); return isFinite(n) ? n.toLocaleString("es-AR", { minimumFractionDigits: dec || 0, maximumFractionDigits: dec || 0 }) : "—"; }
 function _adsPct(x) { return isFinite(x) && x != null ? _adsN(x * 100) + " %" : "—"; }
@@ -71,6 +75,8 @@ function _adsCss() {
     "#adsOv{position:fixed;inset:0;z-index:9600;background:#f1f5f9;display:none;flex-direction:column;font-family:system-ui,Segoe UI,Arial,sans-serif;color:#0f172a;}",
     "#adsOv *{box-sizing:border-box;}",
     "#adsOv button{width:auto;margin-top:0;padding:5px 12px;font-size:13px;line-height:1.25;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;cursor:pointer;}",
+    "#adsOv button.ads-pct{padding:2px 8px;font-weight:700;}",
+    "#adsOv button.ads-pct.on{background:#7c3aed;border-color:#7c3aed;color:#fff;}",
     "#adsOv input,#adsOv select{width:auto;margin-top:0;font:inherit;font-size:14px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;}",
     "#adsOv .ads-top{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#4c1d95;color:#fff;flex-wrap:wrap;}",
     "#adsOv .ads-top .tit{font-weight:800;font-size:17px;margin-right:6px;}",
@@ -170,6 +176,12 @@ function _adsCargarStock() {
 
 // v28.56 (Luis): cuánto tarda un pedido en salir (días). Lo da gv_ads_config: manual o promedio de 2 semanas.
 function _adsLead() { var c = (typeof _ads !== "undefined" && _ads.cfg) || {}; var l = Number(c.lead_dias); return isFinite(l) && c.lead_dias != null ? l : 12; }
+// v28.59 (Luis, D4): días equivalentes de Est. Madre que caen en un plazo de H días. Los calcula la base
+// (gv_ads_em_dias): con la distribución real de las últimas 2 semanas, o max(0, H − días) si se fijaron a mano.
+function _adsEmDias(H) {
+  var c = (typeof _ads !== "undefined" && _ads.cfg) || {}, e = c.em_dias && Number(c.em_dias[String(H)]);
+  return isFinite(e) && c.em_dias && c.em_dias[String(H)] != null ? e : Math.max(0, H - _adsLead());
+}
 function _adsLeadTxt(x) { return String(Math.round(Number(x) * 10) / 10).replace(".", ","); }
 function adsSetLead(v) {
   var t = String(v == null ? "" : v).trim().replace(",", "."), d = t === "" ? null : Number(t);
@@ -225,7 +237,7 @@ function _adsHtmlTall() {
       h += '<tr class="sub"><td colspan="6"><table style="margin:4px auto"><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2" title="Cuántas OC del rango incluyen este artículo">OC<br>evaluadas</th><th rowspan="2">Pedido</th><th rowspan="2" title="Cajas que recibió Virgilio de este proveedor en el período, hasta lo pedido">Recib.<br>Virgilio</th><th rowspan="2">%</th><th colspan="3" class="ug" title="Pedida y recibida de la última OC del artículo">Última OC</th></tr><tr><th class="u1">Fecha</th><th class="u2">Pedida</th><th class="u3">Recibida</th></tr></thead><tbody>';
       t.arts.forEach(function (a) {
         var al = a.pct != null && Number(a.pct) < _ads.umbral;
-        h += "<tr><td><b>" + _adsEsc(a.codigo) + '</b></td><td class="desc" title="' + _adsEsc(a.descripcion) + '">' + _adsEsc(a.descripcion) + "</td><td>" + a.ocs +
+        h += "<tr><td><b>" + _adsEsc(_adsCod(a.codigo)) + '</b></td><td class="desc" title="' + _adsEsc(a.descripcion) + '">' + _adsEsc(a.descripcion) + "</td><td>" + a.ocs +
           "</td><td>" + _adsN(a.pedido) + "</td><td>" + _adsN(a.entregado) + '</td><td class="' + (al ? "neg" : "") + '">' + _adsPct(a.pct) +
           '</td><td class="u1">' + _adsFecha(a.ult_fecha) + '</td><td class="u2">' + _adsN(a.ult_cant) + '</td><td class="u3">' + _adsN(a.ult_rec) + "</td></tr>";
       });
@@ -247,7 +259,7 @@ function adsFiltrarStock(rows, horiz, q, hOrden) {
   var ko = "saldo" + (hOrden || horiz || 10);
   return (rows || []).filter(function (r) {
     if (horiz && !(Number(r[campo]) < 0)) return false;
-    if (q && (String(r.cod) + " " + String(r.descripcion || "")).toUpperCase().indexOf(q) < 0) return false;
+    if (q && (String(r.cod) + " " + _adsCod(r.cod) + " " + String(r.descripcion || "")).toUpperCase().indexOf(q) < 0) return false;
     return true;
   }).sort(function (a, b) {
     return (Number(a[ko]) - Number(b[ko])) || (Number(a.saldo10) - Number(b.saldo10)) || (Number(a.saldo20) - Number(b.saldo20)) || (Number(a.saldo30) - Number(b.saldo30));
@@ -266,14 +278,14 @@ function _adsHtmlStock() {
       return '<span class="chip' + (on ? " on" : "") + '" onclick="adsHoriz(' + x[0] + ')">' + (x[0] ? x[0] + " días · " + x[1] : "todos · " + x[1]) + "</span>";
     }).join(" ") +
     ' · <input id="adsQ" placeholder="Buscar código" style="width:130px" value="' + _adsEsc(_ads.q) + '" oninput="adsBuscar(this.value)">' +
-    ' · <span title="Cuánto tarda un pedido desde que entra hasta que sale. Automático = promedio de las NP web entregadas en las últimas 2 semanas.">Tarda en salir: <input id="adsLead" style="width:46px" value="' + _adsLeadTxt(_adsLead()) + '" onchange="adsSetLead(this.value)"> d' +
-    ((_ads.cfg || {}).lead_manual != null ? ' <span class="chip" onclick="adsSetLead(\'\')" title="Volver al promedio de las últimas 2 semanas">auto ' + ((_ads.cfg || {}).lead_auto != null ? _adsLeadTxt(_ads.cfg.lead_auto) + ' d' : '—') + '</span>' : ' (auto)') + '</span>' +
+    ' · <span title="Cuánto tarda un pedido desde que entra hasta que sale. Si se escribe a mano, queda guardado.">Tarda en salir: <input id="adsLead" style="width:46px" value="' + _adsLeadTxt(_adsLead()) + '" onchange="adsSetLead(this.value)"> d</span>' +
+    ' <button class="ads-pct' + ((_ads.cfg || {}).lead_manual != null ? '' : ' on') + '" onclick="adsSetLead(\'\')" title="Promedio real de las últimas 2 semanas">%</button>' +
     ' · Excel: ' + [10, 20, 30].map(function (d) { return '<button class="xl" onclick="adsExcelStock(' + d + ')">' + d + ' días</button>'; }).join(" ") + '</div>';
   h += '<div class="ads-body">';
   if (_ads.stockErr) return h + '<div class="err">' + _adsEsc(_ads.stockErr) + "</div></div>";
   if (!_ads.stock) return h + '<div class="msg">Leyendo stock…</div></div>';
   var f = adsFiltrarStock(rows, ver, _ads.q, H);
-  h += '<div class="res">Todo a ' + H + ' días · sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · saldo = disponible − comprometido − E.M. plazo (Est. Madre × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ') / 30) · en cajas</div>';
+  h += '<div class="res">Todo a ' + H + ' días · sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · saldo = disponible − comprometido − E.M. plazo · en cajas</div>';
   h += '<table><thead><tr><th rowspan="2" title="Tallerista de la OC vigente del código">Tallerista</th><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2">Stk</th><th rowspan="2">Comprom.<br>' + H + ' d</th><th rowspan="2" title="Est. Madre del mes × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ' días que tarda en salir) / 30: los pedidos que entran y salen dentro del plazo">E.M. plazo<br>' + H + 'd</th>' +
     '<th rowspan="2">Saldo<br>' + H + ' d</th>' +
     '<th colspan="6" class="ug" title="Pedido y recibido de las últimas ' + _ads.n + ' OC (el rango de Entregas talleristas), sumando todos los talleristas · recibido = lo que recibió Virgilio, hasta lo pedido">Período (' + _ads.n + ' OC)</th></tr>' +
@@ -285,7 +297,7 @@ function _adsHtmlStock() {
     var c = _adsStockCalc(r, H), disp = c.disp, proy = c.proy, comp = c.comp, em = c.em, saldo = c.saldo;
     var dist = c.dist.length ? c.dist.map(_adsEsc).join("<br>") : "—";
     // v28.60 (Luis, 08/10): a la izquierda del código, el tallerista de la OC vigente
-    h += '<tr><td class="tall">' + (c.tallAct.length ? c.tallAct.map(_adsEsc).join("<br>") : "—") + "</td><td><b>" + _adsEsc(r.cod) + '</b></td><td class="desc" title="' + _adsEsc(r.descripcion) + '">' + _adsEsc(r.descripcion) +
+    h += '<tr><td class="tall">' + (c.tallAct.length ? c.tallAct.map(_adsEsc).join("<br>") : "—") + "</td><td><b>" + _adsEsc(_adsCod(r.cod)) + '</b></td><td class="desc" title="' + _adsEsc(r.descripcion) + '">' + _adsEsc(r.descripcion) +
       '</td><td title="Góndola ' + _adsN(r.terminado) + " · racks " + _adsN(r.racks) + " · a guardar " + _adsN(r.a_guardar) + " · excedente " + _adsN(r.excedente) + '">' + _adsN(disp) +
       "</td><td>" + _adsN(comp) + '</td><td title="' + _adsN(proy) + ' por mes">' + _adsN(Math.round(em)) +
       '</td><td class="' + (saldo < 0 ? "neg" : "pos") + '">' + _adsN(saldo) + "</td>";
@@ -341,7 +353,7 @@ function _adsStockCalc(r, H) {
   // v28.60 (Luis, 08/10, «058 me da −15, no −16»): la E.M. plazo que se MUESTRA sale del mismo saldo del servidor
   // (disp − comp − saldo): si la base cambia cómo cuenta los días (gv_ads_em_dias), la columna y el saldo no se desfasan.
   var _sal = Number(r["saldo" + H]);
-  var _em = isFinite(_sal) ? Math.max(0, disp - comp - _sal) : proy * Math.max(0, H - (typeof _adsLead === "function" ? _adsLead() : 12)) / 30;
+  var _em = isFinite(_sal) ? Math.max(0, disp - comp - _sal) : proy * (typeof _adsEmDias === "function" ? _adsEmDias(H) : Math.max(0, H - 12)) / 30;
   return { disp: disp, proy: proy, comp: comp, em: _em, saldo: _sal, tallAct: tallAct, estH: pc.length ? estH : null, estOc: estArr.some(function (y) { return y.oc; }), estDet: estDet, estDist: estDist, estCaj: estArr.map(function (y) { return y.p + ": " + _adsN(y.e) + (y.oc ? "" : "*"); }),
            estCalc: estArr.some(function (y) { return !y.oc; }),
            pedP: pc.length ? totPed : null, recP: pc.length ? recP : null, pctP: pc.length && totPed > 0 ? recP / totPed : null,
@@ -430,7 +442,7 @@ function adsExcelTall() {
   var aoa = [["Tallerista", "Cód.", "Descripción", "OC evaluadas", "Pedido", "Recibio Virgilio", "%", "Fecha última OC", "Pedido última OC", "Recibido última OC"]];
   g.forEach(function (t) {
     t.arts.forEach(function (a) {
-      aoa.push([t.proveedor, String(a.codigo), a.descripcion || "", _adsNum(a.ocs), _adsNum(a.pedido), _adsNum(a.entregado),
+      aoa.push([t.proveedor, _adsCod(a.codigo), a.descripcion || "", _adsNum(a.ocs), _adsNum(a.pedido), _adsNum(a.entregado),
         (a.pct == null || !isFinite(a.pct) ? "" : Math.round(a.pct * 100) + "%"), a.ult_fecha ? _adsFecha(a.ult_fecha) : "", _adsNum(a.ult_cant), _adsNum(a.ult_rec)]);
     });
   });
@@ -455,7 +467,7 @@ function adsExcelStock(H) {
               "Fecha últ. OC", "Ped período", "Rec período", "% período", "Entr est OC", "Entr. est. x tall.", "Proporción"]];
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
-    aoa.push([String(r.cod), r.descripcion || "", _adsNum(c.saldo), c.disp, c.comp, Math.round(c.em),
+    aoa.push([_adsCod(r.cod), r.descripcion || "", _adsNum(c.saldo), c.disp, c.comp, Math.round(c.em),
       c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), (c.estH != null && c.estCalc ? _adsNum(c.estH) + "*" : _adsNum(c.estH)), c.estCaj.join("\n"), c.dist.join("\n")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
