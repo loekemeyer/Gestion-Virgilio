@@ -429,7 +429,7 @@ function _hsSuperRender() {
     var it = x.it;
     h += '<tr data-k="' + _hsEsc(x.k) + '"' + (isFinite(x.rent) ? "" : ' class="falta"') + '>' +
          '<td>' + _hsFecha(it.ultima_compra) + '</td>' +
-         '<td title="' + _hsEsc(it.empresa === "chef" ? "Chef" : "LK") + '"><b>' + _hsEsc(it.cod) + '</b></td>' +
+         '<td title="' + _hsEsc(it.empresa === "chef" ? "Chef" : "LK") + '"><b>' + _hsEsc(typeof _padCod === "function" ? _padCod(it.cod) : it.cod) + '</b></td>' +
          '<td class="d" title="' + _hsEsc(it.descripcion) + '">' + _hsEsc(_hsAbrev(it.descripcion, 30)) + '</td>' +
          '<td>' + _hsEsc(it.rubro || "Sin rubro") + '</td>' +
          '<td class="' + (it.es_importado ? "imp" : "nac") + '"' + (it.es_importado && it.importador ? ' title="importado por ' + _hsEsc(it.importador) + '"' : '') + '>' + (it.es_importado ? "Imp" + (it.importador ? "·" + (it.importador === "Tierra Nativa" ? "TN" : _hsEsc(it.importador)) : "") : "Nac") + '</td>' +

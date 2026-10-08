@@ -6396,7 +6396,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.85"></script>
+<script type="module" src="recepcion.js?v=28.86"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10687,7 +10687,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.85";
+const APP_VERSION = "v28.86";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13840,10 +13840,10 @@ async function pkPickConteo() {
 function pkConteoCardHtml() {
   if (!_pk || !_pk.conteo) return "";
   const c = _pk.conteo;
-  if (c.done) return '<div class="pk-conteo done">🔢 ✓ Anotaste el conteo de <b>' + escapeHtml(c.art) + '</b>. ¡Gracias!</div>';
+  if (c.done) return '<div class="pk-conteo done">🔢 ✓ Anotaste el conteo de <b>' + escapeHtml(_padCod(c.art)) + '</b>. ¡Gracias!</div>';
   return '<div class="pk-conteo">' +
     '<div class="pk-conteo-h">🔢 Control de góndola (rápido)</div>' +
-    '<div class="pk-conteo-s">Contá cuántas cajas de <b>' + escapeHtml(c.art) + '</b> QUEDARON en la <b>góndola</b>' + (c.sector ? ' (celda <b>' + escapeHtml(c.sector) + '</b>)' : '') + ' y anotá. <b>Contá DESPUÉS de pickear</b>: lo que queda en la celda, sin las cajas que ya sacaste para esta tanda. No frena nada.</div>' +
+    '<div class="pk-conteo-s">Contá cuántas cajas de <b>' + escapeHtml(_padCod(c.art)) + '</b> QUEDARON en la <b>góndola</b>' + (c.sector ? ' (celda <b>' + escapeHtml(c.sector) + '</b>)' : '') + ' y anotá. <b>Contá DESPUÉS de pickear</b>: lo que queda en la celda, sin las cajas que ya sacaste para esta tanda. No frena nada.</div>' +
     '<div class="pk-conteo-row"><input id="pkConteoInp" type="number" inputmode="numeric" min="0" class="pk-conteo-inp" placeholder="cajas"><button class="pk-btn pk-ok pk-conteo-btn" onclick="pkConteoSubmit()">✓ Anotar</button></div>' +
     '</div>';
 }
@@ -18644,7 +18644,7 @@ function ocgChicaNota(gen) {
   const a = gen.chica || [];
   if (!a.length) return "";
   return '<div class="oc-meta" style="margin:0 0 8px;color:#92400e" title="Una OC de menos de 10 cajas sólo se pide si la góndola está a menos del 30 % de su capacidad">⏸ <b>' + a.length + '</b> OC de menos de 10 cajas no se piden (góndola ≥ 30 %): ' +
-    a.map(function (x) { return '<b>' + escapeHtml(x.cod) + '</b> ' + Math.round(Number(x.total) || 0) + ' cj · ' + Math.round(Number(x.pct) || 0) + ' %'; }).join(" · ") + '</div>';
+    a.map(function (x) { return '<b>' + escapeHtml(_padCod(x.cod)) + '</b> ' + Math.round(Number(x.total) || 0) + ' cj · ' + Math.round(Number(x.pct) || 0) + ' %'; }).join(" · ") + '</div>';
 }
 function ocBodyGen() {
   const gen = _oc.gen;
@@ -19087,7 +19087,7 @@ function ocBodyCfg() {
     const bad = Math.round(suma) !== 100;   // los % no suman 100 → marcar
     const ch = _oc.cfg.changed[a.cod] ? ' style="background:#fef3c7"' : (!a.activo ? ' style="opacity:.55"' : (!String(a.proveedor || "").trim() ? ' style="background:#fff7ed"' : ''));
     const pctStyle = bad ? ' style="color:#b91c1c;font-weight:800"' : '';
-    h += '<tr' + ch + '><td class="oc-cod">' + escapeHtml(a.cod) + '</td>' +
+    h += '<tr' + ch + '><td class="oc-cod">' + escapeHtml(_padCod(a.cod)) + '</td>' +
       '<td>' + escapeHtml(artNombre(a.cod, a.descripcion)) + '</td>' +
       '<td><select class="oc-rinp" style="width:118px" onchange="ocCfgEdit(' + i + ',&quot;proveedor&quot;,this.value)">' + _ocProvOptions(a.proveedor, provs, "(sin proveedor)") + '</select></td>' +
       '<td class="num"><input class="oc-rinp" style="width:56px"' + pctStyle + ' type="number" min="0" max="100" step="1" value="' + a.prop_prov1 + '" oninput="ocCfgEdit(' + i + ',&quot;prop_prov1&quot;,this.value)"></td>' +
@@ -24461,7 +24461,7 @@ function stkGondRender() {
       const lbl = mv.tipo === "guardado_fuera_lista" ? "guard.f/lista" : (mv.tipo === "baja_racks" ? "de racks" : mv.tipo);
       // v5.98: quién hizo el movimiento (legajo→nombre; cacheado en _empleadosNombres).
       const emp = mv.legajo ? ((typeof _empleadosNombres !== "undefined" && _empleadosNombres.get(String(mv.legajo))) || ("Leg " + mv.legajo)) : "s/dato";
-      return '<div class="stkpop-mv"><span class="stkpop-mv-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</span><span class="stkpop-mv-tipo ' + cls + '">' + escapeHtml(lbl) + '</span><span class="stkpop-mv-cod">' + escapeHtml(String(mv.cod_art)) + '</span><span class="stkpop-mv-ref">' + escapeHtml(String(mv.ref || "")) + '</span><span class="stkpop-mv-emp" title="' + escapeHtml(emp) + '">👤 ' + escapeHtml(emp) + '</span><span class="stkpop-mv-d ' + (d < 0 ? "neg" : "pos") + '">' + (d > 0 ? "+" : "") + fmt1(d) + '</span></div>';
+      return '<div class="stkpop-mv"><span class="stkpop-mv-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</span><span class="stkpop-mv-tipo ' + cls + '">' + escapeHtml(lbl) + '</span><span class="stkpop-mv-cod">' + escapeHtml(_padCod(mv.cod_art)) + '</span><span class="stkpop-mv-ref">' + escapeHtml(String(mv.ref || "")) + '</span><span class="stkpop-mv-emp" title="' + escapeHtml(emp) + '">👤 ' + escapeHtml(emp) + '</span><span class="stkpop-mv-d ' + (d < 0 ? "neg" : "pos") + '">' + (d > 0 ? "+" : "") + fmt1(d) + '</span></div>';
     }).join("");
     if (list.length > MAX) h += '<div class="stkpop-empty">Mostrando ' + MAX + ' de ' + list.length + ' — filtrá o buscá para acotar.</div>';
   }
@@ -24565,7 +24565,7 @@ function stkBodyCapacidad() {
       '<b>⚠ ' + revisar.length + ' con lugar en góndola pero SIN Estadística Madre/máximo — revisar.</b> Un artículo no debería tener lugar en góndola si no tiene Estadística Madre: suele ser el <b>código mal escrito</b> (le falta la E, un cero, etc.).' +
       '<div style="margin-top:7px;">' + revisar.map(function (r) {
         const s = sugE(r.cod);
-        return '<span style="display:inline-block;background:#fff;border:1px solid #fecaca;border-radius:8px;padding:3px 8px;margin:0 4px 4px 0;font-family:Consolas,Menlo,monospace;"><b>' + escapeHtml(r.cod) + '</b> <span style="color:#64748b;font-family:system-ui;">(' + r.capacidad + ' cj)</span>' + (s ? ' <b style="color:#166534;">→ ¿' + escapeHtml(s) + '?</b>' : '') + '</span>';
+        return '<span style="display:inline-block;background:#fff;border:1px solid #fecaca;border-radius:8px;padding:3px 8px;margin:0 4px 4px 0;font-family:Consolas,Menlo,monospace;"><b>' + escapeHtml(_padCod(r.cod)) + '</b> <span style="color:#64748b;font-family:system-ui;">(' + r.capacidad + ' cj)</span>' + (s ? ' <b style="color:#166534;">→ ¿' + escapeHtml(s) + '?</b>' : '') + '</span>';
       }).join("") + '</div></div>';
   }
   // v8.62 — discontinuados que TODAVÍA ocupan lugar en góndola → liberar el sector.
@@ -46956,7 +46956,7 @@ function _dpRenderCard(r) {
   var cn = r.codNorm;
   return '<div class="dp-card" id="dpC_' + cn + '">' +
     '<div class="dp-card-head" onclick="dpToggle(\'' + cn + '\')">' +
-      '<span class="dp-cod">' + escapeHtml(r.cod) + '</span>' +
+      '<span class="dp-cod">' + escapeHtml(_padCod(r.cod)) + '</span>' +
       '<span class="dp-desc">' + escapeHtml(artNombre(r.cod, r.desc) || "(sin nombre)") + '</span>' +
       '<span class="dp-dots">' +
         '<span class="dp-dot-g" title="Cajas (empaque)"><span class="dp-dot ' + (r.cajas ? "ok" : "miss") + '"></span><span class="dp-dot-label">Cj</span></span>' +
@@ -47198,7 +47198,7 @@ function lugRender(filter) {
     const chips = its.length
       ? its.map(function (i) {
           return '<span class="lug-chip' + (i.clase === "insumo" ? " lug-chip-ins" : "") + '">' +
-                 escapeHtml(String(i.cod)) +
+                 escapeHtml(_padCod(i.cod)) +
                  (i.cajas_max != null ? ' <b>' + Number(i.cajas_max) + '</b>' : '') +
                  ' <button class="lug-x" title="Sacar de ' + sE + '" onclick="lugDelItem(\'' + sE + '\',\'' + escapeHtml(String(i.cod)) + '\',\'' + escapeHtml(String(i.clase)) + '\')">✕</button></span>';
         }).join("")
@@ -47239,7 +47239,7 @@ function lugRenderCod(filter) {
       const oa = (empDe[String(a.sector).toUpperCase()] || {}).orden, ob = (empDe[String(b.sector).toUpperCase()] || {}).orden;
       return (oa == null ? 1e9 : oa) - (ob == null ? 1e9 : ob);
     });
-    return '<div class="lug-row"><div class="lug-row-h"><span class="lug-sec">' + escapeHtml(c) + '</span>' +
+    return '<div class="lug-row"><div class="lug-row-h"><span class="lug-sec">' + escapeHtml(_padCod(c)) + '</span>' +
       '<span class="lug-meta">' + its.length + ' lugar' + (its.length > 1 ? 'es' : '') + '</span></div>' +
       '<div class="lug-chips">' + its.map(function (i) {
         const l = empDe[String(i.sector).toUpperCase()] || {};
@@ -47388,10 +47388,10 @@ function pmapAlertaRender() {
     '<summary>⚠ Stock sin lugar en el Mapa: ' + partes.join(" · ") + '</summary>';
   if (g.length) h += '<div>🧱 <b>Góndola</b>: hay cajas y ninguna celda tiene el código. Tocá uno, elegí la celda y agregalo:<br>' +
     g.map(function (a) { return '<button onclick="pmapAlertaGondola(' + J(a.cod) + ')" title="' + escapeHtml(a.detalle || "") + '">' +
-      escapeHtml(a.cod) + ' ' + escapeHtml(a.emp || "") + ' · ' + pmapNum(a.cantidad) + ' caj</button>'; }).join("") + '</div>';
+      escapeHtml(_padCod(a.cod)) + ' ' + escapeHtml(a.emp || "") + ' · ' + pmapNum(a.cantidad) + ' caj</button>'; }).join("") + '</div>';
   if (r.length) h += '<div>📦 <b>Racks</b>: stock sin posición. Tocá uno para ubicarlo:<br>' +
     r.map(function (a) { return '<button onclick="prkUbicarAbrir(' + J(a.cod) + ',' + J(a.emp) + ',' + Number(a.cantidad) + ')">' +
-      escapeHtml(a.cod) + ' ' + escapeHtml(a.emp || "") + ' · ' + pmapNum(a.cantidad) + ' caj</button>'; }).join("") + '</div>';
+      escapeHtml(_padCod(a.cod)) + ' ' + escapeHtml(a.emp || "") + ' · ' + pmapNum(a.cantidad) + ' caj</button>'; }).join("") + '</div>';
   if (i.length || s.length) h += '<div>🧰 <b>Insumos</b>: con stock y sin posición, o anotados en un lugar que no existe. Tocá uno para ubicarlo:<br>' +
     s.concat(i).map(function (a) { return '<button onclick="prkInsUbicarAbrir(' + J(a.cod) + ',' + (Number(a.cantidad) || 0) + ',' + J(a.ref_id) + ')" title="' + escapeHtml(a.detalle || "") + '">' +
       (a.tipo === "insumo_sin_lugar" ? "⚠ " : "") + escapeHtml(a.cod) + (Number(a.cantidad) ? ' · ' + pmapNum(a.cantidad) + (a.unidad ? " " + escapeHtml(a.unidad) : "") : "") + '</button>'; }).join("") + '</div>';
@@ -47570,10 +47570,10 @@ function pmapCellHtml(g, n, porCelda) {
     cuerpo = vis.map(function (r) {
       const n = (r.cajas_max != null) ? pmapNum(r.cajas_max) : null;
       if (multi) {
-        return '<span class="pmap-cod">' + escapeHtml(String(r.cod || "—")) +
+        return '<span class="pmap-cod">' + escapeHtml(_padCod(r.cod || "—")) +
                (n != null ? '<i>' + n + '</i>' : '<i class="pmap-nocap">s/cap</i>') + '</span>';
       }
-      return '<span class="pmap-cod">' + escapeHtml(String(r.cod || "—")) + '</span>' +
+      return '<span class="pmap-cod">' + escapeHtml(_padCod(r.cod || "—")) + '</span>' +
              (n != null ? '<span class="pmap-cap"><b>' + n + '</b> caj</span>'
                         : '<span class="pmap-cap pmap-nocap">s/cap</span>');
     }).join("");
@@ -47723,7 +47723,7 @@ function prkCellHtml(r) {
   let cuerpo, tip = sec;
   if (libre) { cuerpo = '<span class="pmap-cod">libre</span>'; tip += " · posición libre"; }
   else {
-    cuerpo = '<span class="pmap-cod">' + escapeHtml(String(r.cod || "—")) + '</span>' +
+    cuerpo = '<span class="pmap-cod">' + escapeHtml(r.fuente === "insumo" ? String(r.cod || "—") : _padCod(r.cod || "—")) + '</span>' +
              (r.fuente === "insumo"   // v22.80: insumo — la cantidad es la declarada en el módulo de Insumos, en su unidad
                ? '<span class="prk-mc">🧰 insumo' + (inn ? ' · ' + pmapNum(inn) : '') + '</span>'
                : '<span class="prk-mc">' + (mc ? '<b>' + pmapNum(mc) + '</b> MC' : "") +
@@ -47754,7 +47754,7 @@ function prkStockLinea(sector) {
   const rs = (_prkRev || []).filter(function (v) { return String(v.sector).toUpperCase() === String(sector).toUpperCase(); });
   if (!rs.length) return "";
   return rs.map(function (v) {
-    return '<div class="prk-nota" style="color:#b45309">🔎 <b>A contar · ' + escapeHtml(String(v.cod)) + '</b>: ' + escapeHtml(String(v.motivo || "")) +
+    return '<div class="prk-nota" style="color:#b45309">🔎 <b>A contar · ' + escapeHtml(_padCod(v.cod)) + '</b>: ' + escapeHtml(String(v.motivo || "")) +
       '. Contá lo que hay y guardalo acá abajo; si no hay nada, ' +
       '<button class="prk-vaciar" onclick="prkRevisarCerrar(' + Number(v.id) + ')">✓ No hay nada: cerrar</button></div>';
   }).join("");
@@ -47791,7 +47791,7 @@ function prkAbrir(sector) {
   }
   box.innerHTML = '<div class="prk-det">' +
     (libre ? 'Posición <b>libre</b>.'
-      : '<b>' + escapeHtml(String(r.cod || "—")) + '</b>' + (d ? ' — ' + escapeHtml(d) : "")) +
+      : '<b>' + escapeHtml(r.fuente === "insumo" ? String(r.cod || "—") : _padCod(r.cod || "—")) + '</b>' + (d ? ' — ' + escapeHtml(d) : "")) +
     (r.estado === "sin_lugar" ? '<br>⚠ Esta posición no existe como rack en 📍 Lugares del depósito.' : "") +
     '</div>' + prkStockLinea(sector) +
     '<div class="prk-form">' +
@@ -47916,7 +47916,7 @@ function prkDesfaseRender() {
     h += '🔎 <b>' + rev.length + ' posición(es) a contar</b>: la planimetría vieja no coincidía con el stock. Tocá una, contá y guardá:' +
       '<div>' + rev.map(function (v) {
         const s = JSON.stringify(String(v.sector)).replace(/"/g, "&quot;");
-        return '<button onclick="prkIrA(' + s + ')">' + escapeHtml(String(v.sector)) + ' · ' + escapeHtml(String(v.cod)) +
+        return '<button onclick="prkIrA(' + s + ')">' + escapeHtml(String(v.sector)) + ' · ' + escapeHtml(_padCod(v.cod)) +
                (v.cajas_planimetria != null ? ' · decía ' + pmapNum(v.cajas_planimetria) : '') + '</button>';
       }).join("") + '</div>';
   }
@@ -47924,7 +47924,7 @@ function prkDesfaseRender() {
     h += (h ? '<br>' : '') + '📦 <b>Stock de racks sin posición</b>: tocá uno para ubicarlo:' +
       '<div>' + sin.map(function (s) {
         const a = [s.cod, s.emp, Number(s.cajas)].map(function (x) { return JSON.stringify(x).replace(/"/g, "&quot;"); }).join(",");
-        return '<button onclick="prkUbicarAbrir(' + a + ')">' + escapeHtml(String(s.cod)) + ' ' + escapeHtml(String(s.emp || "")) +
+        return '<button onclick="prkUbicarAbrir(' + a + ')">' + escapeHtml(_padCod(s.cod)) + ' ' + escapeHtml(String(s.emp || "")) +
                ' · ' + pmapNum(s.cajas) + ' caj</button>';
       }).join("") + '</div>';
   }
@@ -47942,7 +47942,7 @@ function prkUbicarAbrir(cod, emp, cajas) {
   _pmapCelda = ""; pmapCeldaStatus("");
   tit.textContent = "Ubicar " + cod + " · " + (emp || "");
   const a = [cod, emp].map(function (x) { return JSON.stringify(x).replace(/"/g, "&quot;"); }).join(",");
-  box.innerHTML = '<div class="prk-det">Hay <b>' + pmapNum(cajas) + '</b> cajas de <b>' + escapeHtml(cod) + '</b> en el stock de racks que no están en ninguna posición.' +
+  box.innerHTML = '<div class="prk-det">Hay <b>' + pmapNum(cajas) + '</b> cajas de <b>' + escapeHtml(_padCod(cod)) + '</b> en el stock de racks que no están en ninguna posición.' +
       (Number(cajas) < 0 ? '<br>⚠ Da negativo: se bajaron cajas sin decir de qué posición. Corregí la posición de donde salieron.' : '') + '</div>' +
     '<div class="prk-form">' +
       '<label>Posición<input class="planim-inp" id="prkUbSec" type="text" placeholder="AD07" oninput="this.value=this.value.toUpperCase()"></label>' +
@@ -48035,7 +48035,7 @@ function pmapCeldaRender() {
         const cl = String(r.clase || "articulo"), clJ = JSON.stringify(cl).replace(/"/g, "&quot;");
         const d = pmapDesc(r);
         return '<div class="pmap-it">' +
-          '<span class="pmap-it-cod">' + escapeHtml(c) + '</span>' +
+          '<span class="pmap-it-cod">' + escapeHtml(cl === "insumo" ? c : _padCod(c)) + '</span>' +
           '<span class="pmap-it-desc">' + escapeHtml(d || (cl === "insumo" ? "insumo" : "")) + '</span>' +
           '<input class="planim-inp planim-inp-num" id="pmapCap_' + escapeHtml(c) + '" type="number" inputmode="numeric" ' +
             'placeholder="cajas" value="' + (r.cajas_max != null ? Number(r.cajas_max) : "") + '">' +
@@ -48148,7 +48148,7 @@ function pmapViejaRender() {
     '<div>' + _pmapVieja.map(function (r) {
       const c = String(r.cod), sec = String(r.sector || "").toUpperCase();
       return '<button onclick="pmapViejaTraer(' + JSON.stringify(c).replace(/"/g, "&quot;") + ',' +
-             JSON.stringify(sec).replace(/"/g, "&quot;") + ')">' + escapeHtml(c) + ' → ' + escapeHtml(sec) + '</button>';
+             JSON.stringify(sec).replace(/"/g, "&quot;") + ')">' + escapeHtml(_padCod(c)) + ' → ' + escapeHtml(sec) + '</button>';
     }).join("") + '</div>';
 }
 /* No importa solo: abre la celda con el código puesto, para que el supervisor
@@ -61732,7 +61732,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.85"></script>
+<script src="importacion.js?v=28.86"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61973,7 +61973,7 @@ function cgRender() {
       const f = x.ts ? new Date(x.ts) : null;
       const cuando = f ? (String(f.getDate()).padStart(2, "0") + "/" + String(f.getMonth() + 1).padStart(2, "0") + " " + String(f.getHours()).padStart(2, "0") + ":" + String(f.getMinutes()).padStart(2, "0")) : "";
       return '<div class="cg-it">' +
-        '<div class="cg-l1">' + escapeHtml(x.cod || "") + ' · ' + escapeHtml(x.gondolas || "—") + '</div>' +
+        '<div class="cg-l1">' + escapeHtml(_padCod(x.cod || "")) + ' · ' + escapeHtml(x.gondolas || "—") + '</div>' +
         '<div class="cg-l2">Contó <b>' + n(hoy) + '</b> · sist. ' + n(x.saldo_hoy) + ' · <b style="color:' + (d < 0 ? "#b91c1c" : "#15803d") + '">' + (d > 0 ? "+" : "") + n(d) + '</b></div>' +
         '<div class="cg-l3">' + escapeHtml(x.nombre || ("leg. " + (x.legajo || "?"))) + ' · ' + cuando + (x.tanda ? " · " + escapeHtml(x.tanda) : "") + '</div>' +
         '<div class="cg-btns"><button class="cg-ok" title="Ajustar la góndola a lo contado" onclick="cgResolver(' + i + ',true)">✓</button>' +
@@ -64661,10 +64661,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.85"></script>
-<script src="hotsale.js?v=28.85"></script>
-<script src="estadisticas.js?v=28.85"></script>
-<script src="ads.js?v=28.85"></script>
+<script src="cobranzas.js?v=28.86"></script>
+<script src="hotsale.js?v=28.86"></script>
+<script src="estadisticas.js?v=28.86"></script>
+<script src="ads.js?v=28.86"></script>
 
 </body>
 </html>

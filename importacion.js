@@ -3,6 +3,9 @@
    (los onclick="..." inline y los tests lo llaman por nombre) y comparte el scope léxico global con
    index.html. Se carga justo después del <script> principal: nada de acá corre al cargar salvo
    declaraciones con literales, y nada del index lo llama al cargar. */
+/* v28.84 (Luis, D10/D11, tanda 3): el código se MUESTRA con el cero adelante (058, no 58). Sólo la vista:
+   las claves y lo que se manda siguen como están. _padCod vive en index.html; sin él, el código tal cual. */
+function _impPad(c) { return typeof _padCod === "function" ? _padCod(c) : String(c == null ? "" : c); }
 /* v9.11/v9.12 — Módulo "Proveedor de importación": revisar/corregir el proveedor chino de cada
    artículo IMPORTADO. Lee y escribe el MAESTRO real `Importados` (vía vista_prov_importacion:
    una fila por cod_art de los activos, con su proveedor actual, ya cargado). Al tocar el
@@ -77,7 +80,7 @@ function _provImpRender() {
     if (cur && provs.indexOf(cur) < 0) opts += '<option value="' + escapeHtml(cur) + '" selected>' + escapeHtml(cur) + '</option>';
     const sel = '<select onchange="provImpSet(\'' + encodeURIComponent(cod) + '\',this.value)" style="padding:5px 8px;border:1px solid ' + (cur ? '#16a34a' : '#f59e0b') + ';border-radius:8px;font-size:12.5px;background:' + (cur ? '#f0fdf4' : '#fffbeb') + ';font-weight:700;color:#0f172a;max-width:160px">' + opts + '</select>';
     const mk = r.marca ? ' <span style="color:#94a3b8;font-size:10.5px;font-weight:700">' + escapeHtml(String(r.marca)) + '</span>' : '';
-    return '<tr' + (cur ? '' : ' style="background:#fffbeb"') + '><td><b>' + escapeHtml(cod) + '</b>' + mk + '</td><td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(artNombre(cod, r.descripcion) || "") + '">' + escapeHtml(artNombre(cod, r.descripcion) || "—") + '</td><td>' + sel + '</td></tr>';
+    return '<tr' + (cur ? '' : ' style="background:#fffbeb"') + '><td><b>' + escapeHtml(_impPad(cod)) + '</b>' + mk + '</td><td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(artNombre(cod, r.descripcion) || "") + '">' + escapeHtml(artNombre(cod, r.descripcion) || "—") + '</td><td>' + sel + '</td></tr>';
   }).join("") + '</tbody></table></div>';
   body.innerHTML = h;
   if (_stkPop._focusQ) { const qi = document.getElementById("provImpQ"); if (qi) { qi.focus(); try { qi.setSelectionRange(qi.value.length, qi.value.length); } catch (_e) {} } }
@@ -723,7 +726,7 @@ function _impCfgRender() {
         const _ac = _impCfgArt[String(a.cod).trim().toUpperCase()] || {};
         const _der = (_ac.derechos_pct == null) ? "" : _impCfgPctTxt(_ac.derechos_pct);
         return '<div style="display:flex;align-items:center;gap:8px;padding:6px 13px 6px 10px;border-bottom:1px solid #f1f5f9">' +
-          '<b style="font-size:15px;min-width:74px">' + esc(String(a.cod)) + '</b>' +
+          '<b style="font-size:15px;min-width:74px">' + esc(_impPad(a.cod)) + '</b>' +
           '<span style="font-size:13.5px;color:#475569;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
           '<input value="' + esc(_der) + '" placeholder="' + _impCfgPctTxt(_impProvNum(prov, "derechos_pct", g.derechos_pct)) + '" onchange="pedImpCfgArtDer(\'' + encodeURIComponent(String(a.cod)) + '\',this.value)" title="Derechos de este artículo, en porcentaje (35 = 35%). Vacío = el del proveedor." style="width:62px;text-align:center;padding:4px 6px;border:1px solid ' + (_der ? '#0f766e' : '#cbd5e1') + ';border-radius:7px;font-size:14px;font-weight:800;background:' + (_der ? '#f0fdfa' : '#fff') + '">' +
           '<span style="font-size:12px;color:#94a3b8;font-weight:700">% der.</span>' +
@@ -737,7 +740,7 @@ function _impCfgRender() {
         : (otros.length ? otros.map(function (a) {
           const act = String(a.proveedor || "").trim();
           return '<div style="display:flex;align-items:center;gap:8px;padding:6px 13px 6px 10px;border-bottom:1px solid #f1f5f9">' +
-            '<b style="font-size:15px;min-width:74px">' + esc(String(a.cod)) + '</b>' +
+            '<b style="font-size:15px;min-width:74px">' + esc(_impPad(a.cod)) + '</b>' +
             '<span style="font-size:13.5px;color:#475569;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
             (act ? '<span style="font-size:10.5px;font-weight:800;color:#b45309;background:#fffbeb;border-radius:999px;padding:1px 7px" title="Hoy es de ' + esc(act) + ': al agregarlo se lo saca de ahí">' + esc(act) + '</span>' : '') +
             '<button onclick="pedImpCfgCodigo(\'' + encodeURIComponent(String(a.cod)) + '\',\'' + encodeURIComponent(prov) + '\')" style="background:#dcfce7;color:#166534;border:0;border-radius:7px;padding:4px 13px;font-weight:800;font-size:15px;cursor:pointer">+</button></div>';
@@ -892,7 +895,7 @@ async function pedImpStockDesglose(keyEnc, foco) {
           (fac !== 1 && it.stockGp2U > 0 ? ' · le toca el <b>' + Math.round(fac * 100) + ' %</b> de ' + f(it.stockGp2U / fac) + ' u' : ''));
       }
       if (it.stockConvU > 0 || conv) {
-        const cc = conv ? conv.map(function (e) { return escapeHtml(e.cod_art + ' ' + e.empresa); }).join(' + ') : '';
+        const cc = conv ? conv.map(function (e) { return escapeHtml(_impPad(e.cod_art) + ' ' + e.empresa); }).join(' + ') : '';
         h += tr('🔁 Se convierte' + (cc ? ' · <b class="imp-conv-cod" style="font-size:17px;color:#7c3aed">' + cc + '</b>' : ''), f(it.stockConvU || 0),
           'stock disponible en Virgilio de ' + (cc ? '<b>' + cc + '</b>' : 'otro código') + ', que se puede convertir en este');
       }
@@ -1307,7 +1310,7 @@ function _pedHechoRenderCuerpo(soloTabla) {
     var keyEnc = encodeURIComponent(r.key);
     var mBadge = r.marca ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:' + (r.marca === "CH" ? "#b45309" : "#1e6bd6") + ';border-radius:999px;padding:1px 7px" title="Este artículo se compra por LK o por CH: cargá las unidades en la fila de la marca que pediste">' + escapeHtml(r.marca) + '</span>' : '';
     return '<tr id="phTr' + i + '"' + (uni > 0 ? ' class="on"' : '') + '>' +
-      '<td class="phc-cod">' + escapeHtml(it.cod) + mBadge + '</td>' +
+      '<td class="phc-cod">' + escapeHtml(_impPad(it.cod)) + mBadge + '</td>' +
       '<td class="phc-desc" style="color:#475569">' + escapeHtml(String(artNombre(it.cod, it.desc) || "").slice(0, 34)) + '</td>' +
       '<td class="num" style="color:#64748b">' + (it.uniMaster > 0 ? _pedHechoFmt(it.uniMaster) : (it.uxc > 0 ? _pedHechoFmt(it.uxc) + '*' : '—')) + '</td>' +
       '<td class="num"><input class="phc-uni" inputmode="numeric" value="' + (uni > 0 ? uni : "") + '" oninput="pedHechoSetUni(\'' + keyEnc + '\',this.value,' + i + ')" placeholder="0"></td>' +
@@ -1332,7 +1335,7 @@ function _pedHechoPreview() {
       if (!l.it || !l.det) return '<tr><td class="phc-cod">' + escapeHtml(l.cod) + '</td><td colspan="4" class="phc-bad">' + escapeHtml(l.err) + '</td></tr>';
       var alerta = (_pedHecho.prov && (l.it.prov || "(sin proveedor)") !== _pedHecho.prov) ? ' <span class="phc-warn" title="Este código es de ' + escapeHtml(l.it.prov || "") + '">⚠ otro proveedor</span>' : '';
       var mTxt = (l.marca && _pedHechoMarcas(l.it).length > 1) ? ' <b style="color:' + (l.marca === "CH" ? "#b45309" : "#1e6bd6") + '">' + escapeHtml(l.marca) + '</b>' : '';
-      return '<tr' + (l.uni > 0 ? ' class="on"' : '') + '><td class="phc-cod">' + escapeHtml(l.it.cod) + mTxt + '</td>' +
+      return '<tr' + (l.uni > 0 ? ' class="on"' : '') + '><td class="phc-cod">' + escapeHtml(_impPad(l.it.cod)) + mTxt + '</td>' +
         '<td class="phc-desc" style="color:#475569">' + escapeHtml(String(artNombre(l.it.cod, l.it.desc) || "").slice(0, 30)) + alerta + '</td>' +
         '<td class="num">' + (l.uni > 0 ? _pedHechoFmt(l.uni) : '<span class="phc-bad">0</span>') + '</td>' +
         '<td class="num">' + _pedHechoDiv(l.uni, l.it.uxc) + '</td>' +
@@ -3271,7 +3274,7 @@ function _impAltaRender() {
   let h = _impTabsHtml('alta');
   if (A.ok) {
     const o = A.ok;
-    h += '<div class="iaf"><div class="iaf-ok">✓ <b>' + escapeHtml(o.cod) + '</b> (' + escapeHtml(o.marca) + ') ' + (o.alta ? 'quedó dado de alta' : 'quedó modificado') + ' con ' + escapeHtml(o.prov) + '.' +
+    h += '<div class="iaf"><div class="iaf-ok">✓ <b>' + escapeHtml(_impPad(o.cod)) + '</b> (' + escapeHtml(o.marca) + ') ' + (o.alta ? 'quedó dado de alta' : 'quedó modificado') + ' con ' + escapeHtml(o.prov) + '.' +
       (o.mc > 0 ? ' Primer pedido: <b>' + fm(o.mc) + ' MC</b> (' + fm(o.uni) + ' u), figura en 📦 Pedidos.' : '') +
       '<div style="margin-top:4px;font-size:13px">Cargado en: ' + escapeHtml(o.hechos.join(" · ")) + '. Stocks lo muestra en hasta 2 min (lo que tarda en refrescarse).</div></div>' +
       '<div class="iaf-bar"><button class="stk-btn" onclick="_impAlta=null;openPedidosImportacion()">📦 Ver en Pedidos</button>' +
@@ -3301,7 +3304,7 @@ function _impAltaRender() {
   const enCurso = Number(o.en_curso) || 0;
   h += (mod ? '<div style="text-align:center;margin:0 0 8px"><button class="stk-btn" onclick="impAltaModo(\'mod\')">↩ Elegir otro</button></div>' : '') +
     '<div class="iaf-sec">Producto</div><div class="iaf-g">' +
-      '<div>' + lbl("Código") + (mod ? '<b style="font-size:18px">' + escapeHtml(v.cod || "") + '</b>' : inp("cod", "999E", false, 90)) + '</div>' +
+      '<div>' + lbl("Código") + (mod ? '<b style="font-size:18px">' + escapeHtml(_impPad(v.cod || "")) + '</b>' : inp("cod", "999E", false, 90)) + '</div>' +
       '<div>' + lbl("Empresa") + marcaSel + '</div>' +
       '<div>' + lbl("Proveedor") + provSel + '</div>' +
       '<div style="flex:1 1 100%">' + lbl("Descripción") + '<input data-k="descripcion" value="' + val("descripcion") + '" style="width:100%" oninput="_impAltaCambio(\'descripcion\')"></div>' +
