@@ -8405,4 +8405,4 @@ aaa_gv_anon_bloqueo`) o escribir por una RPC SECURITY DEFINER. `sql/gv_anon_inse
   `tests/tv-clave-login.cjs` (e).
 
 - **v28.69 (Luis, 08/10): un celular con el 600 compartido y el nombre de un EMPLEADO ACTIVO registra con SU legajo** (trigger `aa_gv_registro_entrevista_a_empleado`). Caso Kevin Latronico (504). `sql/gv_registro_entrevista_a_empleado_v2869.sql`.
-  **v28.70**: el evento 600 SIN nombre (PKC…) toma el legajo del ingreso de hoy de ese mismo celular.
+  **v28.71**: el evento 600 SIN nombre (PKC…) toma el legajo del ingreso de hoy de ese mismo celular.
