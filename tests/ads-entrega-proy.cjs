@@ -26,5 +26,8 @@ c = vm.runInContext(`_ads.epOc = {}; _ads.epOc[_adsEpKey("Garcia", "550", "2026-
 if (c.estH !== 25) fallas.push("un dato de una OC vieja no cuenta: " + c.estH);
 if (/\.map\(_adsN\)/.test(src)) fallas.push("v28.84: .map(_adsN) le pasa el índice como decimales (87,0 en la 2.ª fila)");
 if (c.estXY.length && c.estXY[0].pend !== "5*") fallas.push("v28.84: en pantalla sólo X: " + c.estXY[0].pend);
+// v28.86: el % sale del período CERRADO si lo hay (Garcia: 40 de 100 → 50 × 40 % = 20 − 5 = 15)
+c = vm.runInContext(`_ads.epOc = {}; _ads.tallCerr = { "GARCIA|550": { pedido: 100, entregado: 40 } }; var _r = _adsStockCalc({ cod: "550", saldo10: -5 }, 10); _ads.tallCerr = null; _r`, ctx);
+if (c.estXY[0].pend !== "15*") fallas.push("v28.86 % del período cerrado: " + c.estXY[0].pend);
 if (fallas.length) { console.error("✗ ads-entrega-proy\n  " + fallas.join("\n  ")); process.exit(1); }
 console.log("✓ ADS: Entrega est. usa la entrega proy. cargada en la OC vigente; sin dato, OC × %");

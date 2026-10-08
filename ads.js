@@ -147,6 +147,14 @@ function _adsCargarTall() {
     else _ads.tall = r.data;
     _adsRender();
   });
+  // v28.86 (Luis, 08/10): el % para PROYECTAR la OC vigente sale del último período CERRADO (sin la OC vigente):
+  // con la vigente adentro, lo que ya llegó de ella entraba al % y después se restaba (Garcia 550: 247 × 14 % − 35 = 0).
+  _ads.tallCerr = null;
+  _adsRpc("gv_ads_talleristas", { p_n: _ads.n, p_incluir_actual: false }).then(function (r) {
+    if (r.error || !Array.isArray(r.data)) return;
+    var m = {}; r.data.forEach(function (x) { m[String(x.proveedor).toUpperCase() + "|" + String(x.codigo).toUpperCase()] = x; });
+    _ads.tallCerr = m; if (_ads.stock) _adsRender();
+  });
 }
 /* v28.44 (Luis): la ENTREGA PROY. que se carga a mano en la OC vigente (consultándole al tallerista,
    Ordenes_Compra.gv_entrega_proy) manda sobre la estimación por ritmo. Clave proveedor|código|fecha de la OC.
@@ -337,7 +345,10 @@ function _adsStockCalc(r, H) {
   // cantidad de la OC vigente × el % que viene entregando en el período. Menos lo que ya recibió de esa OC (ya es stock).
   pc.forEach(function (x) {
     if (ultOc && String(x.ult_fecha || "").slice(0, 10) !== ultOc) return;
-    var ped = Number(x.pedido) || 0, ent = Number(x.entregado) || 0, pct = ped > 0 ? Math.min(1, ent / ped) : 0;
+    var ped = Number(x.pedido) || 0, ent = Number(x.entregado) || 0;
+    var cer = (typeof _ads !== "undefined" && _ads.tallCerr) ? _ads.tallCerr[String(x.proveedor).toUpperCase() + "|" + String(r.cod).toUpperCase()] : null;
+    if (cer && Number(cer.pedido) > 0) { ped = Number(cer.pedido); ent = Number(cer.entregado) || 0; }   // v28.86: % del último período cerrado
+    var pct = ped > 0 ? Math.min(1, ent / ped) : 0;
     var cant = Number(x.ult_cant) || 0, rec = Number(x.ult_rec) || 0;
     var ep = (typeof _ads !== "undefined" && _ads.epOc && typeof _adsEpKey === "function") ? _ads.epOc[_adsEpKey(x.proveedor, r.cod, ultOc)] : null;
     var oc = ep != null && isFinite(ep), e;

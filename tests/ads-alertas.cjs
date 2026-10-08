@@ -37,7 +37,7 @@ const STOCK = [
     window.sb = { rpc: async (n, a) => {
       if (modo === "vacio") return { data: [], error: null };
       if (n === "gv_ads_config") return { data: { n_ocs: 7, umbral: 0.5, incluir_actual: false }, error: null };
-      if (n === "gv_ads_talleristas") { window.__incArg = a && a.p_incluir_actual; return { data: TALL, error: null }; }
+      if (n === "gv_ads_talleristas") { if (a && a.p_incluir_actual) window.__incArg = true; /* v28.86: hay una 2.ª llamada con false */ return { data: TALL, error: null }; }
       if (n === "gv_ads_oc_fechas") return { data: [{ n: 1, fecha: "2026-10-07" }, { n: 2, fecha: "2026-09-30" }], error: null };
       if (n === "gv_ads_stock3") return { data: STOCK, error: null };
       if (n === "gv_ads_badge") return { data: 1, error: null };
