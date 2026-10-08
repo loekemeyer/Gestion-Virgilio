@@ -6,6 +6,8 @@
      (b) en el celular, una clave incorrecta NO deja pasar;
      (c) la clave correcta muestra la lista de nombres y tocar uno entra con ese legajo;
      (d) «+ No estoy en la lista» muestra el legajo; y el legajo sin clave NO entra.
+     (e) v28.66 (Luis): «Soy otro» → legajo (entra con ese legajo; 600 / 6001-6999 no); «No tengo legajo» →
+         nombre, que entra con el legajo de entrevista PROPIO que devuelve gv_operario_alta_crear (6003).
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -46,6 +48,7 @@ const OPS = [{ legajo: "104", nombre: "Jhonny Cartaya" }, { legajo: "77", nombre
       const j = body.p_clave === CLAVE ? { ok: true, operarios: OPS } : { ok: false };
       return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(j) });
     }
+    if (/rpc\/gv_operario_alta_crear/.test(u)) return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ id: 3, nombre: "Zzz Candidato", legajo: "6003", tipo: "entrevista" }) });
     if (/Empleados\?/.test(u)) return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ Legajo: "300", Empleado: "Nuevo Operario" }]) });
     return r.abort();
   });
@@ -77,6 +80,25 @@ const OPS = [{ legajo: "104", nombre: "Jhonny Cartaya" }, { legajo: "77", nombre
     out.porLegajo = ses();
     out.nombreVisible = vis("tvLegajoStep") && !!document.getElementById("nombreLoginInput");
     localStorage.removeItem("vir_legajo_auth");
+    // (e) «Soy otro» → legajo
+    out.soyOtro = /Soy otro/.test(document.getElementById("tvNombreStep").textContent);
+    window.tvMostrarLegajoNum();
+    out.legNumVis = vis("tvLegNumStep") && !vis("tvNombreStep");
+    document.getElementById("tvLegajoNumInput").value = "600";
+    await window.loginConLegajoTv();
+    out.leg600 = ses();
+    document.getElementById("tvLegajoNumInput").value = "300";
+    await window.loginConLegajoTv();
+    out.leg300 = ses();
+    localStorage.removeItem("vir_legajo_auth");
+    // (e) «No tengo legajo» → nombre → legajo propio de entrevista
+    out.noTengo = /No tengo legajo/.test(document.getElementById("tvLegNumStep").textContent);
+    window.tvMostrarLegajo();
+    document.getElementById("nombreLoginInput").value = "Zzz Candidato";
+    await window.loginConNombre();
+    out.entrev = ses();
+    out.esEntrev = typeof esLegajoEntrevista === "function" && esLegajoEntrevista("6003") && esLegajoEntrevista("600") && !esLegajoEntrevista("504");
+    localStorage.removeItem("vir_legajo_auth");
     // (c) elegir nombre
     window.tvElegirOperario({ legajo: "104", nombre: "Jhonny Cartaya" });
     out.porNombre = ses();
@@ -87,6 +109,8 @@ const OPS = [{ legajo: "104", nombre: "Jhonny Cartaya" }, { legajo: "77", nombre
   ok(!res.mala.lista && /incorrecta/i.test(res.mala.err), "(b) clave incorrecta no deja pasar");
   ok(res.buena.lista && res.buena.btns.join("|") === "Jhonny Cartaya|Juan Perez", "(c) clave buena muestra los nombres: " + res.buena.btns.join(", "));
   ok(res.mas.legajo && !res.mas.lista && res.nombreVisible && !res.porLegajo, "(d) «+» muestra el nombre (v27.37), no un legajo");
+  ok(res.soyOtro && res.legNumVis && !res.leg600 && res.leg300 && res.leg300.legajo === "300", "(e) «Soy otro» pide el legajo y entra con él (600 no)");
+  ok(res.noTengo && res.entrev && res.entrev.legajo === "6003" && /Zzz Candidato/.test(res.entrev.nombre || "") && res.esEntrev, "(e) sin legajo → nombre con legajo de entrevista propio (6003)");
   ok(res.porNombre && res.porNombre.legajo === "104" && /104/.test(res.sesion || ""), "(c) tocar el nombre entra con su legajo");
   ok(!errs.length, "sin errores de JS" + (errs.length ? ": " + errs[0] : ""));
   await b.close();

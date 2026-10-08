@@ -8391,3 +8391,15 @@ aaa_gv_anon_bloqueo`) o escribir por una RPC SECURITY DEFINER. `sql/gv_anon_inse
 - La usan `generar_ocs_automaticas` (marcador `v28.61-oc-chica`) y el generador manual (`ocgEnter`: a pedir 0 y la nota
   «⏸ N OC de menos de 10 cajas no se piden»; si la lectura falla lo dice). Al 08/10 frena 18 códigos.
 - `sql/gv_oc_chica_frenada_v2861.sql`, `tests/oc-chica-gondola.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-08, v28.67): LOGIN = clave de la TV → lista · «Soy otro» → legajo · sin legajo → nombre (ENTREVISTA con legajo PROPIO)
+
+- Clave de 4 dígitos de la TV → lista de nombres → **«＋ Soy otro»** → tipea el **legajo** (`loginConLegajoTv`, metodo
+  `clave_tv`; 0, 1, 600 y 6001-6999 no entran) → **«No tengo legajo»** → tipea el nombre (`loginConNombre`). Retira el
+  «sin campo de legajo» de la v27.56: el legajo vuelve, pero SÓLO después de la clave de la TV.
+- **Cada entrevistado tiene SU legajo: 6000 + id de `GV_Operario_Alta` (6001-6999)**, dado de alta en `Empleados` como
+  «<nombre> (entrevista)»: el monitor lo muestra por nombre y no mezcla a los entrevistados. Si el nombre tipeado es el de
+  un empleado activo, entra con el legajo de ese empleado (caso Kevin Latronico = 504). Lo hace `gv_operario_alta_crear`;
+  `es_legajo_entrevista` / `esLegajoEntrevista` aceptan 600 (viejo, de respaldo si la RPC no contesta) y 6001-6999; al
+  validarlo, `gv_operario_alta_validar` desactiva el legajo de entrevista. `sql/gv_entrevista_legajo_propio_v2867.sql`,
+  `tests/tv-clave-login.cjs` (e).

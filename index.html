@@ -6395,7 +6395,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.66"></script>
+<script type="module" src="recepcion.js?v=28.67"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6464,7 +6464,14 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <div id="tvNombreStep" class="hidden">
         <div class="tvclave-lbl">¿Quién sos?</div>
         <div id="tvNombreLista"></div>
-        <button class="tvnom-mas" onclick="tvMostrarLegajo()">＋ No estoy en la lista</button>
+        <button class="tvnom-mas" onclick="tvMostrarLegajoNum()">＋ Soy otro</button>
+      </div>
+      <!-- v28.66 (Luis, 08/10): «Soy otro» → el legajo; sin legajo → el nombre (entrevista, con legajo propio). -->
+      <div id="tvLegNumStep" class="hidden">
+        <div class="tvclave-lbl">Tu legajo</div>
+        <input id="tvLegajoNumInput" type="number" inputmode="numeric" autocomplete="off" placeholder="Legajo" onkeydown="if(event.key==='Enter')loginConLegajoTv()">
+        <button class="primary-btn" onclick="loginConLegajoTv()">Entrar</button>
+        <button class="tvnom-mas" style="margin-top:12px" onclick="tvMostrarLegajo()">No tengo legajo</button>
       </div>
       <div id="tvLegajoStep" class="hidden">
         <!-- v27.37 (Thomas): el que no está en la lista tipea su nombre y entra; queda para que un admin lo valide.
@@ -10319,7 +10326,10 @@ function esOperadorPrueba() { try { const el = document.getElementById("legajoIn
    cada evento se sella con ese nombre (columna gv_nombre_prueba). Espejo del
    backend es_legajo_entrevista(). */
 const INTERVIEW_LEGAJO = "600";
-function esLegajoEntrevista(leg) { return String(leg == null ? "" : leg).trim() === INTERVIEW_LEGAJO; }
+function esLegajoEntrevista(leg) {   // v28.66: 600 compartido (viejo) o el legajo propio de cada entrevistado (6001-6999)
+  const s = String(leg == null ? "" : leg).trim();
+  return s === INTERVIEW_LEGAJO || (/^6\d{3}$/.test(s) && +s >= 6001 && +s <= 6999);
+}
 /* Nombre del candidato de la sesión de entrevista (sólo si el legajo logueado es 600).
    Lee localStorage directo (la sesión de legajo la escribe el módulo de auth, cuyo
    scope no es visible desde este script clásico). La clave espeja LEGAJO_AUTH_KEY. */
@@ -10676,7 +10686,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.66";
+const APP_VERSION = "v28.67";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -45700,7 +45710,7 @@ async function voValidar(id) {
   const inp = document.getElementById("voLeg" + id);
   const leg = inp ? String(inp.value || "").replace(/\D/g, "") : "";
   if (!leg) { voSetStatus("Poné el número de legajo que le vas a dar.", false); return; }
-  if (leg === "0" || leg === "1" || leg === "600") { voSetStatus("Ese legajo no se puede usar (0, 1 ni 600).", false); return; }
+  if (leg === "0" || leg === "1" || esLegajoEntrevista(leg)) { voSetStatus("Ese legajo no se puede usar (0, 1, 600 ni 6001-6999).", false); return; }
   voSetStatus("Validando…");
   try {
     const r = await sb.rpc("gv_operario_alta_validar", { p_id: id, p_legajo: leg });
@@ -61695,7 +61705,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.66"></script>
+<script src="importacion.js?v=28.67"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62397,7 +62407,7 @@ let __tvClaveOkAt = 0;
 const TV_CLAVE_VALIDA_MS = 10 * 60 * 1000;   // una vez validada, 10 min para elegir nombre/legajo
 function _tvClaveVigente() { return __tvClaveOkAt && (Date.now() - __tvClaveOkAt) < TV_CLAVE_VALIDA_MS; }
 function _tvPaso(cual) {
-  ["tvClaveStep", "tvNombreStep", "tvLegajoStep", "tvCervStep"].forEach(function (id) { const e = $(id); if (e) e.classList.toggle("hidden", id !== cual); });
+  ["tvClaveStep", "tvNombreStep", "tvLegNumStep", "tvLegajoStep", "tvCervStep"].forEach(function (id) { const e = $(id); if (e) e.classList.toggle("hidden", id !== cual); });
 }
 window.loginConClaveTv = async function () {
   const errEl = $("legajoLoginError"); if (errEl) errEl.textContent = "";
@@ -62423,7 +62433,26 @@ window.loginConClaveTv = async function () {
       lista.appendChild(b);
     });
   }
-  _tvPaso((j.operarios || []).length ? "tvNombreStep" : "tvLegajoStep");
+  _tvPaso((j.operarios || []).length ? "tvNombreStep" : "tvLegNumStep");
+};
+/* v28.66 (Luis, 08/10): «Soy otro» → tipea el legajo (después de la clave de la TV). */
+window.tvMostrarLegajoNum = function () {
+  _tvPaso("tvLegNumStep");
+  setTimeout(function () { try { $("tvLegajoNumInput").focus(); } catch (_e) {} }, 40);
+};
+window.loginConLegajoTv = async function () {
+  const errEl = $("legajoLoginError"); if (errEl) errEl.textContent = "";
+  if (!_tvClaveVigente()) { _tvPaso("tvClaveStep"); if (errEl) errEl.textContent = "Volvé a poner el código de la TV."; return; }
+  const leg = String(($("tvLegajoNumInput") || {}).value || "").trim();
+  if (!/^\d+$/.test(leg)) { if (errEl) errEl.textContent = "Poné tu número de legajo."; return; }
+  if (leg === "0" || leg === "1" || esLegajoEntrevista(leg)) { if (errEl) errEl.textContent = "Ese legajo no se usa para entrar. Si no tenés legajo, tocá «No tengo legajo»."; return; }
+  const emp = await resolveEmpleadoByLegajo(leg);
+  if (!emp) { if (errEl) errEl.textContent = "No encuentro ese legajo (o no hay conexión). Si no tenés legajo, tocá «No tengo legajo»."; return; }
+  saveLegajoSession(emp, todayKeyBsAs() || "");
+  __identity = { type: "operario", emp: emp, nombre: emp.nombre || ("Legajo " + emp.legajo) };
+  __plantChosen = false;
+  window.__gvLoginMetodo = "clave_tv";
+  _routeAfterAuth();
 };
 window.tvMostrarLegajo = function () {
   _tvPaso("tvLegajoStep");
@@ -62475,15 +62504,20 @@ window.loginConNombre = async function () {
   if (errEl) errEl.textContent = "";
   const nombre = input ? String(input.value || "").replace(/\s+/g, " ").trim() : "";
   if (nombre.length < 3) { if (errEl) errEl.textContent = "Poné tu nombre y apellido."; return; }
+  // v28.66 (Luis, 08/10): cada entrevistado entra con SU legajo (6001-6999) y el monitor lo muestra por nombre;
+  // si el nombre ya es de un empleado, entra con el legajo de ese empleado. Sin respuesta, el 600 compartido.
+  let j = null;
   try {
     let disp = ""; try { disp = (typeof gvDispositivoId === "function") ? gvDispositivoId() : ""; } catch (_e) {}
-    fetch(SB_URL + "/rest/v1/rpc/gv_operario_alta_crear", { method: "POST",
+    const r = await fetch(SB_URL + "/rest/v1/rpc/gv_operario_alta_crear", { method: "POST",
       headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" },
       body: JSON.stringify({ p_nombre: nombre, p_dispositivo: disp }) });
-  } catch (_e) {}
-  const emp = { legajo: INTERVIEW_LEGAJO, nombre: nombre };
+    j = r.ok ? await r.json() : null;
+  } catch (_e) { j = null; }
+  const legRpc = j && j.legajo ? String(j.legajo).trim() : "";
+  const emp = { legajo: legRpc || INTERVIEW_LEGAJO, nombre: (j && j.nombre) || nombre };
   saveLegajoSession(emp, todayKeyBsAs() || "");
-  __identity = { type: "operario", emp: emp, nombre: nombre };
+  __identity = { type: "operario", emp: emp, nombre: emp.nombre };
   __plantChosen = false;
   window.__gvLoginMetodo = "nombre";
   _routeAfterAuth();
@@ -64600,10 +64634,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.66"></script>
-<script src="hotsale.js?v=28.66"></script>
-<script src="estadisticas.js?v=28.66"></script>
-<script src="ads.js?v=28.66"></script>
+<script src="cobranzas.js?v=28.67"></script>
+<script src="hotsale.js?v=28.67"></script>
+<script src="estadisticas.js?v=28.67"></script>
+<script src="ads.js?v=28.67"></script>
 
 </body>
 </html>

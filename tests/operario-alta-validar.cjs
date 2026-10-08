@@ -12,7 +12,7 @@ exige(/id="nombreLoginInput"/, "falta el input de nombre en el login");
 exige(/onclick="loginConNombre\(\)"/, "falta el botón «Entrar con mi nombre»");
 exige(/window\.loginConNombre = async function/, "falta la función loginConNombre");
 exige(/rpc\/gv_operario_alta_crear/, "loginConNombre no registra el alta (gv_operario_alta_crear)");
-exige(/const emp = \{ legajo: INTERVIEW_LEGAJO, nombre: nombre \};/, "el login por nombre no usa el legajo 600 (nombre sellado)");
+exige(/const emp = \{ legajo: legRpc \|\| INTERVIEW_LEGAJO,/, "el login por nombre no usa el legajo de entrevista propio (v28.66; 600 de respaldo)");
 
 // --- Admin: botón en Configuración + overlay + funciones ---
 exige(/onclick="cfgGo\(openValidarOperarios\)"/, "falta el botón «Validar Operarios» en Configuración");
@@ -24,7 +24,7 @@ exige(/sb\.rpc\("gv_operario_alta_sacar"/, "no saca (gv_operario_alta_sacar)");
 // el badge de pendientes se refresca al abrir Configuración
 exige(/voLoadBadge\(\);.*v27\.37|try \{ voLoadBadge\(\); \} catch/, "Configuración no refresca el badge de pendientes");
 // no se puede validar con un legajo prohibido (lo frena el front además del backend)
-exige(/leg === "0" \|\| leg === "1" \|\| leg === "600"/, "voValidar no bloquea legajo 0/1/600");
+exige(/leg === "0" \|\| leg === "1" \|\| esLegajoEntrevista\(leg\)\) \{ voSetStatus/, "voValidar no bloquea legajo 0/1/600/6001-6999");
 
 if (fallas.length) { console.log("operario-alta-validar: ✗ FAIL\n  - " + fallas.join("\n  - ")); process.exit(1); }
 console.log("operario-alta-validar: estático ✓ OK");
