@@ -1050,7 +1050,7 @@ el "mismo día para el cliente" del principio rector, el ancla de cliente v20.27
 |---|---|
 | plazo | entrada del pedido + **14 días corridos**; por **expreso + 13**. Hacia atrás al día con reparto |
 | fecha mínima | la de siempre: `gv_ppp_web_dia_minimo` (4 hábiles, calculado al mediodía) |
-| 1 | si su **grupo** (Capital Sur Z1 · Capital Centro Z2 · Capital Oeste Z3, juntas si cada una < 1 m³ · GBA Sur · GBA Oeste · GBA Norte Z6+Z7) ya sale un día del plazo → **ese**, sin mirar el cupo (el 4,30 m³ es promedio, no techo) |
+| 1 | si su **grupo** (Capital Sur Z1 · Capital Centro Z2 · Capital Oeste Z3, juntas si cada una < 1 m³ · GBA Sur · GBA Oeste · GBA Norte Z6+Z7) ya sale en uno o más días del plazo → **el MENOS cargado de ésos** (m³ del día entero, web + ISIS; v28.55, Luis 08/10: *"distribuí para que queden equilibrados"*; antes iba al primero sin mirar el cupo y el 15/10 juntó 16,57 m³) |
 | 2 | si no, el **último día LIBRE** del plazo (sin ningún grupo de reparto), para que los pedidos del grupo que entren después se sumen |
 | 3 | si todos los días del plazo tienen otro grupo → **gana el cliente**: el día con menos grupos (segundo camión / flete) |
 | 4 | ya vencido → lo antes posible, aunque mezcle grupos: el rezagado no se traba |
