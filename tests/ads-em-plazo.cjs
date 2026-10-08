@@ -2,7 +2,7 @@
 // con los días del promedio de 2 semanas (gv_ads_config.lead_dias) o fijados a mano (gv_ads_lead_guardar).
 const fs = require("fs"), vm = require("vm");
 const src = fs.readFileSync(__dirname + "/../ads.js", "utf8");
-const sql = fs.readFileSync(__dirname + "/../sql/gv_ads_em_plazo_v2856.sql", "utf8");
+const sql = fs.readFileSync(__dirname + "/../sql/gv_ads_em_plazo_v2857.sql", "utf8");
 const fallas = [];
 const ctx = { window: {}, document: { getElementById: () => null }, console, Date, Math, Number, String, isFinite, Promise, Object };
 vm.createContext(ctx); vm.runInContext(src, ctx);
