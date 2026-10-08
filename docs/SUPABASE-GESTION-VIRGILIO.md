@@ -31793,3 +31793,19 @@ igual) es decisión de la persona y no cambia; «movido a mano» cuenta como man
 - Chequeo (vacío = bien): ver el final de `sql/gv_anon_sin_delete_v2850.sql`. Rollback por tabla:
   `alter policy delete_all on public."<tabla>" to anon, authenticated;`
 - Queda del problema 596: los INSERT de anon y las RPC que escriben sin chequeo.
+
+## §3.v2852 — la clave pública ya no ESCRIBE en 58 tablas, y si lo intenta AVISA (Thomas, 08/10, D9 · problema 596)
+
+- Relevamiento: 112 tablas de public tenían INSERT efectivo para anon (grant + policy). En `pg_stat_statements`
+  (desde el 01/10) anon insertó en **14** (operario: Registros, Picking paso, Cervantes, Etiquetas_Lio, Movimientos_Stock,
+  Entregas_Virgilio, db_n8n_espejo, Dispositivo_Login, Impresion_NP, Guardado_Sesiones, Auditorias, Camioneros,
+  errores_cliente). **40** las escribe el código (o un usuario logueado) sin anon en 7 días: quedan para revisar (D10).
+  **58** sin escritura en el código ni de anon: cerradas.
+- Cómo: trigger `aaa_gv_anon_bloqueo` (BEFORE INSERT) → `gv_anon_insert_bloquear()` (definer, mira el GUC `role`).
+  Si es anon: descarta la fila, la guarda entera en **`GV_Anon_Insert_Bloqueado`** (con los headers del request) y
+  manda Telegram (dedup por tabla y hora). authenticated / service_role / postgres siguen igual. No es REVOKE a
+  propósito: un REVOKE no deja rastro.
+- Probado en transacción abortada: anon 0 filas, log 1, Telegram 1; postgres inserta.
+- Lectura: `select * from public."GV_Anon_Insert_Bloqueado" order by ts desc;` (vacía = nadie lo intentó).
+- Rollback: una tabla `alter table public."<t>" disable trigger aaa_gv_anon_bloqueo;` · todas
+  `select public.gv_anon_bloqueo_instalar(false);`. Centinela 370. `sql/gv_anon_insert_bloqueo_v2852.sql`.

@@ -12,9 +12,19 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_ads_stock2",
+      "regla": "ADS saldo = disponible - el mayor entre comprometido y Est. Madre del horizonte (no la suma: el comprometido ya es parte de la Est. Madre)",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_alerta_gondola_llena_telegram",
       "regla": "guardar en gondola por encima de la capacidad avisa por Telegram (no frena el guardado)",
       "quien": "Luis"
+    },
+    {
+      "objeto": "gv_anon_insert_bloquear",
+      "regla": "La clave pública no escribe en las 58 tablas cerradas: descarta la fila, la guarda en GV_Anon_Insert_Bloqueado y avisa por Telegram",
+      "quien": "Thomas"
     },
     {
       "objeto": "gv_armado_avance_guardar",
@@ -482,6 +492,11 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_ppp_mismo_lugar_dos_dias",
+      "regla": "Aviso PPP: mismo cliente + misma dirección en días distintos (sin súper ni retira)",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_ppp_np_cancelar",
       "regla": "una NP de ISIS con la tanda pickeándose/armándose no se cancela desde Programación",
       "quien": "Luis"
@@ -525,6 +540,11 @@
       "objeto": "gv_ppp_tanda_renombrar",
       "regla": "Al renombrar una tanda, las filas del pipeline de Movimientos_Stock que ya existan con el codigo destino se FUSIONAN (delete de la vieja + suma del delta en la ",
       "quien": "Luis, Thomas, Thomas (problema 407), Thomas 18/09"
+    },
+    {
+      "objeto": "gv_ppp_tanda_zona_fuera_regla",
+      "regla": "Cartel: tanda con pedidos que van en camiones distintos (fuera de las reglas de grupo de zonas)",
+      "quien": "Luis"
     },
     {
       "objeto": "gv_ppp_web_armar_pendientes",
@@ -610,6 +630,16 @@
       "objeto": "gv_ppp_web_zona",
       "regla": "RETIRA se matchea EXACTO, nunca por subcadena: \"Retiro\" es un barrio de CABA (Zona 2). Con ~* 'retir' esas direcciones quedaban marcadas como retiro en fabrica ",
       "quien": "Thomas (problema 433)"
+    },
+    {
+      "objeto": "gv_ppp_web_zona_recalc",
+      "regla": "Cambia la dirección de una NP programada en tanda sin empezar: la zona se recalcula; empezada: no se toca y va al cartel",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_ppp_web_zona_retira",
+      "regla": "La zona de un Retira es siempre Retira (no se manda a una dirección, lo vienen a buscar)",
+      "quien": "Luis"
     },
     {
       "objeto": "gv_rack_posicion_guardar",
@@ -797,6 +827,11 @@
       "quien": "Luis, Thomas"
     },
     {
+      "objeto": "vista_importados_stock_parte",
+      "regla": "La parte en Virgilio (942P…) se reparte por E.M. entre los que la comparten (GV_Piezas_Reparto)",
+      "quien": "Luis"
+    },
+    {
       "objeto": "vista_nombres_articulos",
       "regla": "El guard \"la descripcion no puede ser el propio codigo\" compara las DOS puntas normalizadas sin el cero adelante. Si vuelve a comparar la descripcion cruda cont",
       "quien": "Thomas, Thomas (problema 449)"
@@ -819,36 +854,6 @@
     {
       "objeto": "vista_tanda_status",
       "regla": "Una tanda con PKF/APF figura FRENADA (picking/armado), no en curso ni terminada",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_ads_stock2",
-      "regla": "ADS saldo = disponible - el mayor entre comprometido y Est. Madre del horizonte (no la suma: el comprometido ya es parte de la Est. Madre)",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_ppp_mismo_lugar_dos_dias",
-      "regla": "Aviso PPP: mismo cliente + misma dirección en días distintos (sin súper ni retira)",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_ppp_web_zona_retira",
-      "regla": "La zona de un Retira es siempre Retira (no se manda a una dirección, lo vienen a buscar)",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_ppp_web_zona_recalc",
-      "regla": "Cambia la dirección de una NP programada en tanda sin empezar: la zona se recalcula; empezada: no se toca y va al cartel",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_ppp_tanda_zona_fuera_regla",
-      "regla": "Cartel: tanda con pedidos que van en camiones distintos (fuera de las reglas de grupo de zonas)",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "vista_importados_stock_parte",
-      "regla": "La parte en Virgilio (942P…) se reparte por E.M. entre los que la comparten (GV_Piezas_Reparto)",
       "quien": "Luis"
     }
   ]
