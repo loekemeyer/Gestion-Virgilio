@@ -35,6 +35,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const card = pkConteoCardHtml();
     out.cardCod = card.indexOf("500") >= 0;
     out.cardCelda = card.indexOf("A1") >= 0;
+    out.cardDespues = card.indexOf("DESPUÉS de pickear") >= 0;   // v28.58: se cuenta después de pickear
     out.cardInput = card.indexOf("pkConteoInp") >= 0 && card.indexOf("pkConteoSubmit") >= 0;
     _pk.conteo.done = true;
     out.cardDone = pkConteoCardHtml().indexOf("Anotaste") >= 0;
@@ -60,7 +61,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     return out;
   });
   const pass = r.soloUnaCelda && r.cardCod && r.cardCelda && r.cardInput && r.cardDone &&
-    r.submitEmit && r.submitDone && r.evOpcion === "CG" && r.evTexto === "500|42" && r.evId && errs.length === 0;
+    r.submitEmit && r.submitDone && r.evOpcion === "CG" && r.evTexto === "500|42||T1" && r.cardDespues && r.evId && errs.length === 0;
   console.log("pk-conteo-ciclico:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();

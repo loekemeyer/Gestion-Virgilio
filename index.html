@@ -115,6 +115,18 @@ button {
 .sup-sec-label { max-width: min(1280px, 97vw); margin: 26px auto 6px; font-size: 12.5px; font-weight: 800;
   letter-spacing: .05em; text-transform: uppercase; color: #94a3b8; }
 .sup-actions.sup-secondary { grid-template-columns: repeat(8, 1fr); gap: 8px; margin-top: 0; }
+/* v28.58 (Luis, 08/10): conteos de góndola del picking que difieren — en el margen izquierdo de la landing. */
+#cgAside { position: fixed; left: 30px; top: 137px; width: 235px; max-height: calc(100vh - 160px); overflow: auto;
+  background: #fff; border: 2px solid #dc2626; border-radius: 10px; padding: 8px; box-sizing: border-box; text-align: center; z-index: 5; }
+#cgAside .cg-h { font-weight: 800; font-size: 13.5px; color: #b91c1c; margin-bottom: 6px; line-height: 1.2; }
+#cgAside .cg-it { border-top: 1px solid #e2e8f0; padding: 6px 0; }
+#cgAside .cg-l1 { font-size: 15px; font-weight: 800; }
+#cgAside .cg-l2 { font-size: 12.5px; color: #334155; }
+#cgAside .cg-l3 { font-size: 11px; color: #64748b; }
+#cgAside .cg-btns { display: flex; gap: 6px; justify-content: center; margin-top: 4px; }
+#cgAside button { width: auto; margin: 0; padding: 3px 14px; font-size: 16px; border-radius: 6px; border: 1px solid #cbd5e1; background: #f8fafc; cursor: pointer; }
+#cgAside button.cg-ok { color: #15803d; } #cgAside button.cg-no { color: #b91c1c; }
+@media (max-width: 1599px) { #cgAside { position: static; width: auto; max-width: 520px; max-height: none; margin: 0 auto 12px; } }
 .sup-secondary .sup-action-btn { min-height: 78px; padding: 9px 6px; font-size: 12.5px; gap: 5px;
   background: #51688f; border-radius: 11px; }
 .sup-secondary .sup-action-btn:hover { background: #44597a; }
@@ -6383,7 +6395,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.57"></script>
+<script type="module" src="recepcion.js?v=28.58"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6493,6 +6505,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div id="supervisorPanel" class="hidden">
     <div class="app-brand">Gestion <span class="app-brand-hi">Virgilio</span></div>
     <h1 class="sup-title">Administración</h1>
+    <div id="cgAside" style="display:none;"></div>
     <!-- GRANDES: uso diario (orden definido por el usuario). "Stock y Compras" = Stocks + OC en un solo botón. -->
     <div class="sup-actions sup-primary">
       <button class="sup-action-btn" onclick="openFacturacion()" style="position:relative;"><span class="sup-ico">📋</span><span>Facturación</span><span id="facBadge" class="dp-badge" style="display:none;" title="Pedidos listos para facturar (picking + separado terminados, todavía sin facturar)"></span></button>
@@ -10662,7 +10675,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.57";
+const APP_VERSION = "v28.58";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13818,7 +13831,7 @@ function pkConteoCardHtml() {
   if (c.done) return '<div class="pk-conteo done">🔢 ✓ Anotaste el conteo de <b>' + escapeHtml(c.art) + '</b>. ¡Gracias!</div>';
   return '<div class="pk-conteo">' +
     '<div class="pk-conteo-h">🔢 Control de góndola (rápido)</div>' +
-    '<div class="pk-conteo-s">Contá cuántas cajas de <b>' + escapeHtml(c.art) + '</b> hay en la <b>góndola</b>' + (c.sector ? ' (celda <b>' + escapeHtml(c.sector) + '</b>)' : '') + ' y anotá. <b>Contala ANTES de empezar a sacar de esa celda</b> (si no, va a dar diferencia). No frena nada.</div>' +
+    '<div class="pk-conteo-s">Contá cuántas cajas de <b>' + escapeHtml(c.art) + '</b> QUEDARON en la <b>góndola</b>' + (c.sector ? ' (celda <b>' + escapeHtml(c.sector) + '</b>)' : '') + ' y anotá. <b>Contá DESPUÉS de pickear</b>: lo que queda en la celda, sin las cajas que ya sacaste para esta tanda. No frena nada.</div>' +
     '<div class="pk-conteo-row"><input id="pkConteoInp" type="number" inputmode="numeric" min="0" class="pk-conteo-inp" placeholder="cajas"><button class="pk-btn pk-ok pk-conteo-btn" onclick="pkConteoSubmit()">✓ Anotar</button></div>' +
     '</div>';
 }
@@ -13827,16 +13840,19 @@ function pkConteoSubmit() {
   const inp = document.getElementById("pkConteoInp");
   const v = inp ? parseInt(inp.value, 10) : NaN;
   if (isNaN(v) || v < 0) { try { if (inp) inp.focus(); } catch (_e) {} return; }
-  pkEmitConteo(_pk.conteo.art, v, _pk.conteo.sistema);
+  pkEmitConteo(_pk.conteo.art, v);
   _pk.conteo.done = true;
   pkRender();
 }
 /* Evento CG: conteo cíclico de góndola. texto = "COD|contado". Dedup por
    cg_<legajo>_<cod>_<día>. Un trigger de Supabase compara vs el sistema y avisa por Telegram. */
-function pkEmitConteo(art, contado, sistema) {
+function pkEmitConteo(art, contado) {
   const leg = String((_pk && _pk.legajo) || "").trim();
-  // v8.65 — 3er campo: snapshot de la góndola del sistema al mostrar la tarjeta (si se pudo leer).
-  const snap = (sistema == null || isNaN(Number(sistema))) ? "" : ("|" + Math.round(Number(sistema)));
+  /* v28.58 (Luis, 08/10): se cuenta DESPUÉS de pickear → ya no va el snapshot (3er campo vacío) y el 4.º
+     es la TANDA: la base compara contra la góndola al momento de contar, con el picking de esta tanda
+     adentro (gv_conteo_picking_calc). Formato: COD|contado||TANDA. */
+  const tnd = String((_pk && _pk.tanda) || "").trim().toUpperCase().replace(/\|/g, "");
+  const snap = "||" + tnd;
   const payload = {
     legajo: leg, opcion: "CG", descripcion: "Conteo cíclico de góndola",
     texto: (String(art).toUpperCase() + "|" + contado + snap),
@@ -61651,7 +61667,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.57"></script>
+<script src="importacion.js?v=28.58"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61860,6 +61876,61 @@ function showSelector() {
   if (__identity) setUserTag(__identity.nombre || __identity.email || "");
 }
 
+/* v28.58 (Luis, 08/10): CONTEOS DE GÓNDOLA DURANTE EL PICKING que no coinciden con el sistema.
+   El operario cuenta DESPUÉS de pickear (evento CG). La base (gv_conteo_picking_pendientes) compara contra
+   la góndola AL MOMENTO DE CONTAR y trae «contó hoy» = lo contado corrido por lo que se movió después
+   (contó 50, se pickearon 30 → 20). ✓ = ajusta la góndola (Movimientos_Stock 'ajuste', ref CONTEO PICKING,
+   «Stock ajustado por conteo durante picking»); ✕ = rechaza. Los dos sacan la fila. Sin diferencias, no se dibuja. */
+let _cgRows = [];
+async function cgLoad() {
+  const box = document.getElementById("cgAside"); if (!box) return;
+  const sbx = window.sb;
+  if (!sbx || typeof sbx.rpc !== "function") { if (!cgLoad._re) { cgLoad._re = 1; setTimeout(cgLoad, 2500); } return; }
+  let r;
+  try { r = await sbx.rpc("gv_conteo_picking_pendientes"); } catch (e) { r = { error: e }; }
+  if (r && r.error) {
+    box.style.display = "";
+    box.innerHTML = '<div class="cg-h">Conteos de góndola</div><div class="cg-l3">No se pudieron leer los conteos.</div>';
+    return;
+  }
+  _cgRows = (r && r.data) || [];
+  cgRender();
+}
+function cgRender() {
+  const box = document.getElementById("cgAside"); if (!box) return;
+  if (!_cgRows.length) { box.style.display = "none"; box.innerHTML = ""; return; }
+  const n = function (v) { return Math.round(Number(v) || 0).toLocaleString("es-AR"); };
+  box.style.display = "";
+  box.innerHTML = '<div class="cg-h">Conteos de góndola en picking (' + _cgRows.length + ')</div>' +
+    _cgRows.map(function (x, i) {
+      const d = Number(x.dif) || 0;
+      const hoy = Math.max(0, Number(x.contado_hoy) || 0);
+      const f = x.ts ? new Date(x.ts) : null;
+      const cuando = f ? (String(f.getDate()).padStart(2, "0") + "/" + String(f.getMonth() + 1).padStart(2, "0") + " " + String(f.getHours()).padStart(2, "0") + ":" + String(f.getMinutes()).padStart(2, "0")) : "";
+      return '<div class="cg-it">' +
+        '<div class="cg-l1">' + escapeHtml(x.cod || "") + ' · ' + escapeHtml(x.gondolas || "—") + '</div>' +
+        '<div class="cg-l2">Contó <b>' + n(hoy) + '</b> · sist. ' + n(x.saldo_hoy) + ' · <b style="color:' + (d < 0 ? "#b91c1c" : "#15803d") + '">' + (d > 0 ? "+" : "") + n(d) + '</b></div>' +
+        '<div class="cg-l3">' + escapeHtml(x.nombre || ("leg. " + (x.legajo || "?"))) + ' · ' + cuando + (x.tanda ? " · " + escapeHtml(x.tanda) : "") + '</div>' +
+        '<div class="cg-btns"><button class="cg-ok" title="Ajustar la góndola a lo contado" onclick="cgResolver(' + i + ',true)">✓</button>' +
+        '<button class="cg-no" title="Rechazar el conteo (no toca el stock)" onclick="cgResolver(' + i + ',false)">✕</button></div>' +
+        '</div>';
+    }).join("");
+}
+async function cgResolver(i, ajustar) {
+  const x = _cgRows[i]; if (!x) return;
+  const hoy = Math.max(0, Math.round(Number(x.contado_hoy) || 0)), sis = Math.round(Number(x.saldo_hoy) || 0);
+  const msg = ajustar
+    ? "Ajustar la góndola de " + x.cod + " de " + sis + " a " + hoy + " cajas?\n(queda como «Stock ajustado por conteo durante picking»)"
+    : "Rechazar el conteo de " + x.cod + "? El stock no se toca.";
+  if (!confirm(msg)) return;
+  let r;
+  try { r = await window.sb.rpc("gv_conteo_picking_resolver", { p_cid: x.client_id, p_ajustar: !!ajustar }); } catch (e) { r = { error: e }; }
+  if (r && r.error) { alert("No se pudo: " + (r.error.message || r.error) + "\nNo se tocó nada, probá de nuevo."); return; }
+  if (r && r.data && r.data.ok === false && r.data.motivo !== "ya_resuelto") { alert("No se pudo: " + r.data.motivo); return; }
+  cgLoad();
+}
+window.cgLoad = cgLoad; window.cgResolver = cgResolver;   // los onclick del cuadro viven en el global
+
 function showSupervisor(email) {
   window.__isSupervisor = true;
   $("authBlock").classList.add("hidden");
@@ -61886,6 +61957,7 @@ function showSupervisor(email) {
   try { initStkBadge(); } catch (_e) {}   // v10.41: badge Stock y Compras (negativos)
   try { ppLoadBadge(); } catch (_e) {}   // v10.48: badge Pasaje de Papeles (pendientes de enviar)
   try { if (typeof adsLoadBadge === "function") adsLoadBadge(); } catch (_e) {}   // v27.20: badge violeta ADS (talleristas debajo del umbral)
+  try { cgLoad(); } catch (_e) {}   // v28.58: conteos de góndola del picking que difieren
   try { colaImpLoadBadge(); } catch (_e) {}   // v11.60: badge Cola de impresión NP (armadas sin imprimir; rojo si +24h)
   try { expIsisLoadBadge(); } catch (_e) {}   // badge Agregar Expreso ISIS (expresos que eligió el cliente en la página)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
@@ -64500,10 +64572,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.57"></script>
-<script src="hotsale.js?v=28.57"></script>
-<script src="estadisticas.js?v=28.57"></script>
-<script src="ads.js?v=28.57"></script>
+<script src="cobranzas.js?v=28.58"></script>
+<script src="hotsale.js?v=28.58"></script>
+<script src="estadisticas.js?v=28.58"></script>
+<script src="ads.js?v=28.58"></script>
 
 </body>
 </html>

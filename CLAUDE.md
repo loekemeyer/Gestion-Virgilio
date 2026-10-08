@@ -8346,3 +8346,18 @@ Entregas_Virgilio, Picking paso…). **Una escritura de supervisor va con `gvWri
 clave pública pegada a mano.** **Si una pantalla nueva tiene que escribir en una
 de esas tablas con la clave pública**, deshabilitar el trigger en esa tabla (`alter table … disable trigger
 aaa_gv_anon_bloqueo`) o escribir por una RPC SECURITY DEFINER. `sql/gv_anon_insert_bloqueo_v2852.sql`, centinela 370.
+
+## ⚠ REGLA (Luis, 2026-10-08, v28.58): el CONTEO DE GÓNDOLA del picking se aprueba o rechaza en la LANDING del admin
+
+- El operario cuenta **DESPUÉS de pickear** (lo que quedó en la celda) un artículo al azar de una sola celda; el evento CG
+  ahora es `COD|contado||TANDA` (3er campo vacío = sin snapshot).
+- **`gv_conteo_picking_calc(client_id)`** compara contra la góndola (terminado) **al momento de contar**: un movimiento
+  `picking` vale con la hora del PKC de su tanda (el cron escribe la fila minutos después) y el de la MISMA tanda del
+  conteo cuenta siempre como anterior. `dif = contado − esperado` no cambia con lo posterior; el admin ve
+  `contado_hoy = contado + lo movido después` (contó 50, se pickearon 30 → 20). Telegram usa la misma cuenta.
+- Landing (`#cgAside`, margen izquierdo; debajo de 1600 px va arriba de los botones): código · góndolas · contó hoy ·
+  sistema · dif. **✓** = `gv_conteo_picking_resolver(cid, true)`: ajuste en `terminado`, ref `CONTEO PICKING`,
+  «Stock ajustado por conteo durante picking» (nunca deja la góndola en negativo). **✕** = rechazado, no toca stock.
+  Los dos quedan en `GV_Conteo_Picking_Resol`. Sin diferencias, el cuadro no se dibuja.
+- Forward-facing: `Stock_Config.conteo_picking_desde` (08/10 09:48). Centinela 373. `sql/gv_conteo_picking_v2858.sql`,
+  `tests/conteo-picking-admin.cjs`, `tests/pk-conteo-ciclico.cjs`.
