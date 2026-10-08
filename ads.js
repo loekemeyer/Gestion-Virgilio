@@ -274,17 +274,18 @@ function _adsHtmlStock() {
   if (!_ads.stock) return h + '<div class="msg">Leyendo stock…</div></div>';
   var f = adsFiltrarStock(rows, ver, _ads.q, H);
   h += '<div class="res">Todo a ' + H + ' días · sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · saldo = disponible − comprometido − E.M. plazo (Est. Madre × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ') / 30) · en cajas</div>';
-  h += '<table><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2">Stk</th><th rowspan="2">Comprom.<br>' + H + ' d</th><th rowspan="2" title="Est. Madre del mes × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ' días que tarda en salir) / 30: los pedidos que entran y salen dentro del plazo">E.M. plazo<br>' + H + 'd</th>' +
+  h += '<table><thead><tr><th rowspan="2" title="Tallerista de la OC vigente del código">Tallerista</th><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2">Stk</th><th rowspan="2">Comprom.<br>' + H + ' d</th><th rowspan="2" title="Est. Madre del mes × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ' días que tarda en salir) / 30: los pedidos que entran y salen dentro del plazo">E.M. plazo<br>' + H + 'd</th>' +
     '<th rowspan="2">Saldo<br>' + H + ' d</th>' +
     '<th colspan="6" class="ug" title="Pedido y recibido de las últimas ' + _ads.n + ' OC (el rango de Entregas talleristas), sumando todos los talleristas · recibido = lo que recibió Virgilio, hasta lo pedido">Período (' + _ads.n + ' OC)</th></tr>' +
     '<tr><th class="u1">Fecha<br>últ. OC</th><th class="u2">Pedido<br>período</th><th class="u2">Recibido<br>período</th><th class="u2">%</th>' +
     '<th class="u2" title="Lo que falta que entreguen de la OC vigente: lo declarado en la OC si está; si no, la OC × el % que viene entregando cada tallerista, menos lo ya recibido de esa OC">Entrega<br>est. OC</th>' +
     '<th class="u3" title="Tallerista al que le corresponde; si son varios, la parte de cada uno en lo pedido del período">Proporción</th></tr></thead><tbody>';
-  if (!f.length) h += '<tr><td colspan="12" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
+  if (!f.length) h += '<tr><td colspan="13" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H), disp = c.disp, proy = c.proy, comp = c.comp, em = c.em, saldo = c.saldo;
     var dist = c.dist.length ? c.dist.map(_adsEsc).join("<br>") : "—";
-    h += "<tr><td><b>" + _adsEsc(r.cod) + '</b></td><td class="desc" title="' + _adsEsc(r.descripcion) + '">' + _adsEsc(r.descripcion) +
+    // v28.60 (Luis, 08/10): a la izquierda del código, el tallerista de la OC vigente
+    h += '<tr><td class="tall">' + (c.tallAct.length ? c.tallAct.map(_adsEsc).join("<br>") : "—") + "</td><td><b>" + _adsEsc(r.cod) + '</b></td><td class="desc" title="' + _adsEsc(r.descripcion) + '">' + _adsEsc(r.descripcion) +
       '</td><td title="Góndola ' + _adsN(r.terminado) + " · racks " + _adsN(r.racks) + " · a guardar " + _adsN(r.a_guardar) + " · excedente " + _adsN(r.excedente) + '">' + _adsN(disp) +
       "</td><td>" + _adsN(comp) + '</td><td title="' + _adsN(proy) + ' por mes">' + _adsN(Math.round(em)) +
       '</td><td class="' + (saldo < 0 ? "neg" : "pos") + '">' + _adsN(saldo) + "</td>";
@@ -318,6 +319,8 @@ function _adsStockCalc(r, H) {
   // v27.97 (Luis, 07/10, caso 609): la OC de la semana REEMPLAZA a la anterior, así que sólo se estima entrega
   // de los talleristas que están en la OC ACTUAL del código (la de fecha más nueva). El que salió de la OC no entrega más.
   var ultOc = pc.reduce(function (m, x) { var f = x.ult_fecha ? String(x.ult_fecha).slice(0, 10) : ""; return f > m ? f : m; }, "");
+  var tallAct = ultOc ? pc.filter(function (x) { return String(x.ult_fecha || "").slice(0, 10) === ultOc; }).map(function (x) { return x.proveedor; })
+              : (r.oc_prov ? String(r.oc_prov).split(" + ") : []);
   // v28.47 (Luis, 07/10): la OC completa ya ES la cobertura (30 días × índice): la entrega estimada es CUÁNTO DE LA OC
   // VIGENTE va a entregar cada tallerista, sin escalar al plazo. Declarado en la OC (gv_entrega_proy) si está; si no,
   // cantidad de la OC vigente × el % que viene entregando en el período. Menos lo que ya recibió de esa OC (ya es stock).
@@ -335,7 +338,11 @@ function _adsStockCalc(r, H) {
   var _epTxt = function (y) { return y.oc ? " · cargado en la OC" : ""; };
   var estDist = estArr.length > 1 ? estArr.map(function (y) { return y.p + " " + (estH > 0 ? _adsPct(y.e / estH) : "—") + " (" + _adsN(y.e) + ")" + _epTxt(y); })
               : estArr.length ? [estArr[0].p + " (" + _adsN(estArr[0].e) + ")" + _epTxt(estArr[0])] : [];
-  return { disp: disp, proy: proy, comp: comp, em: proy * Math.max(0, H - (typeof _adsLead === "function" ? _adsLead() : 12)) / 30, saldo: Number(r["saldo" + H]), estH: pc.length ? estH : null, estOc: estArr.some(function (y) { return y.oc; }), estDet: estDet, estDist: estDist, estCaj: estArr.map(function (y) { return y.p + ": " + _adsN(y.e) + (y.oc ? "" : "*"); }),
+  // v28.60 (Luis, 08/10, «058 me da −15, no −16»): la E.M. plazo que se MUESTRA sale del mismo saldo del servidor
+  // (disp − comp − saldo): si la base cambia cómo cuenta los días (gv_ads_em_dias), la columna y el saldo no se desfasan.
+  var _sal = Number(r["saldo" + H]);
+  var _em = isFinite(_sal) ? Math.max(0, disp - comp - _sal) : proy * Math.max(0, H - (typeof _adsLead === "function" ? _adsLead() : 12)) / 30;
+  return { disp: disp, proy: proy, comp: comp, em: _em, saldo: _sal, tallAct: tallAct, estH: pc.length ? estH : null, estOc: estArr.some(function (y) { return y.oc; }), estDet: estDet, estDist: estDist, estCaj: estArr.map(function (y) { return y.p + ": " + _adsN(y.e) + (y.oc ? "" : "*"); }),
            estCalc: estArr.some(function (y) { return !y.oc; }),
            pedP: pc.length ? totPed : null, recP: pc.length ? recP : null, pctP: pc.length && totPed > 0 ? recP / totPed : null,
            fechaUlt: fechaUlt, dist: dist };

@@ -7,7 +7,10 @@ const fallas = [];
 const ctx = { window: {}, document: { getElementById: () => null }, console, Date, Math, Number, String, isFinite, Promise, Object };
 vm.createContext(ctx); vm.runInContext(src, ctx);
 vm.runInContext("_ads.cfg = { lead_dias: 12.7 }; _ads.tall = [];", ctx);
-const em = (H) => vm.runInContext(`_adsStockCalc({ cod: "550", disponible: 46, proy_mes: 103, comp${H}: 103, saldo${H}: 0 }, ${H}).em`, ctx);
+const em = (H) => vm.runInContext(`_adsStockCalc({ cod: "550", disponible: 46, proy_mes: 103, comp${H}: 103 }, ${H}).em`, ctx);
+// v28.60: con saldo del servidor, la E.M. que se muestra es disp − comp − saldo (no se desfasa del saldo)
+const emS = vm.runInContext(`_adsStockCalc({ cod: "58", disponible: 4, proy_mes: 16, comp10: 19, saldo10: -16 }, 10).em`, ctx);
+if (emS !== 1) fallas.push("v28.60: 58 con saldo −16 → E.M. 1, dio " + emS);
 if (em(10) !== 0) fallas.push("10 d con 12,7 de demora: E.M. plazo tiene que dar 0, dio " + em(10));
 if (Math.abs(em(20) - 103 * 7.3 / 30) > 1e-9) fallas.push("20 d: 103 × 7,3 / 30, dio " + em(20));
 if (Math.abs(em(30) - 103 * 17.3 / 30) > 1e-9) fallas.push("30 d: 103 × 17,3 / 30, dio " + em(30));

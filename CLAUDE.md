@@ -8361,3 +8361,22 @@ aaa_gv_anon_bloqueo`) o escribir por una RPC SECURITY DEFINER. `sql/gv_anon_inse
   Los dos quedan en `GV_Conteo_Picking_Resol`. Sin diferencias, el cuadro no se dibuja.
 - Forward-facing: `Stock_Config.conteo_picking_desde` (08/10 09:48). Centinela 373. `sql/gv_conteo_picking_v2858.sql`,
   `tests/conteo-picking-admin.cjs`, `tests/pk-conteo-ciclico.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-08, v28.60): «Corregir códigos de NPs» NO EXISTE MÁS — la corrección es automática
+
+- Sale el botón del panel y el chip «🔀 Corregir códigos» de Facturación (`openCorreccPanel`, `facCorreccOpen`,
+  `corrLoadBadge` quedan en el archivo sin puerta). Luis: *"manual no iría más"*.
+- `gv_web_np_sec_auto` (cron 119) sigue cambiando el secundario sin stock por el principal en la NP web. Lo que no puede
+  cambiar (tanda empezada, cajas que no dan enteras en el principal, familia de otra empresa, sin UxB) **sale como
+  faltante**: una NP web se factura desde lo armado, no hay nada que cambiar a mano en ISIS.
+- Preparado y SIN usar: `GV_NP_Cambio_Codigo.cajas_resto` + el trigger `gv_ppp_web_base_np_cambio` respetan un resto
+  para convertir la parte entera de un pedido impar (631 de a 12 → 631E de a 24). Falta que la Edge Function
+  `gv-ppp-web-tandas-diarias` convierta `(cajas − cajas_resto)`; hasta entonces la función nunca deja resto.
+- ⚠ Al tocar ese trigger: `select true, max(...)` sin filas devuelve UNA fila y descartaba TODA alta de `PPP_Web_Base`
+  (pasó ~2 min el 08/10). Va con `count(*)`. `sql/gv_np_secundario_auto_resto_v2859.sql`, `tests/corr-reparto-sec.cjs`.
+
+## ⚠ (Luis, 2026-10-08, v28.60): ADS Stock — tallerista a la izquierda del código y E.M. que cierra con el saldo
+
+- Columna **Tallerista** (los de la OC vigente del código) a la izquierda de Cód. Sólo pantalla (el Excel tiene formato de Luis).
+- La **E.M. plazo** que se muestra sale del saldo del servidor (`disp − comp − saldo`): la base cuenta los días de E.M. con
+  `gv_ads_em_dias` (distribución de demora) y el front con la fórmula vieja daba 0 mientras el saldo restaba 1 (058: −16).

@@ -51,7 +51,7 @@ catch (_e) {
     const corr = document.getElementById("facChipCorr");
     out.revertirEstaYCableado = !!(rev && pie.contains(rev) && /facRevertir/.test(rev.getAttribute("onclick") || ""));
     out.filtroFaltante        = !!(falt && pie.contains(falt) && /facToggleSoloFalt/.test(falt.getAttribute("onclick") || ""));
-    out.filtroCorregirCods    = !!(corr && pie.contains(corr) && /facCorreccOpen/.test(corr.getAttribute("onclick") || ""));
+    out.filtroCorregirCods    = !corr;   // v28.59: el chip «Corregir códigos» salió (la corrección es automática)
     // y los contadores que el JS actualiza por id
     out.contadores = ["facCntTandas", "facCntPend", "facCntDone", "facDot", "facStatusTxt"]
       .every(function (id) { const el = document.getElementById(id); return el && pie.contains(el); });

@@ -9,8 +9,7 @@
    - El panel pinta 98662 en verde ("le alcanza") y 98671 en rojo ("cambiá NP a 607E"), muestra la
      cola ("pedidas 8 en 7 NP, ésta es la 4.ª") y los botones dicen Urgentes (6) / Ver todos (8);
      "Solo urgentes" esconde las cubiertas.
-   - El chip (render y facCorreccRefreshCount) y los badges (corrLoadBadge: rojo 6, verde 2) dan el
-     mismo número que el panel.
+   - v28.59: el chip de Facturación y el botón del panel ya NO existen (la corrección es automática).
    - Sin sec_cubre (vista vieja / rollback) cae al criterio viejo stk_sec >= cajas.
    Sale 1 si falla. */
 const path = require("path");
@@ -69,15 +68,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.botones = h.indexOf("Urgentes (6)") >= 0 && h.indexOf("Ver todos (8)") >= 0;
     _facCorrSoloUrg = true; facCorreccRender(); const h2 = body.innerHTML;
     out.soloUrgentes = h2.indexOf("NP 98662") < 0 && h2.indexOf("NP 98532") < 0 && h2.indexOf("NP 98671") >= 0 && h2.indexOf("NP 98621") >= 0;
-    // chip: lo pinta el render con las filas que tiene, y facCorreccRefreshCount lo vuelve a pedir
-    const cnt = document.getElementById("facCntCorr");
-    out.chipRender = !!cnt && cnt.textContent === "6";
-    if (cnt) cnt.textContent = "x";
-    await facCorreccRefreshCount();
-    out.chipRefresh = !!cnt && cnt.textContent === "6";
-    // badges del panel supervisor
-    await corrLoadBadge();
-    out.badges = document.getElementById("corrBadge").textContent === "6" && document.getElementById("corrBadgeGreen").textContent === "2";
+    // v28.59 (Luis, 08/10): la corrección es automática — ni el chip de Facturación ni el botón del panel existen.
+    out.sinChip = !document.getElementById("facChipCorr") && !document.getElementById("corrBadge");
+    out.sinBoton = !document.querySelector('#supervisorPanel [onclick^="openCorreccPanel"]');
     // vista vieja (rollback): sin sec_cubre → criterio viejo stk_sec >= cajas
     modo = "vieja"; const rv = await facCorreccDataRich();
     out.fallbackViejo = rv[1].secCubre === true && rv[2].secCubre === true && rv[2].secTot === 0 && _corrNpsUrgentes(rv) === 0;
