@@ -22,3 +22,8 @@ create or replace trigger aa_gv_registro_entrevista_a_empleado BEFORE INSERT ON 
  FOR EACH ROW WHEN (((new.legajo = '600'::text) OR (new.legajo ~ '^6[0-9]{3}$'::text)))
  EXECUTE FUNCTION gv_registro_entrevista_a_empleado();
 -- Rollback: alter table public."Registros_Produccion_Virgilio" disable trigger aa_gv_registro_entrevista_a_empleado;
+
+-- v28.70 (08/10): el evento 600 SIN nombre (PKC, ENT…) toma el legajo real del ingreso de HOY de ese mismo
+-- celular (GV_Dispositivo_Login.dispositivo = gv_dispositivo). Caso: el PKC de F69A de Kevin entró como 600
+-- después de la v28.69. Aplicado el 08/10 (create or replace sobre la viva); probado en transacción abortada
+-- (600 + su dispositivo -> 504) y movido ese PKC + 3 movimientos + 6 pasos a 504.
