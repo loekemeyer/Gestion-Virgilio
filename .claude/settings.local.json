@@ -150,7 +150,8 @@
       "Bash(BUMP_FORZAR=1 node scripts/bump-version.cjs 28.27)",
       "Bash(BUMP_FORZAR=1 node scripts/bump-version.cjs 28.28)",
       "Bash(BUMP_FORZAR=1 node scripts/bump-version.cjs 28.29)",
-      "Bash(GIT_EDITOR=true git -c core.editor=true rebase --continue)"
+      "Bash(GIT_EDITOR=true git -c core.editor=true rebase --continue)",
+      "Bash(node monitor/build-admin.cjs)"
     ]
   }
 }
