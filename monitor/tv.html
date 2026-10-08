@@ -372,7 +372,8 @@ var SB_KEY = window.VIR_SUPABASE_KEY;
 var H = { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY };
 var TZ = "America/Argentina/Buenos_Aires";
 
-var REFRESH_MS      = 15000;            // ciclo del tablero
+var REFRESH_MS      = 5000;             // ciclo del tablero (v28.72, Luis: "lo más live posible"; lo caro tiene caché de 60 s)
+var CARTEL_SIN_DATO_MS = 60 * 1000;    // el cartel grande sale a 1 min sin refresco bueno, no por cantidad de fallos
 var EMPLEADOS_TTL   = 60 * 60 * 1000;   // nombres y horarios: cambian una vez al año
 var PROG_TTL        = 60 * 1000;        // la programación no cambia cada 15 s
 var FAC_TTL         = 30 * 1000;
@@ -1734,7 +1735,14 @@ var ultimoOk = 0, fallos = 0, arrancado = false;
    llegan como null, no como vacío: el tablero no afirma ni «salió» ni «no está facturada». */
 function sinDato() { return null; }
 
+var _cicloEnVuelo = false;
+/* v28.72: con 5 s un ciclo lento (base cargada) no se pisa con el siguiente: se saltea. */
 function ciclo() {
+  if (_cicloEnVuelo) return Promise.resolve();
+  _cicloEnVuelo = true;
+  return cicloCorrer().then(function () { _cicloEnVuelo = false; }, function () { _cicloEnVuelo = false; });
+}
+function cicloCorrer() {
   return Promise.all([
     cargarProgramacion(), cargarEventosHoy(), cargarEmpleados(),
     cargarFichadasHoy(), cargarDeshechas(), cargarFacturadas().catch(sinDato), cargarDespachadas().catch(sinDato),
@@ -1811,12 +1819,13 @@ function ciclo() {
       return;
     }
     var seg = ultimoOk ? Math.round((Date.now() - ultimoOk) / 1000) : -1;
-    el("estado").className = "h-est " + (fallos >= 4 ? "err" : "stale");
+    var sinDatoLargo = ultimoOk && (Date.now() - ultimoOk) >= CARTEL_SIN_DATO_MS;
+    el("estado").className = "h-est " + (sinDatoLargo ? "err" : "stale");
     el("estado").textContent = "● desactualizado (" + seg + "s)";
     /* El cartel grande recién después de varios ciclos seguidos fallando: un
        hipo de wifi no tiene que tapar el tablero, que sigue mostrando datos
        viejos pero útiles. ≡ index.html MON_FALLOS_P_CARTEL. */
-    if (fallos >= 4 && ultimoOk) {
+    if (sinDatoLargo) {
       var d = new Date(ultimoOk);
       el("offline").textContent = "⚠ Sin actualizar desde las " +
         String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") +
