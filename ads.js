@@ -427,7 +427,7 @@ function adsExcelStock(H) {
   // todo con ajuste de texto, sus anchos y sus rótulos; el alto de cada fila según el texto más largo.
   // v27.91 (Luis, 07/10, «ADS_stock_10d_20261007_3»): optimización horizontal — cada tallerista en su sub-fila
   // (salto de línea dentro de la celda), descripción sin ajuste, rótulo con borde de abajo, escala 75 (v27.99: «_5», G 8 · L 19,14).
-  // v (Luis, 08/10): «*» en Entr est OC y en Entr. est. x tall. = CALCULADO (OC × % que viene entregando), no cargado a mano en la OC.
+  // v28.54 (Luis, 08/10): «*» en Entr est OC y en Entr. est. x tall. = CALCULADO (OC × % que viene entregando), no cargado a mano en la OC.
   // v28.01 (Luis): el Saldo es lo más importante — primera columna de datos (C) y en negrita.
   var aoa = [["Cód", "Descripción", "Saldo " + H + " d", "Stk", "Comprom " + H + " d", "E M " + H + " d",
               "Fecha últ. OC", "Ped período", "Rec período", "% período", "Entr est OC", "Entr. est. x tall.", "Proporción"]];
