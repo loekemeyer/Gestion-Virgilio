@@ -397,7 +397,11 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
            + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"' + ' applyAlignment="1"><alignment vertical="center"' + W + '/></xf>'   // v28.00 (Luis): TODO centrado en vertical, como su Excel
            + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
            // v28.01 (Luis): columna en NEGRITA (el Saldo del Excel de stock), centrada como los datos
-           + '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"' + W + '/></xf></cellXfs>');
+           + '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"' + W + '/></xf>'
+           // v28.92 (Luis): fila-título de grupo (Excel de talleristas): negrita, a la izquierda, fondo gris
+           + '<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf></cellXfs>')
+         .replace(/<cellXfs count="6"/, '<cellXfs count="7"')
+         .replace(/<fills[\s\S]*?<\/fills>/, '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill></fills>');
   // v27.91 (Luis): el rótulo lleva el borde de abajo grueso de su Excel
   // v28.28 (Luis): TODOS los bordes marcados (cuadrícula al imprimir): 1 = fino en las 4 caras; 2 = el rótulo con el de abajo grueso.
   var _T = '<color indexed="64"/>';
@@ -406,6 +410,9 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
     + '<border><left style="thin">' + _T + '</left><right style="thin">' + _T + '</right><top style="thin">' + _T + '</top><bottom style="medium">' + _T + '</bottom><diagonal/></border></borders>');
   cfb.FileIndex[iSt].content = enc.encode(st);
   var izq = {}; (cfg.izq || []).forEach(function (i) { izq[i] = 3; }); (cfg.izqSin || []).forEach(function (i) { izq[i] = 4; }); (cfg.negrita || []).forEach(function (i) { izq[i] = 5; });
+  var tit = {}; (cfg.titulos || []).forEach(function (i) { tit[String(i + 1)] = 1; });
+  var nCol = cfg.anchos.length, letra = String.fromCharCode(64 + nCol);
+  var merges = (cfg.titulos || []).map(function (i) { return '<mergeCell ref="A' + (i + 1) + ':' + letra + (i + 1) + '"/>'; });
   var colN = function (L) { var n = 0; for (var k = 0; k < L.length; k++) n = n * 26 + (L.charCodeAt(k) - 64); return n - 1; };
   var cols = '<cols>' + cfg.anchos.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + '</cols>';
   cfb.FullPaths.forEach(function (p, i) {
@@ -415,6 +422,7 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
     x = x.replace(/<sheetData/, cols + "<sheetData");
     x = x.replace(/<c r="([A-Z]+)(\d+)"( s="\d+")?/g, function (_m, L, r) {
       if (r === "1") return '<c r="' + L + r + '" s="1"';
+      if (tit[r]) return '<c r="' + L + r + '" s="6"';
       return '<c r="' + L + r + '" s="' + (izq[colN(L)] || 2) + '"';
     });
     if (cfg.altos) x = x.replace(/<row r="(\d+)"([^>]*)>/g, function (m, r, at) {
@@ -427,6 +435,7 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
     x = x.replace(/<sheetFormatPr[^>]*\/>(?=[\s\S]*<sheetFormatPr)/, "");
     if (!/<sheetPr/.test(x)) x = x.replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
     x = x.replace(/<pageMargins[^>]*\/>/, "");
+    if (merges.length) x = x.replace(/<mergeCells[\s\S]*?<\/mergeCells>/, "").replace(/<\/sheetData>/, '</sheetData><mergeCells count="' + merges.length + '">' + merges.join("") + '</mergeCells>');
     x = x.replace(/<\/sheetData>/, '</sheetData>' + (cfg.margenStd ? '<pageMargins left="0.70866141732283461" right="0.70866141732283461" top="0.74803149606299213" bottom="0.74803149606299213" header="0.31496062992125984" footer="0.31496062992125984"/>' : '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>') + '<pageSetup paperSize="9"' + (cfg.escala ? ' scale="' + cfg.escala + '"' : '') + ' orientation="portrait" fitToWidth="1" fitToHeight="0"/>');
     cfb.FileIndex[i].content = enc.encode(x);
   });
@@ -454,16 +463,19 @@ function _adsPctNum(x) { return x == null || !isFinite(x) ? "" : Math.round(x * 
 function adsExcelTall() {
   if (!_ads.tall) { alert("Todavía se están leyendo las OC."); return; }
   var g = adsAgruparTalleristas(_ads.tall, _ads.umbral);
-  var aoa = [["Tallerista", "Cód.", "Descripción", "OC evaluadas", "Pedido", "Recibio Virgilio", "%", "Fecha última OC", "Pedido última OC", "Recibido última OC"]];
+  // v28.92 (Luis, 08/10): sin columna Tallerista — una fila-título por tallerista con su %, y debajo sus artículos
+  var aoa = [["Cód.", "Descripción", "OC evaluadas", "Pedido", "Recibio Virgilio", "%", "Fecha última OC", "Pedido última OC", "Recibido última OC"]], tits = [];
   g.forEach(function (t) {
+    tits.push(aoa.length);
+    aoa.push([t.proveedor + " · " + (t.pct == null || !isFinite(t.pct) ? "—" : Math.round(t.pct * 100) + "%"), "", "", "", "", "", "", "", ""]);
     t.arts.forEach(function (a) {
-      aoa.push([t.proveedor, _adsCod(a.codigo), a.descripcion || "", _adsNum(a.ocs), _adsNum(a.pedido), _adsNum(a.entregado),
+      aoa.push([_adsCod(a.codigo), a.descripcion || "", _adsNum(a.ocs), _adsNum(a.pedido), _adsNum(a.entregado),
         (a.pct == null || !isFinite(a.pct) ? "" : Math.round(a.pct * 100) + "%"), a.ult_fecha ? _adsFecha(a.ult_fecha) : "", _adsNum(a.ult_cant), _adsNum(a.ult_rec)]);
     });
   });
   return _adsXlsx(aoa, "Talleristas", "ADS_talleristas_" + _ads.n + "OC",
     // v27.88 (Luis, 07/10): formato de su Excel «ADS_talleristas_4OC_20261007»: Arial 14, rótulo alto 72, filas de 18, sus anchos
-    { anchos: [12.7109375, 12.42578125, 23, 7.42578125, 7.5703125, 7.5703125, 8.42578125, 8.28515625, 7.5703125, 8.28515625], izq: [0, 2], fuente: 14, altoRot: 72, altos: aoa.map(function (_f, i) { return i ? 18 : null; }) });
+    { anchos: [12.42578125, 23, 7.42578125, 7.5703125, 7.5703125, 8.42578125, 8.28515625, 7.5703125, 8.28515625], izq: [1], fuente: 14, altoRot: 72, titulos: tits, altos: aoa.map(function (_f, i) { return i ? (tits.indexOf(i) >= 0 ? 22 : 18) : null; }) });
 }
 // v27.94: sin llamador desde la v27.98 (Luis: en el Excel va «Pettofrezza: 0», nombre + cajas, ver estCaj).
 function _adsEstSinPct(arr) {
@@ -478,18 +490,22 @@ function adsExcelStock(H) {
   // (salto de línea dentro de la celda), descripción sin ajuste, rótulo con borde de abajo, escala 75 (v27.99: «_5», G 8 · L 19,14).
   // v28.54 (Luis, 08/10): «*» en Entr est OC y en Entr. est. x tall. = CALCULADO (OC × % que viene entregando), no cargado a mano en la OC.
   // v28.01 (Luis): el Saldo es lo más importante — primera columna de datos (C) y en negrita.
-  var aoa = [["Cód", "Descripción", "Saldo " + H + " d", "Stk", "Comprom " + H + " d", "E.M. plazo " + H + "d",
-              "Fecha últ. OC", "Ped período", "Rec período", "% período", "Entr est OC", "Entr. est. x tall.", "Proporción"]];
+  // v28.92 (Luis, 08/10): el Excel es la tabla de la pantalla — Cód · Descripción · Tallerista · Stk · Comp · E.M. plazo ·
+  // Saldo · Últ. OC · Pedido · Recib. · Pend. est. (una sub-fila por tallerista). El Saldo sigue en negrita.
+  var aoa = [["Cód.", "Descripción", "Tallerista", "Stk", "Comp. " + H + "d", "E.M. plazo " + H + "d", "Saldo " + H + "d",
+              "Últ. OC", "Pedido", "Recib.", "Pend. est."]];
   f.forEach(function (r) {
-    var c = _adsStockCalc(r, H);
-    aoa.push([_adsCod(r.cod), r.descripcion || "", _adsNum(c.saldo), c.disp, c.comp, Math.round(c.em),
-      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), (c.estH != null && c.estCalc ? _adsNum(c.estH) + "*" : _adsNum(c.estH)), c.estCaj.join("\n"), c.dist.join("\n")]);
+    var c = _adsStockCalc(r, H), sin = c.pedP == null;
+    aoa.push([_adsCod(r.cod), r.descripcion || "", c.tallAct.length ? c.tallAct.join("\n") : "—", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo),
+      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC",
+      sin ? "" : c.ultPed.map(function (v) { return _adsN(v); }).join("\n"), sin ? "" : c.ultRec.map(function (v) { return _adsN(v); }).join("\n"),
+      sin ? "" : c.estXY.map(function (y) { return y.pend; }).join("\n")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
-    { anchos: ADS_XLS_STOCK_ANCHOS, izq: [11, 12], izqSin: [1], negrita: [2], fuente: 14, altoRot: 72, wrap: true, bordeRot: true, escala: 68, margenStd: true, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [11, 12], 2, 1.4) });
+    { anchos: ADS_XLS_STOCK_ANCHOS, izq: [2], izqSin: [1], negrita: [6], fuente: 14, altoRot: 72, wrap: true, bordeRot: true, escala: 68, margenStd: true, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [2, 8, 9, 10], 2, 1.4) });
 }
 // v28.30 (Luis, «ADS_stock_10d_20261007_8_1», *"ese es el formato que quiero"*): sus anchos exactos, filas de 2 renglones mínimo, escala 68
-var ADS_XLS_STOCK_ANCHOS = [11.28515625, 14.85546875, 5.28515625, 5.140625, 7.140625, 6, 7.7109375, 8.7109375, 6.28515625, 5.28515625, 6.140625, 19.140625, 27.42578125];   // los de su Excel, exactos
+var ADS_XLS_STOCK_ANCHOS = [8.7109375, 23, 14.85546875, 6.28515625, 7.140625, 7.140625, 6.7109375, 7.7109375, 7.140625, 7.140625, 9.7109375];   // v28.92: columnas de la pantalla
 /* alto de cada fila (Arial 14 con ajuste): renglones del texto más largo × 18 pt; ~1,35 de ancho por carácter */
 function _adsAltos(aoa, anchos, cols, minRen, porCar) {
   return aoa.map(function (f, i) {

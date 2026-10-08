@@ -95,7 +95,7 @@ const STOCK = [
     out.xl = bajados.map((x) => ({ n: x.nombre.replace(/_\d{8}\.xlsx$/, ""), cab: x.filas[0], f1: x.filas[1], len: x.filas.length,
       anchos: [...x.xml.matchAll(/<col [^>]*width="([\d.]+)"/g)].map((m) => Number(m[1])),
       alto1: /<row r="1"[^>]* ht="72"/.test(x.xml), congela: /state="frozen"/.test(x.xml), ajusta: /fitToWidth="1"/.test(x.xml),
-      a2: (x.xml.match(/<c r="A2"( s="\d+")?/) || [])[1] || "", b2: (x.xml.match(/<c r="B2"( s="\d+")?/) || [])[1] || "", c2: (x.xml.match(/<c r="C2"( s="\d+")?/) || [])[1] || "", negr: /<font><b\/>/.test(x.sty || ""), grilla: /<border><left style="thin">/.test(x.sty || "") && !/<xf numFmtId="0" fontId="\d" fillId="0" borderId="0" xfId="0" applyFont/.test(x.sty || "") }));
+      a2: (x.xml.match(/<c r="A2"( s="\d+")?/) || [])[1] || "", b2: (x.xml.match(/<c r="B2"( s="\d+")?/) || [])[1] || "", c2: (x.xml.match(/<c r="C2"( s="\d+")?/) || [])[1] || "", g2: (x.xml.match(/<c r="G2"( s="\d+")?/) || [])[1] || "", filas: x.filas, merge: (x.xml.match(/<mergeCell ref="[^"]+"/g) || []).length, tit: /fillId="2"/.test(x.sty || ""), negr: /<font><b\/>/.test(x.sty || ""), grilla: /<border><left style="thin">/.test(x.sty || "") && !/<xf numFmtId="0" fontId="\d" fillId="0" borderId="0" xfId="0" applyFont/.test(x.sty || "") }));
     window.adsHoriz(30); await espera(30);
     out.stock30 = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")].map((f) => f.cells[0].textContent);
     const f30 = document.querySelector("#adsOv .ads-body > table tbody tr");
@@ -133,19 +133,19 @@ const STOCK = [
   if (JSON.stringify(r.stock30) !== JSON.stringify(["505", "506"])) fallas.push("(c) quiebre 30 d: " + JSON.stringify(r.stock30));
   if (JSON.stringify(r.btnXl) !== JSON.stringify(["10 días", "20 días", "30 días"])) fallas.push("(f) botones Excel por rango: " + JSON.stringify(r.btnXl));
   const x10 = r.xl && r.xl[0], x30 = r.xl && r.xl[1], xt = r.xl && r.xl[2];
-  if (!x10 || x10.n !== "ADS_stock_10d" || x10.len !== 2 || x10.cab[2] !== "Saldo 10 d" || x10.cab[3] !== "Stk" || JSON.stringify(x10.f1.slice(0, 10)) !== JSON.stringify(["505", "Cuchillo", -70, 50, 20, 100, "30/09", 350, 250, 71])) fallas.push("(f) Excel stock 10 d: " + JSON.stringify(x10));
+  if (!x10 || x10.n !== "ADS_stock_10d" || x10.len !== 2 || JSON.stringify(x10.cab) !== JSON.stringify(["Cód.","Descripción","Tallerista","Stk","Comp. 10d","E.M. plazo 10d","Saldo 10d","Últ. OC","Pedido","Recib.","Pend. est."]) || JSON.stringify(x10.f1.slice(0, 8)) !== JSON.stringify(["505", "Cuchillo", "Lucho", 50, 20, 100, -70, "30/09"])) fallas.push("(f) Excel stock 10 d: " + JSON.stringify(x10));
   if (!x10 || !xt || !x10.grilla || !xt.grilla) fallas.push("(r) Excel ADS: todas las celdas con borde (cuadrícula al imprimir)");
-  if (!x10 || x10.c2 !== ' s="5"' || !x10.negr) fallas.push("(q) Excel stock: el Saldo (C) en negrita: " + JSON.stringify(x10 && [x10.c2, x10.negr]));
+  if (!x10 || x10.g2 !== ' s="5"' || !x10.negr) fallas.push("(q) Excel stock: el Saldo (G) en negrita: " + JSON.stringify(x10 && [x10.g2, x10.negr]));
   if (!x30 || x30.n !== "ADS_stock_30d" || x30.len !== 3) fallas.push("(f) Excel stock 30 d: " + JSON.stringify(x30));
-  if (!xt || !/^ADS_talleristas_/.test(xt.n) || xt.len !== 4 ||
-      JSON.stringify(xt.cab) !== JSON.stringify(["Tallerista","Cód.","Descripción","OC evaluadas","Pedido","Recibio Virgilio","%","Fecha última OC","Pedido última OC","Recibido última OC"])) fallas.push("(f) Excel talleristas: " + JSON.stringify(xt && xt.cab));
+  if (!xt || !/^ADS_talleristas_/.test(xt.n) || xt.len !== 6 || xt.merge !== 2 || !xt.tit || !/^Oscar · 20%$/.test(String(xt.filas[1][0])) ||
+      JSON.stringify(xt.cab) !== JSON.stringify(["Cód.","Descripción","OC evaluadas","Pedido","Recibio Virgilio","%","Fecha última OC","Pedido última OC","Recibido última OC"])) fallas.push("(f) Excel talleristas (fila-título por tallerista con su %): " + JSON.stringify(xt && [xt.cab, xt.len, xt.merge, xt.filas]));
   // v27.90 (Luis): el % de talleristas va como TEXTO «71%», entero
-  const ft = xt && xt.f1; if (!ft || !/^\d+%$/.test(String(ft[6]))) fallas.push("(g) % talleristas como texto: " + JSON.stringify(ft));
+  const ft = xt && xt.filas[2]; if (!ft || !/^\d+%$/.test(String(ft[5]))) fallas.push("(g) % talleristas como texto: " + JSON.stringify(ft));
   // v27.40: el formato de Luis (anchos chicos, rótulo de 45, congelado, entra a lo ancho; texto a la izq., números centrados)
-  if (!xt || JSON.stringify(xt.anchos) !== JSON.stringify([12.7109375, 12.42578125, 23, 7.42578125, 7.5703125, 7.5703125, 8.42578125, 8.28515625, 7.5703125, 8.28515625]) ||
-      !xt.alto1 || !xt.congela || !xt.ajusta || xt.a2 !== ' s="3"' || xt.b2 !== ' s="2"') fallas.push("(g) formato Excel talleristas: " + JSON.stringify(xt && [xt.anchos, xt.alto1, xt.congela, xt.ajusta, xt.a2, xt.b2]));
+  if (!xt || JSON.stringify(xt.anchos) !== JSON.stringify([12.42578125, 23, 7.42578125, 7.5703125, 7.5703125, 8.42578125, 8.28515625, 7.5703125, 8.28515625]) ||
+      !xt.alto1 || !xt.congela || !xt.ajusta || xt.a2 !== ' s="6"') fallas.push("(g) formato Excel talleristas: " + JSON.stringify(xt && [xt.anchos, xt.alto1, xt.congela, xt.ajusta, xt.a2, xt.b2]));
   // v27.87 (Luis): los anchos y rótulos son los de su Excel «ADS_stock_10d_20261007_1»
-  if (!x10 || JSON.stringify(x10.anchos) !== JSON.stringify([11.28515625, 14.85546875, 5.28515625, 5.140625, 7.140625, 6, 7.7109375, 8.7109375, 6.28515625, 5.28515625, 6.140625, 19.140625, 27.42578125]) || x10.cab[2] !== "Saldo 10 d" || x10.cab[4] !== "Comprom 10 d" || x10.cab[5] !== "E.M. plazo 10d" || x10.cab[12] !== "Proporción") fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
+  if (!x10 || JSON.stringify(x10.anchos) !== JSON.stringify([8.7109375, 23, 14.85546875, 6.28515625, 7.140625, 7.140625, 6.7109375, 7.7109375, 7.140625, 7.140625, 9.7109375])) fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
   // v27.59 D16 (Luis): sin stock que cubra lo comprometido = 0 días aunque no tenga Est. Madre; con sobrante y sin Est. Madre = «sin venta»
   {
     const src = require("fs").readFileSync(path.join(__dirname, "..", "ads.js"), "utf8");
@@ -166,7 +166,7 @@ const STOCK = [
     const cEst = ctx._adsStockCalc({ disponible: 5, proy_mes: 0, comp10: 0, saldo10: 5 }, 10), est = cEst.estH;
     // v27.91 (Luis): cada tallerista en su sub-fila del Excel, descripción sin ajuste, borde del rótulo, escala 74
   { const _s = require("fs").readFileSync(__dirname + "/../ads.js", "utf8");
-    if (!/c\.estCaj\.join\("\\n"\), c\.dist\.join\("\\n"\)/.test(_s) || !/izqSin: \[1\], negrita: \[2\]/.test(_s) || !/bordeRot: true, escala: 68, margenStd: true/.test(_s)) fallas.push("(l) formato stock v27.91"); }
+    if (!/c\.estXY\.map\(function \(y\) \{ return y\.pend; \}\)\.join\("\\n"\)/.test(_s) || !/izqSin: \[1\], negrita: \[6\]/.test(_s) || !/bordeRot: true, escala: 68, margenStd: true/.test(_s)) fallas.push("(l) formato stock v27.91"); }
   { const _m = src.match(/function _adsEstSinPct[\s\S]*?\n\}/); const _f = _m && new Function(_m[0] + "; return _adsEstSinPct;")();
     if (!_f || JSON.stringify(_f(["A 83 % (50)", "Lucho (350)"])) !== JSON.stringify(["50", "350"])) fallas.push("(m) Excel: entrega estimada sólo cajas"); }
   { const _sv = ctx._adsPctCod; ctx._adsPctCod = function () { return [
