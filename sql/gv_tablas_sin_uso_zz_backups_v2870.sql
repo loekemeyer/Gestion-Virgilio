@@ -1,0 +1,15 @@
+-- v28.70 (Luis, 08/10/2026, D13: "backup y sacalas") · YA APLICADO en hrxfctzncixxqmpfhskv
+-- 18 tablas de public sin lector (ni front de este repo, ni funciones, ni crons, ni FK) pasaron a
+-- zz_backups con RLS prendida y sin escritura para anon/authenticated. Quedan anotadas en
+-- public."GV_Backups_Indice" (movida_el = 08/10). Producción Virgilio no cuenta (Luis: "no va más").
+-- Las vistas que las nombraban siguen andando (referencian por OID): gv_codigos_multigrafia (sin
+-- lector) y el centinela gv_fuentes_lugares. Verificado: gv_reglas_perdidas 0 · gv_endpoints_rotos 0.
+--   backups: GV_UxB_pre_sync_20260912, snap_costo_nombres_0903, db_n8n_espejo_historico_20260419,
+--            _restructura_sectores, GV_Baseline_20260912, _rls_diag
+--   legacy:  Ubicaciones_Articulos, Stock_Ubicaciones, Insumos_Ubicaciones_Unificadas,
+--            GV_Lugar_Pendiente, Precios_Historico, Proveedores_Insumos
+--   sueltas: cajas_stock_planta, flejes_stock_planta, partes_plasticas_stock_planta,
+--            empleados_loekemeyer_chef, GV_Region, GV_Region_Vecina
+-- NO se movió Entrevistas_Virgilio: la usa el admin de Cervantes (entero/Produccion/entrevistas.html).
+-- ROLLBACK de una:  alter table zz_backups."<tabla>" set schema public;
+-- (y devolverle los grants que tenía si una pantalla la vuelve a necesitar)
