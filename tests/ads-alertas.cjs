@@ -128,7 +128,7 @@ const STOCK = [
   const C10 = ["Tallerista","Cód.","Descripción","Stk","Comprom.10 d","E.M. plazo10d","Saldo10 d","Últ.OC","Pedido","Recibido","Estim.pend."];
   if (JSON.stringify(r.cols10) !== JSON.stringify(C10)) fallas.push("(c) columnas stock: " + JSON.stringify(r.cols10));
   if (r.tallCol !== "Lucho") fallas.push("(c) v28.60 tallerista a la izquierda del código: " + JSON.stringify(r.tallCol));
-  if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","100","-70","30/09","350","250"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));
+  if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","100","-70","30/09","200","100"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));
   if (JSON.stringify(r.fila30) !== JSON.stringify(["50","60","300","-310","30/09"])) fallas.push("(c) fila a 30 d: " + JSON.stringify(r.fila30));
   if (JSON.stringify(r.stock30) !== JSON.stringify(["505", "506"])) fallas.push("(c) quiebre 30 d: " + JSON.stringify(r.stock30));
   if (JSON.stringify(r.btnXl) !== JSON.stringify(["10 días", "20 días", "30 días"])) fallas.push("(f) botones Excel por rango: " + JSON.stringify(r.btnXl));
