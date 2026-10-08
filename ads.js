@@ -18,8 +18,9 @@
      (ads_n_ocs, ads_umbral, ads_incluir_actual): el badge es el mismo para todos.
    PESTAÑA 2 · STOCK (quiebres a 10, 20 y 30 días)
      saldo N = (góndola + racks + a guardar + excedente) − el MAYOR entre las NP programadas
-               sin pickear con entrega hasta hoy + N (vencidas también) y Est. Madre × N/30
-               (v27.92, Luis D3: no la suma — lo comprometido ya es parte de la Est. Madre)
+               sin pickear con entrega hasta hoy + N (vencidas también) y E.M. plazo
+               (v28.56, Luis: E.M. plazo = Est. Madre × max(0, N − días que tarda en salir) / 30;
+               los días salen del promedio de las últimas 2 semanas o los fija un supervisor)
      Negativo = quiebre. Sólo artículos CON TALLERISTA (v27.23: los importados sin tallerista no van).
      Con la última OC del código (cuánto se recibió) y el %
      que viene entregando ese tallerista en ese artículo (rango de la pestaña 1).
@@ -167,6 +168,18 @@ function _adsCargarStock() {
   });
 }
 
+// v28.56 (Luis): cuánto tarda un pedido en salir (días). Lo da gv_ads_config: manual o promedio de 2 semanas.
+function _adsLead() { var c = (typeof _ads !== "undefined" && _ads.cfg) || {}; var l = Number(c.lead_dias); return isFinite(l) && c.lead_dias != null ? l : 12; }
+function _adsLeadTxt(x) { return String(Math.round(Number(x) * 10) / 10).replace(".", ","); }
+function adsSetLead(v) {
+  var t = String(v == null ? "" : v).trim().replace(",", "."), d = t === "" ? null : Number(t);
+  if (d != null && !(d >= 0 && d <= 60)) { alert("Días entre 0 y 60 (vacío = automático)."); _adsRender(); return; }
+  _adsRpc("gv_ads_lead_guardar", { p_dias: d }).then(function (r) {
+    if (r.error) { alert("No se guardó: " + (r.error.message || r.error)); return; }
+    _ads.cfg = Object.assign({}, _ads.cfg || {}, r.data || {}); _ads.stock = null; _adsRender(); _adsCargarStock();
+    try { adsLoadBadge(); } catch (_e) {}
+  });
+}
 function adsSetN(v) { _ads.n = Math.max(1, Math.min(12, parseInt(v, 10) || 4)); _adsCargarTall(); }
 function adsSetUmbral(v) { var n = parseFloat(String(v).replace(",", ".")); if (n > 0 && n <= 100) { _ads.umbral = n / 100; _adsRender(); } }
 function adsGuardarCfg() {
@@ -253,13 +266,15 @@ function _adsHtmlStock() {
       return '<span class="chip' + (on ? " on" : "") + '" onclick="adsHoriz(' + x[0] + ')">' + (x[0] ? x[0] + " días · " + x[1] : "todos · " + x[1]) + "</span>";
     }).join(" ") +
     ' · <input id="adsQ" placeholder="Buscar código" style="width:130px" value="' + _adsEsc(_ads.q) + '" oninput="adsBuscar(this.value)">' +
+    ' · <span title="Cuánto tarda un pedido desde que entra hasta que sale. Automático = promedio de las NP web entregadas en las últimas 2 semanas.">Tarda en salir: <input id="adsLead" style="width:46px" value="' + _adsLeadTxt(_adsLead()) + '" onchange="adsSetLead(this.value)"> d' +
+    ((_ads.cfg || {}).lead_manual != null ? ' <span class="chip" onclick="adsSetLead(\'\')" title="Volver al promedio de las últimas 2 semanas">auto ' + ((_ads.cfg || {}).lead_auto != null ? _adsLeadTxt(_ads.cfg.lead_auto) + ' d' : '—') + '</span>' : ' (auto)') + '</span>' +
     ' · Excel: ' + [10, 20, 30].map(function (d) { return '<button class="xl" onclick="adsExcelStock(' + d + ')">' + d + ' días</button>'; }).join(" ") + '</div>';
   h += '<div class="ads-body">';
   if (_ads.stockErr) return h + '<div class="err">' + _adsEsc(_ads.stockErr) + "</div></div>";
   if (!_ads.stock) return h + '<div class="msg">Leyendo stock…</div></div>';
   var f = adsFiltrarStock(rows, ver, _ads.q, H);
-  h += '<div class="res">Todo a ' + H + ' días · sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · en cajas</div>';
-  h += '<table><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2">Stk</th><th rowspan="2">Comprom.<br>' + H + ' d</th><th rowspan="2" title="Est. Madre del mes × ' + H + '/30">Est. Madre<br>' + H + ' d</th>' +
+  h += '<div class="res">Todo a ' + H + ' días · sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · saldo = disponible − comprometido − E.M. plazo (Est. Madre × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ') / 30) · en cajas</div>';
+  h += '<table><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2">Stk</th><th rowspan="2">Comprom.<br>' + H + ' d</th><th rowspan="2" title="Est. Madre del mes × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ' días que tarda en salir) / 30: los pedidos que entran y salen dentro del plazo">E.M. plazo<br>' + H + 'd</th>' +
     '<th rowspan="2">Saldo<br>' + H + ' d</th>' +
     '<th colspan="6" class="ug" title="Pedido y recibido de las últimas ' + _ads.n + ' OC (el rango de Entregas talleristas), sumando todos los talleristas · recibido = lo que recibió Virgilio, hasta lo pedido">Período (' + _ads.n + ' OC)</th></tr>' +
     '<tr><th class="u1">Fecha<br>últ. OC</th><th class="u2">Pedido<br>período</th><th class="u2">Recibido<br>período</th><th class="u2">%</th>' +
@@ -320,7 +335,7 @@ function _adsStockCalc(r, H) {
   var _epTxt = function (y) { return y.oc ? " · cargado en la OC" : ""; };
   var estDist = estArr.length > 1 ? estArr.map(function (y) { return y.p + " " + (estH > 0 ? _adsPct(y.e / estH) : "—") + " (" + _adsN(y.e) + ")" + _epTxt(y); })
               : estArr.length ? [estArr[0].p + " (" + _adsN(estArr[0].e) + ")" + _epTxt(estArr[0])] : [];
-  return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]), estH: pc.length ? estH : null, estOc: estArr.some(function (y) { return y.oc; }), estDet: estDet, estDist: estDist, estCaj: estArr.map(function (y) { return y.p + ": " + _adsN(y.e) + (y.oc ? "" : "*"); }),
+  return { disp: disp, proy: proy, comp: comp, em: proy * Math.max(0, H - (typeof _adsLead === "function" ? _adsLead() : 12)) / 30, saldo: Number(r["saldo" + H]), estH: pc.length ? estH : null, estOc: estArr.some(function (y) { return y.oc; }), estDet: estDet, estDist: estDist, estCaj: estArr.map(function (y) { return y.p + ": " + _adsN(y.e) + (y.oc ? "" : "*"); }),
            estCalc: estArr.some(function (y) { return !y.oc; }),
            pedP: pc.length ? totPed : null, recP: pc.length ? recP : null, pctP: pc.length && totPed > 0 ? recP / totPed : null,
            fechaUlt: fechaUlt, dist: dist };
@@ -429,7 +444,7 @@ function adsExcelStock(H) {
   // (salto de línea dentro de la celda), descripción sin ajuste, rótulo con borde de abajo, escala 75 (v27.99: «_5», G 8 · L 19,14).
   // v28.54 (Luis, 08/10): «*» en Entr est OC y en Entr. est. x tall. = CALCULADO (OC × % que viene entregando), no cargado a mano en la OC.
   // v28.01 (Luis): el Saldo es lo más importante — primera columna de datos (C) y en negrita.
-  var aoa = [["Cód", "Descripción", "Saldo " + H + " d", "Stk", "Comprom " + H + " d", "E M " + H + " d",
+  var aoa = [["Cód", "Descripción", "Saldo " + H + " d", "Stk", "Comprom " + H + " d", "E.M. plazo " + H + "d",
               "Fecha últ. OC", "Ped período", "Rec período", "% período", "Entr est OC", "Entr. est. x tall.", "Proporción"]];
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);

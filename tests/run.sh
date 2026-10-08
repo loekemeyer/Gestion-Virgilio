@@ -1176,6 +1176,7 @@ node tests/est-madre-unica.cjs
 echo "== ads-alertas (v27.21: ADS — Alertas Damián Stock, talleristas + quiebres; ads.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ads-alertas.cjs
 node tests/ads-entrega-proy.cjs
+node tests/ads-em-plazo.cjs
 echo "== hotsale-rent (v25.91: Hot Sale — rent. ponderada del período, importados y nacionales por separado; hotsale.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/hotsale-rent.cjs
 echo "== isis-estadisticas (v26.20: Estadísticas ISIS — ventas y pedidos configurados como los manuales 29 y 31, disruptivos en rojo; estadisticas.js) =="

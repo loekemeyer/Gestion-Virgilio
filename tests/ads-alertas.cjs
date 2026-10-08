@@ -124,14 +124,14 @@ const STOCK = [
   if (JSON.stringify(r.chips) !== JSON.stringify(["10 días · 1", "20 días · 1", "30 días · 2", "todos · 3"])) fallas.push("(c) chips " + JSON.stringify(r.chips));
   if (JSON.stringify(r.stockCods) !== JSON.stringify(["505"])) fallas.push("(c) quiebre 10 d: " + JSON.stringify(r.stockCods));
   if (String(r.pctTall).trim() !== "Lucho (350)") fallas.push("(c) Dist un solo tallerista, sin % y con cajas: " + r.pctTall);
-  const C10 = ["Cód.","Descripción","Stk","Comprom.10 d","Est. Madre10 d","Saldo10 d","Período (4 OC)","Fechaúlt. OC","Pedidoperíodo","Recibidoperíodo","%","Entregaest. OC","Proporción"];
+  const C10 = ["Cód.","Descripción","Stk","Comprom.10 d","E.M. plazo10d","Saldo10 d","Período (4 OC)","Fechaúlt. OC","Pedidoperíodo","Recibidoperíodo","%","Entregaest. OC","Proporción"];
   if (JSON.stringify(r.cols10) !== JSON.stringify(C10)) fallas.push("(c) columnas stock: " + JSON.stringify(r.cols10));
-  if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","100","-70","30/09","350","250","71 %"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));
-  if (JSON.stringify(r.fila30) !== JSON.stringify(["50","60","300","-310","30/09"])) fallas.push("(c) fila a 30 d: " + JSON.stringify(r.fila30));
+  if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","0","-70","30/09","350","250","71 %"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));
+  if (JSON.stringify(r.fila30) !== JSON.stringify(["50","60","180","-310","30/09"])) fallas.push("(c) fila a 30 d: " + JSON.stringify(r.fila30));
   if (JSON.stringify(r.stock30) !== JSON.stringify(["505", "506"])) fallas.push("(c) quiebre 30 d: " + JSON.stringify(r.stock30));
   if (JSON.stringify(r.btnXl) !== JSON.stringify(["10 días", "20 días", "30 días"])) fallas.push("(f) botones Excel por rango: " + JSON.stringify(r.btnXl));
   const x10 = r.xl && r.xl[0], x30 = r.xl && r.xl[1], xt = r.xl && r.xl[2];
-  if (!x10 || x10.n !== "ADS_stock_10d" || x10.len !== 2 || x10.cab[2] !== "Saldo 10 d" || x10.cab[3] !== "Stk" || JSON.stringify(x10.f1.slice(0, 10)) !== JSON.stringify(["505", "Cuchillo", -70, 50, 20, 100, "30/09", 350, 250, 71])) fallas.push("(f) Excel stock 10 d: " + JSON.stringify(x10));
+  if (!x10 || x10.n !== "ADS_stock_10d" || x10.len !== 2 || x10.cab[2] !== "Saldo 10 d" || x10.cab[3] !== "Stk" || JSON.stringify(x10.f1.slice(0, 10)) !== JSON.stringify(["505", "Cuchillo", -70, 50, 20, 0, "30/09", 350, 250, 71])) fallas.push("(f) Excel stock 10 d: " + JSON.stringify(x10));
   if (!x10 || !xt || !x10.grilla || !xt.grilla) fallas.push("(r) Excel ADS: todas las celdas con borde (cuadrícula al imprimir)");
   if (!x10 || x10.c2 !== ' s="5"' || !x10.negr) fallas.push("(q) Excel stock: el Saldo (C) en negrita: " + JSON.stringify(x10 && [x10.c2, x10.negr]));
   if (!x30 || x30.n !== "ADS_stock_30d" || x30.len !== 3) fallas.push("(f) Excel stock 30 d: " + JSON.stringify(x30));
@@ -143,7 +143,7 @@ const STOCK = [
   if (!xt || JSON.stringify(xt.anchos) !== JSON.stringify([12.7109375, 12.42578125, 23, 7.42578125, 7.5703125, 7.5703125, 8.42578125, 8.28515625, 7.5703125, 8.28515625]) ||
       !xt.alto1 || !xt.congela || !xt.ajusta || xt.a2 !== ' s="3"' || xt.b2 !== ' s="2"') fallas.push("(g) formato Excel talleristas: " + JSON.stringify(xt && [xt.anchos, xt.alto1, xt.congela, xt.ajusta, xt.a2, xt.b2]));
   // v27.87 (Luis): los anchos y rótulos son los de su Excel «ADS_stock_10d_20261007_1»
-  if (!x10 || JSON.stringify(x10.anchos) !== JSON.stringify([11.28515625, 14.85546875, 5.28515625, 5.140625, 7.140625, 6, 7.7109375, 8.7109375, 6.28515625, 5.28515625, 6.140625, 19.140625, 27.42578125]) || x10.cab[2] !== "Saldo 10 d" || x10.cab[4] !== "Comprom 10 d" || x10.cab[5] !== "E M 10 d" || x10.cab[12] !== "Proporción") fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
+  if (!x10 || JSON.stringify(x10.anchos) !== JSON.stringify([11.28515625, 14.85546875, 5.28515625, 5.140625, 7.140625, 6, 7.7109375, 8.7109375, 6.28515625, 5.28515625, 6.140625, 19.140625, 27.42578125]) || x10.cab[2] !== "Saldo 10 d" || x10.cab[4] !== "Comprom 10 d" || x10.cab[5] !== "E.M. plazo 10d" || x10.cab[12] !== "Proporción") fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
   // v27.59 D16 (Luis): sin stock que cubra lo comprometido = 0 días aunque no tenga Est. Madre; con sobrante y sin Est. Madre = «sin venta»
   {
     const src = require("fs").readFileSync(path.join(__dirname, "..", "ads.js"), "utf8");
