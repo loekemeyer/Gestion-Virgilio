@@ -300,7 +300,7 @@ function _adsHtmlStock() {
   h += '<table class="ads-stk"><thead><tr><th title="Tallerista de la OC vigente del código">Tallerista</th><th>Cód.</th><th>Descripción</th><th>Stk</th><th>Comp.<br>' + H + 'd</th><th title="Est. Madre del mes × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ' días que tarda en salir) / 30: los pedidos que entran y salen dentro del plazo">E.M. plazo<br>' + H + 'd</th>' +
     '<th>Saldo<br>' + H + 'd</th><th title="Fecha de la última OC del código">Últ.<br>OC</th>' +
     '<th title="Lo pedido en la última OC, uno por tallerista">Pedido</th><th title="Lo que recibió Virgilio de la última OC, uno por tallerista">Recib.</th>' +
-    '<th title="Por tallerista: lo que falta que entregue de la última OC (lo cargado en la OC menos lo ya recibido; con * si la casilla está vacía y es la OC × el % que viene entregando)">Pend.<br>est.</th></tr></thead><tbody>';   // v28.62 (Luis, 08/10): sin Proporción en pantalla (sigue en el Excel)
+    '<th title="Por tallerista, X/Y de la última OC: X = lo que va a entregar (lo cargado en la OC; con * si la casilla está vacía: la OC × el % que entregó en el período anterior), menos lo ya entregado · Y = lo pedido menos lo ya entregado">Pend.<br>est.</th></tr></thead><tbody>';   // v28.62 (Luis, 08/10): sin Proporción en pantalla (sigue en el Excel)
   if (!f.length) h += '<tr><td colspan="11" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H), disp = c.disp, proy = c.proy, comp = c.comp, em = c.em, saldo = c.saldo;
@@ -370,7 +370,9 @@ function _adsStockCalc(r, H) {
            ultPed: estArr.map(function (y) { return y.y; }), ultRec: estArr.map(function (y) { return y.r; }),   // v28.83 (Luis): pedido y recibido de la ÚLTIMA OC, uno por tallerista
            // v28.82: X = lo que falta (proyectado de la OC − lo ya recibido). v28.64 (Luis, 08/10): «X/Y» por tallerista: X = proyectado de entrega (con * si es estimado: la casilla de la OC
            // está VACÍA; un 0 cargado es dato y va sin *), Y = lo pedido en la última OC
-           estXY: estArr.map(function (y) { return { p: y.p, txt: _adsN(y.e) + (y.oc ? "" : "*") + "/" + _adsN(y.y), pend: _adsN(y.e) + (y.oc ? "" : "*") /* v28.84: en pantalla sólo X (Y ya está en Pedido) */ }; }),
+           // v28.87 (Luis, 08/10): Pend. est. = X/Y. Y = lo que FALTA de la OC (pedido − ya entregado). X = lo cargado en la OC
+           // (casilla vacía no es 0) o, sin dato, lo proyectado con el % del período cerrado (con *), menos lo ya entregado.
+           estXY: estArr.map(function (y) { var t = _adsN(y.e) + (y.oc ? "" : "*") + "/" + _adsN(Math.max(0, y.y - y.r)); return { p: y.p, txt: t, pend: t }; }),
            pedP: pc.length ? totPed : null, recP: pc.length ? recP : null, pctP: pc.length && totPed > 0 ? recP / totPed : null,
            fechaUlt: fechaUlt, dist: dist };
 }
