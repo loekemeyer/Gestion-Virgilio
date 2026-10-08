@@ -276,14 +276,12 @@ function _adsHtmlStock() {
   h += '<div class="res">Todo a ' + H + ' días · sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · saldo = disponible − comprometido − E.M. plazo (Est. Madre × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ') / 30) · en cajas</div>';
   h += '<table><thead><tr><th rowspan="2" title="Tallerista de la OC vigente del código">Tallerista</th><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2">Stk</th><th rowspan="2">Comprom.<br>' + H + ' d</th><th rowspan="2" title="Est. Madre del mes × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ' días que tarda en salir) / 30: los pedidos que entran y salen dentro del plazo">E.M. plazo<br>' + H + 'd</th>' +
     '<th rowspan="2">Saldo<br>' + H + ' d</th>' +
-    '<th colspan="6" class="ug" title="Pedido y recibido de las últimas ' + _ads.n + ' OC (el rango de Entregas talleristas), sumando todos los talleristas · recibido = lo que recibió Virgilio, hasta lo pedido">Período (' + _ads.n + ' OC)</th></tr>' +
+    '<th colspan="5" class="ug" title="Pedido y recibido de las últimas ' + _ads.n + ' OC (el rango de Entregas talleristas), sumando todos los talleristas · recibido = lo que recibió Virgilio, hasta lo pedido">Período (' + _ads.n + ' OC)</th></tr>' +
     '<tr><th class="u1">Fecha<br>últ. OC</th><th class="u2">Pedido<br>período</th><th class="u2">Recibido<br>período</th><th class="u2">%</th>' +
-    '<th class="u2" title="Lo que falta que entreguen de la OC vigente: lo declarado en la OC si está; si no, la OC × el % que viene entregando cada tallerista, menos lo ya recibido de esa OC">Entrega<br>est. OC</th>' +
-    '<th class="u3" title="Tallerista al que le corresponde; si son varios, la parte de cada uno en lo pedido del período">Proporción</th></tr></thead><tbody>';
-  if (!f.length) h += '<tr><td colspan="13" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
+    '<th class="u3" title="Lo que falta que entreguen de la OC vigente: lo declarado en la OC si está; si no, la OC × el % que viene entregando cada tallerista, menos lo ya recibido de esa OC">Entrega<br>est. OC</th></tr></thead><tbody>';   // v28.62 (Luis, 08/10): sin Proporción en pantalla (sigue en el Excel)
+  if (!f.length) h += '<tr><td colspan="12" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H), disp = c.disp, proy = c.proy, comp = c.comp, em = c.em, saldo = c.saldo;
-    var dist = c.dist.length ? c.dist.map(_adsEsc).join("<br>") : "—";
     // v28.60 (Luis, 08/10): a la izquierda del código, el tallerista de la OC vigente
     h += '<tr><td class="tall">' + (c.tallAct.length ? c.tallAct.map(_adsEsc).join("<br>") : "—") + "</td><td><b>" + _adsEsc(r.cod) + '</b></td><td class="desc" title="' + _adsEsc(r.descripcion) + '">' + _adsEsc(r.descripcion) +
       '</td><td title="Góndola ' + _adsN(r.terminado) + " · racks " + _adsN(r.racks) + " · a guardar " + _adsN(r.a_guardar) + " · excedente " + _adsN(r.excedente) + '">' + _adsN(disp) +
@@ -291,11 +289,11 @@ function _adsHtmlStock() {
       '</td><td class="' + (saldo < 0 ? "neg" : "pos") + '">' + _adsN(saldo) + "</td>";
     // v27.78 (Luis): el recuadro es del PERÍODO (las N OC del rango), no de la última OC; la fecha sí es la de la última OC
     var fUlt = c.fechaUlt ? _adsFecha(c.fechaUlt) : '<span class="neg">sin OC</span>';
-    if (c.pedP == null) h += '<td class="u1">' + fUlt + '</td><td colspan="4" class="u2">' + (_ads.tall ? "sin OC en el período" : "…") + "</td>";
+    if (c.pedP == null) h += '<td class="u1">' + fUlt + '</td><td colspan="4" class="u3">' + (_ads.tall ? "sin OC en el período" : "…") + "</td>";
     else h += '<td class="u1">' + fUlt + '</td><td class="u2">' + _adsN(c.pedP) + '</td><td class="u2">' + _adsN(c.recP) +
       '</td><td class="u2' + (c.pctP != null && c.pctP < _ads.umbral ? " neg" : "") + '">' + _adsPct(c.pctP) +
-      '</td><td class="u2" title="' + _adsEsc((c.estDist.length ? c.estDist : c.estDet).join("\n")) + '"><b' + (c.estOc ? ' style="text-decoration:underline dotted"' : "") + '>' + _adsN(c.estH) + "</b></td>";   // v27.85 (Luis): el reparto por tallerista va en el tooltip
-    h += '<td class="u3">' + dist + "</td></tr>";
+      '</td><td class="u3" title="' + _adsEsc((c.estDist.length ? c.estDist : c.estDet).join("\n")) + '"><b' + (c.estOc ? ' style="text-decoration:underline dotted"' : "") + '>' + _adsN(c.estH) + "</b></td>";   // v27.85 (Luis): el reparto por tallerista va en el tooltip
+    h += "</tr>";
   });
   return h + "</tbody></table></div>";
 }
