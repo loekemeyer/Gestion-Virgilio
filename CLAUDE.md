@@ -8403,3 +8403,5 @@ aaa_gv_anon_bloqueo`) o escribir por una RPC SECURITY DEFINER. `sql/gv_anon_inse
   `es_legajo_entrevista` / `esLegajoEntrevista` aceptan 600 (viejo, de respaldo si la RPC no contesta) y 6001-6999; al
   validarlo, `gv_operario_alta_validar` desactiva el legajo de entrevista. `sql/gv_entrevista_legajo_propio_v2867.sql`,
   `tests/tv-clave-login.cjs` (e).
+
+- **v28.69 (Luis, 08/10): un celular con el 600 compartido y el nombre de un EMPLEADO ACTIVO registra con SU legajo** (trigger `aa_gv_registro_entrevista_a_empleado`). Caso Kevin Latronico (504). `sql/gv_registro_entrevista_a_empleado_v2869.sql`.
