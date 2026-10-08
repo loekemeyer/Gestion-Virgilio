@@ -4,6 +4,11 @@ Proyecto `hrxfctzncixxqmpfhskv`. Alcance: funciones de `public` y `procesos` que
 y que en su cuerpo tienen `insert/update/delete/truncate` → **186 firmas (181 nombres)**. Solo lectura:
 no se ejecutó nada. Plan de referencia: `docs/PLAN-LOGIN-OPERARIOS-RED.md`.
 
+> **08/10/2026 (v28.68, Thomas D12): tandas A y B APLICADAS** (84 firmas propias; `sql/gv_rpc_cierre_anon_v2868.sql`,
+> backup `zz_backups."GV_Backup_FuncGrants_20261008"`). Quedaron afuera `gv_ppp_nps_mover_a` (hoy la llama index.html),
+> `gv_tandas_codigos_usados_sync` y `gv_ppp_reprogramar_sin_factura`. Las `http_*` de la extensión son de `supabase_admin`:
+> no se pueden revocar desde la sesión. Falta C, E, F y G (necesitan que la pantalla mande sesión).
+
 ## Resumen
 
 1. **186 firmas**: 27 trigger · 26 internas/cron (sin app) · 7 solo Edge Function/CI con `service_role` · 4 no escriben de verdad (solo tablas temporales o comentario) · 100 RPC que llama alguna app · 22 sin uso en código ni logs.
