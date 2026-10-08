@@ -8406,3 +8406,16 @@ aaa_gv_anon_bloqueo`) o escribir por una RPC SECURITY DEFINER. `sql/gv_anon_inse
 
 - **v28.69 (Luis, 08/10): un celular con el 600 compartido y el nombre de un EMPLEADO ACTIVO registra con SU legajo** (trigger `aa_gv_registro_entrevista_a_empleado`). Caso Kevin Latronico (504). `sql/gv_registro_entrevista_a_empleado_v2869.sql`.
   **v28.71**: el evento 600 SIN nombre (PKC…) toma el legajo del ingreso de hoy de ese mismo celular.
+
+## ⚠ REGLA (Thomas, 2026-10-08, v28.75, D15): 18 funciones de SUPERVISOR exigen la sesión de Google — `gv_rpc_guard`
+
+Las RPC que usan sólo pantallas de supervisor (insumo_* del admin, aceptar/rechazar_conteo, faltante_resolver,
+zona_barrio_set, gv_supers_set/baja, corr_convertir_faltante, gv_conciliacion_registrar, gv_pedido_horario_set,
+gv_insumo_ubicaciones_guardar) arrancan con `perform public.gv_rpc_guard('<fn>')` (marcador `rpc-guard-d15`): si la
+fila de **`GV_RPC_Guard`** está activa y el que llama no es supervisor, corta con `SUPERVISOR: …` (401). Por eso el
+front las llama con `gvWriteHdr()` (la sesión), nunca con la clave pública. El operario entra como usuario anónimo
+(authenticated): un revoke a anon no alcanzaba. Probado por HTTP con la clave pública → 401 SUPERVISOR.
+- **Rollback rápido**: `select public.gv_rpc_guard_instalar(false);` (o `update … set activo=false where fn='<fn>'`).
+- **Rollback total**: `select public.gv_rpc_guard_quitar();` (repone los cuerpos de `zz_backups."GV_Backup_RPCGuard_defs_20261008"`, 20 firmas).
+- ⚠ Probar desde el MCP NO sirve: `gv_es_supervisor_o_servicio` deja pasar `session_user = postgres`. Se prueba con `net.http_post` + clave pública.
+- Afuera: `gv_oc_generar_pendientes` (regla protegida) e `insumo_unidad_guardar` (operario). `sql/gv_rpc_guard_supervisor_d15.sql`.

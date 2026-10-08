@@ -81,7 +81,7 @@ begin
   for r in select firma, def from zz_backups."GV_Backup_RPCGuard_defs_20261008" loop
     execute r.def; n := n + 1;
   end loop;
-  update public."GV_RPC_Guard" set activo = false;
+  update public."GV_RPC_Guard" set activo = false where activo;
   return 'cuerpos originales repuestos: ' || n;
 end $f$;
 revoke all on function public.gv_rpc_guard_quitar() from public, anon, authenticated;
