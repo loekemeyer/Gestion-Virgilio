@@ -27,3 +27,21 @@ create or replace trigger aa_gv_registro_entrevista_a_empleado BEFORE INSERT ON 
 -- celular (GV_Dispositivo_Login.dispositivo = gv_dispositivo). Caso: el PKC de F69A de Kevin entró como 600
 -- después de la v28.69. Aplicado el 08/10 (create or replace sobre la viva); probado en transacción abortada
 -- (600 + su dispositivo -> 504) y movido ese PKC + 3 movimientos + 6 pasos a 504.
+
+-- v28.72 (08/10, Luis D2): lo mismo para los pasos de picking (GV_Picking_Paso_Evento): el 600 toma el legajo
+-- del ingreso de hoy de ese celular. Aplicado el 08/10.
+create or replace function public.gv_pkpaso_entrevista_a_empleado()
+ returns trigger language plpgsql security definer set search_path to 'public','pg_temp'
+as $f$ declare v_leg text; begin
+  if new.legajo = '600' and nullif(btrim(coalesce(new.dispositivo,'')),'') is not null then
+    select btrim(l.legajo::text) into v_leg from public."GV_Dispositivo_Login" l
+     where l.dispositivo = new.dispositivo
+       and (l.created_at at time zone 'America/Argentina/Buenos_Aires')::date = (now() at time zone 'America/Argentina/Buenos_Aires')::date
+       and btrim(l.legajo::text) ~ '^\d+$' and not public.es_legajo_entrevista(l.legajo::text) and btrim(l.legajo::text) not in ('0','1')
+     order by l.created_at desc limit 1;
+    if v_leg is not null then new.legajo := v_leg; end if;
+  end if;
+  return new; end $f$;
+create or replace trigger aa_gv_pkpaso_entrevista_a_empleado before insert on public."GV_Picking_Paso_Evento"
+ for each row when (new.legajo = '600') execute function public.gv_pkpaso_entrevista_a_empleado();
+-- Nota: el lock de F69A quedó con legajo 600 (nombre Kevin Latronico) para que su celular, logueado con el 600, la siga.
