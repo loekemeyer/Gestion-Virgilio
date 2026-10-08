@@ -5,7 +5,7 @@ const fs = require("fs");
 const s = fs.readFileSync(__dirname + "/../index.html", "utf8");
 const grab = n => { const i = s.indexOf("function " + n + "("); if (i < 0) throw new Error("falta " + n); let d = 0; for (let k = s.indexOf("{", i); ; k++) { if (s[k] == "{") d++; if (s[k] == "}" && !--d) return s.slice(i, k + 1); } };
 global.TZ_AR = "America/Argentina/Buenos_Aires"; global.escapeHtml = x => String(x);
-eval(["_pkHojaDia", "_pkHojaHm", "_pkHojaDm", "_pkHojaNum", "_pkHojaMinOtras", "pkHojaArmar", "pkHojaHtml"].map(grab).join("\n") + ";global.A=pkHojaArmar;global.H=pkHojaHtml;");
+eval(["_padCod", "_pkHojaDia", "_pkHojaHm", "_pkHojaDm", "_pkHojaNum", "_pkHojaMinOtras", "pkHojaArmar", "pkHojaHtml"].map(grab).join("\n") + ";global.A=pkHojaArmar;global.H=pkHojaHtml;");
 let bad = 0; const ok = (c, m) => { if (!c) { bad++; console.log("✗", m); } else console.log("✓", m); };
 const tp = { legajo: "94", ts_inicio: "2026-10-01T08:00:00-03:00", ts_cliente: "2026-10-01T10:00:00-03:00" };
 const pkc = ["E70F|505|5|5|0|LK", "E70F|501|4|2|0|LK", "E70F|809E LK|1|0|0|LK", "E70F|066|1|1|0|LK"].map(texto => ({ texto }));

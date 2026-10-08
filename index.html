@@ -13601,7 +13601,7 @@ function pkRender() {
     body.innerHTML = `<div class="pk-flow">${nav}
       <div class="pk-big-row">
         <div class="pk-big-col"><span class="pk-cod-lbl">📦 EXCEDENTE</span><span class="pk-sector-big exc">${escapeHtml(exu)}</span></div>
-        <div class="pk-big-col pk-big-right"><span class="pk-cod-lbl">CÓDIGO</span><span class="pk-cod-big">${escapeHtml(it.art)}</span></div>
+        <div class="pk-big-col pk-big-right"><span class="pk-cod-lbl">CÓDIGO</span><span class="pk-cod-big">${escapeHtml(_padCod(it.art))}</span></div>
       </div>
       <div class="pk-skip">⏭ <b>Salteá la góndola</b> — hay <b>excedente en ${escapeHtml(exu)}</b>.<br>Lo levantás al <b>final</b> del picking.</div>
       <button class="pk-btn pk-ok" onclick="pkNext()">Siguiente →</button>
@@ -13614,14 +13614,14 @@ function pkRender() {
     body.innerHTML = `<div class="pk-flow">${nav}
       <div class="pk-cod-row"><span class="pk-cod-lbl">ACLARAR</span><span class="pk-sector">Sector: ${escapeHtml(it.sector || "—")}</span></div>
       <div class="pk-dual-warn">⚠ Acá hay <b>Nacional</b> e <b>Importado</b> en el mismo lugar y son iguales.<br>¿Cuál estás levantando?</div>
-      <button class="pk-btn pk-ok" onclick="pkClarify('${escapeHtml(it.dual.nac)}')">Nacional — ${escapeHtml(it.dual.nac)}</button>
-      <button class="pk-btn pk-imp" onclick="pkClarify('${escapeHtml(it.dual.imp)}')">Importado — ${escapeHtml(it.dual.imp)}</button>
+      <button class="pk-btn pk-ok" onclick="pkClarify('${escapeHtml(it.dual.nac)}')">Nacional — ${escapeHtml(_padCod(it.dual.nac))}</button>
+      <button class="pk-btn pk-imp" onclick="pkClarify('${escapeHtml(it.dual.imp)}')">Importado — ${escapeHtml(_padCod(it.dual.imp))}</button>
     </div>`;
     return;
   }
   const rec = (it.dual && it.pick) ? it.pick : it.art;
   const dualTag = (it.dual && it.pick)
-    ? `<div class="pk-dual-tag">${it.pick === it.dual.imp ? "IMPORTADO" : "NACIONAL"} <b>${escapeHtml(it.pick)}</b> <button class="pk-dual-change" onclick="pkReclarify()">cambiar</button></div>`
+    ? `<div class="pk-dual-tag">${it.pick === it.dual.imp ? "IMPORTADO" : "NACIONAL"} <b>${escapeHtml(_padCod(it.pick))}</b> <button class="pk-dual-change" onclick="pkReclarify()">cambiar</button></div>`
     : ``;
   // SECTOR (sin guion) a la IZQUIERDA y CÓDIGO a la DERECHA, ambos grandes. Mismo
   // bloque para el paso normal y para la pantalla de "Faltan". En el paso de excedente
@@ -13657,10 +13657,10 @@ function pkRender() {
     const m = /\s+(LK|CH|LOKE)$/.exec(String(rec).toUpperCase());
     return m ? (m[1] === "LOKE" ? "LK" : m[1]) : (it.emp === "LK" || it.emp === "CH" ? it.emp : "");
   })();
-  const codBig = `<span class="pk-cod-big">${escapeHtml(recCod)}</span>` +
+  const codBig = `<span class="pk-cod-big">${escapeHtml(_padCod(recCod))}</span>` +
     (recEmp ? `<span class="pk-cod-emp pk-cod-emp-${recEmp.toLowerCase()}">${recEmp}</span>` : "");
   const equivHint = it.real
-    ? `<div style="background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:10px;padding:9px 11px;margin-top:8px;font-size:14px;font-weight:800;text-align:center;line-height:1.25;">👉 Levantá el <b>${escapeHtml(it.real)}</b>${it.realNota ? " — " + escapeHtml(it.realNota) : ""}<br><small style="font-weight:700;opacity:.85;">(el cliente lo pidió como ${escapeHtml(it.art)})</small></div>`
+    ? `<div style="background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:10px;padding:9px 11px;margin-top:8px;font-size:14px;font-weight:800;text-align:center;line-height:1.25;">👉 Levantá el <b>${escapeHtml(_padCod(it.real))}</b>${it.realNota ? " — " + escapeHtml(it.realNota) : ""}<br><small style="font-weight:700;opacity:.85;">(el cliente lo pidió como ${escapeHtml(_padCod(it.art))})</small></div>`
     : ``;
   // v8.85 — aviso si el código pertenece a una familia de equivalentes y NO es el
   // primario/default. El operario puede estar pickeando un secundario porque la NP
@@ -13670,9 +13670,9 @@ function pkRender() {
   if (_fam85 && _ocgNorm(rec) !== _fam85._defN) {
     const _defDisp = _equivDisp(_fam85, _fam85._defN);
     famWarn = `<div style="background:#fef2f2;border:2px solid #fca5a5;color:#991b1b;border-radius:12px;padding:11px 13px;margin-top:8px;font-size:14px;font-weight:800;text-align:center;line-height:1.35;">
-      ⚠️ Este código (<b>${escapeHtml(rec)}</b>) es <u>secundario</u>.<br>
-      El primario es <b>${escapeHtml(_defDisp)}</b> (${escapeHtml(_fam85.desc)}).<br>
-      <small style="font-weight:700;opacity:.85;">¿Estás seguro que querés pickear <b>${escapeHtml(rec)}</b> y no <b>${escapeHtml(_defDisp)}</b>?</small>
+      ⚠️ Este código (<b>${escapeHtml(_padCod(rec))}</b>) es <u>secundario</u>.<br>
+      El primario es <b>${escapeHtml(_padCod(_defDisp))}</b> (${escapeHtml(_fam85.desc)}).<br>
+      <small style="font-weight:700;opacity:.85;">¿Estás seguro que querés pickear <b>${escapeHtml(_padCod(rec))}</b> y no <b>${escapeHtml(_padCod(_defDisp))}</b>?</small>
     </div>`;
   }
   const bigRow = `<div class="pk-big-row">
@@ -13745,7 +13745,7 @@ function pkRenderDone(body, N, nav) {
   // Si saltearon artículos con "Adelante" sin marcar Ok/F, NO se puede terminar:
   // hay que marcar cada uno (Ok o F) sí o sí. Listamos los que faltan.
   if (pend > 0) {
-    const faltanList = pickItems.filter(it => _pk.results[it.key] == null).map(it => escapeHtml(it.art));
+    const faltanList = pickItems.filter(it => _pk.results[it.key] == null).map(it => escapeHtml(_padCod(it.art)));
     body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
       <div class="pk-done-ico" style="color:#dc2626">!</div>
       <div class="pk-done-t">Te faltan ${pend} sin marcar</div>
@@ -14441,7 +14441,7 @@ function arPackLios(items, lioSize) {
 }
 
 function arCompTxt(comp) {
-  return (comp || []).map(c => escapeHtml(c.art) + "×" + pkFmt(c.cajas)).join(" + ");
+  return (comp || []).map(c => escapeHtml(_padCod(c.art)) + "×" + pkFmt(c.cajas)).join(" + ");
 }
 
 /* m³(key) → cajas por lío. Siembra los overrides por código resolviendo SU m³,
@@ -14531,7 +14531,7 @@ function arRender() {
   const isDone = _ar.done.has(_ar.idx);
   const itemsHtml = b.items.slice()
     .sort((x, y) => arNumOf(x.art) - arNumOf(y.art))
-    .map(it => `<div class="ar-item"><span class="ar-item-cod">${escapeHtml(it.art)}</span><span class="ar-item-cajas">${pkFmt(it.cajas)} caja${it.cajas === 1 ? "" : "s"}</span></div>`)
+    .map(it => `<div class="ar-item"><span class="ar-item-cod">${escapeHtml(_padCod(it.art))}</span><span class="ar-item-cajas">${pkFmt(it.cajas)} caja${it.cajas === 1 ? "" : "s"}</span></div>`)
     .join("");
   // Composición concreta: qué cajas juntar en cada lío (con su total de cajas).
   const liosHtml = b.liosComp.map((comp, i) => {
@@ -14954,7 +14954,7 @@ function _compNoMasGrid(n) {
   if (!pend.length) return g + '<div class="cmpl-empty">No queda ninguna caja sin poner \uD83D\uDC4D</div>';
   return g + '<div class="cmpl-sgrid">' + pend.map(function (c) {
     const sci = n.codes.indexOf(c);
-    return '<button class="cmpl-sitem" onclick="_compSinMas(' + sci + ')"><span class="cmpl-sicod">' + escapeHtml(c.cod) + '</span><span class="cmpl-sirest">sin poner ' + ((c.rest || 0) + (c.cur || 0)) + '</span><span class="cmpl-siadd">\uD83D\uDEAB no hay más</span></button>';
+    return '<button class="cmpl-sitem" onclick="_compSinMas(' + sci + ')"><span class="cmpl-sicod">' + escapeHtml(_padCod(c.cod)) + '</span><span class="cmpl-sirest">sin poner ' + ((c.rest || 0) + (c.cur || 0)) + '</span><span class="cmpl-siadd">\uD83D\uDEAB no hay más</span></button>';
   }).join("") + '</div>';
 }
 function _compSinMas(ci) {
@@ -15237,7 +15237,7 @@ function _compRenderLios() {
     h += '<div class="cmpl-eh">✏️ Líos generados (' + n.liosArr.length + ')</div>';
     if (!groups.length) h += '<div class="cmpl-empty">Todavía no armaste ningún lío.</div>';
     else h += groups.map(function (g, gi) {
-      const comp = g.items.map(function (it) { return escapeHtml(it.cod) + "×" + it.qty; }).join("  ") + (g.suelta ? " · suelta" : "");
+      const comp = g.items.map(function (it) { return escapeHtml(_padCod(it.cod)) + "×" + it.qty; }).join("  ") + (g.suelta ? " · suelta" : "");
       const labTxt = g.count > 1 ? (g.label + '1–' + g.label + g.count) : g.label;
       return '<div class="cmpl-eg">' +
         '<div class="cmpl-eg-top"><span class="cmpl-lab">' + labTxt + '</span><span class="cmpl-egc">' + comp + '</span>' + (g.count > 1 ? '<span class="cmpl-egn">×' + g.count + '</span>' : '') + '</div>' +
@@ -15253,7 +15253,7 @@ function _compRenderLios() {
     h += '<div class="cmpl-shint">Las que van <b>solas</b>: tocá cada código, cada toque = <b>un lío de 1 caja</b>.</div>';
     if (n.liosArr.some(function (l) { return l.suelta; })) h += '<button class="cmpl-sundo" onclick="_compSueltaUndo()">↶ Deshacer última suelta</button>';
     if (!restCods.length) h += '<div class="cmpl-empty">No quedan cajas sin asignar 👍</div>';
-    else h += '<div class="cmpl-sgrid">' + restCods.map(function (c) { const sci = n.codes.indexOf(c); return '<button class="cmpl-sitem" onclick="_compLioSuelta(' + sci + ')"><span class="cmpl-sicod">' + escapeHtml(c.cod) + '</span><span class="cmpl-sirest">quedan ' + c.rest + '</span><span class="cmpl-siadd">📦 marcar</span></button>'; }).join("") + '</div>';
+    else h += '<div class="cmpl-sgrid">' + restCods.map(function (c) { const sci = n.codes.indexOf(c); return '<button class="cmpl-sitem" onclick="_compLioSuelta(' + sci + ')"><span class="cmpl-sicod">' + escapeHtml(_padCod(c.cod)) + '</span><span class="cmpl-sirest">quedan ' + c.rest + '</span><span class="cmpl-siadd">📦 marcar</span></button>'; }).join("") + '</div>';
   } else if (view === "nomas") {
     /* v21.00 — «NO HAY MÁS». Mismo dibujo que Sueltas (reusa .cmpl-sgrid/.cmpl-sitem). Lista
        los códigos que todavía tienen cajas SIN PONER en esta NP; lo que ya se cerró en un lío
@@ -15272,7 +15272,7 @@ function _compRenderLios() {
       const grp = _compLioGroups(n), sig = _compLioSig(lastLio);
       let g = null; for (let gi = 0; gi < grp.length; gi++) { if (grp[gi].sig === sig) { g = grp[gi]; break; } }
       if (g) {
-        const compTxt = (lastLio.items || []).map(function (it) { return escapeHtml(it.cod) + '×' + it.qty; }).join(' + ');
+        const compTxt = (lastLio.items || []).map(function (it) { return escapeHtml(_padCod(it.cod)) + '×' + it.qty; }).join(' + ');
         h += '<div class="cmpl-repbar">';
         h += '<button class="cmpl-rep' + (g.canMore ? '' : ' off') + '" onclick="_compRepetirLast()">🔁 Repetir Lío ' + g.label + '<br><small>' + (g.canMore ? 'otro igual · ' + compTxt : 'ya no quedan cajas') + '</small></button>';
         if (g.count > 1) h += '<button class="cmpl-repminus" onclick="_compQuitarLast()" title="Quitar el último de ese lío">−</button>';
@@ -15286,7 +15286,7 @@ function _compRenderLios() {
       const rem = c.cur + c.rest;
       return '<div class="cmpl-sq' + (c.cur > 0 ? " has" : "") + '" onclick="_compLioStep(' + ci + ',1)">' +
         (c.cur > 0 ? '<button class="cmpl-min" onclick="event.stopPropagation();_compLioStep(' + ci + ',-1)">−</button>' : '') +
-        '<div class="cmpl-cod">' + escapeHtml(c.cod) + '</div><div class="cmpl-cur2">' + c.cur + '<span class="cmpl-tot2"> / ' + rem + '</span></div></div>';
+        '<div class="cmpl-cod">' + escapeHtml(_padCod(c.cod)) + '</div><div class="cmpl-cur2">' + c.cur + '<span class="cmpl-tot2"> / ' + rem + '</span></div></div>';
     }).join("") + "</div>";
     const _noSep = n.codes.filter(function (c) { return !c.sep && c.rest > 0; });
     if (_noSep.length) h += '<button class="csep-tosep" onclick="_compGo(2)">↩ Volver a separar · faltan ' + _noSep.reduce(function (s, c) { return s + c.rest; }, 0) + ' cajas</button>';
@@ -15464,7 +15464,7 @@ function _compSepPedido() {
   const grid = '<div class="csep-grid" style="grid-template-rows:repeat(' + rows + ',minmax(88px,1fr))">' + codes.map(function (c) {
     const ci = n.codes.indexOf(c);
     return '<button class="csep-card' + (c.sep ? " done" : "") + '" onclick="_compSepTap(' + idx + ',' + ci + ')">' +
-      '<div class="csep-c">' + escapeHtml(c.cod) + '</div><div class="csep-q">' + c.sale + ' cajas</div></button>';
+      '<div class="csep-c">' + escapeHtml(_padCod(c.cod)) + '</div><div class="csep-q">' + c.sale + ' cajas</div></button>';
   }).join("") + '</div>';
   const sepN = codes.filter(function (c) { return c.sep; }).length;
   const _dir = (_comp.dirByNp && _comp.dirByNp[n.np]) || n.dir || "";
@@ -15490,7 +15490,7 @@ function _compSepMatrix() {
       tot += c.sale; const ci = n.codes.indexOf(c), npIdx = _comp.nps.indexOf(n);
       return '<td class="csep-cell' + (c.sep ? " done" : "") + '" onclick="_compSepTap(' + npIdx + ',' + ci + ')">' + (c.sep ? '<span class="csep-cdone">' + c.sale + '</span>' : c.sale) + '</td>';
     }).join("");
-    return '<tr><td class="csep-mxc">' + escapeHtml(cod) + '</td><td class="csep-mxt">' + tot + '</td>' + cells + '</tr>';
+    return '<tr><td class="csep-mxc">' + escapeHtml(_padCod(cod)) + '</td><td class="csep-mxt">' + tot + '</td>' + cells + '</tr>';
   }).join("");
   return '<div class="csep-mxwrap"><table class="csep-mx"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
     '<button class="csep-armar" onclick="_compSepArmar()">🔨 Armar líos con lo separado →</button>';
@@ -15633,7 +15633,7 @@ function _compDifHtml() {
     const rows = Math.max(3, Math.ceil(codes.length / 3));
     const grid = '<div class="csep-grid" style="grid-template-rows:repeat(' + rows + ',minmax(88px,1fr))">' + codes.map(function (c) {
       const ci = n.codes.indexOf(c);
-      return '<button class="csep-card csep-pickc' + (c.sep ? " done" : "") + '" onclick="_compDifPick(' + ci + ')"><div class="csep-c">' + escapeHtml(c.cod) + '</div><div class="csep-q">' + c.sale + ' cajas</div></button>';
+      return '<button class="csep-card csep-pickc' + (c.sep ? " done" : "") + '" onclick="_compDifPick(' + ci + ')"><div class="csep-c">' + escapeHtml(_padCod(c.cod)) + '</div><div class="csep-q">' + c.sale + ' cajas</div></button>';
     }).join("") + '</div>';
     return '<div class="csep-difbnr">👆 Tocá el artículo diferente a la mesa<small>de a uno por vez · NP ' + escapeHtml(n.np) + '</small></div>' + grid + '<button class="csep-cancel" onclick="_compDifBack()">✕ Cancelar</button>';
   }
@@ -15641,7 +15641,7 @@ function _compDifHtml() {
   let h = '<button class="csep-back" onclick="_compDifBack()">← Volver</button>';
   h += '<div class="csep-difh">⚠ Artículo diferente a la mesa</div>';
   h += '<div class="csep-difsub">No es tu error — lo bajó el picking. Vos solo avisás.</div>';
-  h += '<div class="csep-difcod">Código <b>' + escapeHtml(c.cod) + '</b> · el picking marcó <b>' + c.sale + ' cajas</b></div>';
+  h += '<div class="csep-difcod">Código <b>' + escapeHtml(_padCod(c.cod)) + '</b> · el picking marcó <b>' + c.sale + ' cajas</b></div>';
   h += '<div class="csep-difq">¿Qué hay en la mesa?</div>';
   h += '<div class="csep-difrow">' +
     '<button class="csep-difopt' + (d.tipo === "mas" ? " on" : "") + '" onclick="_compDifTipo(\'mas\')">▲ Hay de más<br><small>bajó de más</small></button>' +
@@ -48332,7 +48332,7 @@ async function refreshFaltantes() {
         totArts++; totCajas += x.falta; tFalt += x.falta;
         const _fc = x.falta <= 10 ? "#854d0e" : x.falta <= 50 ? "#9a3412" : "#991b1b";
         const _fb = x.falta <= 10 ? "#fef9c3" : x.falta <= 50 ? "#fed7aa" : "#fecaca";
-        const main = `<tr><td class="c-art">${escapeHtml(x.art)}</td><td class="num c-muted">${x.real}</td><td class="num c-muted">${x.esp}</td><td class="falt"><span style="background:${_fb};color:${_fc};border-radius:5px;padding:1px 8px;font-weight:800;">${x.falta}</span></td><td class="c-leg">${escapeHtml(x.legajo)}</td></tr>`;
+        const main = `<tr><td class="c-art">${escapeHtml(_padCod(x.art))}</td><td class="num c-muted">${x.real}</td><td class="num c-muted">${x.esp}</td><td class="falt"><span style="background:${_fb};color:${_fc};border-radius:5px;padding:1px 8px;font-weight:800;">${x.falta}</span></td><td class="c-leg">${escapeHtml(x.legajo)}</td></tr>`;
         return main + whoRow(tanda, x.art, x.real);
       }).join("");
       html += `<div class="falt-tanda"><div class="falt-tanda-h"><span class="falt-tanda-name">Tanda ${escapeHtml(tanda)}</span><span class="falt-tanda-badge">${tFalt} cajas faltan</span></div>` +
@@ -56907,7 +56907,7 @@ function armadoRemitoData(row){
     total = arts.reduce(function(s, a){ return s + (Number(a.cajas) || 0); }, 0);
   }
   const liosOut = lios.map(function(l, k){
-    return { label: labels[k], comp: (l.items || []).map(function(it){ return String(it.cod) + " ×" + it.qty; }).join(", ") + (l.suelta ? "  (suelta)" : "") };
+    return { label: labels[k], comp: (l.items || []).map(function(it){ return _padCod(String(it.cod)) + " ×" + it.qty; }).join(", ") + (l.suelta ? "  (suelta)" : "") };
   });
   // v6.31 — nombres (picking/armado) + faltantes para el remito nuevo. El caller puede
   // pasar row.pickName/armName ya resueltos, o row.pickerLeg/armadorLeg (legajos) que
@@ -57041,7 +57041,7 @@ function pkHojaHtml(d){
     return '<table><thead><tr><th>Cod</th><th>Sector</th><th>Total<br>cajas</th></tr></thead><tbody>' +
       rows.map(function (x){
         var cls = (x.real === 0 && x.esp > 0) ? 'pkh-no' : ((x.real != null && x.real < x.esp) ? 'pkh-f' : '');
-        return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="pkh-cod">' + escapeHtml(x.cod) + '</td><td>' + escapeHtml((x.lug && x.lug.sector) || '—') + '</td><td>' + celdaTot(x) + '</td></tr>';
+        return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="pkh-cod">' + escapeHtml(_padCod(x.cod)) + '</td><td>' + escapeHtml((x.lug && x.lug.sector) || '—') + '</td><td>' + celdaTot(x) + '</td></tr>';
       }).join('') + '</tbody></table>';
   };
   var npRows = d.nps.length ? d.nps.map(function (x){
@@ -57218,14 +57218,14 @@ async function pgaVerArmado(tanda){
 function armadoRemitoInnerHtml(d, tipo){
   tipo = (tipo === "FACTURADO") ? "FACTURADO" : "ARMADO";
   const artRows = d.arts.length ? d.arts.map(function(a){
-    return '<tr><td class="rmt-cc rmt-cod">' + escapeHtml(a.cod) + '</td><td class="rmt-cq">' + a.cajas + '</td><td>' + escapeHtml(a.lios.join(", ")) + '</td></tr>';
+    return '<tr><td class="rmt-cc rmt-cod">' + escapeHtml(_padCod(a.cod)) + '</td><td class="rmt-cq">' + a.cajas + '</td><td>' + escapeHtml(a.lios.join(", ")) + '</td></tr>';
   }).join("") : '<tr><td colspan="3" class="rmt-empty">— sin artículos —</td></tr>';
   const lioRows = d.lios.length ? d.lios.map(function(l){
     return '<tr><td class="rmt-cc rmt-cod">' + escapeHtml(l.label) + '</td><td>' + escapeHtml(l.comp) + '</td></tr>';
   }).join("") : '<tr><td colspan="2" class="rmt-empty">— sin líos —</td></tr>';
   const falt = d.faltantes || [];
   const faltRows = falt.length ? falt.map(function(f){
-    return '<tr><td class="rmt-cc rmt-cod">' + escapeHtml(String(f.cod)) + '</td><td>' + (Number(f.cajas) || 0) + '</td></tr>';
+    return '<tr><td class="rmt-cc rmt-cod">' + escapeHtml(_padCod(String(f.cod))) + '</td><td>' + (Number(f.cajas) || 0) + '</td></tr>';
   }).join("") : '<tr><td colspan="2" class="rmt-empty">— sin faltantes —</td></tr>';
   const ctrl = (tipo === "FACTURADO")
     ? '<div class="rmt-ctrl"><div class="rmt-ctrl-lg">Legajo</div><div class="rmt-ctrl-co">Controlado: ______</div></div>' : '';
