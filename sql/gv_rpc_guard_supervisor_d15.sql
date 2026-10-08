@@ -12,8 +12,8 @@
 -- ROLLBACK TOTAL (vuelve los cuerpos al original guardado):
 --   select public.gv_rpc_guard_quitar();
 --
--- Afuera a propósito: gv_oc_generar_pendientes (regla protegida: se pide el sí aparte),
--- insumo_unidad_guardar (la llama el operario al inventar una unidad), y todo lo del celular
+-- v28.76 (Thomas D16): se sumó gv_oc_generar_pendientes (19 funciones).
+-- Afuera a propósito: insumo_unidad_guardar (la llama el operario al inventar una unidad), y todo lo del celular
 -- del operario (tandas, picking, racks, faltantes de armado).
 
 create table if not exists public."GV_RPC_Guard" (
@@ -42,7 +42,7 @@ declare
   fns text[] := array['aceptar_conteo','rechazar_conteo','faltante_resolver','zona_barrio_set',
     'insumo_alta','insumo_borrar','insumo_editar','insumo_recodificar','insumo_identificar',
     'insumo_factores_guardar','insumo_cat_guardar','insumo_cat_borrar','gv_supers_set','gv_supers_baja',
-    'corr_convertir_faltante','gv_conciliacion_registrar','gv_pedido_horario_set','gv_insumo_ubicaciones_guardar'];
+    'corr_convertir_faltante','gv_conciliacion_registrar','gv_pedido_horario_set','gv_insumo_ubicaciones_guardar','gv_oc_generar_pendientes'];
   r record; v_src text; v_def text; n int := 0;
 begin
   if not p_on then

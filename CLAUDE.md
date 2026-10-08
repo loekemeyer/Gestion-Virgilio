@@ -8418,7 +8418,8 @@ front las llama con `gvWriteHdr()` (la sesión), nunca con la clave pública. El
 - **Rollback rápido**: `select public.gv_rpc_guard_instalar(false);` (o `update … set activo=false where fn='<fn>'`).
 - **Rollback total**: `select public.gv_rpc_guard_quitar();` (repone los cuerpos de `zz_backups."GV_Backup_RPCGuard_defs_20261008"`, 20 firmas).
 - ⚠ Probar desde el MCP NO sirve: `gv_es_supervisor_o_servicio` deja pasar `session_user = postgres`. Se prueba con `net.http_post` + clave pública.
-- Afuera: `gv_oc_generar_pendientes` (regla protegida) e `insumo_unidad_guardar` (operario). `sql/gv_rpc_guard_supervisor_d15.sql`.
+- **v28.78 (Thomas D16): también `gv_oc_generar_pendientes`** (generador manual de OC; el front ya mandaba la sesión). Son 19 funciones activas.
+- Afuera: `insumo_unidad_guardar` (operario). `sql/gv_rpc_guard_supervisor_d15.sql`.
 
 ## ⚠ REGLA (Luis, 2026-10-08, v28.77): «NPs por Día» y Programación — el NÚMERO grande, el % chiquito, y Facturado = «con FC ISIS / exportadas»
 
