@@ -290,7 +290,7 @@ function _adsHtmlStock() {
     '<th rowspan="2">Saldo<br>' + H + ' d</th>' +
     '<th colspan="5" class="ug" title="Pedido y recibido de las últimas ' + _ads.n + ' OC (el rango de Entregas talleristas), sumando todos los talleristas · recibido = lo que recibió Virgilio, hasta lo pedido">Período (' + _ads.n + ' OC)</th></tr>' +
     '<tr><th class="u1">Fecha<br>últ. OC</th><th class="u2">Pedido<br>período</th><th class="u2">Recibido<br>período</th><th class="u2">%</th>' +
-    '<th class="u3" title="Lo que falta que entreguen de la OC vigente: lo declarado en la OC si está; si no, la OC × el % que viene entregando cada tallerista, menos lo ya recibido de esa OC">Entrega<br>est. OC</th></tr></thead><tbody>';   // v28.62 (Luis, 08/10): sin Proporción en pantalla (sigue en el Excel)
+    '<th class="u3" title="X/Y por tallerista: X = lo que se proyecta que entregue de la OC vigente (lo cargado en la OC; con * si no hay dato y es la OC × el % que viene entregando) · Y = lo pedido en esa OC">Entrega<br>est. OC</th></tr></thead><tbody>';   // v28.62 (Luis, 08/10): sin Proporción en pantalla (sigue en el Excel)
   if (!f.length) h += '<tr><td colspan="12" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H), disp = c.disp, proy = c.proy, comp = c.comp, em = c.em, saldo = c.saldo;
@@ -304,7 +304,7 @@ function _adsHtmlStock() {
     if (c.pedP == null) h += '<td class="u1">' + fUlt + '</td><td colspan="4" class="u3">' + (_ads.tall ? "sin OC en el período" : "…") + "</td>";
     else h += '<td class="u1">' + fUlt + '</td><td class="u2">' + _adsN(c.pedP) + '</td><td class="u2">' + _adsN(c.recP) +
       '</td><td class="u2' + (c.pctP != null && c.pctP < _ads.umbral ? " neg" : "") + '">' + _adsPct(c.pctP) +
-      '</td><td class="u3" title="' + _adsEsc((c.estDist.length ? c.estDist : c.estDet).join("\n")) + '"><b' + (c.estOc ? ' style="text-decoration:underline dotted"' : "") + '>' + _adsN(c.estH) + "</b></td>";   // v27.85 (Luis): el reparto por tallerista va en el tooltip
+      '</td><td class="u3" title="' + _adsEsc((c.estDist.length ? c.estDist : c.estDet).join("\n")) + '">' + (c.estXY.length ? c.estXY.map(function (y) { return '<b>' + _adsEsc(y.txt) + '</b>'; }).join("<br>") : "—") + "</td>";   // v28.64: X/Y, una fila por tallerista   // v27.85 (Luis): el reparto por tallerista va en el tooltip
     h += "</tr>";
   });
   return h + "</tbody></table></div>";
@@ -340,9 +340,10 @@ function _adsStockCalc(r, H) {
     var cant = Number(x.ult_cant) || 0, rec = Number(x.ult_rec) || 0;
     var ep = (typeof _ads !== "undefined" && _ads.epOc && typeof _adsEpKey === "function") ? _ads.epOc[_adsEpKey(x.proveedor, r.cod, ultOc)] : null;
     var oc = ep != null && isFinite(ep), e;
-    if (oc) { e = Math.max(0, Math.round(ep) - rec); estDet.push(x.proveedor + ": " + e + " (declarado en la OC: " + Math.round(ep) + ", ya recibió " + rec + ")"); }
-    else { e = Math.max(0, Math.round(cant * pct) - rec); estDet.push(x.proveedor + ": " + e + " (OC " + cant + " × " + Math.round(pct * 100) + " % que viene entregando, ya recibió " + rec + ")"); }
-    estH += e; estArr.push({ p: x.proveedor, e: e, oc: oc });
+    var xp = oc ? Math.round(ep) : Math.round(cant * pct);   // v28.64: lo proyectado de la OC (sin restar lo recibido)
+    if (oc) { e = Math.max(0, xp - rec); estDet.push(x.proveedor + ": " + e + " (declarado en la OC: " + xp + ", ya recibió " + rec + ")"); }
+    else { e = Math.max(0, xp - rec); estDet.push(x.proveedor + ": " + e + " (OC " + cant + " × " + Math.round(pct * 100) + " % que viene entregando, ya recibió " + rec + ")"); }
+    estH += e; estArr.push({ p: x.proveedor, e: e, oc: oc, x: xp, y: cant });
   });
   // v27.82 (Luis): la entrega estimada discriminada por tallerista, con su parte de lo estimado
   var _epTxt = function (y) { return y.oc ? " · cargado en la OC" : ""; };
@@ -354,6 +355,9 @@ function _adsStockCalc(r, H) {
   var _em = isFinite(_sal) ? Math.max(0, disp - comp - _sal) : proy * (typeof _adsEmDias === "function" ? _adsEmDias(H) : Math.max(0, H - 12)) / 30;
   return { disp: disp, proy: proy, comp: comp, em: _em, saldo: _sal, tallAct: tallAct, estH: pc.length ? estH : null, estOc: estArr.some(function (y) { return y.oc; }), estDet: estDet, estDist: estDist, estCaj: estArr.map(function (y) { return y.p + ": " + _adsN(y.e) + (y.oc ? "" : "*"); }),
            estCalc: estArr.some(function (y) { return !y.oc; }),
+           // v28.64 (Luis, 08/10): «X/Y» por tallerista: X = proyectado de entrega (con * si es estimado: la casilla de la OC
+           // está VACÍA; un 0 cargado es dato y va sin *), Y = lo pedido en la última OC
+           estXY: estArr.map(function (y) { return { p: y.p, txt: _adsN(y.x) + (y.oc ? "" : "*") + "/" + _adsN(y.y) }; }),
            pedP: pc.length ? totPed : null, recP: pc.length ? recP : null, pctP: pc.length && totPed > 0 ? recP / totPed : null,
            fechaUlt: fechaUlt, dist: dist };
 }
