@@ -6395,7 +6395,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.60"></script>
+<script type="module" src="recepcion.js?v=28.61"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10676,7 +10676,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.60";
+const APP_VERSION = "v28.61";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -18498,6 +18498,16 @@ async function ocgEnter() {
     //   itemsAll = todo (incl. falta 0)  ·  items = solo a pedir > 0 (lo que se genera/manda).
     const rows = await supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,descripcion,proveedor,tiene_prov_real,pr1,proveedor2,pr2,indice,proy,cap,maximo,pedidos,stock,uni_x_caja,n_caja,total&activo=eq.true&order=total.desc");
     if (!_oc) return;   // se cerró el generador mientras calculaba
+    /* v28.61 (Luis, 08/10): una OC de menos de 10 cajas sólo se pide si la góndola está a menos del 30 % de su
+       capacidad. La regla vive en la base (gv_oc_chica_frenada; la usa también la generación automática): acá esos
+       códigos quedan con a pedir 0 y se listan arriba. Si la lectura falla se dice, no se frena nada a ciegas. */
+    let _chica = {}, _chicaErr = null;
+    try {
+      const rc = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_oc_chica_frenada", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" });
+      if (!rc.ok) throw new Error("HTTP " + rc.status);
+      (await rc.json() || []).forEach(function (x) { _chica[String(x.cod).toUpperCase().trim()] = x; });
+    } catch (e) { _chicaErr = String((e && e.message) || e); }
+    if (!_oc) return;
     const itemsAll = [];
     (rows || []).forEach(function (r) {
       const cod = String(r.cod).toUpperCase().trim();
@@ -18510,7 +18520,8 @@ async function ocgEnter() {
       const maxCajas = Math.round(Number(r.maximo) || 0);
       const demanda = Math.round(Number(r.pedidos) || 0);
       const stock = Math.round(Number(r.stock) || 0);
-      const totalFalta = Math.round(Number(r.total) || 0);
+      const chica = _chica[cod] || null;
+      const totalFalta = chica ? 0 : Math.round(Number(r.total) || 0);
       const pc = Number(r.proy) || 0;                 // proyección cajas/mes (0 = sin ventas)
       const indice = (Number(r.indice) > 0) ? Number(r.indice) : OCG_FACTOR_MAXIMO;
       const cap = Number(r.cap) || 0;
@@ -18535,7 +18546,7 @@ async function ocgEnter() {
       });
     });
     const items = itemsAll.filter(function (it) { return it.falta > 0; });
-    _oc.gen = { items: items, itemsAll: itemsAll, fecha: new Date().toISOString().slice(0, 10) };
+    _oc.gen = { items: items, itemsAll: itemsAll, fecha: new Date().toISOString().slice(0, 10), chica: Object.keys(_chica).map(function (k) { return _chica[k]; }), chicaErr: _chicaErr };
     ocRender();
     // v21.14 — el ancla del ciclo automático; el contador la usa. En su propia llamada con su
     // propio catch: si falla, el contador se cae al miércoles y el generador sigue andando.
@@ -18617,6 +18628,14 @@ function ocgDescargarExcel() {
 function ocgSetMode(m) { if (_oc) { _oc.genMode = (m === "tall" ? "tall" : "art"); ocRender(); } }
 // ordena proveedores dejando "(sin proveedor)" al final
 function _ocgProvSort(a, b) { if (a === "(sin proveedor)") return 1; if (b === "(sin proveedor)") return -1; return a.localeCompare(b); }
+/* v28.61 (Luis, 08/10): las OC de menos de 10 cajas con la góndola ≥ 30 % no se piden. */
+function ocgChicaNota(gen) {
+  if (gen.chicaErr) return '<div class="oc-meta" style="color:#b91c1c;margin:0 0 8px">⚠ No pude leer qué OC chicas se frenan (' + escapeHtml(gen.chicaErr) + '): revisá las de menos de 10 cajas a mano.</div>';
+  const a = gen.chica || [];
+  if (!a.length) return "";
+  return '<div class="oc-meta" style="margin:0 0 8px;color:#92400e" title="Una OC de menos de 10 cajas sólo se pide si la góndola está a menos del 30 % de su capacidad">⏸ <b>' + a.length + '</b> OC de menos de 10 cajas no se piden (góndola ≥ 30 %): ' +
+    a.map(function (x) { return '<b>' + escapeHtml(x.cod) + '</b> ' + Math.round(Number(x.total) || 0) + ' cj · ' + Math.round(Number(x.pct) || 0) + ' %'; }).join(" · ") + '</div>';
+}
 function ocBodyGen() {
   const gen = _oc.gen;
   const mode = (_oc.genMode === "tall") ? "tall" : "art";
@@ -18630,6 +18649,7 @@ function ocBodyGen() {
     '<button class="oc-btn' + (mode === "tall" ? " ok" : "") + '" onclick="ocgSetMode(\'tall\')">👷 Por tallerista</button></div>';
   if (!gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + Estadística Madre × índice)…</div>';
   if (gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(gen.error) + '</div>';
+  h += ocgChicaNota(gen);
   return h + (mode === "tall" ? ocBodyGenTall() : ocBodyGenArt());
 }
 // Vista "Por artículo": UNA fila por artículo (no una por artículo·tallerista), solo a pedir > 0.
@@ -61668,7 +61688,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.60"></script>
+<script src="importacion.js?v=28.61"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64573,10 +64593,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.60"></script>
-<script src="hotsale.js?v=28.60"></script>
-<script src="estadisticas.js?v=28.60"></script>
-<script src="ads.js?v=28.60"></script>
+<script src="cobranzas.js?v=28.61"></script>
+<script src="hotsale.js?v=28.61"></script>
+<script src="estadisticas.js?v=28.61"></script>
+<script src="ads.js?v=28.61"></script>
 
 </body>
 </html>

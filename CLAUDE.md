@@ -8380,3 +8380,12 @@ aaa_gv_anon_bloqueo`) o escribir por una RPC SECURITY DEFINER. `sql/gv_anon_inse
 - Columna **Tallerista** (los de la OC vigente del código) a la izquierda de Cód. Sólo pantalla (el Excel tiene formato de Luis).
 - La **E.M. plazo** que se muestra sale del saldo del servidor (`disp − comp − saldo`): la base cuenta los días de E.M. con
   `gv_ads_em_dias` (distribución de demora) y el front con la fórmula vieja daba 0 mientras el saldo restaba 1 (058: −16).
+
+## ⚠ REGLA (Luis, 2026-10-08, v28.61): una OC de MENOS DE 10 CAJAS sólo se pide con la GÓNDOLA a menos del 30 %
+
+- Por código (el total antes de repartir entre proveedores): góndola (`terminado`) ≥ 30 % de la capacidad → no se pide.
+  Sin capacidad cargada no se frena. `gv_oc_chica_frenada()` (lectura, anon) es la única cuenta; parámetros en
+  `Stock_Config` (`oc_chica_cajas` 10, `oc_chica_gondola_pct` 0,30).
+- La usan `generar_ocs_automaticas` (marcador `v28.61-oc-chica`) y el generador manual (`ocgEnter`: a pedir 0 y la nota
+  «⏸ N OC de menos de 10 cajas no se piden»; si la lectura falla lo dice). Al 08/10 frena 18 códigos.
+- `sql/gv_oc_chica_frenada_v2861.sql`, `tests/oc-chica-gondola.cjs`.
