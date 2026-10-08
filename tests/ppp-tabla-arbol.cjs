@@ -247,7 +247,7 @@ catch (_e) {
   t(eq(r.dias[0].slice(0, 4), ["▸Lun 14/09", "5,2", "2", "3"]), "(2) el día trae m³, tandas y NPs — " + JSON.stringify(r.dias[0].slice(0, 4)));
   t(r.hoy, "(2) el día de hoy está marcado");
   t(r.sinTandasCerrado, "(2) arranca cerrado: no se ven tandas");
-  t(eq(r.pctMartes, ["20 %1", "20 %1", "40 %2", "20 %1"]), "(3) los 4 % del martes en números — " + JSON.stringify(r.pctMartes));
+  t(eq(r.pctMartes, ["120 %", "120 %", "240 %", "120 %"]), "(3) los 4 % del martes en números — " + JSON.stringify(r.pctMartes));
   t(eq(r.pctClases, ["fac", "arm", "pro", "pen"]), "(3) cada % con su color (fac/arm/pro/pen)");
   t(eq(r.tandas, ["D56D", "D67E", "E01E"]), "(4) el día se expande en sus tandas, ordenadas — " + JSON.stringify(r.tandas));
   t(r.tandaClases.some((c) => /e-armado/.test(c)) && r.tandaClases.some((c) => /e-proceso/.test(c)),

@@ -114,13 +114,13 @@ catch (_e) {
   t(r.salioUno === "true,false,false,false,true",
     "(2)(3) SÓLO la cargada al camión y la ya entregada salieron; la dada por salida a mano, la " +
     "presunta y la facturada sin cargar NO — " + r.salioUno);
-  t(r.pctDia === "50 %3", "(4) el día dice 50 % (3 de 6) — «" + r.pctDia + "»");
-  t(r.pctTanda === "50 %3", "(4) y la tanda lo mismo — «" + r.pctTanda + "»");
-  t(r.total === "50 %3", "(4) igual que el total de abajo — «" + r.total + "»");
+  t(r.pctDia === "350 %", "(4) el día dice 3 (50 %) — v28.77: el número grande primero — «" + r.pctDia + "»");
+  t(r.pctTanda === "350 %", "(4) y la tanda lo mismo — «" + r.pctTanda + "»");
+  t(r.total === "350 %", "(4) igual que el total de abajo — «" + r.total + "»");
   const espera = ["98001:🚚", "98002:—", "98003:—", "98004:—", "98005:🚚", "98006:🚚"];
   t(JSON.stringify(r.chips) === JSON.stringify(espera),
     "(4) y cada NP lleva su chip 🚚 salvo la que no salió — " + JSON.stringify(r.chips));
-  t(JSON.stringify(r.filaDia) === JSON.stringify(["50 %3", "33 %2", "17 %1", "0 %0", "0 %0"]),
+  t(JSON.stringify(r.filaDia) === JSON.stringify(["350 %", "233 %", "117 %", "00 %", "00 %"]),
     "(5) las 5 columnas NETEAN y suman 100 %: lo que salió no se cuenta otra vez como facturado — " +
     JSON.stringify(r.filaDia));
   const npEsp = ["98001:sal=100 %", "98002:fac=100 %", "98003:arm=100 %",

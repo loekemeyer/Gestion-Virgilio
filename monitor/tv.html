@@ -129,6 +129,7 @@ table.rd{width:auto;margin:0 auto}
 .rd td.rd-fe{text-align:center;color:#e2e8f0;white-space:nowrap;font-size:calc(2.4*var(--u))}
 .rd tr+tr td{border-top:1px solid #16203a}
 .rd td small{display:block;font-size:.62em;font-weight:700;color:inherit;opacity:.85}
+.rd td .fcn{opacity:.75}
 .rd tr.hoy td.rd-fe{color:#93c5fd}
 .rd .sal{color:#a78bfa}.rd .fac{color:#60a5fa}.rd .arm{color:#4ade80}.rd .pro{color:#fbbf24}.rd .pen{color:#f87171}
 .rd .z{color:#334155}
@@ -881,6 +882,21 @@ function cargarPickeado(tandas) {
     return m;
   }).catch(function (e) { console.warn("[tv] pickeado:", e.message); return new Map(); });
 }
+/* v28.77 (Luis, 08/10): de las NP facturadas (exportadas al Excel), cuáles ya tienen la factura de
+   ISIS parseada. ≡ index pgaFcCargar. Sin respuesta: null (la columna muestra sólo el total). */
+function cargarFcParseada(arbol) {
+  var nps = [];
+  (arbol || []).forEach(function (r) { var np = String(r.np || "").trim(); if (r.estado === "facturado" && np && nps.indexOf(np) < 0) nps.push(np); });
+  if (!nps.length) return Promise.resolve(new Set());
+  var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+  return conTimeout(fetch(SB_URL + "/rest/v1/rpc/gv_np_fc_parseada", {
+    method: "POST", cache: "no-store", signal: ctrl ? ctrl.signal : undefined,
+    headers: Object.assign({ "Content-Type": "application/json" }, H),
+    body: JSON.stringify({ p_nps: nps })
+  }), ctrl, "gv_np_fc_parseada").then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (filas) { var s = new Set(); (filas || []).forEach(function (f) { s.add(String(f.np || "").trim().toUpperCase().replace(/\.0+$/, "")); }); return s; })
+    .catch(function (e) { console.warn("[tv] fc parseada:", e.message); return null; });
+}
 /* v26.67 (D6): una tanda FRENADA se reparte: cada uno su m³, en su día. ≡ index gvCreditoTandas. Sin respuesta: Map vacío. */
 function cargarCredito(tandas) {
   if (!tandas.length) return Promise.resolve(new Map());
@@ -1000,17 +1016,18 @@ var cargarArbol = cache(PROG_TTL, function () {
   }).catch(function (e) { console.warn("[tv] arbol:", e.message); return null; });
 });
 var RD_EST = ["facturado", "armado", "proceso", "pendiente"];
-function resumenDias(filas, despachadas, n) {
+function resumenDias(filas, despachadas, n, fcParse) {
   var dias = new Map(), hoy = hoyKey();
   (filas || []).forEach(function (r) {
     var k = String(r.fecha || "").slice(0, 10);
     if (!k || k < hoy || k >= "9999") return;
     var d = dias.get(k);
-    if (!d) { d = { key: k, m3: 0, nps: 0, tandas: new Set(), est: {}, estSal: {}, salio: 0 }; RD_EST.forEach(function (e) { d.est[e] = 0; d.estSal[e] = 0; }); dias.set(k, d); }
+    if (!d) { d = { key: k, m3: 0, nps: 0, tandas: new Set(), est: {}, estSal: {}, salio: 0, fcNeto: 0 }; RD_EST.forEach(function (e) { d.est[e] = 0; d.estSal[e] = 0; }); dias.set(k, d); }
     var est = RD_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
     var np = String(r.np || "").trim().replace(/\.0+$/, "");
     var sal = despachadas.has(np) ? 1 : 0;
     d.m3 += Number(r.m3) || 0; d.nps++; d.est[est]++; d.salio += sal; if (sal) d.estSal[est]++;
+    if (est === "facturado" && !sal && fcParse && fcParse.has(np.toUpperCase())) d.fcNeto++;   // v28.77
     if (r.tanda) d.tandas.add(String(r.tanda).toUpperCase());
   });
   return Array.from(dias.values()).sort(function (a, b) { return a.key.localeCompare(b.key); }).slice(0, n);
@@ -1501,13 +1518,14 @@ function pintar(d) {
     el("fcTit").innerHTML = "NPs por Día";
     el("fcBox").innerHTML = '<div class="vacio">No se pudo leer lo cargado al camión</div>';
   } else {
-    var rds = resumenDias(d.arbol, d.despachadas, 4);   /* v24.38 (Luis): un día más */
+    var rds = resumenDias(d.arbol, d.despachadas, 4, d.fcParse);   /* v24.38 (Luis): un día más */
     el("fcTit").innerHTML = "NPs por Día" +
       (fcSalidas ? " <small>· <b class=\"fc-salio\">" + fcSalidas + (fcSalidas === 1 ? " salió" : " salieron") + " sin FC</b></small>" : "");
-    var pc = function (nn, tot, cls) {
+    var pc = function (nn, tot, cls, pre) {
       var p = tot ? Math.round(100 * nn / tot) : 0;
-      /* v25.01 (Luis): el número de pedidos grande y el % chiquito abajo, los dos en color. */
-      return '<td class="' + cls + (nn ? '' : ' z') + '">' + nn + '<small>' + p + '%</small></td>';
+      /* v25.01 (Luis): el número de pedidos grande y el % chiquito abajo, los dos en color.
+         v28.77 (Luis): Facturado = «con FC de ISIS parseada / exportadas al Excel». */
+      return '<td class="' + cls + (nn ? '' : ' z') + '">' + (pre ? '<span class="fcn">' + pre + '</span>' : '') + nn + '<small>' + p + '%</small></td>';
     };
     /* v24.70: el m³ del día es el mismo que daba «Total por día» (las tandas del día). */
     var m3Dia = function (x) { var g = porDia.get(x.key); return g ? g.total : x.m3; };
@@ -1518,7 +1536,7 @@ function pintar(d) {
         return '<tr' + (x.key === hoyKey() ? ' class="hoy"' : '') + '>' +
           '<td class="rd-fe">' + esc(diaEtiqueta(x.key)) + '</td>' +
           '<td class="rd-m3">' + n1(m3Dia(x)) + '</td>' +
-          pc(x.salio, x.nps, "sal") + pc(neto("facturado"), x.nps, "fac") + pc(neto("armado"), x.nps, "arm") +
+          pc(x.salio, x.nps, "sal") + pc(neto("facturado"), x.nps, "fac", (d.fcParse && neto("facturado")) ? x.fcNeto + "/" : "") + pc(neto("armado"), x.nps, "arm") +
           pc(neto("proceso"), x.nps, "pro") + pc(neto("pendiente"), x.nps, "pen") + '</tr>';
       }).join("") + '</tbody></table>'
       : '<div class="vacio">Nada programado</div>';
@@ -1741,8 +1759,8 @@ function ciclo() {
     var crKeys = [];   // v26.67: tandas cerradas o frenadas hoy → si alguna está frenada, se reparte
     eventos.forEach(function (ev) { var t = String(ev.texto || "").trim().toUpperCase();
       if (t && /^(TP|TAP|PKF|APF)$/.test(ev.opcion) && dayKey(ev.ts_cliente) === hoy && crKeys.indexOf(t) < 0) crKeys.push(t); });
-    return Promise.all([cargarStatus(keys), cargarPickeado(pkKeys), cargarCredito(crKeys)]).then(function (sp) {
-      var status = sp[0], pickeado = sp[1], credito = sp[2];
+    return Promise.all([cargarStatus(keys), cargarPickeado(pkKeys), cargarCredito(crKeys), cargarFcParseada(arbol)]).then(function (sp) {
+      var status = sp[0], pickeado = sp[1], credito = sp[2], fcParse = sp[3];
       /* v26.55: copia (la programación está cacheada: no se toca) con el m³ PICKEADO de cada tanda con TP. */
       if (pickeado.size) { var p2 = new Map(); prog.forEach(function (v, k) { var f = pickeado.get(k);
         p2.set(k, f == null ? v : Object.assign({}, v, { m3: (Number(v.m3) || 0) * f, m3Ped: Number(v.m3) || 0 })); }); prog = p2; }
@@ -1776,7 +1794,7 @@ function ciclo() {
         actividad: actividadActual(guardado.length ? eventos.concat(guardado) : eventos, hoy, fjHoy, fichados),
         alertas: Array.from(alertas).sort(),
         empleados: empleados, facturadas: facturadas, despachadas: despachadas,
-        horas: horas, arbol: arbol, eventos: eventos, credito: credito
+        horas: horas, arbol: arbol, eventos: eventos, credito: credito, fcParse: fcParse
       });
 
       ultimoOk = Date.now(); fallos = 0;

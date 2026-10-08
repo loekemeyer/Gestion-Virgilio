@@ -8419,3 +8419,13 @@ front las llama con `gvWriteHdr()` (la sesión), nunca con la clave pública. El
 - **Rollback total**: `select public.gv_rpc_guard_quitar();` (repone los cuerpos de `zz_backups."GV_Backup_RPCGuard_defs_20261008"`, 20 firmas).
 - ⚠ Probar desde el MCP NO sirve: `gv_es_supervisor_o_servicio` deja pasar `session_user = postgres`. Se prueba con `net.http_post` + clave pública.
 - Afuera: `gv_oc_generar_pendientes` (regla protegida) e `insumo_unidad_guardar` (operario). `sql/gv_rpc_guard_supervisor_d15.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-08, v28.77): «NPs por Día» y Programación — el NÚMERO grande, el % chiquito, y Facturado = «con FC ISIS / exportadas»
+
+- En la Programación de la PPP (`_pgaPctTd`) y en la TV / Mon. Admin («NPs por Día»), cada celda de estado muestra
+  la **cantidad de NP grande** y el **% chico** (en la PPP al lado, en la TV abajo).
+- **Facturado = `x/y`**: `y` = NP exportadas al Excel del Facturador (filas de `Facturacion_NP`, neteadas por Salió,
+  el número de siempre); `x` = de ésas, cuántas ya tienen la factura de ISIS parseada y asignada
+  (`GV_Cruce_FC_Asig.doc_id`, cron 90). Lo lee `gv_np_fc_parseada(text[])` (anon, sólo lectura). Si esa lectura
+  falla, la celda muestra sólo `y` (no un 0/…).
+- `sql/gv_np_fc_parseada_v2877.sql`, `tests/fc-parseada-x-de-y.cjs`.

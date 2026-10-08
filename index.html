@@ -4050,6 +4050,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 /* los porcentajes, en números y con color */
 .pga-pct{ font-weight:800; white-space:nowrap; }
 .pga-pct small{ font-weight:700; color:#94a3b8; font-size:11.5px; margin-left:4px; }
+.pga-pct .pga-fcn{ font-weight:700; opacity:.75; }
 .pga-pct.sal{ color:#6d28d9; }
 .pga-pct.fac{ color:#1d4ed8; } .pga-pct.arm{ color:#15803d; }
 .pga-pct.pro{ color:#a16207; } .pga-pct.pen{ color:#b91c1c; }
@@ -6395,7 +6396,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.76"></script>
+<script type="module" src="recepcion.js?v=28.77"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10686,7 +10687,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.76";
+const APP_VERSION = "v28.77";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -42235,12 +42236,27 @@ function pgaNeed(force) {
     body: JSON.stringify({ p_desde: desde, p_hasta: hasta })
   }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(function (rows) { _pgaRows = rows || []; _pgaTs = Date.now(); _pgaErr = ""; _pgaBusy = false;
-      pgaDestDeFilas(_pgaRows); pppRenderProg(); })
+      pgaDestDeFilas(_pgaRows); pgaFcCargar(_pgaRows); pppRenderProg(); })
     .catch(function (e) {
       _pgaBusy = false; _pgaErr = String((e && e.message) || e);
       if (!_pgaRows) _pgaRows = [];
       pppRenderProg();
     });
+}
+/* v28.77 (Luis, 08/10): qué NP facturadas (exportadas al Excel) ya tienen la factura de ISIS
+   parseada. null = no se pudo leer → la columna Facturado muestra sólo el total. */
+let _pgaFc = null;
+function _pgaFcTiene(r) { const np = _pppNpNorm(r && r.np); return !!(np && _pgaFc && _pgaFc.has(np)); }
+function pgaFcCargar(rows) {
+  const nps = [...new Set((rows || []).filter(function (r) { return r.estado === "facturado"; })
+    .map(function (r) { return String(r.np || "").trim(); }).filter(Boolean))];
+  fetch(SUPABASE_URL + "/rest/v1/rpc/gv_np_fc_parseada", {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_nps: nps })
+  }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (a) { _pgaFc = new Set((a || []).map(function (x) { return _pppNpNorm(x.np); })); pppRenderProg(); })
+    .catch(function (e) { console.warn("[ppp] fc parseada:", e && e.message); });
 }
 function pgaRecargar() { _pgaTs = 0; _pgaItems = {}; _patrTs = 0; _pgaDest = null; _pgaDestPide = new Set(); _pgaObs = null; _pgaObsPide = new Set();
   pgaNeed(true); patrNeed(true); pppRenderProg(); }
@@ -42443,10 +42459,11 @@ function patrColapsar() {
 function _pgaCuerpoHtml(dias, opts) {
   const esAtraso = !!(opts && opts.atraso);
   const hoy = _pppHoyKey();
-  const tot = { m3: 0, nps: 0, tandas: 0, est: _pgaEstCero(), estSal: _pgaEstCero(), salio: 0 };
+  const tot = { m3: 0, nps: 0, tandas: 0, est: _pgaEstCero(), estSal: _pgaEstCero(), salio: 0, fc: 0, fcSal: 0 };
   let h = "";
   for (const d of dias) {
     tot.m3 += d.m3; tot.nps += d.nps; tot.tandas += d.tandasArr.length;
+    tot.fc += d.fc || 0; tot.fcSal += d.fcSal || 0;
     for (const k of PGA_EST) { tot.est[k] += d.est[k]; tot.estSal[k] += (d.estSal ? d.estSal[k] : 0); }
     tot.salio += d.salio || 0;
     // v18.31: buscando, los días y las tandas que quedaron abren solos — lo que se busca es
@@ -42473,7 +42490,7 @@ function _pgaCuerpoHtml(dias, opts) {
         (esp ? '<span class="pga-esp">' + (d.nps ? 'sin fecha' : 'vacío') + '</span>' : '') +
         (esAtraso ? '<span class="patr-dias' + (atr >= 7 ? ' grave' : '') + '">hace ' + atr + ' día' + (atr === 1 ? '' : 's') + '</span>' : '') + '</td>' +
       '<td>' + _pppFmtM3(d.m3) + '</td><td>' + d.tandasArr.length + '</td><td>' + d.nps + '</td>' +
-      _pgaPctFila(d.est, d.nps, d.salio, d.estSal) + '</tr>';
+      _pgaPctFila(d.est, d.nps, d.salio, d.estSal, d) + '</tr>';
     if (!ab) continue;
     for (const t of d.tandasArr) {
       const tb = !!_pgaOpenT[t.key] || !!_pppSearch, te = _pgaEstadoGrupo(t.est, t.nps, t.salio);
@@ -42510,7 +42527,7 @@ function _pgaCuerpoHtml(dias, opts) {
           '</span>' +
         '</div></td>' +
         '<td>' + _pppFmtM3(t.m3) + '</td><td></td><td>' + t.nps + '</td>' +
-        _pgaPctFila(t.est, t.nps, t.salio, t.estSal) + '</tr>';
+        _pgaPctFila(t.est, t.nps, t.salio, t.estSal, t) + '</tr>';
       if (!tb) continue;
       for (const r of t.filas) {
         const nk = t.key + "|" + r.np, nb = !!_pgaOpenN[nk];
@@ -42627,7 +42644,7 @@ function _pgaCuerpoHtml(dias, opts) {
   }
   return h + '</tbody><tfoot><tr>' +
     '<td>Total</td><td>' + _pppFmtM3(tot.m3) + '</td><td>' + tot.tandas + '</td><td>' + tot.nps + '</td>' +
-    _pgaPctFila(tot.est, tot.nps, tot.salio, tot.estSal) + '</tr></tfoot></table>';
+    _pgaPctFila(tot.est, tot.nps, tot.salio, tot.estSal, tot) + '</tr></tfoot></table>';
 }
 
 /* v18.78 — recibe las filas por parámetro para que el submódulo "Pedidos atrasados"
@@ -42647,6 +42664,8 @@ function _pgaArbol(filas) {
     let d = dias.get(k);
     if (!d) { d = { key: k, m3: 0, nps: 0, est: _pgaEstCero(), estSal: _pgaEstCero(), salio: 0, mis: 0, misProv: new Set(), tandas: new Map() }; dias.set(k, d); }
     d.m3 += Number(r.m3) || 0; d.nps++; d.est[est]++; d.salio += sal; if (sal) d.estSal[est]++;
+    const _fc = (est === "facturado" && _pgaFcTiene(r)) ? 1 : 0;   // v28.77
+    d.fc = (d.fc || 0) + _fc; d.fcSal = (d.fcSal || 0) + (_fc && sal ? 1 : 0);
     // v20.45 (Luis): el día y la tanda heredan la marca de sus NP — la suma de las partes ES el
     // todo, igual que los m³ y los estados. Si el día la calculara por su cuenta podría decir algo
     // distinto de las tandas que muestra al abrirlo.
@@ -42656,6 +42675,7 @@ function _pgaArbol(filas) {
     let t = d.tandas.get(tk);
     if (!t) { t = { tanda: tk, key: k + "|" + tk, m3: 0, nps: 0, est: _pgaEstCero(), estSal: _pgaEstCero(), salio: 0, mis: 0, misProv: new Set(), filas: [] }; d.tandas.set(tk, t); }
     t.m3 += Number(r.m3) || 0; t.nps++; t.est[est]++; t.salio += sal; if (sal) t.estSal[est]++; t.filas.push(r);
+    t.fc = (t.fc || 0) + _fc; t.fcSal = (t.fcSal || 0) + (_fc && sal ? 1 : 0);
     if (_mis) { t.mis++; if (_dst.provincia) t.misProv.add(_dst.provincia); }
   }
   const out = [...dias.values()].sort(function (a, b) { return a.key.localeCompare(b.key); });
@@ -42673,12 +42693,15 @@ function _pgaConEspera(dias) {
   dias.push({ key: PGA_ESPERA_KEY, m3: 0, nps: 0, est: _pgaEstCero(), estSal: _pgaEstCero(), salio: 0, tandas: new Map(), tandasArr: [] });
   return dias;
 }
-function _pgaPctTd(n, tot, cls) {
+function _pgaPctTd(n, tot, cls, pre) {
   const p = tot ? Math.round(100 * n / tot) : 0;
+  /* v28.77 (Luis, 08/10): el NÚMERO de NP grande y el % chiquito, igual que el monitor. */
+  return '<td><span class="pga-pct ' + cls + (n ? '' : ' z') + '"' +
+    (pre ? ' title="' + pre + n + ' con factura de ISIS parseada / exportadas al Excel"' : '') + '>' +
+    (pre ? '<span class="pga-fcn">' + pre + '</span>' : '') + n + '<small>' + p + '<span class="pga-pcs"> </span>%</small></span></td>';
   // v20.10: el espacio antes del % va en su propio span — en el celular se esconde («100%») y con
   // cinco columnas de porcentaje eso son ~20 px, que es justo lo que hacía que la tabla no entrara.
   // El `textContent` no cambia: sigue diciendo "100 %".
-  return '<td><span class="pga-pct ' + cls + (n ? '' : ' z') + '">' + p + '<span class="pga-pcs"> </span>%<small>' + n + '</small></span></td>';
 }
 /* v20.10: la 1ª celda es SALIÓ y NO entra en el reparto de los otros cuatro — una NP facturada
    puede haber salido o no, así que esta columna se lee sola y la fila ya no suma 100 %.
@@ -42696,10 +42719,15 @@ function _pgaPctTd(n, tot, cls) {
    ya salida se tiene que seguir viendo facturada, no como "mezcla".
    ⚠ Mientras no llegaron las dos fuentes (En Salida y los CCN), SALIÓ dice «—» y los otros cuatro
    van SIN netear: es lo único honesto mientras no se sabe qué salió. */
-function _pgaPctFila(e, n, salio, eSal) {
+function _pgaPctFila(e, n, salio, eSal, o) {
   const s = eSal || _pgaEstCero(), listo = _pgaSalioListo();
   const neto = function (k) { return e[k] - (listo ? (s[k] || 0) : 0); };
-  return _pgaSalioTd(salio, n) + _pgaPctTd(neto("facturado"), n, "fac") + _pgaPctTd(neto("armado"), n, "arm") +
+  /* v28.77 (Luis, 08/10): Facturado = «con FC de ISIS / exportadas al Excel». El denominador es el
+     de siempre (NP en Facturacion_NP, neteado por Salió); el numerador, cuántas de ésas ya tienen la
+     factura de ISIS parseada (gv_np_fc_parseada). Sin esa lectura, sólo el denominador. */
+  const fac = neto("facturado");
+  const fcN = (_pgaFc && o) ? (Number(o.fc) || 0) - (listo ? (Number(o.fcSal) || 0) : 0) : null;
+  return _pgaSalioTd(salio, n) + _pgaPctTd(fac, n, "fac", (fcN != null && fac) ? fcN + "/" : "") + _pgaPctTd(neto("armado"), n, "arm") +
          _pgaPctTd(neto("proceso"), n, "pro") + _pgaPctTd(neto("pendiente"), n, "pen");
 }
 /* v20.11 (Thomas: *"quiero que cada NP lleve el dato de los porcentajes (para determinar su
@@ -61704,7 +61732,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.76"></script>
+<script src="importacion.js?v=28.77"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64633,10 +64661,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.76"></script>
-<script src="hotsale.js?v=28.76"></script>
-<script src="estadisticas.js?v=28.76"></script>
-<script src="ads.js?v=28.76"></script>
+<script src="cobranzas.js?v=28.77"></script>
+<script src="hotsale.js?v=28.77"></script>
+<script src="estadisticas.js?v=28.77"></script>
+<script src="ads.js?v=28.77"></script>
 
 </body>
 </html>

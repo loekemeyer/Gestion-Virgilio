@@ -395,7 +395,7 @@ function responder(url) {
   ok(/mt-ver/.test(r.meta), "falta el veredicto arriba del resumen de días");
   ok(!/mt-bar|pickeado|Ritmo |m³<\/b> armado/.test(r.meta),
      "volvió texto que Luis mandó sacar de la banda: " + r.meta.slice(0, 200));
-  ok(/resumenDias\(d\.arbol, d\.despachadas, 4\)/.test(
+  ok(/resumenDias\(d\.arbol, d\.despachadas, 4[,)]/.test(
        require("fs").readFileSync(require("path").join(__dirname, "..", "monitor", "tv.html"), "utf8")),
      "el resumen de días tiene que pedir 4 días (el fixture sólo trae uno: va estático)");
   ok(/<td class="rd-fe">/.test(r.dias), "el resumen de días no se dibujó");
