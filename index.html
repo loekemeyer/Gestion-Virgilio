@@ -6383,7 +6383,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.52"></script>
+<script type="module" src="recepcion.js?v=28.53"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10662,7 +10662,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.52";
+const APP_VERSION = "v28.53";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -22069,7 +22069,7 @@ async function stkNpFaltanDoCancel(npEnc, motivoEnc) {
   try {
     const r = await fetch(SUPABASE_URL + "/rest/v1/NP_Canceladas?on_conflict=np", {
       method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      headers: await gvWriteHdr({ Prefer: "resolution=merge-duplicates,return=minimal" }),
       body: JSON.stringify({ np: np, motivo: motivo })
     });
     if (!r.ok && r.status !== 409) { try { alert("No se pudo marcar (HTTP " + r.status + ")."); } catch (_e) {} return; }
@@ -24047,10 +24047,7 @@ async function stkFaltEditNota(key, campo) {
   try {
     await fetch(SUPABASE_URL + "/rest/v1/Faltantes_Notas?on_conflict=cod", {
       method: "POST",
-      headers: {
-        "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY,
-        "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"
-      },
+      headers: await gvWriteHdr({ "Prefer": "resolution=merge-duplicates,return=minimal" }),
       body: JSON.stringify({ cod: key, dia_resolucion: next.dia, motivo: next.motivo, actualizado: new Date().toISOString() })
     });
   } catch (e) { console.warn("stkFaltEditNota persist:", e); }
@@ -40589,7 +40586,7 @@ async function _zgFetchAddrs() {
 }
 async function _zgCachePut(key, dir, barrio, c) {
   try {
-    await fetch(SUPABASE_URL + "/rest/v1/PPP_Geo?on_conflict=dir_key", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ dir_key: key, direccion: dir, barrio: barrio, lat: c.lat, lng: c.lng, comp: c.comp || null }) });
+    await fetch(SUPABASE_URL + "/rest/v1/PPP_Geo?on_conflict=dir_key", { method: "POST", headers: await gvWriteHdr({ Prefer: "resolution=merge-duplicates,return=minimal" }), body: JSON.stringify({ dir_key: key, direccion: dir, barrio: barrio, lat: c.lat, lng: c.lng, comp: c.comp || null }) });
   } catch (e) { }
 }
 /* v11.62 — asegura que el DEPÓSITO esté geocodificado en PPP_Geo. Si falta, lo geocodifica
@@ -40733,7 +40730,7 @@ async function _rtCacheAll() {
 }
 async function _rtCachePut(key, dir, barrio, c) {
   try {
-    await fetch(SUPABASE_URL + "/rest/v1/PPP_Geo", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify({ dir_key: key, direccion: dir, barrio: barrio, lat: c.lat, lng: c.lng }) });
+    await fetch(SUPABASE_URL + "/rest/v1/PPP_Geo", { method: "POST", headers: await gvWriteHdr({ Prefer: "resolution=ignore-duplicates,return=minimal" }), body: JSON.stringify({ dir_key: key, direccion: dir, barrio: barrio, lat: c.lat, lng: c.lng }) });
   } catch (e) { }
 }
 async function _rtFetchPeds(fecha) {
@@ -46377,7 +46374,7 @@ async function avpLog(tipo, np, cod, vend) {
   try {
     await fetch(SUPABASE_URL + "/rest/v1/envio_programacion_log", {
       method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      headers: await gvWriteHdr({ Prefer: "return=minimal" }),
       body: JSON.stringify({ tipo: tipo, np: np, cod_cliente: cod, vend: vend, quien: (_avp && _avp.quien) || "" })
     });
   } catch (_e) {}
@@ -46896,7 +46893,7 @@ async function dpMarkDiscontinuo(codEnc) {
   try {
     var r = await fetch(SUPABASE_URL + "/rest/v1/Articulos_Discontinuados?on_conflict=cod", {
       method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      headers: await gvWriteHdr({ Prefer: "resolution=merge-duplicates,return=minimal" }),
       body: JSON.stringify({ cod: cod, motivo: "discontinuo (marcado a mano)" })
     });
     if (!r.ok && r.status !== 409) { try { alert("No se pudo marcar (HTTP " + r.status + ")."); } catch (_e) {} return; }
@@ -60348,6 +60345,14 @@ async function facAuthWriteHeaders(extra) {
   if (extra) Object.assign(h, extra);
   return h;
 }
+/* v28.53 (problema 596, D10): escrituras de supervisor con la SESION, no con la clave publica.
+   Sin sesion cae a la clave publica: si la tabla esta cerrada para anon (aaa_gv_anon_bloqueo),
+   la fila queda guardada en GV_Anon_Insert_Bloqueado y avisa por Telegram (no se pierde). */
+async function gvWriteHdr(extra) {
+  const h = await facAuthWriteHeaders(extra);
+  if (h) return h;
+  return Object.assign({ apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, extra || {});
+}
 /* v23.05 (problema 577): Stock_Config ya no se escribe con la clave pública. La base sólo deja
    escribir a un supervisor logueado (es_supervisor_virgilio()); sin sesión se avisa y no se guarda. */
 async function _scfgAuth() {
@@ -61646,7 +61651,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.52"></script>
+<script src="importacion.js?v=28.53"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64495,10 +64500,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.52"></script>
-<script src="hotsale.js?v=28.52"></script>
-<script src="estadisticas.js?v=28.52"></script>
-<script src="ads.js?v=28.52"></script>
+<script src="cobranzas.js?v=28.53"></script>
+<script src="hotsale.js?v=28.53"></script>
+<script src="estadisticas.js?v=28.53"></script>
+<script src="ads.js?v=28.53"></script>
 
 </body>
 </html>

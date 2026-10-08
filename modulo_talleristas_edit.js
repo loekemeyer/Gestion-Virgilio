@@ -181,6 +181,7 @@ function tallEditClose() {
 }
 
 async function tallEditStep1Save() {
+  const _WH = await gvWriteHdr({ "Prefer": "return=minimal" }); // v28.53: con la sesion, no la clave publica
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   const nombre = _tallEditState.nombre;
   const telefono = document.getElementById("tallEditTelefono").value.trim();
@@ -192,7 +193,7 @@ async function tallEditStep1Save() {
       SUPABASE_URL + "/rest/v1/Tall_ProvAT_PS?nombre=eq." + encodeURIComponent(nombre),
       {
         method: "PATCH",
-        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        headers: _WH,
         body: JSON.stringify(updateBody)
       }
     );
@@ -245,6 +246,7 @@ function tallEditFilterCods() {
 }
 
 async function tallEditAssignCod(cod) {
+  const _WH = await gvWriteHdr({ "Prefer": "return=minimal" }); // v28.53: con la sesion, no la clave publica
   const nombre = _tallEditState.nombre;
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
 
@@ -276,7 +278,7 @@ async function tallEditAssignCod(cod) {
       SUPABASE_URL + "/rest/v1/OC_Maximos?cod=eq." + encodeURIComponent(cod),
       {
         method: "PATCH",
-        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        headers: _WH,
         body: JSON.stringify(updateBody)
       }
     );
@@ -371,6 +373,7 @@ function tallEditRenderCurrentCods() {
 }
 
 async function tallEditUpdatePct(cod, provPos, newVal) {
+  const _WH = await gvWriteHdr({ "Prefer": "return=minimal" }); // v28.53: con la sesion, no la clave publica
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   const pct = Math.max(0, Math.min(100, parseFloat(newVal) || 0));
 
@@ -380,7 +383,7 @@ async function tallEditUpdatePct(cod, provPos, newVal) {
       SUPABASE_URL + "/rest/v1/OC_Maximos?cod=eq." + encodeURIComponent(cod),
       {
         method: "PATCH",
-        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        headers: _WH,
         body: JSON.stringify(updateBody)
       }
     );
@@ -393,6 +396,7 @@ async function tallEditUpdatePct(cod, provPos, newVal) {
 }
 
 async function tallEditRemoveProv(cod, provPos) {
+  const _WH = await gvWriteHdr({ "Prefer": "return=minimal" }); // v28.53: con la sesion, no la clave publica
   if (!confirm("¿Quitar este proveedor del código " + cod + "?")) return;
 
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
@@ -427,7 +431,7 @@ async function tallEditRemoveProv(cod, provPos) {
       SUPABASE_URL + "/rest/v1/OC_Maximos?cod=eq." + encodeURIComponent(cod),
       {
         method: "PATCH",
-        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        headers: _WH,
         body: JSON.stringify(updateBody)
       }
     );

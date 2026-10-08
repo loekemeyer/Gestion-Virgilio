@@ -69,3 +69,33 @@ begin
 end $inst$;
 
 select public.gv_anon_bloqueo_instalar(true);
+
+-- ═══ v28.53 (Thomas, 08/10, D10): las otras 40 tablas, con la misma alarma ═══
+-- Revisadas pantalla por pantalla: las escriben con SESIÓN (supabase-js con sesión, o
+-- facAuthWriteHeaders). Las 7 que escribían con la clave pública pasaron a gvWriteHdr()
+-- (index.html: Articulos_Discontinuados, Faltantes_Notas, NP_Canceladas, PPP_Geo,
+-- envio_programacion_log; modulo_talleristas_arts/edit.js: Tall_ProvAT_PS, Codigos X
+-- Tallerista, Articulos Virgilio X Tallerista y OC_Maximos, que con anon ya fallaba).
+-- Faltantes_Notas: sus policies eran sólo anon → se les sumó authenticated.
+-- Rollback: select public.gv_anon_bloqueo_d10(false);
+create or replace function public.gv_anon_bloqueo_d10(p_on boolean default true)
+returns text language plpgsql as $inst$
+declare t text; n int := 0;
+  v_tablas text[] := array['Ajustes Online PS','Articulos Virgilio X Tallerista','Articulos_Cajas','Articulos_Discontinuados','Cajas','Codigos X Tallerista','Control_Logistica','Control_Modo_OP','Empleados','Entregas PS','Entrevistas','Entrevistas_Virgilio','Faltantes_Notas','Flejes_Entradas','GV_Recepcion_Comentarios','GV_Recepcion_Receptores','Matrices','NC_Loeke_Chef_Hechas','NP_Canceladas','NP_Secuencia_Revisadas','NP_Sin_Base_Revisadas','Ordenes_Compra','PPP_Geo','Pendientes','Preavisos','Proporcion_Articulo_Tallerista','Recepcion_Insumos','Relevamientos_Cajas','Relevamientos_Cajas_Items','Rutas_Confirmadas','Rutas_Problemas','Tall_ProvAT_PS','Volumen_Articulos','envio_programacion_log','Entregas Tallerista Virgilio','Envios a Talleristas','Envios a PS','Entregas Prov AT','Entregas Tallerista Cervantes','Correcciones_Pedido'];
+begin
+  foreach t in array v_tablas loop
+    if to_regclass(format('public.%I', t)) is null then continue; end if;
+    if p_on then
+      execute format('create or replace trigger aaa_gv_anon_bloqueo before insert on public.%I for each row execute function public.gv_anon_insert_bloquear()', t);
+      execute format('alter table public.%I enable trigger aaa_gv_anon_bloqueo', t);
+    else
+      execute format('alter table public.%I disable trigger aaa_gv_anon_bloqueo', t);
+    end if;
+    n := n + 1;
+  end loop;
+  return (case when p_on then 'bloqueadas ' else 'liberadas ' end) || n;
+end $inst$;
+alter policy faltnotas_ins on public."Faltantes_Notas" to anon, authenticated;
+alter policy faltnotas_upd on public."Faltantes_Notas" to anon, authenticated;
+alter policy faltnotas_sel on public."Faltantes_Notas" to anon, authenticated;
+select public.gv_anon_bloqueo_d10(true);

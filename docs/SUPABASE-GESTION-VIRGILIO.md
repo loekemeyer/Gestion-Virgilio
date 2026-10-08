@@ -31809,3 +31809,7 @@ igual) es decisión de la persona y no cambia; «movido a mano» cuenta como man
 - Lectura: `select * from public."GV_Anon_Insert_Bloqueado" order by ts desc;` (vacía = nadie lo intentó).
 - Rollback: una tabla `alter table public."<t>" disable trigger aaa_gv_anon_bloqueo;` · todas
   `select public.gv_anon_bloqueo_instalar(false);`. Centinela 370. `sql/gv_anon_insert_bloqueo_v2852.sql`.
+- **v28.53 (D10)**: las otras 40 también (98 tablas en total con `aaa_gv_anon_bloqueo`). Se revisó cada pantalla:
+  escriben con sesión. Las 7 que usaban la clave pública pasaron a `gvWriteHdr()` (index.html y
+  modulo_talleristas_arts/edit.js; ahí OC_Maximos ya fallaba con anon). Probado: authenticated entra, anon no
+  (log +1). Quedan con INSERT de anon sólo las 14 que el operario usa de verdad. Rollback `gv_anon_bloqueo_d10(false)`.

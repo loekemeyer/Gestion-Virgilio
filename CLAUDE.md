@@ -8335,11 +8335,13 @@ cartel que diga que se tiene que revisar y asignar manualmente"*.
   cambia su dirección, pasan a Zona 1 y salen en el cartel.
 - `sql/gv_ppp_web_zona_recalc_v2840.sql`, `tests/ppp-zona-fuera-regla.cjs`, centinelas v28.40.
 
-## ⚠ REGLA (Thomas, 2026-10-08, v28.52): 58 tablas de public NO aceptan escrituras de la clave pública — y si se intenta, AVISA
+## ⚠ REGLA (Thomas, 2026-10-08, v28.52-53): 98 tablas de public NO aceptan escrituras de la clave pública — y si se intenta, AVISA
 
 Trigger `aaa_gv_anon_bloqueo` → `gv_anon_insert_bloquear()`: con rol anon la fila se descarta, queda entera en
 **`GV_Anon_Insert_Bloqueado`** y sale un Telegram. La lista está en `gv_anon_bloqueo_instalar` (sectores viejos de
-Cervantes, Fichadas_Virgilio, Insumos, Proveedores, Racks_Bajadas…). **Si una pantalla nueva tiene que escribir en una
+Cervantes, Fichadas_Virgilio, Insumos, Proveedores, Racks_Bajadas…) y en `gv_anon_bloqueo_d10` (40 más: recepción,
+Cervantes admin, talleristas…; v28.53). anon sólo inserta en las 14 del operario (Registros, Movimientos_Stock,
+Entregas_Virgilio, Picking paso…). **Una escritura de supervisor va con `gvWriteHdr()` (la sesión), nunca con la
+clave pública pegada a mano.** **Si una pantalla nueva tiene que escribir en una
 de esas tablas con la clave pública**, deshabilitar el trigger en esa tabla (`alter table … disable trigger
-aaa_gv_anon_bloqueo`) o escribir por una RPC SECURITY DEFINER. Las 40 tablas que el código escribe sin anon en 7 días
-quedan para revisar pantalla por pantalla (D10). `sql/gv_anon_insert_bloqueo_v2852.sql`, centinela 370.
+aaa_gv_anon_bloqueo`) o escribir por una RPC SECURITY DEFINER. `sql/gv_anon_insert_bloqueo_v2852.sql`, centinela 370.

@@ -332,6 +332,7 @@ function tallArtStep3Back() {
 }
 
 async function tallArtStep3Save() {
+  const _WH = await gvWriteHdr({ "Prefer": "return=minimal" }); // v28.53: con la sesion, no la clave publica
   var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   var nombre = _tallArtState.nombre;
   var tipo = _tallArtState.tipo;
@@ -347,7 +348,7 @@ async function tallArtStep3Save() {
     };
     var tallRes = await fetch(SUPABASE_URL + "/rest/v1/Tall_ProvAT_PS", {
       method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+      headers: _WH,
       body: JSON.stringify(tallBody)
     });
     if (!tallRes.ok) {
@@ -401,14 +402,14 @@ async function tallArtStep3Save() {
         upsertPromises.push(
           fetch(SUPABASE_URL + "/rest/v1/OC_Maximos", {
             method: "POST",
-            headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+            headers: _WH,
             body: JSON.stringify(body)
           }).then(function(r) {
             if (r.status === 409) {
               // Ya existe → PATCH
               return fetch(SUPABASE_URL + "/rest/v1/OC_Maximos?cod=eq." + encodeURIComponent(cod), {
                 method: "PATCH",
-                headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+                headers: _WH,
                 body: JSON.stringify({ proveedor: nombre, prop_prov1: 100, proveedor2: null, prop_prov2: 0 })
               });
             }
@@ -455,7 +456,7 @@ async function tallArtStep3Save() {
 
         var codRes = await fetch(SUPABASE_URL + "/rest/v1/Codigos%20X%20Tallerista", {
           method: "POST",
-          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+          headers: _WH,
           body: JSON.stringify(newCodRows)
         });
         if (!codRes.ok) {
@@ -482,7 +483,7 @@ async function tallArtStep3Save() {
       if (artRows.length) {
         var artRes2 = await fetch(SUPABASE_URL + "/rest/v1/Articulos%20Virgilio%20X%20Tallerista", {
           method: "POST",
-          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+          headers: _WH,
           body: JSON.stringify(artRows)
         });
         if (!artRes2.ok) {
