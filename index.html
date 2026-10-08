@@ -6396,7 +6396,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.87"></script>
+<script type="module" src="recepcion.js?v=28.88"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10687,7 +10687,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.87";
+const APP_VERSION = "v28.88";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34251,11 +34251,14 @@ function openMonitor() {
     _monitorVpListener = () => classifyAndApplyMonitorVp();
     window.addEventListener("resize", _monitorVpListener);
   }
-  refreshMonitor();
+  /* v28.82 (Luis, 08/10: "si no figura nada usando el monitor viejo sacalo, no va mas"): el tablero viejo
+     (#monitorContent) ya no tiene puerta: el supervisor abre en la Vista TV y el kiosko va a monitor/tv.html.
+     No se refresca mas en segundo plano (eran ~15 consultas cada 30 s por cada admin con el monitor abierto). */
+  if (window.__monViejoActivo) refreshMonitor();
   if (monitorIntervalId) clearInterval(monitorIntervalId);
   // Mismo intervalo para kiosko y modo normal (MONITOR_REFRESH_MS = 30 s).
   const refreshMs = MONITOR_REFRESH_MS;
-  monitorIntervalId = setInterval(refreshMonitor, refreshMs);
+  if (window.__monViejoActivo) monitorIntervalId = setInterval(refreshMonitor, refreshMs);
   // Contador regresivo visible para el operario
   let _nextRefreshAt = Date.now() + MONITOR_REFRESH_MS;
   window._monitorSetNextRefresh = () => { _nextRefreshAt = Date.now() + MONITOR_REFRESH_MS; };
@@ -48404,6 +48407,11 @@ const KIOSK_FLAG = "vir_tv_kiosk";
 const _kioskEnrolled = (function () { try { return localStorage.getItem(KIOSK_FLAG) === "1"; } catch (_e) { return false; } })();
 const _keyValid = _monParams.get("key") === MONITOR_TV_KEY;
 if (window.__pendingMonitorParam && (_keyValid || _kioskEnrolled)) {
+  /* v28.82: el kiosko del monitor (?monitor=tv) va a la TV liviana. El tablero viejo no va mas. */
+  if (window.__pendingMonitorParam === "tv" || window.__pendingMonitorParam === "1") {
+    try { localStorage.setItem(KIOSK_FLAG, "1"); } catch (_e) {}
+    location.replace("monitor/tv.html?key=tv");
+  }
   window.__tvKioskMode = true;     // el módulo de auth lo respeta y no pide login
   window.__isSupervisor = true;    // sólo para que requireSupervisor() deje abrir
   if (_keyValid) {
@@ -61732,7 +61740,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.87"></script>
+<script src="importacion.js?v=28.88"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64661,10 +64669,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.87"></script>
-<script src="hotsale.js?v=28.87"></script>
-<script src="estadisticas.js?v=28.87"></script>
-<script src="ads.js?v=28.87"></script>
+<script src="cobranzas.js?v=28.88"></script>
+<script src="hotsale.js?v=28.88"></script>
+<script src="estadisticas.js?v=28.88"></script>
+<script src="ads.js?v=28.88"></script>
 
 </body>
 </html>
