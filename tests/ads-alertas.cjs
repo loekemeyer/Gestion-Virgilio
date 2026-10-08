@@ -125,7 +125,7 @@ const STOCK = [
   if (JSON.stringify(r.chips) !== JSON.stringify(["10 días · 1", "20 días · 1", "30 días · 2", "todos · 3"])) fallas.push("(c) chips " + JSON.stringify(r.chips));
   if (JSON.stringify(r.stockCods) !== JSON.stringify(["505"])) fallas.push("(c) quiebre 10 d: " + JSON.stringify(r.stockCods));
   if (r.pctTall !== 11) fallas.push("(c) v28.82 sin Proporción ni %: celdas " + r.pctTall);
-  const C10 = ["Tallerista","Cód.","Descripción","Stk","Comprom.10 d","E.M. plazo10d","Saldo10 d","Últ.OC","Pedido","Recibido","Estim.pend."];
+  const C10 = ["Tallerista","Cód.","Descripción","Stk","Comp.10d","E.M. plazo10d","Saldo10d","Últ.OC","Pedido","Recib.","Pend.est."];
   if (JSON.stringify(r.cols10) !== JSON.stringify(C10)) fallas.push("(c) columnas stock: " + JSON.stringify(r.cols10));
   if (r.tallCol !== "Lucho") fallas.push("(c) v28.60 tallerista a la izquierda del código: " + JSON.stringify(r.tallCol));
   if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","100","-70","30/09","200","100"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));

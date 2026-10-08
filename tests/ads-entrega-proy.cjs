@@ -24,5 +24,7 @@ if (c30.estH !== c.estH) fallas.push("no escala con el plazo (a 30 d igual que a
 if (!/cargado en la OC/.test(c.estDist.join("|")) ) fallas.push("el tooltip no dice el origen: " + c.estDist.join("|"));
 c = vm.runInContext(`_ads.epOc = {}; _ads.epOc[_adsEpKey("Garcia", "550", "2026-09-30")] = 60; _adsStockCalc({ cod: "550", saldo10: -5 }, 10)`, ctx);
 if (c.estH !== 25) fallas.push("un dato de una OC vieja no cuenta: " + c.estH);
+if (/\.map\(_adsN\)/.test(src)) fallas.push("v28.84: .map(_adsN) le pasa el índice como decimales (87,0 en la 2.ª fila)");
+if (c.estXY.length && c.estXY[0].pend !== "5*") fallas.push("v28.84: en pantalla sólo X: " + c.estXY[0].pend);
 if (fallas.length) { console.error("✗ ads-entrega-proy\n  " + fallas.join("\n  ")); process.exit(1); }
 console.log("✓ ADS: Entrega est. usa la entrega proy. cargada en la OC vigente; sin dato, OC × %");

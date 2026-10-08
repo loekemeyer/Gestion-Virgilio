@@ -91,7 +91,7 @@ function _adsCss() {
     "#adsOv th{background:#ede9fe;color:#3b0764;font-size:11.5px;padding:4px 6px;text-align:center;line-height:1.15;position:sticky;top:0;z-index:1;}",
     "#adsOv td{padding:3px 6px;text-align:center;border-top:1px solid #eef2f7;white-space:nowrap;}",
     "#adsOv td.desc{max-width:200px;overflow:hidden;text-overflow:ellipsis;}",
-    "#adsOv table.ads-stk{font-size:15px;} #adsOv table.ads-stk th{font-size:12.5px;padding:3px 4px;} #adsOv table.ads-stk td{padding:2px 4px;} #adsOv table.ads-stk td.estp{line-height:1.25;}",
+    "#adsOv table.ads-stk{font-size:15px;} #adsOv table.ads-stk th{font-size:12.5px;padding:3px 3px;} #adsOv table.ads-stk td{padding:2px 3px;} #adsOv table.ads-stk td.desc{max-width:165px;} #adsOv table.ads-stk td.estp{line-height:1.25;}",
     "#adsOv tr.t{cursor:pointer;}",
     "#adsOv tr.t:hover{background:#faf5ff;}",
     "#adsOv tr.al td.pct{color:#b91c1c;font-weight:800;}",
@@ -288,10 +288,10 @@ function _adsHtmlStock() {
   var f = adsFiltrarStock(rows, ver, _ads.q, H);
   h += '<div class="res">Todo a ' + H + ' días · sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · saldo = disponible − comprometido − E.M. plazo · en cajas</div>';
   // v28.82 (Luis, 08/10): sin el recuadro «Período»: Últ. OC · Pedido · Recibido · Estim. pend. con el mismo encabezado que el resto
-  h += '<table class="ads-stk"><thead><tr><th title="Tallerista de la OC vigente del código">Tallerista</th><th>Cód.</th><th>Descripción</th><th>Stk</th><th>Comprom.<br>' + H + ' d</th><th title="Est. Madre del mes × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ' días que tarda en salir) / 30: los pedidos que entran y salen dentro del plazo">E.M. plazo<br>' + H + 'd</th>' +
-    '<th>Saldo<br>' + H + ' d</th><th title="Fecha de la última OC del código">Últ.<br>OC</th>' +
-    '<th title="Lo pedido en la última OC, uno por tallerista">Pedido</th><th title="Lo que recibió Virgilio de la última OC, uno por tallerista">Recibido</th>' +
-    '<th title="Por tallerista, X/Y: X = lo que falta que entregue de la OC vigente (lo cargado en la OC menos lo ya recibido; con * si la casilla está vacía y es la OC × el % que viene entregando) · Y = lo pedido en esa OC">Estim.<br>pend.</th></tr></thead><tbody>';   // v28.62 (Luis, 08/10): sin Proporción en pantalla (sigue en el Excel)
+  h += '<table class="ads-stk"><thead><tr><th title="Tallerista de la OC vigente del código">Tallerista</th><th>Cód.</th><th>Descripción</th><th>Stk</th><th>Comp.<br>' + H + 'd</th><th title="Est. Madre del mes × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ' días que tarda en salir) / 30: los pedidos que entran y salen dentro del plazo">E.M. plazo<br>' + H + 'd</th>' +
+    '<th>Saldo<br>' + H + 'd</th><th title="Fecha de la última OC del código">Últ.<br>OC</th>' +
+    '<th title="Lo pedido en la última OC, uno por tallerista">Pedido</th><th title="Lo que recibió Virgilio de la última OC, uno por tallerista">Recib.</th>' +
+    '<th title="Por tallerista: lo que falta que entregue de la última OC (lo cargado en la OC menos lo ya recibido; con * si la casilla está vacía y es la OC × el % que viene entregando)">Pend.<br>est.</th></tr></thead><tbody>';   // v28.62 (Luis, 08/10): sin Proporción en pantalla (sigue en el Excel)
   if (!f.length) h += '<tr><td colspan="11" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H), disp = c.disp, proy = c.proy, comp = c.comp, em = c.em, saldo = c.saldo;
@@ -303,8 +303,8 @@ function _adsHtmlStock() {
     // v27.78 (Luis): el recuadro es del PERÍODO (las N OC del rango), no de la última OC; la fecha sí es la de la última OC
     var fUlt = c.fechaUlt ? _adsFecha(c.fechaUlt) : '<span class="neg">sin OC</span>';
     if (c.pedP == null) h += '<td>' + fUlt + '</td><td colspan="3">' + (_ads.tall ? "sin OC en el período" : "…") + "</td>";
-    else h += '<td>' + fUlt + '</td><td>' + (c.ultPed.length ? c.ultPed.map(_adsN).join("<br>") : "—") + '</td><td>' + (c.ultRec.length ? c.ultRec.map(_adsN).join("<br>") : "—") +
-      '</td><td class="estp" title="' + _adsEsc((c.estDist.length ? c.estDist : c.estDet).join("\n")) + '">' + (c.estXY.length ? c.estXY.map(function (y) { return '<b>' + _adsEsc(y.txt) + '</b>'; }).join("<br>") : "—") + "</td>";   // v28.64: X/Y, una fila por tallerista   // v27.85 (Luis): el reparto por tallerista va en el tooltip
+    else h += '<td>' + fUlt + '</td><td>' + (c.ultPed.length ? c.ultPed.map(function (v) { return _adsN(v); }).join("<br>") : "—") + '</td><td>' + (c.ultRec.length ? c.ultRec.map(function (v) { return _adsN(v); }).join("<br>") : "—") +
+      '</td><td class="estp" title="' + _adsEsc((c.estDist.length ? c.estDist : c.estDet).join("\n")) + '">' + (c.estXY.length ? c.estXY.map(function (y) { return '<b>' + _adsEsc(y.pend) + '</b>'; }).join("<br>") : "—") + "</td>";   // v28.64: X/Y, una fila por tallerista   // v27.85 (Luis): el reparto por tallerista va en el tooltip
     h += "</tr>";
   });
   return h + "</tbody></table></div>";
@@ -358,7 +358,7 @@ function _adsStockCalc(r, H) {
            ultPed: estArr.map(function (y) { return y.y; }), ultRec: estArr.map(function (y) { return y.r; }),   // v28.83 (Luis): pedido y recibido de la ÚLTIMA OC, uno por tallerista
            // v28.82: X = lo que falta (proyectado de la OC − lo ya recibido). v28.64 (Luis, 08/10): «X/Y» por tallerista: X = proyectado de entrega (con * si es estimado: la casilla de la OC
            // está VACÍA; un 0 cargado es dato y va sin *), Y = lo pedido en la última OC
-           estXY: estArr.map(function (y) { return { p: y.p, txt: _adsN(y.e) + (y.oc ? "" : "*") + "/" + _adsN(y.y) }; }),
+           estXY: estArr.map(function (y) { return { p: y.p, txt: _adsN(y.e) + (y.oc ? "" : "*") + "/" + _adsN(y.y), pend: _adsN(y.e) + (y.oc ? "" : "*") /* v28.84: en pantalla sólo X (Y ya está en Pedido) */ }; }),
            pedP: pc.length ? totPed : null, recP: pc.length ? recP : null, pctP: pc.length && totPed > 0 ? recP / totPed : null,
            fechaUlt: fechaUlt, dist: dist };
 }
