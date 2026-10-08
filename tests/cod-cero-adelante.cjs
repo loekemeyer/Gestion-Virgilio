@@ -56,9 +56,20 @@ const BUSQUEDA = [["26", "026"], ["27", "0027"], ["35E", "035E"], ["67", "067"]]
       if (typeof window[fn] !== "function") { fallas.push("no existe " + fn); return; }
       if (!/codCanon\(/.test(String(window[fn]))) fallas.push(fn + " guarda el código sin pasar por codCanon");
     });
+    // v28.71 (Luis, D10/D11 tanda 1): codCanon y _abastCodDisp MUESTRAN con el cero adelante
+    if (typeof codCanon === "function" && codCanon("58") !== "058") fallas.push("codCanon(58) = " + codCanon("58"));
+    if (typeof _abastCodDisp === "function" && _abastCodDisp("58") !== "058") fallas.push("_abastCodDisp(58) = " + _abastCodDisp("58"));
+    // los pop-ups de Stocks dibujan el código por _padCod
+    ["stkOpenFcsArt", "stkOpenExcedenteArt", "stkOpenRacksArt", "stkOpenCapArt", "stkOpenMovsArt"].forEach((fn) => {
+      if (typeof window[fn] !== "function") { fallas.push("no existe " + fn); return; }
+      if (!/_padCod\(/.test(String(window[fn]))) fallas.push(fn + " muestra el código sin _padCod");
+    });
     return fallas;
   }, { ESCRITURA, BUSQUEDA });
 
+  const rcp = require("fs").readFileSync(require("path").join(__dirname, "..", "recepcion.js"), "utf8");
+  if (!/function _rcpPad\(/.test(rcp)) r.push("recepcion.js sin _rcpPad");
+  if (!/Cod_Art: _rcpPad\(/.test(rcp)) r.push("recepcion.js: el alta de código no guarda con _rcpPad");
   const ok = r.length === 0 && errs.length === 0;
   console.log("cod-cero-adelante: escritura=" + ESCRITURA.length + " · busqueda=" + (BUSQUEDA.length * 3) +
     (r.length ? " · FALLAS: " + r.join(" | ") : "") + " · pageerrors:", errs.length ? errs.join("|") : "none",

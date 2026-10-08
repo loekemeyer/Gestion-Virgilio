@@ -6396,7 +6396,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.77"></script>
+<script type="module" src="recepcion.js?v=28.78"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10687,7 +10687,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.77";
+const APP_VERSION = "v28.78";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16672,7 +16672,7 @@ async function loadCodCanon() {
 }
 /* Devuelve el código canónico para mostrar (027, no 27/0027). Usa el mapa de OC_Maximos
    si ya se cargó; si no, cae al pad. Nunca rompe: siempre devuelve algo mostrable. */
-function codCanon(cod) { const k = _ocgNorm(cod); return (_codCanon && _codCanon[k]) || _padCod(cod); }
+function codCanon(cod) { const k = _ocgNorm(cod); return _padCod((_codCanon && _codCanon[k]) || cod); }   // v28.74: el canónico también va con el cero (058)
 /* v12.45 — código canónico CON sufijo de empresa: la forma ÚNICA de MOSTRAR un código en
    toda la app. Canoniza la base (035E, 026 — vía el mapa OC_Maximos que carga loadCodCanon)
    y le re-anexa " LK"/" CH" si el código lo trae ("438E LK" → "438E LK", "35E" → "035E").
@@ -19520,16 +19520,16 @@ function stkOpenFcsArt(codEnc) {
   const cod = decodeURIComponent(codEnc), k = _ocgNorm(cod);
   // v8.90: desconcatenación — título y mensajes con código base
   const _codBfc = codBase(cod), _kB = _ocgNorm(_codBfc);
-  _stkPopShell("🧾 FC s/Salida — " + escapeHtml(_codBfc), "stkPopBody");
+  _stkPopShell("🧾 FC s/Salida — " + escapeHtml(_padCod(_codBfc)), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (!body) return;
   /* v21.13 — por artículo + empresa. `codEnc` trae el cod de la fila, que puede llevar
      el sufijo heredado ("438E LK"); _fcsClave lo separa en sus dos datos. */
   const _pa = (_stk.fcs && _stk.fcs.porArt) || {};
   const a = _pa[_fcsClave(cod)] || _pa[_fcsClave(cod, "LK")] || _pa[_fcsClave(cod, "CH")] || null;
-  if (!a || !a.nps || !a.nps.length) { body.innerHTML = '<div class="stkpop-empty">No hay facturado sin salida de <b>' + escapeHtml(_codBfc) + '</b> ahora.</div>'; return; }
+  if (!a || !a.nps || !a.nps.length) { body.innerHTML = '<div class="stkpop-empty">No hay facturado sin salida de <b>' + escapeHtml(_padCod(_codBfc)) + '</b> ahora.</div>'; return; }
   const pend = (_stk.fcs && _stk.fcs.pend) || {};
   const nps = a.nps.slice().sort(function (x, y) { return y.cajas - x.cajas || String(x.np).localeCompare(String(y.np), undefined, { numeric: true }); });
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codBfc) + '</b> · facturado <b>sin salida</b>: <b>' + (Math.round(a.cajas * 10) / 10) + ' cajas</b> en ' + nps.length + ' NP(s). Ya salió del stock contable (facturada) pero sigue <b>física</b> en el depósito — todavía sin cargar al camión.</div>';
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_padCod(_codBfc)) + '</b> · facturado <b>sin salida</b>: <b>' + (Math.round(a.cajas * 10) / 10) + ' cajas</b> en ' + nps.length + ' NP(s). Ya salió del stock contable (facturada) pero sigue <b>física</b> en el depósito — todavía sin cargar al camión.</div>';
   h += '<div class="stkpop-grp"><div class="stkpop-nps">' + nps.map(function (n) { const p = pend[n.np] || {}; return '<span class="stkpop-np" style="display:block"><b>NP ' + escapeHtml(n.np) + '</b>' + (p.tanda ? ' <small style="color:#94a3b8">· ' + escapeHtml(p.tanda) + '</small>' : '') + ' · ' + escapeHtml(p.rs || "—") + ' <b>· ' + n.cajas + ' cajas</b>' + (p.fecha ? ' <small style="color:#94a3b8">· fact. ' + escapeHtml(p.fecha) + '</small>' : '') + '</span>'; }).join("") + '</div></div>';
   body.innerHTML = h;
 }
@@ -19962,7 +19962,7 @@ function _abastN(n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10)
 function _abastEsImportado(cod) { return /E/i.test(String(cod || "")); }
 /* Display: los códigos numéricos van a 3 dígitos (las vistas los guardan sin ceros a la
    izquierda → "31"; el usuario los quiere como "031"). Los que tienen letras quedan igual. */
-function _abastCodDisp(cod) { const c = String(codBase(cod) || ""); return /^[0-9]+$/.test(c) ? c.padStart(3, "0") : c; }
+function _abastCodDisp(cod) { return _padCod(String(codBase(cod) || "")); }   // v28.74: 35E → 035E también
 function _mesAdd(mes, delta) {
   const p = String(mes).split("-"); const d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1 + delta, 1);
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
@@ -22608,7 +22608,7 @@ async function stkOpenEstadioArt(codEnc, dep) {
         .filter(function (t) { return t && refs.indexOf(t) < 0; });
     } catch (_e) { liveTandas = []; }
   }
-  if (!refs.length && !liveTandas.length) { if (body) body.innerHTML = '<div class="stkpop-empty">No hay ' + (dep === "a_facturar" ? "a facturar" : "pickeado") + ' de ' + escapeHtml(codBase(cod)) + ' en este momento.</div>'; return; }
+  if (!refs.length && !liveTandas.length) { if (body) body.innerHTML = '<div class="stkpop-empty">No hay ' + (dep === "a_facturar" ? "a facturar" : "pickeado") + ' de ' + escapeHtml(_padCod(codBase(cod))) + ' en este momento.</div>'; return; }
   const tandas = refs.filter(function (r) { return /[A-Z]/.test(r); });     // ref con letra = tanda
   const npRefs = refs.filter(function (r) { return !/[A-Z]/.test(r); });    // ref numérica = NP directo (CP/RC)
   const npMap = await _stkFetchNpsByTanda(tandas.concat(liveTandas));
@@ -22691,7 +22691,7 @@ async function stkOpenExcedenteArt(codEnc) {
   const cod = decodeURIComponent(codEnc), codN = _stkNormCod(codBase(cod)), emp = _stkEmpDe(cod);
   // v8.90: desconcatenación — título y mensajes con código base
   const _codBex = codBase(cod);
-  _stkPopShell("🧊 Excedente — " + escapeHtml(_codBex), "stkPopBody");
+  _stkPopShell("🧊 Excedente — " + escapeHtml(_padCod(_codBex)), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (!body) return;
   const byU = {}; let sinU = 0;
   _stk.movs.forEach(function (mv) {
@@ -22704,9 +22704,9 @@ async function stkOpenExcedenteArt(codEnc) {
   if (ubics.length === 1) byU[ubics[0]] += sinU;   // única ubicación → absorbe las bajas sin ubicación (como el export)
   ubics = ubics.filter(function (u) { return round1(byU[u]) > 0.05; })
     .sort(function (a, b) { const ka = String(a).match(/^([A-Za-z]+)(\d+)/), kb = String(b).match(/^([A-Za-z]+)(\d+)/); if (ka && kb && ka[1].toUpperCase() !== kb[1].toUpperCase()) return ka[1] < kb[1] ? -1 : 1; if (ka && kb) return (+ka[2]) - (+kb[2]); return String(a).localeCompare(String(b)); });
-  if (!ubics.length) { body.innerHTML = '<div class="stkpop-empty">No hay excedente de ' + escapeHtml(_codBex) + ' con ubicación' + (round1(sinU) > 0 ? ' (' + round1(sinU) + ' cajas sin ubicación cargada)' : '') + '.</div><div style="margin-top:10px;text-align:center"><button class="mva-clear" onclick="stkOpenMovsArt(\'' + encodeURIComponent(cod) + '\',\'excedente\',\'Excedente\',\'🔁\')">🔁 Ver movimientos</button></div>'; return; }
+  if (!ubics.length) { body.innerHTML = '<div class="stkpop-empty">No hay excedente de ' + escapeHtml(_padCod(_codBex)) + ' con ubicación' + (round1(sinU) > 0 ? ' (' + round1(sinU) + ' cajas sin ubicación cargada)' : '') + '.</div><div style="margin-top:10px;text-align:center"><button class="mva-clear" onclick="stkOpenMovsArt(\'' + encodeURIComponent(cod) + '\',\'excedente\',\'Excedente\',\'🔁\')">🔁 Ver movimientos</button></div>'; return; }
   const tot = round1(ubics.reduce(function (s, u) { return s + byU[u]; }, 0));
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codBex) + '</b> · excedente: <b>' + tot + ' cajas</b> en ' + ubics.length + ' ubicación(es).</div>';
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_padCod(_codBex)) + '</b> · excedente: <b>' + tot + ' cajas</b> en ' + ubics.length + ' ubicación(es).</div>';
   // v6.47: acceso a los MOVIMIENTOS del depósito (mismo detalle que góndola/racks/a guardar).
   h += '<div style="margin-bottom:10px"><button class="mva-clear" onclick="stkOpenMovsArt(\'' + encodeURIComponent(cod) + '\',\'excedente\',\'Excedente\',\'🔁\')">🔁 Ver movimientos (entradas/salidas + saldo)</button></div>';
   h += '<div class="stkpop-grp"><div class="stkpop-nps">' + ubics.map(function (u) { return '<span class="stkpop-np"><b>📍 ' + escapeHtml(u) + '</b> · ' + round1(byU[u]) + ' cajas</span>'; }).join("") + '</div></div>';
@@ -22717,7 +22717,7 @@ async function stkOpenRacksArt(codEnc) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc), codN = _stkNormCod(codBase(cod)), emp = _stkEmpDe(cod);
   _stkPop = { kind: "racksArt", cod: cod, codN: codN, emp: emp, dep: "racks", titulo: "Racks", icono: "🏗", desde: "", hasta: "", pos: [] };
-  _stkPopShell("🏗 Racks — " + escapeHtml(codBase(cod)), "stkPopBody");
+  _stkPopShell("🏗 Racks — " + escapeHtml(_padCod(codBase(cod))), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando…</div>';
   let rows = [];
   try {
@@ -22740,7 +22740,7 @@ function stkOpenCapArt(codEnc) {
   const _codB = codBase(cod), _codBN = _ocgNorm(_codB);
   const _sfxCap = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
   const _empCap = _sfxCap ? _sfxCap[1].toUpperCase().replace("LOKE", "LK") : "";
-  _stkPopShell("📥 Capacidad de góndola — " + escapeHtml(_codB) + (_empCap ? ' <span style="font-size:14px;font-weight:800;color:' + (_empCap === "LK" ? "#b91c1c" : "#1e40af") + ';">' + _empCap + '</span>' : ''), "stkPopBody");
+  _stkPopShell("📥 Capacidad de góndola — " + escapeHtml(_padCod(_codB)) + (_empCap ? ' <span style="font-size:14px;font-weight:800;color:' + (_empCap === "LK" ? "#b91c1c" : "#1e40af") + ';">' + _empCap + '</span>' : ''), "stkPopBody");
   _stkPop = { kind: "capArt", codEnc: codEnc, codN: codN };
   stkRenderCapArt(codEnc);
   // v11.79 — la carga rápida (stocks_carga_rapida) trae la capacidad AGREGADA por código
@@ -22770,9 +22770,9 @@ function stkRenderCapArt(codEnc) {
   }
   // v11.79 — mientras el detalle por sector aún carga, avisá en vez de mostrar "—".
   var _cargandoSec = _stk.capLoaded !== true && mine.some(function (r) { return r.sector === "—"; });
-  if (!mine.length) { body.innerHTML = '<div class="stkpop-empty">No hay capacidad de góndola cargada para ' + escapeHtml(_codB) + (_empCap ? ' (' + _empCap + ')' : '') + '.</div>'; return; }
+  if (!mine.length) { body.innerHTML = '<div class="stkpop-empty">No hay capacidad de góndola cargada para ' + escapeHtml(_padCod(_codB)) + (_empCap ? ' (' + _empCap + ')' : '') + '.</div>'; return; }
   const tot = mine.reduce(function (s, r) { return s + r.cajas; }, 0);
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codB) + '</b>' + (_empCap ? ' <b style="color:' + (_empCap === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empCap + '</b>' : '') + ' · capacidad de góndola: <b>' + tot + ' cajas</b> en ' + (_cargandoSec ? '?' : mine.length) + ' ubicación(es).</div>';
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_padCod(_codB)) + '</b>' + (_empCap ? ' <b style="color:' + (_empCap === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empCap + '</b>' : '') + ' · capacidad de góndola: <b>' + tot + ' cajas</b> en ' + (_cargandoSec ? '?' : mine.length) + ' ubicación(es).</div>';
   if (_cargandoSec) h += '<div class="stk-loading">Cargando ubicaciones…</div>';
   else h += '<div class="stkpop-grp"><div class="stkpop-nps">' + mine.map(function (r) { return '<span class="stkpop-np"><b>📍 ' + escapeHtml(r.sector) + '</b> · ' + r.cajas + ' cajas</span>'; }).join("") + '</div></div>';
   body.innerHTML = h;
@@ -22957,7 +22957,7 @@ function stkCajasPedidasExport() {
   try {
     const blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "Cajas_pedidas_" + cod + "_" + fecha + ".xls";
+    const a = document.createElement("a"); a.href = url; a.download = "Cajas_pedidas_" + _padCod(cod) + "_" + fecha + ".xls";
     document.body.appendChild(a); a.click();
     setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (_e) {} }, 1500);
   } catch (e) { try { alert("No se pudo generar el Excel: " + (e.message || e)); } catch (_e) {} }
@@ -22969,7 +22969,7 @@ async function stkOpenMovsArt(codEnc, dep, titulo, icono) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc);
   _stkPop = { kind: "movsArt", cod: cod, codN: _stkNormCod(codBase(cod)), emp: _stkEmpDe(cod), dep: dep, titulo: titulo || dep, icono: icono || "🔁", desde: "", hasta: "", npByTanda: {} };
-  _stkPopShell((icono || "🔁") + " " + (titulo || dep) + " — " + escapeHtml(codBase(cod)), "stkPopBody");
+  _stkPopShell((icono || "🔁") + " " + (titulo || dep) + " — " + escapeHtml(_padCod(codBase(cod))), "stkPopBody");
   // v10.42: fetch fresco de movimientos SOLO de este artículo (no depender de _stk.movs que puede estar viejo)
   // v10.43: stocks_carga_rapida guarda cod SIN ceros (26, 7, 35E) pero Movimientos_Stock
   //         guarda CON ceros (026, 007, 035E). Query con ambos formatos via or().
@@ -23247,7 +23247,7 @@ function _stkMovsBlock() {
     const movBody = '<span class="mva-movtipo">' + escapeHtml(String(mv.tipo || "")) + '</span>' + (mv.ref ? '<span class="mva-ref">' + escapeHtml(String(mv.ref)) + '</span>' : '') + npTxt + _chTag + _stkQuienChip(mv);
     return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="mva-mov"><div class="mva-movrow">' + plus + '<span class="mva-movbody">' + movBody + '</span></div></td><td class="mva-cant">' + cant + '</td><td class="mva-sal">' + round1(saldo) + '</td></tr>' + detrow;
   }).reverse().join("");   // v25.56 (Luis): el saldo se calcula ASC; se muestra del más reciente (arriba) al más antiguo
-  let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(codBase(_stkPop.cod)) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, del más reciente (arriba) al más antiguo. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.<br><small style="color:#94a3b8">👤 = siglas y legajo del que lo hizo (en <b>recepcion</b>, del que recibió). En <span class="mva-qui aprox">ámbar ~</span> va el deducido por la sesión de RT (recepciones viejas, sin legajo guardado).</small></div>';
+  let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(_padCod(codBase(_stkPop.cod))) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, del más reciente (arriba) al más antiguo. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.<br><small style="color:#94a3b8">👤 = siglas y legajo del que lo hizo (en <b>recepcion</b>, del que recibió). En <span class="mva-qui aprox">ámbar ~</span> va el deducido por la sesión de RT (recepciones viejas, sin legajo guardado).</small></div>';
   h += '<div class="mva-daterow">Desde <input type="date" min="2025-01-01" class="mva-date" value="' + escapeHtml(_stkPop.desde) + '" onchange="stkMovsArtDate(\'desde\',this.value)"> hasta <input type="date" min="2025-01-01" class="mva-date" value="' + escapeHtml(_stkPop.hasta) + '" onchange="stkMovsArtDate(\'hasta\',this.value)">' + ((_stkPop.desde || _stkPop.hasta) ? ' <button class="mva-clear" onclick="stkMovsArtDate(\'clear\')">✕</button>' : '') + '</div>';
   h += list.length
     ? '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Fecha</th><th>Movimiento</th><th class="num">Cant.</th><th class="num">Saldo</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
@@ -61732,7 +61732,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.77"></script>
+<script src="importacion.js?v=28.78"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64661,10 +64661,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.77"></script>
-<script src="hotsale.js?v=28.77"></script>
-<script src="estadisticas.js?v=28.77"></script>
-<script src="ads.js?v=28.77"></script>
+<script src="cobranzas.js?v=28.78"></script>
+<script src="hotsale.js?v=28.78"></script>
+<script src="estadisticas.js?v=28.78"></script>
+<script src="ads.js?v=28.78"></script>
 
 </body>
 </html>
