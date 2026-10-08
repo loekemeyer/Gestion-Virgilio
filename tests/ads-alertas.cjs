@@ -76,9 +76,9 @@ const STOCK = [
     const fs = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")];
     out.stockCods = fs.map((f) => f.cells[1].textContent);   // v28.60: cells[0] = tallerista
     out.tallCol = fs[0] ? fs[0].cells[0].textContent : "";
-    out.pctTall = fs[0] ? fs[0].cells.length : 0;   // v28.62: sin Proporción en pantalla → 12 celdas
+    out.pctTall = fs[0] ? fs[0].cells.length : 0;   // v28.82: sin Proporción ni % → 11 celdas
     out.cols10 = [...document.querySelectorAll("#adsOv .ads-body > table > thead th")].map((t) => t.textContent);
-    out.fila10 = fs[0] ? [...fs[0].cells].slice(3, 11).map((c) => c.textContent) : [];
+    out.fila10 = fs[0] ? [...fs[0].cells].slice(3, 10).map((c) => c.textContent) : [];
     // v27.34: Excel por rango y de talleristas (se lee el archivo que se baja)
     const bajados = [];
     window.gvXlsxBajar = (bytes, nombre) => {
@@ -124,11 +124,11 @@ const STOCK = [
   if (r.cerrarAncho > 200) fallas.push("(e) Cerrar ancho " + r.cerrarAncho);
   if (JSON.stringify(r.chips) !== JSON.stringify(["10 días · 1", "20 días · 1", "30 días · 2", "todos · 3"])) fallas.push("(c) chips " + JSON.stringify(r.chips));
   if (JSON.stringify(r.stockCods) !== JSON.stringify(["505"])) fallas.push("(c) quiebre 10 d: " + JSON.stringify(r.stockCods));
-  if (r.pctTall !== 12) fallas.push("(c) v28.62 sin Proporción: celdas " + r.pctTall);
-  const C10 = ["Tallerista","Cód.","Descripción","Stk","Comprom.10 d","E.M. plazo10d","Saldo10 d","Período (4 OC)","Fechaúlt. OC","Pedidoperíodo","Recibidoperíodo","%","Entregaest. OC"];
+  if (r.pctTall !== 11) fallas.push("(c) v28.82 sin Proporción ni %: celdas " + r.pctTall);
+  const C10 = ["Tallerista","Cód.","Descripción","Stk","Comprom.10 d","E.M. plazo10d","Saldo10 d","Últ.OC","Pedido","Recibido","Estim.pend."];
   if (JSON.stringify(r.cols10) !== JSON.stringify(C10)) fallas.push("(c) columnas stock: " + JSON.stringify(r.cols10));
   if (r.tallCol !== "Lucho") fallas.push("(c) v28.60 tallerista a la izquierda del código: " + JSON.stringify(r.tallCol));
-  if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","100","-70","30/09","350","250","71 %"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));
+  if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","100","-70","30/09","350","250"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));
   if (JSON.stringify(r.fila30) !== JSON.stringify(["50","60","300","-310","30/09"])) fallas.push("(c) fila a 30 d: " + JSON.stringify(r.fila30));
   if (JSON.stringify(r.stock30) !== JSON.stringify(["505", "506"])) fallas.push("(c) quiebre 30 d: " + JSON.stringify(r.stock30));
   if (JSON.stringify(r.btnXl) !== JSON.stringify(["10 días", "20 días", "30 días"])) fallas.push("(f) botones Excel por rango: " + JSON.stringify(r.btnXl));
