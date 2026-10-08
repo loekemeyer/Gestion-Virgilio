@@ -1,0 +1,16 @@
+-- v28.50 (Luis, D1 07/10: "cualquiera"): sacar a cuarentena un pedido ARMADO y darle día lo puede
+-- hacer cualquier supervisor que ya puede usar el botón (es_supervisor_virgilio: los 3 mails + la
+-- tabla Supervisores_Virgilio), no sólo los 3 mails de gv_es_supervisor_o_servicio.
+-- La puerta es una señal LOCAL a la transacción (gv.cuar_mover) que prenden sólo
+-- gv_cuarentena_devolver y gv_cuarentena_armado_asignar_dia alrededor de su llamada a
+-- gv_ppp_pedido_mover. «📅 Cambiar de día» sigue igual. Aplicado como parche sobre pg_get_functiondef
+-- (idempotente, marcador v28.50-cuar-cualquiera / gv.cuar_mover).
+-- Al 07/10 Supervisores_Virgilio no tiene mails extra: hoy no cambia a nadie, cubre altas futuras.
+--
+-- gv_ppp_pedido_mover, chequeo nuevo:
+--   if not (public.gv_es_supervisor_o_servicio()
+--           or (current_setting('gv.cuar_mover', true) = '1' and public.es_supervisor_virgilio())) then
+-- gv_cuarentena_devolver / gv_cuarentena_armado_asignar_dia:
+--   perform set_config('gv.cuar_mover', '1', true);  <llamada a gv_ppp_pedido_mover>
+--   perform set_config('gv.cuar_mover', '', true);
+-- Rollback: reponer el chequeo viejo  if not public.gv_es_supervisor_o_servicio() then

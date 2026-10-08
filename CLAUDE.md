@@ -8318,7 +8318,7 @@ cartel que diga que se tiene que revisar y asignar manualmente"*.
 - **Aprobado sin nada armado** → lo programa el armador como siempre. **Aprobado y armado** → NO se programa solo: cartel
   *«ESTABA ARMADO… asignale el día A MANO»* y se programa soltándolo en un día (`gv_cuarentena_armado_asignar_dia`, conserva
   el código; sin aprobación frena con `CUARENTENA:`).
-- ⚠ Sacar un armado exige `gv_es_supervisor_o_servicio()` (lo pide `gv_ppp_pedido_mover`).
+- Sacar un armado y darle día lo puede hacer **cualquier supervisor** que ya usa el botón (`es_supervisor_virgilio`; Luis D1, v28.50): señal local `gv.cuar_mover` → `gv_ppp_pedido_mover`. `sql/gv_cuarentena_sacar_cualquiera_v2850.sql`.
 - Centinelas 367-369. `sql/gv_cuarentena_sacar_armado_v2845.sql`, `tests/cuar-sacar-armado.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-07, v28.40, D10): cambia la DIRECCIÓN de una NP programada → la ZONA se RECALCULA — y tanda fuera de regla = CARTEL
