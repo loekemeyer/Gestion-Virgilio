@@ -294,7 +294,7 @@ function _adsHtmlStock() {
   var f = adsFiltrarStock(rows, ver, _ads.q, H);
   // v28.90 (Luis, 08/10): sin el renglón explicativo «Todo a N días · …»
   // v28.82 (Luis, 08/10): sin el recuadro «Período»: Últ. OC · Pedido · Recibido · Estim. pend. con el mismo encabezado que el resto
-  h += '<table class="ads-stk"><thead><tr><th title="Tallerista de la OC vigente del código">Tallerista</th><th>Cód.</th><th>Descripción</th><th>Stk</th><th>Comp.<br>' + H + 'd</th><th title="Est. Madre del mes × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ' días que tarda en salir) / 30: los pedidos que entran y salen dentro del plazo">E.M. plazo<br>' + H + 'd</th>' +
+  h += '<table class="ads-stk"><thead><tr><th>Cód.</th><th>Descripción</th><th title="Tallerista de la OC vigente del código">Tallerista</th><th>Stk</th><th>Comp.<br>' + H + 'd</th><th title="Est. Madre del mes × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ' días que tarda en salir) / 30: los pedidos que entran y salen dentro del plazo">E.M. plazo<br>' + H + 'd</th>' +
     '<th>Saldo<br>' + H + 'd</th><th title="Fecha de la última OC del código">Últ.<br>OC</th>' +
     '<th title="Lo pedido en la última OC, uno por tallerista">Pedido</th><th title="Lo que recibió Virgilio de la última OC, uno por tallerista">Recib.</th>' +
     '<th title="Por tallerista, X/Y de la última OC: X = lo que va a entregar (lo cargado en la OC; con * si la casilla está vacía: la OC × el % que entregó en el período anterior), menos lo ya entregado · Y = lo pedido menos lo ya entregado">Pend.<br>est.</th></tr></thead><tbody>';   // v28.62 (Luis, 08/10): sin Proporción en pantalla (sigue en el Excel)
@@ -302,8 +302,9 @@ function _adsHtmlStock() {
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H), disp = c.disp, proy = c.proy, comp = c.comp, em = c.em, saldo = c.saldo;
     // v28.60 (Luis, 08/10): a la izquierda del código, el tallerista de la OC vigente
-    h += '<tr><td class="tall">' + (c.tallAct.length ? c.tallAct.map(_adsEsc).join("<br>") : "—") + "</td><td><b>" + _adsEsc(_adsCod(r.cod)) + '</b></td><td class="desc" title="' + _adsEsc(r.descripcion) + '">' + _adsEsc(r.descripcion) +
-      '</td><td title="Góndola ' + _adsN(r.terminado) + " · racks " + _adsN(r.racks) + " · a guardar " + _adsN(r.a_guardar) + " · excedente " + _adsN(r.excedente) + '">' + _adsN(disp) +
+    // v28.91 (Luis, 08/10): orden Cód · Descripción · Tallerista
+    h += '<tr><td><b>' + _adsEsc(_adsCod(r.cod)) + '</b></td><td class="desc" title="' + _adsEsc(r.descripcion) + '">' + _adsEsc(r.descripcion) +
+      '</td><td class="tall">' + (c.tallAct.length ? c.tallAct.map(_adsEsc).join("<br>") : "—") + '</td><td title="Góndola ' + _adsN(r.terminado) + " · racks " + _adsN(r.racks) + " · a guardar " + _adsN(r.a_guardar) + " · excedente " + _adsN(r.excedente) + '">' + _adsN(disp) +
       "</td><td>" + _adsN(comp) + '</td><td title="' + _adsN(proy) + ' por mes">' + _adsN(Math.round(em)) +
       '</td><td class="' + (saldo < 0 ? "neg" : "pos") + '">' + _adsN(saldo) + "</td>";
     // v27.78 (Luis): el recuadro es del PERÍODO (las N OC del rango), no de la última OC; la fecha sí es la de la última OC

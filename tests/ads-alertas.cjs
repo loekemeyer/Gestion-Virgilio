@@ -74,8 +74,8 @@ const STOCK = [
     window.adsTab("stock"); await espera(50);
     out.chips = [...document.querySelectorAll("#adsOv .chip")].map((c) => c.textContent);
     const fs = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")];
-    out.stockCods = fs.map((f) => f.cells[1].textContent);   // v28.60: cells[0] = tallerista
-    out.tallCol = fs[0] ? fs[0].cells[0].textContent : "";
+    out.stockCods = fs.map((f) => f.cells[0].textContent);   // v28.91: Cód · Descripción · Tallerista
+    out.tallCol = fs[0] ? fs[0].cells[2].textContent : "";
     out.pctTall = fs[0] ? fs[0].cells.length : 0;   // v28.82: sin Proporción ni % → 11 celdas
     out.cols10 = [...document.querySelectorAll("#adsOv .ads-body > table > thead th")].map((t) => t.textContent);
     out.fila10 = fs[0] ? [...fs[0].cells].slice(3, 10).map((c) => c.textContent) : [];
@@ -97,7 +97,7 @@ const STOCK = [
       alto1: /<row r="1"[^>]* ht="72"/.test(x.xml), congela: /state="frozen"/.test(x.xml), ajusta: /fitToWidth="1"/.test(x.xml),
       a2: (x.xml.match(/<c r="A2"( s="\d+")?/) || [])[1] || "", b2: (x.xml.match(/<c r="B2"( s="\d+")?/) || [])[1] || "", c2: (x.xml.match(/<c r="C2"( s="\d+")?/) || [])[1] || "", negr: /<font><b\/>/.test(x.sty || ""), grilla: /<border><left style="thin">/.test(x.sty || "") && !/<xf numFmtId="0" fontId="\d" fillId="0" borderId="0" xfId="0" applyFont/.test(x.sty || "") }));
     window.adsHoriz(30); await espera(30);
-    out.stock30 = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")].map((f) => f.cells[1].textContent);
+    out.stock30 = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")].map((f) => f.cells[0].textContent);
     const f30 = document.querySelector("#adsOv .ads-body > table tbody tr");
     out.fila30 = f30 ? [...f30.cells].slice(3, 8).map((c) => c.textContent) : [];
     modo = "vacio"; window.adsClose(); window.openAds(); await espera(150);
@@ -125,9 +125,9 @@ const STOCK = [
   if (JSON.stringify(r.chips) !== JSON.stringify(["10 días · 1", "20 días · 1", "30 días · 2", "todos · 3"])) fallas.push("(c) chips " + JSON.stringify(r.chips));
   if (JSON.stringify(r.stockCods) !== JSON.stringify(["505"])) fallas.push("(c) quiebre 10 d: " + JSON.stringify(r.stockCods));
   if (r.pctTall !== 11) fallas.push("(c) v28.82 sin Proporción ni %: celdas " + r.pctTall);
-  const C10 = ["Tallerista","Cód.","Descripción","Stk","Comp.10d","E.M. plazo10d","Saldo10d","Últ.OC","Pedido","Recib.","Pend.est."];
+  const C10 = ["Cód.","Descripción","Tallerista","Stk","Comp.10d","E.M. plazo10d","Saldo10d","Últ.OC","Pedido","Recib.","Pend.est."];
   if (JSON.stringify(r.cols10) !== JSON.stringify(C10)) fallas.push("(c) columnas stock: " + JSON.stringify(r.cols10));
-  if (r.tallCol !== "Lucho") fallas.push("(c) v28.60 tallerista a la izquierda del código: " + JSON.stringify(r.tallCol));
+  if (r.tallCol !== "Lucho") fallas.push("(c) v28.91 tallerista en la 3.ª columna: " + JSON.stringify(r.tallCol));
   if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","100","-70","30/09","200","100"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));
   if (JSON.stringify(r.fila30) !== JSON.stringify(["50","60","300","-310","30/09"])) fallas.push("(c) fila a 30 d: " + JSON.stringify(r.fila30));
   if (JSON.stringify(r.stock30) !== JSON.stringify(["505", "506"])) fallas.push("(c) quiebre 30 d: " + JSON.stringify(r.stock30));
