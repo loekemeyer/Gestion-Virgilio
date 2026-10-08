@@ -14,7 +14,7 @@ let c = vm.runInContext(`_ads.epOc = {}; _adsStockCalc({ cod: "550", saldo10: -5
 if (c.estH !== 5 + 20 || c.estOc) fallas.push("sin dato: OC × % − recibido (Garcia 50×20 %−5 = 5 + Poly 40×50 % = 20): " + c.estH);
 c = vm.runInContext(`_ads.epOc = {}; _ads.epOc[_adsEpKey("Garcia", "550", "2026-10-07")] = 60; _adsStockCalc({ cod: "550", saldo10: -5 }, 10)`, ctx);
 if (!c.estCaj.some(t => /^Garcia: 55$/.test(t)) || !c.estCaj.some(t => /^Poly: 20\*$/.test(t)) || !c.estCalc) fallas.push("v28.53 asterisco = calculado: " + JSON.stringify(c.estCaj));
-if (JSON.stringify(c.estXY.map(y => y.txt)) !== JSON.stringify(["60/50", "20*/40"])) fallas.push("v28.64 X/Y por tallerista (X proyectado, * si estimado; Y = OC): " + JSON.stringify(c.estXY));
+if (JSON.stringify(c.estXY.map(y => y.txt)) !== JSON.stringify(["55/50", "20*/40"])) fallas.push("v28.82 X/Y (X = pendiente) por tallerista (X proyectado, * si estimado; Y = OC): " + JSON.stringify(c.estXY));
 c = vm.runInContext(`_ads.epOc = {}; _ads.epOc[_adsEpKey("Garcia", "550", "2026-10-07")] = 0; _adsStockCalc({ cod: "550", saldo10: -5 }, 10)`, ctx);
 if (c.estXY[0].txt !== "0/50") fallas.push("un 0 cargado en la OC es dato: va sin *: " + c.estXY[0].txt);
 c = vm.runInContext(`_ads.epOc = {}; _ads.epOc[_adsEpKey("Garcia", "550", "2026-10-07")] = 60; _adsStockCalc({ cod: "550", saldo10: -5 }, 10)`, ctx);
