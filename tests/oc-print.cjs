@@ -79,9 +79,13 @@ catch (_e) {
     out.manualGuion = htmlT.indexOf("—") >= 0;
     // total de cajas = 22+70+237+10 = 339
     out.total = htmlT.indexOf(">339<") >= 0;
-    // ORDEN por % Lleno de menor a mayor: 123(-33) < 518(28) < 505(99) < manual(—, al final)
+    // v28.74: ORDEN por código de menor a mayor: 123 < 505 < 518 < 999
     const pos = function (cod) { return htmlT.indexOf(">" + cod + "<"); };
-    out.orden = pos("123") < pos("518") && pos("518") < pos("505") && pos("505") < pos("999");
+    out.orden = pos("123") < pos("505") && pos("505") < pos("518") && pos("518") < pos("999");
+    // v28.74: primera columna Cod, segunda Linea (encabezado y cuerpo)
+    const ths = Array.from(dT.querySelectorAll("thead th")).map((e) => e.textContent.trim());
+    const tds0 = dT.querySelector("tbody tr").querySelectorAll("td");
+    out.codPrimero = ths[0] === "Cod" && ths[1] === "Linea" && tds0[0].classList.contains("cod") && tds0[1].classList.contains("lin");
 
     // Consistencia: cada fila del cuerpo tiene tantas celdas como columnas.
     // TALLERISTA = 9 columnas; OPERADOR = 12 (9 + 3 Cajas Recibidas).

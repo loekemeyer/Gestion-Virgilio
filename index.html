@@ -6395,7 +6395,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.73"></script>
+<script type="module" src="recepcion.js?v=28.74"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10686,7 +10686,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.73";
+const APP_VERSION = "v28.74";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17790,20 +17790,18 @@ function ocPrintHtml(x, opts) {
       ncaja: (r.oc_ncaja != null && r.oc_ncaja !== "") ? Number(r.oc_ncaja) : null
     };
   });
-  // Orden: % Lleno ascendente (menor a mayor); las que no tienen %, al final.
+  // v28.74 (Luis, 08/10): orden por CÓDIGO de menor a mayor (alfanumérico natural: 053 < 315 < 823 < 55289).
+  // Retira el orden por % Lleno de la v7.40.
   items.sort(function (a, b) {
-    if (a.pct == null && b.pct == null) return 0;
-    if (a.pct == null) return 1;
-    if (b.pct == null) return -1;
-    return a.pct - b.pct;
+    return String(codCanon(a.r.codigo) || "").localeCompare(String(codCanon(b.r.codigo) || ""), "es", { numeric: true, sensitivity: "base" });
   });
   let tot = 0, rows = "";
   items.forEach(function (it) {
     tot += it.cajas;
     const linClass = it.linea === "LK" ? " lk" : (it.linea === "CH" ? " ch" : "");
     rows += '<tr>' +
-      '<td class="lin' + linClass + '">' + escapeHtml(it.linea || "—") + '</td>' +
       '<td class="cod">' + escapeHtml(codCanon(it.r.codigo) || "—") + '</td>' +
+      '<td class="lin' + linClass + '">' + escapeHtml(it.linea || "—") + '</td>' +
       '<td class="desc">' + escapeHtml(artNombre(it.r.codigo, it.r.descripcion) || "") + '</td>' +
       '<td class="num big">' + it.cajas + '</td>' +
       '<td class="num' + (it.faltaPed > 0 ? ' falt' : '') + '">' + (it.faltaPed != null ? it.faltaPed : "—") + '</td>' +
@@ -17817,8 +17815,8 @@ function ocPrintHtml(x, opts) {
   const tel = String(x.telefono || ocTelDe(x.proveedor) || "").trim();
   const rs = conRecibidas ? ' rowspan="2"' : '';
   const head1 = '<tr>' +
-    '<th' + rs + ' class="lin">Linea</th>' +
     '<th' + rs + '>Cod</th>' +
+    '<th' + rs + ' class="lin">Linea</th>' +
     '<th' + rs + ' class="desc">Descripcion</th>' +
     '<th' + rs + ' class="num">Cajas</th>' +
     '<th' + rs + ' class="num">Falta<br>Pedido</th>' +
@@ -61705,7 +61703,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.73"></script>
+<script src="importacion.js?v=28.74"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64634,10 +64632,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.73"></script>
-<script src="hotsale.js?v=28.73"></script>
-<script src="estadisticas.js?v=28.73"></script>
-<script src="ads.js?v=28.73"></script>
+<script src="cobranzas.js?v=28.74"></script>
+<script src="hotsale.js?v=28.74"></script>
+<script src="estadisticas.js?v=28.74"></script>
+<script src="ads.js?v=28.74"></script>
 
 </body>
 </html>
