@@ -235,10 +235,7 @@ function _adsHtmlTall() {
   if (_ads.tallErr) return h + '<div class="err">' + _adsEsc(_ads.tallErr) + "</div></div>";
   if (!_ads.tall) return h + '<div class="msg">Leyendo OC…</div></div>';
   var g = adsAgruparTalleristas(_ads.tall, _ads.umbral);
-  var nAl = g.filter(function (t) { return t.alerta; }).length;
-  var d0 = null, d1 = null; _ads.tall.forEach(function (r) { if (!d0 || r.desde < d0) d0 = r.desde; if (!d1 || r.hasta > d1) d1 = r.hasta; });
-  h += '<div class="res">OC del ' + _adsFecha(d0) + " al " + _adsFecha(d1) + " · <b" + (nAl ? ' class="neg"' : "") + ">" + nAl + "</b> de " + g.length +
-    " talleristas debajo del " + Math.round(_ads.umbral * 100) + " % · tocá uno para ver sus artículos</div>";
+  // v28.90 (Luis, 08/10): sin el renglón «OC del … · N de M talleristas debajo del …»
   h += '<table><thead><tr><th>Tallerista</th><th>Art.</th><th>Pedido<br>(cajas)</th><th>Entregado<br>(cajas)</th><th>%</th><th></th></tr></thead><tbody>';
   g.forEach(function (t) {
     h += '<tr class="t' + (t.alerta ? " al" : "") + '" onclick="adsToggle(decodeURIComponent(\'' + encodeURIComponent(t.pkey).replace(/'/g, "%27") + '\'))"><td><b>' + (_ads.abiertos[t.pkey] ? "▾ " : "▸ ") + _adsEsc(t.proveedor) + "</b></td><td>" + t.arts.length +
@@ -295,7 +292,7 @@ function _adsHtmlStock() {
   if (_ads.stockErr) return h + '<div class="err">' + _adsEsc(_ads.stockErr) + "</div></div>";
   if (!_ads.stock) return h + '<div class="msg">Leyendo stock…</div></div>';
   var f = adsFiltrarStock(rows, ver, _ads.q, H);
-  h += '<div class="res">Todo a ' + H + ' días · sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · saldo = disponible − comprometido − E.M. plazo · en cajas</div>';
+  // v28.90 (Luis, 08/10): sin el renglón explicativo «Todo a N días · …»
   // v28.82 (Luis, 08/10): sin el recuadro «Período»: Últ. OC · Pedido · Recibido · Estim. pend. con el mismo encabezado que el resto
   h += '<table class="ads-stk"><thead><tr><th title="Tallerista de la OC vigente del código">Tallerista</th><th>Cód.</th><th>Descripción</th><th>Stk</th><th>Comp.<br>' + H + 'd</th><th title="Est. Madre del mes × (' + H + ' − ' + _adsLeadTxt(_adsLead()) + ' días que tarda en salir) / 30: los pedidos que entran y salen dentro del plazo">E.M. plazo<br>' + H + 'd</th>' +
     '<th>Saldo<br>' + H + 'd</th><th title="Fecha de la última OC del código">Últ.<br>OC</th>' +
