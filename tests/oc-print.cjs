@@ -85,6 +85,10 @@ catch (_e) {
     // v28.74: primera columna Cod, segunda Linea (encabezado y cuerpo)
     const ths = Array.from(dT.querySelectorAll("thead th")).map((e) => e.textContent.trim());
     const tds0 = dT.querySelector("tbody tr").querySelectorAll("td");
+    // v28.76: texto puro → 55289 va entre 532 y 575
+    const x3 = { proveedor: "P", fecha: "2026-10-07", rows: ["575", "55289", "053", "532"].map((c) => ({ codigo: c, descripcion: "X", linea: "LK", cantidad: 1 })) };
+    const h3 = ocPrintHtml(x3), p3 = (c) => h3.indexOf(">" + c + "<");
+    out.textoPuro = p3("053") < p3("532") && p3("532") < p3("55289") && p3("55289") < p3("575");
     out.codPrimero = ths[0] === "Cod" && ths[1] === "Linea" && tds0[0].classList.contains("cod") && tds0[1].classList.contains("lin");
 
     // Consistencia: cada fila del cuerpo tiene tantas celdas como columnas.
