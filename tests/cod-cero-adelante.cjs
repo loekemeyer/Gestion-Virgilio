@@ -70,6 +70,12 @@ const BUSQUEDA = [["26", "026"], ["27", "0027"], ["35E", "035E"], ["67", "067"]]
   const rcp = require("fs").readFileSync(require("path").join(__dirname, "..", "recepcion.js"), "utf8");
   if (!/function _rcpPad\(/.test(rcp)) r.push("recepcion.js sin _rcpPad");
   if (!/Cod_Art: _rcpPad\(/.test(rcp)) r.push("recepcion.js: el alta de código no guarda con _rcpPad");
+  // v28.79 (D14, tanda 2): picking, hoja de picking, armado, faltantes y remito muestran el cero
+  const ix = require("fs").readFileSync(require("path").join(__dirname, "..", "index.html"), "latin1");
+  const cuerpo = (n) => { const i = ix.indexOf("function " + n + "("); if (i < 0) return ""; let d = 0; for (let k = ix.indexOf("{", i); k < ix.length; k++) { if (ix[k] == "{") d++; if (ix[k] == "}" && !--d) return ix.slice(i, k + 1); } return ""; };
+  ["pkRender", "pkHojaHtml", "armadoRemitoInnerHtml", "arRender", "arCompTxt", "_compDifHtml", "_compSepMatrix", "_compRenderLios"].forEach((fn) => {
+    const c = cuerpo(fn); if (!c) r.push("no existe " + fn); else if (!/_padCod\(/.test(c)) r.push(fn + " muestra el código sin _padCod");
+  });
   const ok = r.length === 0 && errs.length === 0;
   console.log("cod-cero-adelante: escritura=" + ESCRITURA.length + " · busqueda=" + (BUSQUEDA.length * 3) +
     (r.length ? " · FALLAS: " + r.join(" | ") : "") + " · pageerrors:", errs.length ? errs.join("|") : "none",
