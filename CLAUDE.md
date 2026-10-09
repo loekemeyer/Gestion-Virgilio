@@ -8491,3 +8491,10 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
 - Datos 09/10: 606 vuelto a 0; 606E = 130 cajas (13 MC) en X22, imputadas al pedido PI B260601 (1.560 u, llegado) con
   `gv_imp_imputar_ingreso_racks`.
 - `sql/gv_racks_ajuste_sin_posicion_v2905.sql`, centinela 379, `tests/stk-ajuste-racks-posicion.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-09, v29.12): SALIDA A CERVANTES tiene pestañas GÓNDOLA y RACKS
+
+- Insumos y Productos Movimiento → 🚚 Salida a Cervantes: **Góndola** (como siempre, `terminado`) y **Racks**: una fila por
+  posición con stock (`Racks_Planimetria`, fuente stock), unidad **Caja o MC** por fila (MC = `GV_Rack_CxM`; sin master, sólo caja).
+- El movimiento va en **cajas** (MC × cajas por master), `tipo salida_cervantes`, depósito `racks` (CH: `racks_ch` si su saldo
+  alcanza), `ubicacion` = la posición. Lectura de racks rota → lo dice, no «no hay». `tests/sc-racks-unidad.cjs`.
