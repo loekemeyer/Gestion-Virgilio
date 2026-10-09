@@ -8395,6 +8395,13 @@ Entregas_Virgilio, Picking paso…). **Una escritura de supervisor va con `gvWri
 clave pública pegada a mano.** **Si una pantalla nueva tiene que escribir en una
 de esas tablas con la clave pública**, deshabilitar el trigger en esa tabla (`alter table … disable trigger
 aaa_gv_anon_bloqueo`) o escribir por una RPC SECURITY DEFINER. `sql/gv_anon_insert_bloqueo_v2852.sql`, centinela 370.
+⚠⚠ **v29.16 (Luis, 09/10, D13): el trigger mira `current_user`, no el `role` de la sesión.** Una función SECURITY DEFINER
+llamada con la clave pública escribe como `postgres`, pero `current_setting('role')` seguía en `anon` y el bloqueo
+descartaba la escritura interna (perdidas 08-09/10: Importados_Mov_Stock 14, Racks_Bajadas 4, Fichadas_Historico 20).
+Hoy `gv_anon_insert_bloquear` es **SECURITY INVOKER**: escritura directa con la clave pública → `anon` → bloqueada; adentro
+de una función del sistema → entra. `gv_anon_insert_log` (definer) sólo actúa desde un trigger (`pg_trigger_depth() > 0`).
+**Una escritura de la clave pública en esas tablas va por una RPC SECURITY DEFINER.** Probado en transacción abortada
+(directo 0 filas + 1 log · interno 1 fila · /rpc directo al log 0). `sql/gv_anon_bloqueo_current_user_v2916.sql`.
 
 ## ⚠ REGLA (Luis, 2026-10-08, v28.58): el CONTEO DE GÓNDOLA del picking se aprueba o rechaza en la LANDING del admin
 

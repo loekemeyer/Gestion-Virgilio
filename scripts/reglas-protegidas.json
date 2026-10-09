@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82/v26.93 gv_ppp_dia_ajustar; + v26.86 gv_alerta_gondola_llena_telegram; + v26.98 gv_importado_alta, gv_importados_bache_primer_pedido; + v26.99 gv_importado_guardar); + v27.89 gv_cc_sombra_tick, gv_cc_sombra_racha; + v27.92 gv_ads_stock2; + v28.34 gv_ppp_mismo_lugar_dos_dias; + v28.38 gv_ppp_web_zona_retira; + v28.40 gv_ppp_web_zona_recalc, gv_ppp_tanda_zona_fuera_regla; + v28.43 vista_importados_stock_parte; + v28.96 racks_plani_ingreso, gv_imp_imputar_ingreso_racks; + v29.05 gv_racks_ajuste_sin_posicion + v29.11 gv_imp_ir_asignar",
+  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82/v26.93 gv_ppp_dia_ajustar; + v26.86 gv_alerta_gondola_llena_telegram; + v26.98 gv_importado_alta, gv_importados_bache_primer_pedido; + v26.99 gv_importado_guardar); + v27.89 gv_cc_sombra_tick, gv_cc_sombra_racha; + v27.92 gv_ads_stock2; + v28.34 gv_ppp_mismo_lugar_dos_dias; + v28.38 gv_ppp_web_zona_retira; + v28.40 gv_ppp_web_zona_recalc, gv_ppp_tanda_zona_fuera_regla; + v28.43 vista_importados_stock_parte; + v28.96 racks_plani_ingreso, gv_imp_imputar_ingreso_racks; + v29.05 gv_racks_ajuste_sin_posicion + v29.11 gv_imp_ir_asignar + v29.16 gv_anon_insert_log",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -25,6 +25,11 @@
       "objeto": "gv_anon_insert_bloquear",
       "regla": "La clave pública no escribe en las 58 tablas cerradas: descarta la fila, la guarda en GV_Anon_Insert_Bloqueado y avisa por Telegram",
       "quien": "Thomas"
+    },
+    {
+      "objeto": "gv_anon_insert_log",
+      "regla": "El registro del bloqueo de la clave pública sólo se dispara desde el trigger (llamado directo por /rpc no escribe ni manda Telegram)",
+      "quien": "Luis"
     },
     {
       "objeto": "gv_armado_avance_guardar",
@@ -244,6 +249,11 @@
     {
       "objeto": "gv_imp_imputar_ingreso_racks",
       "regla": "El ingreso a racks suma lo llegado al bache de importación (sin mover stock)",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_imp_ir_asignar",
+      "regla": "el pedido de un ingreso a racks de importación lo elige un supervisor en Importación, no el operario (v29.11)",
       "quien": "Luis"
     },
     {
@@ -652,6 +662,11 @@
       "quien": "Marianela"
     },
     {
+      "objeto": "gv_racks_ajuste_sin_posicion",
+      "regla": "Un ajuste de racks desde el panel (legajo 0) sin posición de rack del Mapa no se graba",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_refrescar_articulo_empresa",
       "regla": "Idem: la fuente de racks es la tabla viva",
       "quien": "v19.27"
@@ -864,16 +879,6 @@
     {
       "objeto": "vista_tanda_status",
       "regla": "Una tanda con PKF/APF figura FRENADA (picking/armado), no en curso ni terminada",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_racks_ajuste_sin_posicion",
-      "regla": "Un ajuste de racks desde el panel (legajo 0) sin posición de rack del Mapa no se graba",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_imp_ir_asignar",
-      "regla": "el pedido de un ingreso a racks de importación lo elige un supervisor en Importación, no el operario (v29.11)",
       "quien": "Luis"
     }
   ]
