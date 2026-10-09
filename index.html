@@ -3094,6 +3094,8 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
 .pmap-head b{ color:#0f172a; }
 .pmap-wrap{ overflow-x:auto; padding-bottom:6px; }
 .pmap-cols{ display:grid; grid-template-columns:repeat(auto-fill, minmax(124px, 1fr)); gap:12px; align-items:start; }
+/* v28.98 (Luis): en pantalla ancha TODOS los módulos de la góndola en UNA fila, al ancho de la página (las 60 ubic. de la Ñ). */
+@media (min-width:1000px){ .pmap-cols[style*="--pmc"]{ grid-template-columns:repeat(var(--pmc), minmax(0,1fr)); gap:6px; } .pmap-cols[style*="--pmc"] .pmap-cell{ padding:3px 5px; } .pmap-cols[style*="--pmc"] .pmap-cod{ font-size:17px; } }
 /* Los módulos de 5 celdas ENVUELVEN y se reparten el ancho en vez de irse de
    costado: la góndola A son 17 columnas y antes se veían 6, el resto scrolleaba.
    Va en GRID y no en flex para que la última fila tenga columnas del MISMO ancho
@@ -6396,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.97"></script>
+<script type="module" src="recepcion.js?v=29.02"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10687,7 +10689,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.97";
+const APP_VERSION = "v29.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17283,7 +17285,8 @@ function ocBodyList() {
   let h = _ocRecepErrBanner() + ocAlarmaBanner();
   h += '<div class="oc-tools"><button class="oc-btn ok" onclick="ocNueva()">+ Nueva OC (carga manual)</button><button class="oc-btn" onclick="ocgEnter()">⚙ Generar OCs</button><button class="oc-btn" onclick="ocEntregas()">📊 % Entregas</button><button class="oc-btn" onclick="ocTrazar()">🔎 Trazar artículo</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar proveedor / rubro / fecha" value="' + escapeHtml(_oc.filtro) + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
   const g = ocGroups(), byF = {};
-  Object.keys(g).forEach(function (k) { const x = g[k], fe = x.fecha || ""; if (!byF[fe]) byF[fe] = { fecha: fe, groups: [], nItems: 0, ped: 0, rec: 0 }; const st = ocGroupStats(x); byF[fe].groups.push(x); byF[fe].nItems += x.rows.length; byF[fe].ped += st.ped; byF[fe].rec += st.rec; });
+  // v29.00 (Thomas, D6): esta pantalla es de ARTÍCULO TERMINADO — las OC de flejes (Basconia, kg) no van.
+  Object.keys(g).filter(function (k) { return !/flej/i.test(String(g[k].rubro || "")); }).forEach(function (k) { const x = g[k], fe = x.fecha || ""; if (!byF[fe]) byF[fe] = { fecha: fe, groups: [], nItems: 0, ped: 0, rec: 0 }; const st = ocGroupStats(x); byF[fe].groups.push(x); byF[fe].nItems += x.rows.length; byF[fe].ped += st.ped; byF[fe].rec += st.rec; });
   let fechas = Object.keys(byF);
   const f = (_oc.filtro || "").toLowerCase().trim();
   if (f) fechas = fechas.filter(function (fe) { return _ocDdmm(fe).indexOf(f) >= 0 || fe.indexOf(f) >= 0 || byF[fe].groups.some(function (gr) { return ((gr.proveedor || "") + " " + (gr.rubro || "")).toLowerCase().indexOf(f) >= 0; }); });
@@ -19345,7 +19348,7 @@ async function _stkEmCargar() {
     try {   // mismo origen: se le saca el menú lateral del admin, que acá no lleva a ningún lado
       var d = fr.contentDocument; if (!d || d.getElementById("stkEmCss")) return;
       var s = d.createElement("style"); s.id = "stkEmCss";
-      s.textContent = ".sidebar{display:none!important}.app-shell,.main-content{min-height:0!important}.page{padding:14px 18px!important;max-width:none!important}";
+      s.textContent = ".sidebar{display:none!important}.app-shell,.main-content{min-height:0!important}.page{padding:14px 18px!important;max-width:none!important}.est-madre-table-wrap{max-height:calc(100vh - 140px)!important}";   // v28.99 (Luis): la tabla usa todo el alto del cuadro
       (d.head || d.documentElement).appendChild(s);
     } catch (_e) {}
   };
@@ -22816,7 +22819,15 @@ async function stkOpenCajasPedidasArt(codEnc) {
   // v12.39 — también traer la variante con "L" (ej. 438EL): es un artículo de Loeke que
   // vende Chef y su pedido cuenta en la fila LK. Se trae articulo IN (438E, 438EL) y la
   // empresa de cada pedido se decide con la L (L → LK; el resto por NP).
-  const _codCands = _stkArtCands(_codB).map(encodeURIComponent).join(",");   // v19.79: variantes de cero (problema 425)
+  const _cands0 = _stkArtCands(_codB);
+  /* v29.01 (Thomas: "636E dice 6 pero entro y dice 0") — la columna cuenta también lo pedido con un código
+     EQUIVALENTE (Equivalencias_Codigos: 636 → 636E). Se suman esos códigos a la búsqueda. */
+  try {
+    const _eq = await fetch(SUPABASE_URL + "/rest/v1/Equivalencias_Codigos?select=cod_pedido,cod_real", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    const _cn = _cands0.map(function (c) { return _stkNormCod(c); });
+    (_eq || []).forEach(function (e) { if (_cn.indexOf(_stkNormCod(e.cod_real)) >= 0) _stkArtCands(String(e.cod_pedido || "")).forEach(function (c) { if (_cands0.indexOf(c) < 0) _cands0.push(c); }); });
+  } catch (_e) {}
+  const _codCands = _cands0.map(encodeURIComponent).join(",");   // v19.79: variantes de cero (problema 425)
   /* v19.65 (Thomas: "¿por qué ahí dice que pide 198 pero cuando entro veo solo tres cajas?
      algo está mal") — la fuente pasó de `gv_ppp_base_pedidos` (SOLO el espejo de ISIS) a
      `gv_demanda_pedidos`, que es ISIS + WEB. Es el MISMO agujero que tenía el generador de
@@ -29351,7 +29362,8 @@ function gvRacksTramo(op, legajo, iniMs, texto) {
   if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
   const payload = { legajo: leg, opcion: op, descripcion: DESC[op] || op, texto: String(texto || ""), ts: nowMs,
     id: (op.toLowerCase() + "_" + leg + "_" + nowMs.toString(36)).replace(/[^a-zA-Z0-9_\-]/g, ""),
-    ts_inicio_iso: (iniMs && iniMs < nowMs) ? new Date(iniMs).toISOString() : null };
+    // v28.98: la APERTURA (RKI/IRI) va SIN ts_inicio: con él parecía cerrada y sonaba la alarma de inactivo con el operario adentro.
+    ts_inicio_iso: (op !== "RKI" && op !== "IRI" && iniMs && iniMs < nowMs) ? new Date(iniMs).toISOString() : null };
   enqueueReport(payload);
   if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
   try { updatePendingIndicator(); } catch (_e) {}
@@ -30000,7 +30012,13 @@ async function cpLoadFaltantes() {
   // código correcto (ej. "809E CH", "438E LK") en vez del pelado. Códigos comunes: sin cambio.
   let corrMap = {};
   try { corrMap = await fetchCorrecciones(); } catch (_e) { corrMap = {}; }
-  return rows.filter(function (e) { return Number(e.cajas_falto) > 0 && !facSet[String(e.np).trim()]; })
+  // v28.97 — tampoco lo ANULADO (tanda -X) ni el pedido CANCELADO: ofrecía completar 6 NP canceladas.
+  let canSet = {};
+  try {
+    const rc = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_np_canceladas_lista", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" });
+    if (rc.ok) (await rc.json()).forEach(function (x) { canSet[String(x.np || "").trim().toUpperCase()] = 1; });
+  } catch (_e) {}
+  return rows.filter(function (e) { return Number(e.cajas_falto) > 0 && !facSet[String(e.np).trim()] && !_entregaAnulada(e) && !canSet[String(e.np).trim().toUpperCase()]; })
     .map(function (e) { e._cod_orig = e.cod_art; e.cod_art = codEmpSplit(corrArt(e.cod_art, e.np, corrMap), e.np); return e; });
 }
 /* Tandas PICKEADAS con faltantes pero SIN armar todavía (no tienen filas en
@@ -47539,9 +47557,9 @@ function pmapGondolaHtml(g) {
           Object.keys(ocupadas).length + ' con artículo · ' + libres + ' libres · ' +
           'capacidad <b>' + pmapNum(capTot) + '</b> cajas' +
           (Object.keys(emps).length ? ' · ' + escapeHtml(Object.keys(emps).sort().join("/")) : "") + '</div>';
-  h += '<div class="pmap-wrap"><div class="pmap-cols">';
   const alto = pmapAlto(g);
   const cols = Math.ceil(maxN / alto) || 1;
+  h += '<div class="pmap-wrap"><div class="pmap-cols" style="--pmc:' + cols + '">';
   for (let c = 0; c < cols; c++) {
     h += '<div class="pmap-col">';
     for (let lvl = alto; lvl >= 1; lvl--) h += pmapCellHtml(g, c * alto + lvl, porCelda);
@@ -55038,7 +55056,7 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
   for (var leg in byLeg) {
     if (fjHoy && fjHoy.has(leg)) { vistos[leg] = 1; continue; }       // ya cerró jornada → fuera
     var evs = byLeg[leg].sort(function (a, b) { return a.ts - b.ts; });
-    var pick = null, pickTs = 0, arm = null, armTs = 0, tog = null, togTs = 0, lastTs = 0, gstIni = 0, gstUlt = 0;
+    var pick = null, pickTs = 0, arm = null, armTs = 0, tog = null, togTs = 0, lastTs = 0, gstIni = 0, gstUlt = 0, rkTog = null, rkTs = 0;
     for (var k = 0; k < evs.length; k++) {
       var e = evs[k]; if (e.ts > lastTs) lastTs = e.ts;
       if (e.op === "GST") { if (!gstIni) gstIni = e.ts; gstUlt = e.ts; continue; }   // v23.64
@@ -55051,15 +55069,17 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
       else if (e.op === "APF") { if (arm === e.tx) arm = null; }
       else if (e.op === "MGI") { tog = "MG"; togTs = e.ts; }                       // v23.63
       else if (e.op === "MGC") { if (tog === "MG") tog = null; }
-      else if (e.op === "RKI") { tog = "RKB"; togTs = e.ts; }                      // v23.66: bajando racks
-      else if (e.op === "IRI") { tog = "IRT"; togTs = e.ts; }                      // v23.66: ingresando a racks
+      else if (e.op === "RKI") { tog = "RKB"; togTs = e.ts; rkTog = "RKB"; rkTs = e.ts; }   // v23.66: bajando racks
+      else if (e.op === "IRI") { tog = "IRT"; togTs = e.ts; rkTog = "IRT"; rkTs = e.ts; }   // v23.66: ingresando a racks
       else if (e.op === "MG" && e.ini) { if (tog === "MG") tog = null; }
+      else if ((e.op === "RKB" || e.op === "IRT") && e.ini) { if (rkTog === e.op) rkTog = null; if (tog === e.op) tog = null; }   // v28.98: un toggle (CT) adentro del ingreso/bajada de racks no lo cierra ≡ tv.html
       else if (_MON_ACT_TOGGLES[e.op]) { if (!e.ini) { tog = e.op; togTs = e.ts; } else if (tog === e.op) { tog = null; } }
     }
     var cands = [];                                                  // acciones abiertas → la más reciente manda
     if (pick) cands.push({ k: "pick", ts: pickTs, tanda: pick });
     if (arm) cands.push({ k: "arm", ts: armTs, tanda: arm });
     if (tog) cands.push({ k: tog, ts: togTs });
+    else if (rkTog) cands.push({ k: rkTog, ts: rkTs });
     // v23.64: sin nada abierto y con guardado reciente → "Guardando" desde el primer movimiento de la racha
     if (!cands.length && gstUlt && (nowMs - gstUlt) <= MON_GST_VIVO_MIN * 60000) cands.push({ k: "GST", ts: gstIni });
     cands.sort(function (a, b) { return b.ts - a.ts; });
@@ -61740,7 +61760,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.97"></script>
+<script src="importacion.js?v=29.02"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64669,10 +64689,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.97"></script>
-<script src="hotsale.js?v=28.97"></script>
-<script src="estadisticas.js?v=28.97"></script>
-<script src="ads.js?v=28.97"></script>
+<script src="cobranzas.js?v=29.02"></script>
+<script src="hotsale.js?v=29.02"></script>
+<script src="estadisticas.js?v=29.02"></script>
+<script src="ads.js?v=29.02"></script>
 
 </body>
 </html>

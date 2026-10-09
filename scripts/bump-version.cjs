@@ -48,7 +48,8 @@ const actual = mApp[2];
 let nueva;
 if (arg === "--patch") {
   const p = actual.split(".");
-  p[p.length - 1] = String(Number(p[p.length - 1]) + 1);
+  const _ult = p[p.length - 1];
+  p[p.length - 1] = String(Number(_ult) + 1).padStart(_ult.length, "0");   // v29.01: 29.00 -> 29.01 (no 29.1)
   nueva = p.join(".");
 } else {
   nueva = arg.replace(/^v/, "");

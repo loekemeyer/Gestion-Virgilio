@@ -4031,7 +4031,7 @@ estadística **3 % del CIF con tope u$s 180**. Retira el 35 % de derechos de la 
 **Recuperable separado** (v23.80, Luis): la tarjeta y el desglose muestran aparte lo que vuelve como crédito fiscal — IVA 21 %, IVA adicional 20 %, Ganancias 6 %, IIBB 0,17 % (v23.81) sobre CIF + derechos + estadística (`_nacRecup`) — y NO lo suman al costo. En avión (courier) el IVA sigue en el no recuperable. **En avión también va la comisión NTL** (v23.81, Luis). La comisión NTL es 5 % del **FOB**, no del CIF (ya lo era; el test lo fija).
 **Fujian paga 35 %** (v23.78, Luis: *"solo ponele 35% a fujian / 18% al resto"*): `_DERECHOS_PROV` / `_derechosProv(prov)`, los tres modos.
 
-## ⚠ REGLA (Luis, 2026-10-09, v28.97): el INGRESO A RACKS de importación DESCUENTA el pedido en viaje
+## ⚠ REGLA (Luis, 2026-10-09, v29.02): el INGRESO A RACKS de importación DESCUENTA el pedido en viaje
 
 **Luis:** *"404E entró por ingreso a racks · ese ingreso fue del pedido de importación"*. El contenedor (Becky,
 PI B260601) lo cargan los operarios por **Ingreso a racks → 📦 Importación** (`racks_plani_ingreso`), no por Recepción

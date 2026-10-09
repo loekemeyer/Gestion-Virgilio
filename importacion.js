@@ -582,7 +582,10 @@ function pedImpProyAbrir(codEnc, proyCajas) {
   // v23.95 (Luis: "sigue saliendo de importación cuando aprieto") — la proyección se dibuja en
   // SU PROPIO overlay, encima del módulo, que queda intacto abajo. Sin «volver»: se cierra y ya.
   _stkPopAlt = "impProyOv";
-  try { stkShowProyVentas(codEnc, proyCajas); } finally { _stkPopAlt = null; }
+  // v28.97: un dual (438E, 439E…) va con SU empresa: sin el sufijo las ventas salían LK + CH contra la E.M. de un solo lado.
+  const _pl = _it ? _impPlantaVista(_it) : "";
+  const _cEnc = _pl ? encodeURIComponent(String(_impCodVista(_it)).trim() + " " + _pl) : codEnc;
+  try { stkShowProyVentas(_cEnc, proyCajas); } finally { _stkPopAlt = null; }
 }
 
 /* ══ v23.90 (Luis, 29/09) — MOQ: el mínimo que el chino acepta fabricar ══════════════
@@ -880,11 +883,13 @@ async function pedImpStockDesglose(keyEnc, foco) {
     if (insDet !== undefined) { insDetG = insDet; insErrG = !!insErr; } else { insDet = insDetG; insErr = insErrG; }
     const tr = function (a, b, c) { return '<tr><td style="text-align:left;padding:8px 10px">' + a + '</td><td class="num" style="padding:8px 10px;font-weight:700">' + b + '</td><td style="text-align:left;color:#475569;font-size:14px;padding:8px 10px">' + (c || "") + '</td></tr>'; };
     let h = '';
+    /* v28.97: el insumo compartido se muestra con SU parte (el total ya la traía: 312 u × 68 % = 211). */
+    const _shIns = (it.piezasShare != null && it.piezasShare !== 1) ? Number(it.piezasShare) : 1;
     if (foco !== "proy") {
       h += '<table class="mva-tbl imp-stk-desg" style="width:100%;font-size:16px"><thead><tr><th style="text-align:left;font-size:13px">Qué cuenta</th><th class="num" style="font-size:13px">u</th><th style="text-align:left;font-size:13px">De dónde</th></tr></thead><tbody>';
       h += tr('Stock propio del artículo', f(it.stockPropioModulo), 'depósitos de Virgilio' + (it.uniPedidas > 0 ? ', ya descontadas ' + f(it.uniPedidas) + ' u de pedidos abiertos' : ''));
       if (insErr) h += tr('Depósito insumos', f(it.stockInsU), '<span style="color:#b91c1c">no se pudo leer el detalle</span>');
-      else if (insDet && insDet.length) insDet.forEach(function (d) { if (Number(d.saldo) || Number(d.uni)) h += tr('🧰 Insumo ' + escapeHtml(d.insumo), f(d.uni), escapeHtml(f(d.saldo) + ' ' + (d.unidad || '') + (Number(d.factor) > 1 ? ' × ' + f(d.factor) : ''))); });
+      else if (insDet && insDet.length) insDet.forEach(function (d) { if (Number(d.saldo) || Number(d.uni)) h += tr('🧰 Insumo ' + escapeHtml(d.insumo), f(Number(d.uni) * _shIns), (_shIns !== 1 ? 'le toca el ' + Math.round(_shIns * 100) + ' % de ' + f(d.uni) + ' u · ' : '') + escapeHtml(f(d.saldo) + ' ' + (d.unidad || '') + (Number(d.factor) > 1 ? ' × ' + f(d.factor) : ''))); });
       else h += tr('Depósito insumos', f(it.stockInsU), '');
       if (it.stockTermU > 0) h += tr('🧩 Productos ya armados', f(it.stockTermU), 'stock de los terminados que usan ' + (it.esInsumo ? 'este insumo' : 'esta parte') + ' (detalle abajo)');
       if (it.stockGp2U > 0 || equiv) {
@@ -901,7 +906,7 @@ async function pedImpStockDesglose(keyEnc, foco) {
       }
       if (it.stockParteU > 0) h += tr('🔧 Parte ' + escapeHtml(it.stockParteCods || ''), f(it.stockParteU), 'el stock de la parte cuenta como stock de este artículo');
       /* v28.43 (Luis, 07/10): las piezas (GP2) y los insumos de este artículo los COMPARTE con otros
-         (GV_Piezas_Reparto: 942E con 633E, 438E LK con CH…). Las filas de arriba ya traen sólo su parte. */
+         (GV_Piezas_Reparto: 942E con 633E, 438E LK con CH…). Las filas de arriba muestran sólo su parte (los insumos, desde v28.97). */
       if (it.piezasShare != null && it.piezasShare !== 1)
         h += '<tr class="imp-piezas-share"><td colspan="3" style="text-align:left;padding:8px 10px;font-size:14px;color:#7c2d12;background:#fff7ed">🔀 Piezas e insumos <b>compartidos</b>: a este artículo le toca el <b>' +
           Math.round(it.piezasShare * 100) + ' %</b>, según la Estadística Madre del mes' + (it.piezasReparto ? ' (' + escapeHtml(it.piezasReparto) + ')' : '') + '.</td></tr>';

@@ -1199,7 +1199,7 @@ function actividadActual(eventos, hoy, fjHoy, fichados) {
   for (var leg2 in porLeg) {
     if (fjHoy.has(leg2)) { vistos[leg2] = 1; continue; }   // ya cerró jornada
     var evs = porLeg[leg2].sort(function (a, b) { return a.ts - b.ts; });
-    var pick = null, pickTs = 0, arm = null, armTs = 0, tog = null, togTs = 0, ultTs = 0, gstIni = 0, gstUlt = 0;
+    var pick = null, pickTs = 0, arm = null, armTs = 0, tog = null, togTs = 0, ultTs = 0, gstIni = 0, gstUlt = 0, rkTog = null, rkTs = 0;
     for (var k = 0; k < evs.length; k++) {
       var e = evs[k];
       if (e.ts > ultTs) ultTs = e.ts;
@@ -1213,15 +1213,17 @@ function actividadActual(eventos, hoy, fjHoy, fichados) {
       else if (e.op === "TAP") { if (!e.tx || arm === e.tx) arm = null; }
       else if (e.op === "MGI") { tog = "MG"; togTs = e.ts; }                       /* ≡ index.html v23.63 */
       else if (e.op === "MGC") { if (tog === "MG") tog = null; }
-      else if (e.op === "RKI") { tog = "RKB"; togTs = e.ts; }                      /* v23.66: bajando racks */
-      else if (e.op === "IRI") { tog = "IRT"; togTs = e.ts; }                      /* v23.66: ingresando a racks */
+      else if (e.op === "RKI") { tog = "RKB"; togTs = e.ts; rkTog = "RKB"; rkTs = e.ts; }                      /* v23.66: bajando racks */
+      else if (e.op === "IRI") { tog = "IRT"; togTs = e.ts; rkTog = "IRT"; rkTs = e.ts; }                      /* v23.66: ingresando a racks */
       else if (e.op === "MG" && e.ini) { if (tog === "MG") tog = null; }
+      else if ((e.op === "RKB" || e.op === "IRT") && e.ini) { if (rkTog === e.op) rkTog = null; if (tog === e.op) tog = null; }
       else if (ACT_TOGGLES[e.op]) { if (!e.ini) { tog = e.op; togTs = e.ts; } else if (tog === e.op) { tog = null; } }
     }
     var cands = [];
     if (pick) cands.push({ k: "pick", ts: pickTs, tanda: pick });
     if (arm)  cands.push({ k: "arm",  ts: armTs,  tanda: arm });
     if (tog)  cands.push({ k: tog,    ts: togTs });
+    else if (rkTog) cands.push({ k: rkTog, ts: rkTs });
     if (!cands.length && gstUlt && (Date.now() - gstUlt) <= GST_VIVO_MIN * 60000) cands.push({ k: "GST", ts: gstIni });
     cands.sort(function (a, b) { return b.ts - a.ts; });
     out.push({ legajo: leg2, idle: !cands.length, desde: cands.length ? cands[0].ts : ultTs,
