@@ -223,6 +223,8 @@ echo "== rkb-orden-urgencia (v25.89: Bajar de Racks ordena por la góndola más 
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rkb-orden-urgencia.cjs
 echo "== ins-sale-mc (v24.69: insumo con MC sale sólo en MC, stock en base) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-sale-mc.cjs
+echo "== ins-ri-cat-bolsas (v29.22: RI elige categoría sin importados; inyector = sólo bolsas) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-ri-cat-bolsas.cjs
 
 echo "== ssg-switch (regresión: switch admin del aviso 'picking sin stock') =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ssg-switch.cjs

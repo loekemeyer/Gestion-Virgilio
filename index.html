@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.21"></script>
+<script type="module" src="recepcion.js?v=29.22"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10698,7 +10698,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.21";
+const APP_VERSION = "v29.22";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27294,9 +27294,32 @@ function insChooserGo(which) {
     // v21.74: primero el tipo de envío (inyectores / otros), después el destino
     insEnvioTipo();
   } else if (which === "RI") {
-    // v9.15: Pedir ubicación ANTES de abrir el modal de insumos
-    askInsUbicacion(which);
+    // v29.22 (Luis): lo PRIMERO es qué se recibe (las categorías, sin importados);
+    // después la ubicación / documentación de siempre.
+    insRecibirCat();
   }
+}
+/* v29.22 (Luis, 09/10): "lo primero que sale cuando aprietan la recepción es elegir qué
+   quieren recibir con las categorías que tenemos en insumos (sin contar importados)". */
+const INS_RI_SIN = ["importados"];
+async function insRecibirCat() {
+  let ov = document.getElementById("insChooserModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  const card = function (inner) { return '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' + inner + '</div>'; };
+  ov.innerHTML = card('<div style="font-size:18px;font-weight:800;">📥 Recibir insumos</div><div style="font-size:13px;color:#64748b;margin-top:8px;">Cargando…</div>');
+  ov.style.display = "flex";
+  try { await insLoadMeta(true); } catch (_e) { /* quedan los defaults */ }
+  const btn = "width:100%;margin-bottom:9px;padding:15px;border:none;border-radius:12px;background:#4f46e5;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
+  const cats = INS_CATS.filter(function (c) { return INS_RI_SIN.indexOf(c.k) < 0; });
+  ov.innerHTML = card('<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📥 Recibir insumos</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:14px;">¿Qué recibís?</div>' +
+    cats.map(function (c) { return '<button class="ins-ri-cat" onclick="insRecibirCatGo(\'' + c.k + '\')" style="' + btn + '">' + escapeHtml(c.lbl) + '</button>'; }).join("") +
+    '<button onclick="closeInsumoChooser()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>');
+}
+function insRecibirCatGo(k) {
+  closeInsumoChooser();
+  window._insRiCat = k;
+  askInsUbicacion("RI");
 }
 /* v21.74 — Entregar insumos: DOS botones antes del destino.
    "Envío a inyectores" → sólo la lista de inyectores de GP2 (bolsas plásticas).
@@ -27348,7 +27371,9 @@ function askInsUbicacion(mode, sub) {
     '</div>';
   ov.style.display = "flex";
   window._insGp2 = null;
-  if (!soloOtros) _insGp2Opciones(mode, soloIny);
+  // v29.22: las OC de bolsas de GP2 sólo si lo que se recibe son plásticos
+  const _riCat = isIn ? (window._insRiCat || "") : "";
+  if (!soloOtros && (!isIn || !_riCat || _riCat === "plastico")) _insGp2Opciones(mode, soloIny);
 
   // Auto-focus en el input
   setTimeout(() => {
@@ -27548,6 +27573,10 @@ function insUbicGp2Ok(mode, i) {
     insUbicOk("EI", { modo: "EI", inyector: nom, mv: mv });
   }
 }
+/* v29.22 — bolsa plástica que se manda a un inyector: plástico, con código real y ubicación. */
+function _insEsBolsaIny(it) {
+  return !!it && insCatOf(it) === "plastico" && !_insEsTmp(it) && !it.noCode && String(it.ubic || "").trim() !== "";
+}
 /* Material GP2 (del bundle) del insumo, por codigo_virgilio == cod de Virgilio. null si no es bolsa. */
 function _insGp2Mat(gp2, it) {
   if (!gp2 || !it || !it.cod) return null;
@@ -27640,7 +27669,16 @@ async function showInsumoModal(mode, legajo, _resume) {
     // +10 Caja y −10 Uni netean 0 en vista_saldos_stock.insumos pero hay stock real en 2 unidades).
     Object.keys(saldos).forEach(function (k) { const sd = saldos[k], xu = xUni[k] || null; if (((sd.insumos || 0) !== 0 || (xu && xu.length)) && !items.some(function (it) { return it.cod === k; })) items.push({ cod: k, nombre: sd.desc || "", sector: "", ubic: "", cat: "", noCode: String(k).indexOf("·") >= 0, stock: Number(sd.insumos || 0), stockByUni: xu, qty: 0, unidad: _defUni(xu, "") }); });
     items.sort(_insSortCod);
-    _ins = { mode: mode, legajo: String(legajo || "").trim(), items: items, filtro: "", cat: "", qty: null, nuevo: null };
+    // v29.22 (Luis): en RECEPCIÓN no aparecen los importados, y abre en la categoría elegida.
+    const riCat = (mode === "RI") ? (window._insRiCat || "") : ""; window._insRiCat = null;
+    let lista = items;
+    if (mode === "RI") lista = lista.filter(function (x) { return INS_RI_SIN.indexOf(insCatOf(x)) < 0; });
+    // v29.22 (Luis): envío a un INYECTOR = sólo las bolsas plásticas reales (las que tienen
+    // ubicación en el Mapa; ni los TMP- ni los códigos viejos), nada más.
+    const gp2Ei = (mode === "EI" && window._insGp2 && window._insGp2.modo === "EI");
+    if (gp2Ei) lista = lista.filter(_insEsBolsaIny);
+    _ins = { mode: mode, legajo: String(legajo || "").trim(), items: lista, filtro: "", cat: (riCat && insCatDef(riCat)) ? riCat : "", qty: null, nuevo: null };
+    if (gp2Ei) { _ins.soloBolsas = true; _ins.cat = "plastico"; }
     // v14.95 — bolsas ↔ GP2: si en la ubicación se eligió un inyector / una OC de GP2, queda en la
     // sesión (viaja con el borrador). RI con OC: precarga las bolsas pendientes de cada material.
     const gp2 = window._insGp2 || null; window._insGp2 = null;
@@ -27842,10 +27880,11 @@ function insRender() {
       : _ins.items.filter(function (it) { const k = insCatOf(it); return cat === "?" ? k === "" : k === cat; });
     const shown = (f ? base.filter(function (it) { return stkMatchBusq(f, it.cod, (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || ""), true); }) : base)   // v21.43
       .slice().sort(_insSortCat(cat));
-    h += '<div class="ins-bar"><button class="ins-back" onclick="insBack()">‹ Atrás</button>' +
+    if (_ins.soloBolsas) h += '<div class="ins-bar"><span class="ins-bar-t">🧪 Bolsas plásticas</span></div>';
+    else h += '<div class="ins-bar"><button class="ins-back" onclick="insBack()">‹ Atrás</button>' +
       '<span class="ins-bar-t">' + escapeHtml(cat ? insCatLbl(cat === "?" ? "" : cat) : "🔎 Buscar") + '</span></div>';
     if (cat === "?") h += '<div class="ins-depw">⚠ Códigos <b>sin clasificar</b>: viejos, duplicados o recién sugeridos. Esperan que los ordenen desde Stock y Compras. Si el que buscás está acá, avisá.</div>';
-    h += '<input class="ins-search" type="search" placeholder="🔎 Buscar ' + (cat ? "en esta categoría" : "en TODOS") + '" value="' + escapeHtml(_ins.filtro) + '" oninput="if(_ins){_ins.filtro=this.value;insRender();}">';
+    if (!_ins.soloBolsas) h += '<input class="ins-search" type="search" placeholder="🔎 Buscar ' + (cat ? "en esta categoría" : "en TODOS") + '" value="' + escapeHtml(_ins.filtro) + '" oninput="if(_ins){_ins.filtro=this.value;insRender();}">';
     if (!shown.length) {
       h += '<div class="ins-empty">' + (f ? "No hay ninguno que diga “" + escapeHtml(_ins.filtro) + "”." : "No hay insumos en esta categoría.") + '</div>';
       if (f && cat) h += '<button class="ins-back" style="width:100%;" onclick="if(_ins){_ins.cat=\'\';insRender();}">🔎 Buscar en TODAS las categorías</button>';
@@ -27918,7 +27957,7 @@ function _insNuevoHtml(isIn) {
   h += '<div class="ins-nvl">Detalle <span class="ins-cbadge">— qué es, en tus palabras</span></div>' +
     '<textarea id="insNvDet" class="ins-nvt" rows="3" placeholder="Ej: alambre finito que trajo Pérez, bolsa gris sin etiqueta…" oninput="insNuevoSet(\'det\',this.value)">' + escapeHtml(n.det) + '</textarea>';
   h += '<div class="ins-nvl">Elegí la categoría</div><div class="ins-cats">' +
-    INS_CATS.map(function (c) {
+    INS_CATS.filter(function (c) { return INS_RI_SIN.indexOf(c.k) < 0; }).map(function (c) {
       return '<button class="ins-cchip' + (n.cat === c.k ? " on" : "") + '" onclick="insNuevoPick(\'cat\',\'' + c.k + '\')">' + c.lbl + '</button>';
     }).join("") +
     '<button class="ins-cchip' + (n.cat === "" ? " on" : "") + '" onclick="insNuevoPick(\'cat\',\'\')">❓ Sin categoría clara</button>' +
@@ -28048,9 +28087,9 @@ function _insSaleMC(it) {
   return mc ? mc.u : "";
 }
 function insCloseQty() { if (!_ins) return; _ins.qty = null; insRender(); }
-function insBack() { if (!_ins) return; _ins.cat = ""; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = null; insRender(); }
+function insBack() { if (!_ins || _ins.soloBolsas) return; _ins.cat = ""; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = null; insRender(); }
 /* Entrar a una categoría (pantalla 2). Volver a tocarla desde adentro = volver. */
-function insSetCat(k) { if (!_ins) return; _ins.cat = (_ins.cat === k) ? "" : k; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = null; insRender(); }
+function insSetCat(k) { if (!_ins || _ins.soloBolsas) return; _ins.cat = (_ins.cat === k) ? "" : k; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = null; insRender(); }
 function insChg(i, d) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, it.qty + d); insRender(); }
 function insSet(i, v) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, parseInt(v, 10) || 0); insRender(); }
 async function insConfirmar() {
@@ -61987,7 +62026,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.21"></script>
+<script src="importacion.js?v=29.22"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64917,12 +64956,12 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.21"></script>
-<script src="hotsale.js?v=29.21"></script>
-<script src="estadisticas.js?v=29.21"></script>
-<script src="ads.js?v=29.21"></script>
+<script src="cobranzas.js?v=29.22"></script>
+<script src="hotsale.js?v=29.22"></script>
+<script src="estadisticas.js?v=29.22"></script>
+<script src="ads.js?v=29.22"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.21"></script>
+<script src="ayuda.js?v=29.22"></script>
 
 </body>
 </html>

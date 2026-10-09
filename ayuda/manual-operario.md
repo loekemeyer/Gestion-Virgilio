@@ -190,11 +190,13 @@ Para pasar mercadería de una posición de rack a otra (no cambia el stock, sól
 
 Tocá **📦** y **Enviar**. Hay **3 opciones**:
 
-- **📥 Recibir insumos**: entra stock de insumos. Elegís **de dónde recibís** y la **documentación**
-  (Remito, Factura o los dos) y tocás **Enviar**. Adentro cargás las cantidades
+- **📥 Recibir insumos**: entra stock de insumos. Primero **«¿Qué recibís?»**: elegís la categoría
+  (plásticos, flejes, cajas, partes…; los importados no se reciben acá). Después **de dónde recibís** y
+  la **documentación** (Remito, Factura o los dos) y tocás **Enviar**. Adentro cargás las cantidades
   (**«+ Agregar insumo nuevo»** si no está) y **«✓ Registrar entrada»**.
 - **📤 Entregar insumos**: sale stock de insumos. Primero **«¿Qué envío es?»**: **🏭 Envío a
-  inyectores** o **📦 Envío a otros**; después el destino, **Enviar**, las cantidades y
+  inyectores** (elegís el inyector y aparecen sólo las bolsas plásticas) o **📦 Envío a otros**;
+  después el destino, **Enviar**, las cantidades y
   **«✓ Registrar salida»**. Un insumo que viene en caja master (MC) **sale siempre en MC
   enteras**.
 - **🚚 Salida a Cervantes**: mandar mercadería a Cervantes. Tiene dos pestañas, **Góndola** y

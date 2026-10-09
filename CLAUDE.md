@@ -8567,3 +8567,13 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
 - ⚠ **Groq retiró `llama-3.3-70b-versatile` (09/10: 404 model_not_found)**: se pasó a `openai/gpt-oss-120b` (con
   `reasoning_effort: low`). Si un proveedor empieza a fallar, mirar `GV_Ayuda_Log.error` y la lista de modelos del proveedor.
 - `sql/gv_ayuda_log_v2916.sql`, `sql/gv_ayuda_config_v2918.sql`, `tests/ayuda-chat.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-09, v29.22): INSUMOS del operario — RECIBIR arranca por la CATEGORÍA; a un INYECTOR sólo van las BOLSAS
+
+- **📥 Recibir insumos**: lo primero es **«¿Qué recibís?»** con las categorías de `Insumos_Categorias` **menos importados**
+  (`INS_RI_SIN`, `insRecibirCat`). Después siguen la ubicación y la documentación de siempre; las OC de bolsas de GP2 sólo
+  aparecen si la categoría es plásticos. El modal abre en esa categoría y en RI **no hay importados** (ni en «+ Agregar insumo»).
+- **📤 Envío a inyectores**: elegido el inyector, el modal muestra **sólo las bolsas plásticas** (`_insEsBolsaIny`: categoría
+  plástico, código real, con ubicación en el Mapa, sin TMP-), sin «‹ Atrás» ni buscador (`_ins.soloBolsas`). Al 09/10 son 9
+  (ABS, AI, EBA, NY c/Carga 25%, NY Recup, NY Virgen, PE Polie, PP 2630, PS PE). Una bolsa nueva aparece cuando se le da ubicación.
+- `tests/ins-ri-cat-bolsas.cjs`.
