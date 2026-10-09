@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.28"></script>
+<script type="module" src="recepcion.js?v=29.29"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10701,7 +10701,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.28";
+const APP_VERSION = "v29.29";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -28065,6 +28065,24 @@ function _insQtyHtml(it, i, isIn) {
       : (it.unidad ? ('stock: ' + _insNum(stk) + ' ' + escapeHtml(it.unidad)) : 'stock: ' + _insNum(it.stock));
   const _k = insCatOf(it);
   const _mcSolo = _insSaleMC(it);   // v24.69: sale sólo en MC
+  // v29.29 (Thomas): las bolsas plásticas van SÓLO en Bolsas (sin otras unidades) y se ven en kg.
+  if (_k === "plastico") {
+    const _kg = _insKgBolsas(it.qty);
+    const _bol = '<b>Bolsas</b>' + (it.qty > 0 ? ' <span style="font-size:13px;color:#475569;font-weight:800;">= ' + _insNum(_kg) + ' kg</span>' : '') +
+      ' <span style="font-size:11.5px;color:#64748b;">(' + _insNum(_insKgXBolsa()) + ' kg por bolsa)</span>';
+    return '<div class="ins-qov" onclick="if(event.target===this)insCloseQty()"><div class="ins-qc">' +
+      '<div class="ins-qh"><div><div class="ins-qcod">' + escapeHtml(_insBtnCod(it)) + '</div>' +
+      (it.nombre ? '<div class="ins-qnom">' + escapeHtml(it.nombre) + '</div>' : "") +
+      '<div class="ins-stk">stock: ' + _insNum(stk) + ' Bolsas</div></div>' +
+      '<button class="ins-close" style="background:#e2e8f0;color:#475569;" onclick="insCloseQty()">✕</button></div>' +
+      '<div class="ins-qrow"><button class="ins-qb" onclick="insChg(' + i + ',-1)">–</button>' +
+      '<input class="ins-qi" type="number" min="0" inputmode="numeric" value="' + it.qty + '" oninput="insSet(' + i + ',this.value)">' +
+      '<button class="ins-qb" onclick="insChg(' + i + ',1)">+</button></div>' +
+      '<div class="ins-uni" style="justify-content:center;">' + _bol + '</div>' +
+      (neg ? '<div class="ins-warn">⚠ el stock de Bolsas quedaría en ' + _insNum(stk - it.qty) + '</div>' : "") +
+      '<button class="ins-qok ' + (isIn ? "in" : "out") + '" onclick="insCloseQty()">Listo</button>' +
+      '</div></div>';
+  }
   let chips = _mcSolo ? ('<button class="ins-uchip on">' + escapeHtml(_mcSolo) + '</button> <span style="font-size:12px;color:#64748b;">sale siempre en MC enteras</span>') : _insUnitsFor(it, insLoadUnits()).map(function (u) {
     const ok = insUniPermitida(_k, u);
     return '<button class="ins-uchip' + (it.unidad === u ? " on" : "") + (ok ? "" : " no") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')"' +
@@ -28086,7 +28104,11 @@ function _insQtyHtml(it, i, isIn) {
     '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + (it.qty > 0 && (!it.unidad || !insUniPermitida(_k, it.unidad)) ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
     '</div></div>';
 }
-function insOpenQty(i) { if (!_ins || !_ins.items[i]) return; const _mc = _insSaleMC(_ins.items[i]); if (_mc) _ins.items[i].unidad = _mc; _ins.qty = i; insRender(); }
+function insOpenQty(i) { if (!_ins || !_ins.items[i]) return; const _mc = _insSaleMC(_ins.items[i]); if (_mc) _ins.items[i].unidad = _mc; if (insCatOf(_ins.items[i]) === "plastico") _ins.items[i].unidad = "Bolsas"; _ins.qty = i; insRender(); }
+/* v29.29 (Thomas, 09/10): kg de las bolsas plásticas. El kg por bolsa es el de GP2
+   (GP2.parametro material_plastico_kg_x_bolsa, viene en el bundle); sin dato, 25. */
+function _insKgXBolsa() { const g = _ins && _ins.gp2 && _ins.gp2.mv; const k = Number(g && g.kg_x_bolsa); return k > 0 ? k : 25; }
+function _insKgBolsas(n) { return Math.round((Number(n) || 0) * _insKgXBolsa() * 100) / 100; }
 /* v24.69 (Thomas, 30/09, D11): un insumo que tiene MC (Insumos_Factores) SALE siempre en MC
    enteras — a Cervantes o bajado de racks: *"lo mínimo que se le manda es 1 MC… no bajan uni
    sueltas, siempre por MC"*. El stock queda en su unidad base y el movimiento dice las MC. */
@@ -28143,6 +28165,8 @@ async function insConfirmar() {
       var fa = insFactorDe(it.cod, uni);
       if (fa != null) { nota = " · cargado " + it.qty + " " + uni + " × " + fa; qty = qty * fa; uni = fDef.base; }   // v24.69: queda escrito lo que se cargó
     }
+    // v29.29 (Thomas): bolsa plástica = siempre Bolsas, y queda escrito cuántos kg son
+    if (insCatOf(it) === "plastico") { uni = "Bolsas"; nota = " · " + _insNum(qty) + " bolsas = " + _insNum(_insKgBolsas(qty)) + " kg"; }
     return { cod_art: it.cod, descripcion: ((it.nombre || "") + nota).trim() || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: it.ubic || it.sector || null };
   });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
@@ -62036,7 +62060,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.28"></script>
+<script src="importacion.js?v=29.29"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64966,12 +64990,12 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.28"></script>
-<script src="hotsale.js?v=29.28"></script>
-<script src="estadisticas.js?v=29.28"></script>
-<script src="ads.js?v=29.28"></script>
+<script src="cobranzas.js?v=29.29"></script>
+<script src="hotsale.js?v=29.29"></script>
+<script src="estadisticas.js?v=29.29"></script>
+<script src="ads.js?v=29.29"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.28"></script>
+<script src="ayuda.js?v=29.29"></script>
 
 </body>
 </html>

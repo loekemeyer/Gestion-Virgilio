@@ -5,6 +5,7 @@
    (d) «Envío a inyectores» muestra SÓLO las bolsas plásticas reales (plástico, con ubicación,
        sin TMP-), sin «‹ Atrás» ni buscador;
    (f) v29.28 (D9): «Envío a otros» sin bolsas; «Envío a inyectores» sólo bolsas;
+   (g) v29.29: la bolsa sólo en Bolsas, con su equivalente en kg (también en el movimiento);
    (e) v29.25: en RECIBIR y en «Envío a otros», de plásticos sólo las bolsas reales (sin TMP- ni
        códigos viejos), sin «+ Agregar insumo» en plásticos ni la categoría en el alta. Sale 1 si falla. */
 const path = require("path");
@@ -70,9 +71,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     insEnvioTipoGo("iny"); insUbicCancel(); window._insGp2 = null;
     await showInsumoModal("EI", "104");
     out.f = _ins.soloBolsas === true && _ins.items.length > 0 && _ins.items.every(function (x) { return x.cat === "plastico"; });
+    // (g) v29.29 (Thomas): la bolsa va sólo en Bolsas, se ve en kg y el movimiento lleva los kg
+    const ip = _ins.items.findIndex(function (x) { return x.cod === "PP 2630"; });
+    insOpenQty(ip); _ins.items[ip].qty = 4; insRender();
+    const qh = (document.querySelector("#insBody .ins-qov") || {}).innerHTML || "";
+    let movG = null; const _smG = window.stockMove; window.stockMove = function (rows) { movG = rows; };
+    window.alert = function () {}; insCloseQty(); await insConfirmar(); window.stockMove = _smG;
+    const m0 = (movG || [])[0] || {};
+    out.g = !/ins-uchip/.test(qh) && /Bolsas/.test(qh) && /= 100 kg/.test(qh) && m0.unidad === "Bolsas" && m0.delta === -4 && /4 bolsas = 100 kg/.test(m0.descripcion || "");
     return out;
   });
-  const pass = r.a && r.b && r.c && r.d && r.e && r.f && errs.length === 0;
+  const pass = r.a && r.b && r.c && r.d && r.e && r.f && r.g && errs.length === 0;
   console.log("ins-ri-cat-bolsas:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();
