@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.29"></script>
+<script type="module" src="recepcion.js?v=29.30"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10701,7 +10701,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.29";
+const APP_VERSION = "v29.30";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27305,6 +27305,9 @@ function insChooserGo(which) {
 /* v29.22 (Luis, 09/10): "lo primero que sale cuando aprietan la recepción es elegir qué
    quieren recibir con las categorías que tenemos en insumos (sin contar importados)". */
 const INS_RI_SIN = ["importados"];
+/* v29.25/29.30 (Thomas): categorías con lista CERRADA — el operario no da de alta nada nuevo ahí. */
+const INS_CAT_CERRADA = ["plastico", "cajas"];
+const INS_CAJA_X_PAQ = 25;   // v29.30 (Thomas, D22): cada paquete trae 25 cajas
 async function insRecibirCat() {
   let ov = document.getElementById("insChooserModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
@@ -27679,6 +27682,8 @@ async function showInsumoModal(mode, legajo, _resume) {
     // v29.25 (09/10): de PLÁSTICOS se tocan sólo las 9 bolsas reales (con lugar en el Mapa), en RI y EI.
     // Ni los TMP- ni los códigos viejos (1262500, 1266500, 1445): no se reciben ni se entregan.
     lista = lista.filter(function (x) { return insCatOf(x) !== "plastico" || _insEsBolsaIny(x); });
+    // v29.30 (Thomas): de CAJAS se tocan sólo las 11 cajas reales (Caja Nº 1 … Nº 29), ningún TMP-.
+    lista = lista.filter(function (x) { return insCatOf(x) !== "cajas" || (!_insEsTmp(x) && !x.noCode); });
     // v29.22 (Luis): envío a un INYECTOR = sólo las bolsas plásticas reales (las que tienen
     // ubicación en el Mapa; ni los TMP- ni los códigos viejos), nada más.
     const gp2Ei = (mode === "EI" && window._insGp2 && window._insGp2.modo === "EI");
@@ -27909,7 +27914,7 @@ function insRender() {
           (it.qty > 0 ? '<span class="ins-itq' + (it.unidad ? "" : " falta") + '">' + it.qty + " " + escapeHtml(it.unidad || "¿unidad?") + '</span>' : "") +
           '</button>';
       }).join("") +
-        (cat && isIn && cat !== "plastico" ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
+        (cat && isIn && INS_CAT_CERRADA.indexOf(cat) < 0 ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
         '</div>';
     }
   }
@@ -27967,7 +27972,7 @@ function _insNuevoHtml(isIn) {
   h += '<div class="ins-nvl">Detalle <span class="ins-cbadge">— qué es, en tus palabras</span></div>' +
     '<textarea id="insNvDet" class="ins-nvt" rows="3" placeholder="Ej: alambre finito que trajo Pérez, bolsa gris sin etiqueta…" oninput="insNuevoSet(\'det\',this.value)">' + escapeHtml(n.det) + '</textarea>';
   h += '<div class="ins-nvl">Elegí la categoría</div><div class="ins-cats">' +
-    INS_CATS.filter(function (c) { return INS_RI_SIN.indexOf(c.k) < 0 && c.k !== "plastico"; }).map(function (c) {   // v29.25: una bolsa nueva no la da de alta el operario
+    INS_CATS.filter(function (c) { return INS_RI_SIN.indexOf(c.k) < 0 && INS_CAT_CERRADA.indexOf(c.k) < 0; }).map(function (c) {   // v29.25/30: bolsas y cajas no las da de alta el operario
       return '<button class="ins-cchip' + (n.cat === c.k ? " on" : "") + '" onclick="insNuevoPick(\'cat\',\'' + c.k + '\')">' + c.lbl + '</button>';
     }).join("") +
     '<button class="ins-cchip' + (n.cat === "" ? " on" : "") + '" onclick="insNuevoPick(\'cat\',\'\')">❓ Sin categoría clara</button>' +
@@ -28065,6 +28070,24 @@ function _insQtyHtml(it, i, isIn) {
       : (it.unidad ? ('stock: ' + _insNum(stk) + ' ' + escapeHtml(it.unidad)) : 'stock: ' + _insNum(it.stock));
   const _k = insCatOf(it);
   const _mcSolo = _insSaleMC(it);   // v24.69: sale sólo en MC
+  // v29.30 (Thomas, D24): las CAJAS se cargan en cajas o en paquetes (25 cajas c/u); el stock va en cajas.
+  if (_k === "cajas") {
+    const _paq = _insUEq(it.unidad, "Paquetes");
+    const _ch = function (u, lbl) { return '<button class="ins-uchip' + (_insUEq(it.unidad, u) ? " on" : "") + '" onclick="insSetUnidad(' + i + ',\'' + u + '\')">' + lbl + '</button>'; };
+    return '<div class="ins-qov" onclick="if(event.target===this)insCloseQty()"><div class="ins-qc">' +
+      '<div class="ins-qh"><div><div class="ins-qcod">' + escapeHtml(_insBtnCod(it)) + '</div>' +
+      '<div class="ins-stk">stock: ' + _insNum(_insStockForUnit(Object.assign({}, it, { unidad: "Uni" }))) + ' cajas</div></div>' +
+      '<button class="ins-close" style="background:#e2e8f0;color:#475569;" onclick="insCloseQty()">✕</button></div>' +
+      '<div class="ins-qrow"><button class="ins-qb" onclick="insChg(' + i + ',-1)">–</button>' +
+      '<input class="ins-qi" type="number" min="0" inputmode="numeric" value="' + it.qty + '" oninput="insSet(' + i + ',this.value)">' +
+      '<button class="ins-qb" onclick="insChg(' + i + ',1)">+</button></div>' +
+      '<div class="ins-uni" style="justify-content:center;">' + _ch("Uni", "Cajas") + _ch("Paquetes", "Paquetes (" + INS_CAJA_X_PAQ + ")") +
+      (_paq && it.qty > 0 ? ' <span style="font-size:13px;color:#475569;font-weight:800;">= ' + _insNum(it.qty * INS_CAJA_X_PAQ) + ' cajas</span>' : '') + '</div>' +
+      (function () { const _stC = _insStockForUnit(Object.assign({}, it, { unidad: "Uni" })), _q = it.qty * (_paq ? INS_CAJA_X_PAQ : 1);
+        return (!isIn && _q > _stC) ? '<div class="ins-warn">⚠ el stock quedaría en ' + _insNum(_stC - _q) + ' cajas</div>' : ''; })() +
+      '<button class="ins-qok ' + (isIn ? "in" : "out") + '" onclick="insCloseQty()">Listo</button>' +
+      '</div></div>';
+  }
   // v29.29 (Thomas): las bolsas plásticas van SÓLO en Bolsas (sin otras unidades) y se ven en kg.
   if (_k === "plastico") {
     const _kg = _insKgBolsas(it.qty);
@@ -28104,7 +28127,7 @@ function _insQtyHtml(it, i, isIn) {
     '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + (it.qty > 0 && (!it.unidad || !insUniPermitida(_k, it.unidad)) ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
     '</div></div>';
 }
-function insOpenQty(i) { if (!_ins || !_ins.items[i]) return; const _mc = _insSaleMC(_ins.items[i]); if (_mc) _ins.items[i].unidad = _mc; if (insCatOf(_ins.items[i]) === "plastico") _ins.items[i].unidad = "Bolsas"; _ins.qty = i; insRender(); }
+function insOpenQty(i) { if (!_ins || !_ins.items[i]) return; const _mc = _insSaleMC(_ins.items[i]); if (_mc) _ins.items[i].unidad = _mc; if (insCatOf(_ins.items[i]) === "plastico") _ins.items[i].unidad = "Bolsas"; if (insCatOf(_ins.items[i]) === "cajas" && !_insUEq(_ins.items[i].unidad, "Paquetes")) _ins.items[i].unidad = "Uni"; _ins.qty = i; insRender(); }
 /* v29.29 (Thomas, 09/10): kg de las bolsas plásticas. El kg por bolsa es el de GP2
    (GP2.parametro material_plastico_kg_x_bolsa, viene en el bundle); sin dato, 25. */
 function _insKgXBolsa() { const g = _ins && _ins.gp2 && _ins.gp2.mv; const k = Number(g && g.kg_x_bolsa); return k > 0 ? k : 25; }
@@ -28167,6 +28190,8 @@ async function insConfirmar() {
     }
     // v29.29 (Thomas): bolsa plástica = siempre Bolsas, y queda escrito cuántos kg son
     if (insCatOf(it) === "plastico") { uni = "Bolsas"; nota = " · " + _insNum(qty) + " bolsas = " + _insNum(_insKgBolsas(qty)) + " kg"; }
+    // v29.30 (Thomas, D24): caja cargada en paquetes → se guarda en cajas (× 25), con lo cargado anotado
+    if (insCatOf(it) === "cajas") { if (_insUEq(uni, "Paquetes")) { nota = " · cargado " + _insNum(qty) + " paquetes × " + INS_CAJA_X_PAQ; qty = qty * INS_CAJA_X_PAQ; } uni = "Uni"; }
     return { cod_art: it.cod, descripcion: ((it.nombre || "") + nota).trim() || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: it.ubic || it.sector || null };
   });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
@@ -62060,7 +62085,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.29"></script>
+<script src="importacion.js?v=29.30"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64990,12 +65015,12 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.29"></script>
-<script src="hotsale.js?v=29.29"></script>
-<script src="estadisticas.js?v=29.29"></script>
-<script src="ads.js?v=29.29"></script>
+<script src="cobranzas.js?v=29.30"></script>
+<script src="hotsale.js?v=29.30"></script>
+<script src="estadisticas.js?v=29.30"></script>
+<script src="ads.js?v=29.30"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.29"></script>
+<script src="ayuda.js?v=29.30"></script>
 
 </body>
 </html>

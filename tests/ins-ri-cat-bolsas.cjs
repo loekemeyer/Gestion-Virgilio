@@ -5,6 +5,7 @@
    (d) «Envío a inyectores» muestra SÓLO las bolsas plásticas reales (plástico, con ubicación,
        sin TMP-), sin «‹ Atrás» ni buscador;
    (f) v29.28 (D9): «Envío a otros» sin bolsas; «Envío a inyectores» sólo bolsas;
+   (h) v29.30: cajas sin TMP, en cajas o paquetes (×25), guardadas en cajas;
    (g) v29.29: la bolsa sólo en Bolsas, con su equivalente en kg (también en el movimiento);
    (e) v29.25: en RECIBIR y en «Envío a otros», de plásticos sólo las bolsas reales (sin TMP- ni
        códigos viejos), sin «+ Agregar insumo» en plásticos ni la categoría en el alta. Sale 1 si falla. */
@@ -28,7 +29,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       { cod: "1445", nombre: "viejo", categoria: "plastico", ubicacion: "" },
       { cod: "TMP-0013", nombre: "tmp", categoria: "plastico", ubicacion: "" },
       { cod: "505C", nombre: "cuchilla", categoria: "importados", ubicacion: "R01AD" },
-      { cod: "F10", nombre: "121 X 1,20", categoria: "fleje", ubicacion: "K04" }
+      { cod: "F10", nombre: "121 X 1,20", categoria: "fleje", ubicacion: "K04" },
+      { cod: "Caja Nº 29", nombre: "Caja Nº 29", categoria: "cajas", ubicacion: "" },
+      { cod: "TMP-0024", nombre: "Loeke caja # 1", categoria: "cajas", ubicacion: "" }
     ]; };
     window.stockFetchSaldos = async function () { return {}; };
     window.insFetchSaldosXUni = async function () { return {}; };
@@ -78,10 +81,23 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     let movG = null; const _smG = window.stockMove; window.stockMove = function (rows) { movG = rows; };
     window.alert = function () {}; insCloseQty(); await insConfirmar(); window.stockMove = _smG;
     const m0 = (movG || [])[0] || {};
+    // (h) v29.30 (Thomas): cajas sin TMP; se cargan en cajas o paquetes (×25) y se guardan en cajas
+    window._insEnvioSub = null; window._insGp2 = null; window._insRiCat = "cajas";
+    await showInsumoModal("RI", "104");
+    const cjs = _ins.items.filter(function (x) { return x.cat === "cajas"; }).map(function (x) { return x.cod; }).sort();
+    const htmlCj = document.getElementById("insBody").innerHTML;
+    const ic = _ins.items.findIndex(function (x) { return x.cod === "Caja Nº 29"; });
+    insOpenQty(ic); insSetUnidad(ic, "Paquetes"); _ins.items[ic].qty = 2; insRender();
+    const qc = (document.querySelector("#insBody .ins-qov") || {}).innerHTML || "";
+    let movH = null; const _smH = window.stockMove; window.stockMove = function (rows) { movH = rows; };
+    insCloseQty(); await insConfirmar(); window.stockMove = _smH;
+    const h0 = (movH || [])[0] || {};
+    out.h = JSON.stringify(cjs) === JSON.stringify(["Caja Nº 29"]) && !/ins-itbtn add/.test(htmlCj) && /= 50 cajas/.test(qc) &&
+      (qc.match(/ins-uchip/g) || []).length === 2 && h0.unidad === "Uni" && h0.delta === 50 && /2 paquetes × 25/.test(h0.descripcion || "");
     out.g = !/ins-uchip/.test(qh) && /Bolsas/.test(qh) && /= 100 kg/.test(qh) && m0.unidad === "Bolsas" && m0.delta === -4 && /4 bolsas = 100 kg/.test(m0.descripcion || "");
     return out;
   });
-  const pass = r.a && r.b && r.c && r.d && r.e && r.f && r.g && errs.length === 0;
+  const pass = r.a && r.b && r.c && r.d && r.e && r.f && r.g && r.h && errs.length === 0;
   console.log("ins-ri-cat-bolsas:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();
