@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.25"></script>
+<script type="module" src="recepcion.js?v=29.26"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10701,7 +10701,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.25";
+const APP_VERSION = "v29.26";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27549,12 +27549,7 @@ async function _insGp2Opciones(mode, soloIny) {
       if (!mv || !mv.inyectores || !mv.inyectores.length) { if (soloIny) _insUbicSinIny(box); return; }
       box.innerHTML = (soloIny ? '' : '<div style="font-size:12.5px;font-weight:800;color:#115e59;margin-bottom:6px;">🧪 Bolsas plásticas — ¿van a un inyector?</div>') +
         mv.inyectores.map(function (nom, i) {
-          const falta = (mv.materiales || []).map(function (m) {
-            const x = (m.inyectores || []).filter(function (y) { return y.proveedor === nom; })[0];
-            return (x && Number(x.bolsas_a_enviar) > 0) ? (m.codigo_virgilio || m.codigo) + " " + x.bolsas_a_enviar : "";
-          }).filter(Boolean).join(" · ");
-          return '<button onclick="insUbicGp2Ok(\'EI\',' + i + ')" style="' + btn + '">🏭 ' + escapeHtml(nom) +
-            '<span style="' + sub + '">' + (falta ? "le faltan: " + escapeHtml(falta) : "al día con sus OC") + '</span></button>';
+          return '<button onclick="insUbicGp2Ok(\'EI\',' + i + ')" style="' + btn + '">🏭 ' + escapeHtml(nom) + '</button>';   // v29.26 (Thomas): sin «le faltan / al día con sus OC»
         }).join("") +
         (soloIny ? '' : '<div style="font-size:12px;color:#64748b;margin:2px 0 10px;">— o escribí a dónde lo enviás (otro destino) —</div>');
     }
@@ -27596,7 +27591,7 @@ function _insGp2Falta(it) {
   return Number(m.pendiente_bolsas) || 0;
 }
 function _insGp2Banner() {
-  const gp2 = _ins && _ins.gp2; if (!gp2) return "";
+  const gp2 = _ins && _ins.gp2; if (!gp2 || gp2.modo === "EI") return "";   // v29.26 (Thomas): sin cartel en la entrega a un inyector
   return '<div class="ins-depw" style="background:#f0fdfa;border-color:#5eead4;color:#115e59;">' +
     (gp2.modo === "EI" ? '🏭 Entrega a <b>' + escapeHtml(gp2.inyector) + '</b>: las bolsas plásticas se descuentan también en Gestión Productiva.'
                         : '📦 Recepción de la <b>OC N° ' + escapeHtml(String(gp2.oc.numero)) + '</b> (' + escapeHtml(gp2.oc.proveedor || "") + '): las bolsas se reciben contra esa OC en Gestión Productiva.') +
@@ -27901,7 +27896,7 @@ function insRender() {
           '<span class="ins-itcod">' + escapeHtml(_insBtnCod(it)) + '</span>' +
           (it.nombre ? '<span class="ins-itnom">' + escapeHtml(it.nombre) + '</span>' : "") +
           (it.ubic ? '<span class="ins-itubi">📍 ' + escapeHtml(it.ubic) + '</span>' : "") +
-          (function () { const f = _insGp2Falta(it); return f == null ? "" : '<span class="ins-itubi" style="color:#b45309;">' + (isIn ? "📦 pendiente " : "🏭 faltan ") + _insNum(f) + ' bolsas</span>'; })() +
+          (function () { const f = isIn ? _insGp2Falta(it) : null; return f == null ? "" : '<span class="ins-itubi" style="color:#b45309;">' + (isIn ? "📦 pendiente " : "🏭 faltan ") + _insNum(f) + ' bolsas</span>'; })() +
           (it.qty > 0 ? '<span class="ins-itq' + (it.unidad ? "" : " falta") + '">' + it.qty + " " + escapeHtml(it.unidad || "¿unidad?") + '</span>' : "") +
           '</button>';
       }).join("") +
@@ -62032,7 +62027,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.25"></script>
+<script src="importacion.js?v=29.26"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64962,12 +64957,12 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.25"></script>
-<script src="hotsale.js?v=29.25"></script>
-<script src="estadisticas.js?v=29.25"></script>
-<script src="ads.js?v=29.25"></script>
+<script src="cobranzas.js?v=29.26"></script>
+<script src="hotsale.js?v=29.26"></script>
+<script src="estadisticas.js?v=29.26"></script>
+<script src="ads.js?v=29.26"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.25"></script>
+<script src="ayuda.js?v=29.26"></script>
 
 </body>
 </html>

@@ -41,13 +41,14 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await showInsumoModal("RI", "104");
     out.c = _ins.cat === "fleje" && !_ins.items.some(function (x) { return x.cat === "importados"; }) && window._insRiCat === null;
     insUbicCancel();
-    window._insGp2 = { modo: "EI", inyector: "Inyector X", mv: { materiales: [], inyectores: ["Inyector X"] } };
+    window._insGp2 = { modo: "EI", inyector: "Inyector X", mv: { materiales: [{ codigo_virgilio: "ABS", inyectores: [{ proveedor: "Inyector X", bolsas_a_enviar: 0 }] }], inyectores: ["Inyector X"] } };
     await showInsumoModal("EI", "104");
     const cods = _ins.items.map(function (x) { return x.cod; }).sort();
     const html = document.getElementById("insBody").innerHTML;
     insBack();
     out.d = JSON.stringify(cods) === JSON.stringify(["ABS", "PP 2630"]) && _ins.soloBolsas === true && _ins.cat === "plastico" &&
-      !/insBack\(\)/.test(html) && !/class="ins-search"/.test(html) && /Bolsas plásticas/.test(html);
+      !/insBack\(\)/.test(html) && !/class="ins-search"/.test(html) && /Bolsas plásticas/.test(html) &&
+      !/faltan/.test(html) && !/descuentan también/.test(html);   // v29.26 (Thomas): sin los comentarios de GP2 en la entrega
     out.cods = cods;
     // (e) v29.25
     window._insRiCat = "plastico"; window._insGp2 = null;
