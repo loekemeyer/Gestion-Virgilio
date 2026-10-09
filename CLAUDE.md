@@ -8589,3 +8589,22 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
   tramo entero del módulo, y `h_mdt` con opcion INS). Hoy esos items llevan `noReplay: true` y el replay saltea todo `h_*`.
 - Al agregar un item de Historial que no es el evento enviado: `noReplay: true`. `tests/historial-no-replay.cjs`.
 
+
+## ⚠ REGLA (Thomas, 2026-10-09, v29.32, D32): el stock de insumos de VIRGILIO se COPIA EN VIVO a GP2
+
+*"Cuando hago un relevamiento tengo que ver online en GP2 el stock de Cervantes y el de Virgilio: el máximo necesita las dos plantas."*
+
+- El stock sigue viviendo en `Movimientos_Stock` (deposito `insumos`, D28 a). **`gv_gp2_espejo_insumos(cod, simular)`** deja en
+  GP2, en el depósito «<sector> en Virgilio» (virgilio_sector con `ref_id` = sector; bolsas → 57), EXACTAMENTE el saldo de
+  Virgilio pasado a la unidad de GP2 (Cajones × uni_x_cajon · Bolsas × 25 kg · Kg · Uni · Paquetes × 25). Reconcilia
+  (objetivo − lo que hay) con un movimiento `ajuste` de GP2 con nota «Espejo Virgilio (…)»; si cuadra no escribe.
+- Corre por el disparador `zz_gv_gp2_espejo_insumos` (cada movimiento de insumos; nunca frena la carga: el error va al log)
+  y por el cron `gv-gp2-espejo-insumos` (:19 y :49). Alcance: cajas, fleje, parte_procesado, partes_crudo, plastico — los
+  importados NO.
+- **Qué código va con qué componente lo dice `GP2.importado_virgilio_componente`** (54 cargadas el 09/10; el resto lo asigna
+  Thomas en GP2 → Stock General → Virgilio, D30). Un código sin equivalencia no se copia.
+- **D16 (Thomas): el celular del operario de Virgilio NO escribe en GP2.** Lo que pasa en GP2 (envío de bolsas a un inyector,
+  consumo) lo carga el admin dentro de GP2. `gv_insumo_envio_inyector` queda sin grant y sin llamador.
+- Lectura: `select * from public.gv_gp2_espejo_insumos(null, true);` (qué haría) · `select * from public."GV_GP2_Espejo_Log" order by id desc;`
+- Rollback: `select cron.unschedule('gv-gp2-espejo-insumos');` + `alter table public."Movimientos_Stock" disable trigger zz_gv_gp2_espejo_insumos;`
+- `sql/gv_gp2_espejo_insumos_v2932.sql`.

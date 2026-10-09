@@ -86,7 +86,7 @@ declare
   r record;
   v_kg_bolsa numeric;
 begin
-  select coalesce(nullif(btrim(p.valor),'')::numeric, 25) into v_kg_bolsa
+  select coalesce(p.valor::numeric, 25) into v_kg_bolsa
     from "GP2".parametro p where p.clave = 'material_plastico_kg_x_bolsa';
   v_kg_bolsa := coalesce(v_kg_bolsa, 25);
 
