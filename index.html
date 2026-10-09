@@ -6396,7 +6396,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.96"></script>
+<script type="module" src="recepcion.js?v=28.97"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10687,7 +10687,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.96";
+const APP_VERSION = "v28.97";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -29748,7 +29748,7 @@ function irRender() {
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas a mover' + (_ir.cod ? ' (máx ' + Math.round(disp) + ')' : '') + '</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div>';
     if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(codCanonSuf(_ir.cod)) + ' en ' + origTxt + '.</div>';
   } else {
-    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock.</div>';
+    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>se descuenta solo del pedido de importación en viaje</b> de ese código.</div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="ej. 582E" value="' + escapeHtml(codBase(_ir.cod)) + '" oninput="irSetCod(this.value)"></div>';
     if (_ir.cod) h += '<div class="ir-desc">' + escapeHtml(nombre || "(código nuevo, sin nombre)") + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
     h += '<div class="ir-row2"><div class="ir-fld"><div class="ir-lbl">Masters</div><div class="ir-stp"><button class="ir-sb" onclick="irChgM(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.masters) || 0) + '" oninput="irSetM(this.value)"><button class="ir-sb" onclick="irChgM(1)">+</button></div></div>';
@@ -61740,7 +61740,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.96"></script>
+<script src="importacion.js?v=28.97"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64669,10 +64669,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.96"></script>
-<script src="hotsale.js?v=28.96"></script>
-<script src="estadisticas.js?v=28.96"></script>
-<script src="ads.js?v=28.96"></script>
+<script src="cobranzas.js?v=28.97"></script>
+<script src="hotsale.js?v=28.97"></script>
+<script src="estadisticas.js?v=28.97"></script>
+<script src="ads.js?v=28.97"></script>
 
 </body>
 </html>

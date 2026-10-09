@@ -4031,6 +4031,26 @@ estadística **3 % del CIF con tope u$s 180**. Retira el 35 % de derechos de la 
 **Recuperable separado** (v23.80, Luis): la tarjeta y el desglose muestran aparte lo que vuelve como crédito fiscal — IVA 21 %, IVA adicional 20 %, Ganancias 6 %, IIBB 0,17 % (v23.81) sobre CIF + derechos + estadística (`_nacRecup`) — y NO lo suman al costo. En avión (courier) el IVA sigue en el no recuperable. **En avión también va la comisión NTL** (v23.81, Luis). La comisión NTL es 5 % del **FOB**, no del CIF (ya lo era; el test lo fija).
 **Fujian paga 35 %** (v23.78, Luis: *"solo ponele 35% a fujian / 18% al resto"*): `_DERECHOS_PROV` / `_derechosProv(prov)`, los tres modos.
 
+## ⚠ REGLA (Luis, 2026-10-09, v28.97): el INGRESO A RACKS de importación DESCUENTA el pedido en viaje
+
+**Luis:** *"404E entró por ingreso a racks · ese ingreso fue del pedido de importación"*. El contenedor (Becky,
+PI B260601) lo cargan los operarios por **Ingreso a racks → 📦 Importación** (`racks_plani_ingreso`), no por Recepción
+ni por 📥 RECIBIR, y el pedido seguía «en viaje». (Los marcadores y centinelas de la base dicen v28.96: llave, no cambiar.)
+
+- `racks_plani_ingreso` llama al final a **`gv_imp_imputar_ingreso_racks(mov_id, legajo)`**: busca el pedido EN CURSO de
+  ese código con reingreso más próximo y algo pendiente (dual: misma empresa), suma `cajas × uni por caja` (Importados o,
+  sin dato, `Importados_Volumen.uni_inner`) a `unidades_llegadas`, deja la fila en `GV_Imp_Recepcion` (se ve en
+  📜 Historial) y en `Importados_Mov_Stock`, y recalcula el pedido en curso. **No mueve stock**: ya entró con el IR.
+- Llega todo → `llegado`; llega menos → sigue en viaje con lo que falta; lo de más es sobrante de ESE pedido (v23.49).
+- **↩ Anular** en Historial deshace sólo la imputación: no hay fila de destino, así que no saca las cajas del rack.
+- Nunca frena el IR. Todo queda en **`GV_Imp_Ingreso_Racks_Log`** (`resultado <> 'imputado'` = mirar: `sin_pedido`,
+  `sin_uni_x_caja`, `error`). El modo 🏠 Nacional (`racks_plani_ingreso_nacional`) no imputa.
+- ⚠ **Un contenedor que entró por IR NO se recibe además por 📥 RECIBIR** (se contaría dos veces).
+- Imputados a mano el 09/10 (pedido de Luis): 404E 928 u, 958E 3.120 (+240), 954E 2.016, 932E 1.728 → llegados;
+  957E 2.448 de 4.752 → sigue en viaje. ⚠ El IR de **«606» 10 cajas** (X22, 09:16) no se imputó: no es importado
+  (¿606E?, que está en el mismo PI).
+- `sql/gv_imp_ingreso_racks_v2896.sql`, `tests/imp-ingreso-racks.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-29, v23.95): los MESES OBJETIVO se eligen en el encabezado del proveedor
 
 **Luis:** *"el parámetro de meses objetivo ponelo configurable al lado del nombre de cada proveedor
