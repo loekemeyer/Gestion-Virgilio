@@ -12,6 +12,8 @@ chk("SQL: asignar y avisos son de supervisor", /gv_imp_ir_asignar[\s\S]*?es_supe
 chk("SQL: no mueve stock", !/insert into public\."Movimientos_Stock"/.test(sql));
 const sql2 = fs.readFileSync(__dirname + "/../sql/gv_imp_ir_retroactivo_v2917.sql", "utf8").replace(/--[^\n]*/g, "");
 chk("SQL v29.17: lo anterior entra como a_revisar, sin descontar", /'a_revisar'/.test(sql2) && !/gv_imp_imputar_ingreso_racks\(/.test(sql2) && !/insert into public\."Movimientos_Stock"/.test(sql2));
+const sql3 = fs.readFileSync(__dirname + "/../sql/gv_imp_ir_solo_admin_v2921.sql", "utf8").replace(/--[^\n]*/g, "");
+chk("SQL v29.21: con 1 o más pedidos en viaje NO descuenta solo (a_elegir)", /if v_ncand >= 1 then/.test(sql3) && /'v_ncand >= 1'/.test(sql3));
 const js = fs.readFileSync(__dirname + "/../importacion.js", "utf8");
 chk("JS: las 3 RPC van con la sesión", /"gv_imp_ir_avisos", "gv_imp_ir_asignar", "gv_imp_ir_visto"\]/.test(js));
 const idx = fs.readFileSync(__dirname + "/../index.html", "latin1");

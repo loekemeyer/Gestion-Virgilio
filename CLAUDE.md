@@ -4080,6 +4080,11 @@ ni por 📥 RECIBIR, y el pedido seguía «en viaje». (Los marcadores y centine
   A MANO** en 📥 Recibido: 41 ingresos (22-23/07, 31/08, 25/09) entraron al registro como `a_revisar` («↺ revisar
   (anterior al 09/10)»), sin descontar nada. El admin elige el pedido (↔) o marca ✓ Visto si ya estaba descontado. Los 21
   imputados solos del 09/10 también quedan para que el admin los mire. `sql/gv_imp_ir_retroactivo_v2917.sql`.
+- ⚠⚠ **v29.21 (Luis, 09/10: *"NO SE TENDRIA QUE HABER DESCONTADO NADA DE NINGUN PEDIDO QUE NO HAYA SIDO POR MEDIO DEL
+  FRONT DEL ADMIN"*): el Ingreso a racks NUNCA descuenta solo.** Con 1 o más pedidos en viaje queda `a_elegir` y lo
+  confirma un admin en 📥 Recibido (↔). Retira el «un solo pedido → se descuenta solo» de arriba. Marcador de la base
+  `v29.19-ir-solo-admin` (llave), centinela 382 = `v_ncand >= 1`. Una sesión de Claude tampoco imputa por su cuenta:
+  la imputación la hace el admin. `sql/gv_imp_ir_solo_admin_v2921.sql`.
 
 ## ⚠ REGLA (Luis, 2026-09-29, v23.95): los MESES OBJETIVO se eligen en el encabezado del proveedor
 
