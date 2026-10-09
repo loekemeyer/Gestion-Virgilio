@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.32"></script>
+<script type="module" src="recepcion.js?v=29.33"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10701,7 +10701,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.32";
+const APP_VERSION = "v29.33";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27770,10 +27770,15 @@ function _insMedida(nombre) {
 function _insSortCat(cat) {
   // El ORDEN que fijó el admin en Stock y Compras → Insumos manda sobre el automático
   // (idea 5572). Los que no tienen orden van después, con el criterio de siempre.
+  // v29.33 (Thomas): orden >= 1000 = va AL FINAL, después de los que no tienen orden (EBA, discontinua).
   const auto = _insSortAuto(cat);
+  const _fin = function (x) { return x.orden !== null && x.orden !== undefined && x.orden >= 1000; };
   return function (a, b) {
-    const oa = (a.orden === null || a.orden === undefined) ? null : a.orden;
-    const ob = (b.orden === null || b.orden === undefined) ? null : b.orden;
+    const fa = _fin(a), fb = _fin(b);
+    if (fa !== fb) return fa ? 1 : -1;
+    if (fa && fb && a.orden !== b.orden) return a.orden - b.orden;
+    const oa = (fa || a.orden === null || a.orden === undefined) ? null : a.orden;
+    const ob = (fb || b.orden === null || b.orden === undefined) ? null : b.orden;
     if (oa !== null && ob === null) return -1;
     if (oa === null && ob !== null) return 1;
     if (oa !== null && ob !== null && oa !== ob) return oa - ob;
@@ -62098,7 +62103,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.32"></script>
+<script src="importacion.js?v=29.33"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65028,12 +65033,12 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.32"></script>
-<script src="hotsale.js?v=29.32"></script>
-<script src="estadisticas.js?v=29.32"></script>
-<script src="ads.js?v=29.32"></script>
+<script src="cobranzas.js?v=29.33"></script>
+<script src="hotsale.js?v=29.33"></script>
+<script src="estadisticas.js?v=29.33"></script>
+<script src="ads.js?v=29.33"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.32"></script>
+<script src="ayuda.js?v=29.33"></script>
 
 </body>
 </html>
