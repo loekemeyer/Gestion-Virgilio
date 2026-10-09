@@ -4031,7 +4031,7 @@ estadística **3 % del CIF con tope u$s 180**. Retira el 35 % de derechos de la 
 **Recuperable separado** (v23.80, Luis): la tarjeta y el desglose muestran aparte lo que vuelve como crédito fiscal — IVA 21 %, IVA adicional 20 %, Ganancias 6 %, IIBB 0,17 % (v23.81) sobre CIF + derechos + estadística (`_nacRecup`) — y NO lo suman al costo. En avión (courier) el IVA sigue en el no recuperable. **En avión también va la comisión NTL** (v23.81, Luis). La comisión NTL es 5 % del **FOB**, no del CIF (ya lo era; el test lo fija).
 **Fujian paga 35 %** (v23.78, Luis: *"solo ponele 35% a fujian / 18% al resto"*): `_DERECHOS_PROV` / `_derechosProv(prov)`, los tres modos.
 
-## ⚠ REGLA (Luis, 2026-10-09, v29.02): el INGRESO A RACKS de importación DESCUENTA el pedido en viaje
+## ⚠ REGLA (Luis, 2026-10-09, v29.04): el INGRESO A RACKS de importación DESCUENTA el pedido en viaje
 
 **Luis:** *"404E entró por ingreso a racks · ese ingreso fue del pedido de importación"*. El contenedor (Becky,
 PI B260601) lo cargan los operarios por **Ingreso a racks → 📦 Importación** (`racks_plani_ingreso`), no por Recepción
@@ -8459,3 +8459,8 @@ front las llama con `gvWriteHdr()` (la sesión), nunca con la clave pública. El
   (`GV_Cruce_FC_Asig.doc_id`, cron 90). Lo lee `gv_np_fc_parseada(text[])` (anon, sólo lectura). Si esa lectura
   falla, la celda muestra sólo `y` (no un 0/…).
 - `sql/gv_np_fc_parseada_v2877.sql`, `tests/fc-parseada-x-de-y.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-09, v29.04): IR, Mover racks, Insumos, Completar Pedido y Pasar a urgente se ENVÍAN como BR/MG
+
+- Primer toque SELECCIONA, «Enviar» EMPIEZA la tarea (evento **MDI**, `texto` = MOV/INS/CP/RC) y abre el módulo; abierta, el botón queda rojo y tocarlo RE-ABRE el mismo módulo (retomar, mismo tramo). Abajo, barra con **⛔ Anular** (MDT `ANULADO` → no productivas) y **🏁 Terminé** (MDT con `ts_inicio`). IR sigue con IRI/IRT y también va por «Enviar».
+- `MOD_TAREA` en index.html; tope 12 h (`_gvModVivo`). Vista `gv_monitor_horas_operario_dia` y `gv_horas_operario_detalle_v2` (marcador `v28.93-mdt`): MDT suma a Hs MOV ≡ `fetchMonitorDayStats`; TV / Mon. Admin «En este momento». `sql/gv_modulo_tarea_mdi_mdt_v2893.sql`, `tests/modulo-tarea-enviar.cjs`.

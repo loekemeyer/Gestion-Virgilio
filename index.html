@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.03"></script>
+<script type="module" src="recepcion.js?v=29.04"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -7155,7 +7155,7 @@ const desc = {
   RI:"Recepción Insumos", EI:"Entrega Insumos", INS:"📦 Insumos y Productos Movimiento",
   CP:"Completar Pedido", RC:"Pasar a urgente", IR:"Ingreso a Racks",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
-  Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
+  Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo", MOV:"Mover racks",
   LT:"Llegada Tarde", PKC:"Picking artículo", CCN:"Carga Camión NP",
   PSP:"Picking sin planimetría"
 };
@@ -8765,6 +8765,7 @@ function updateCoreButtonsState(){
     else if (TOGGLE_CODES.includes(code) && st && st.toggles && st.toggles[code]) pending = true;
     else if (code === "BR" && _gvModVivo(st, "racks")) pending = true;   // v26.83: vencida no pinta rojo (≡ MG)
     else if (code === "IR" && _gvModVivo(st, "ir")) pending = true;      // v26.83: Ingreso a racks abierto (minimizado) en rojo
+    else if (MOD_TAREA[b.dataset.code] && _gvModVivo(st, MOD_TAREA[b.dataset.code].k)) pending = true;   // v28.93
     else if (code === "MG" && _gvModVivo(st, "mg")) pending = true;   // v25.86 · v26.56: vencida no pinta rojo    // v25.79 (el título del botón RKBM)
     b.classList.toggle("pending", pending);
   });
@@ -8981,7 +8982,7 @@ Object.keys(filas).forEach(rowId => {
       <div class="box-desc">${desc[code]}</div>
     `;
     // v7.49: "INS" es un botón UI unificado (no un opcode): abre el chooser Recibir/Entregar/Nuevo.
-    d.onclick = (code === "INS") ? (() => insumoChooser(String(legajoInput.value || ""))) : (() => selectOption(code));
+    d.onclick = () => selectOption(code);   // v28.93: INS también se selecciona y arranca con «Enviar»
     document.getElementById(rowId).appendChild(d);
   });
 });
@@ -8992,7 +8993,7 @@ try {
   mov.className = "box box-sm";
   mov.setAttribute("data-code", "MOV");
   mov.innerHTML = `<div class="box-title" style="font-size:15px">🔀</div><div class="box-desc">Mover racks</div>`;
-  mov.onclick = () => showMoverModal(legajoInput.value);
+  mov.onclick = () => selectOption("MOV");   // v28.93: tarea con «Enviar» (MOD_TAREA)
   const r4 = document.getElementById("row4");
   if (r4) r4.appendChild(mov);
 } catch (_e) { /* no-op */ }
@@ -9403,6 +9404,7 @@ function _tmLibre(leg) {
     if (st.racks && st.racks.active && Date.now() - (st.racks.ts || 0) < _12h) return false;
     if (st.ir && st.ir.active && Date.now() - (st.ir.ts || 0) < _12h) return false;
     if (st.mg && st.mg.active && Date.now() - (st.mg.ts || 0) < _12h) return false;   // v25.86: guardado abierto
+    if (typeof MOD_TAREA !== "undefined" && Object.keys(MOD_TAREA).some(function (c) { return _gvModVivo(st, MOD_TAREA[c].k); })) return false;   // v28.93
     if (getAnyToggleActive(leg)) return false;
     if (getActiveDeadTime(leg)) return false;
   } catch (_e) { return false; }
@@ -10064,7 +10066,9 @@ function selectOption(code) {
   // v5.05: Completar Pedido — agrega cajas que llegaron tarde a una NP armada SIN
   // facturar. Abre el modal directo (sin Enviar ni evento; el evento CP lo emite el
   // modal al confirmar). Operario (botonera, 4ª fila) y Marianela (panel admin).
-  if (code === "CP") { showCPModal(legajoStr); return; }
+  // v28.93: CP / RC / Mover racks / Insumos = tareas (ver MOD_TAREA): abiertas → RETOMA el módulo;
+  // si no, se seleccionan y arrancan con «Enviar».
+  if (MOD_TAREA[code] && modTareaActiva(legajoStr, code)) { MOD_TAREA[code].abrir(legajoStr); _modTareaVigilar(); return; }
 
   // v7.68: Guardado a Góndola (MG) — abre el chooser DIRECTO, igual que CP/SC (sin
   // Enviar, sin evento y SIN toggle). Antes MG era un toggle: al cerrar el modal el
@@ -10090,7 +10094,7 @@ function selectOption(code) {
   // v5.49: Pasar cajas a un pedido urgente — sacale cajas a un pedido que sale
   // después (armado o pickeado) y dáselas a uno urgente que sale antes. Abre el
   // modal directo (sin Enviar; el evento RC lo emite el modal al confirmar).
-  if (code === "RC") { showRCModal(legajoStr); return; }
+  // v28.93: RC va por MOD_TAREA (arriba).
 
   // v5.52: Entrega Artículos para envasar — REMOVIDO (no se usa).
   // v9.15: EA ha sido sacado del flujo operativo.
@@ -10098,7 +10102,11 @@ function selectOption(code) {
 
   // v5.67: Ingreso a Racks — da de alta lo que llega (importaciones) a los racks, con
   // su posición. Modal directo (sin Enviar; el evento IR lo emite al cargar cada palet).
-  if (code === "IR") { showIngresoRacksModal(legajoStr); return; }
+  // v28.93 (Luis): IR también se arranca con «Enviar» (≡ BR); abierto (minimizado) → retoma.
+  if (code === "IR") {
+    const stIr = getLegajoState(legajoStr) || {};
+    if (_gvModVivo(stIr, "ir")) { showIngresoRacksModal(legajoStr); return; }
+  }
 
   // CC ya abierto: el botón CC RE-ABRE el popup de Carga Camión (no lo cierra).
   // El cierre se hace SOLO con "Terminé Carga Camión" dentro del popup.
@@ -10122,7 +10130,7 @@ function selectOption(code) {
   selected = code;
   selectedArea.classList.remove("hidden");
 
-  selectedBox.innerText = code === "RKBM" ? "BR" : code;
+  selectedBox.innerText = code === "RKBM" ? "BR" : (code === "MOV" ? "🔀" : (code === "INS" ? "📦" : code));
   selectedDesc.innerText = desc[code];
 
   // reset input
@@ -10689,7 +10697,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.03";
+const APP_VERSION = "v29.04";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11451,6 +11459,11 @@ async function send() {
     else showRacksBajarModal(legajoStr);   // gvRacksTramo("RKI") abre la tarea
     return;
   }
+  // v28.93: «Enviar» en IR / Mover racks / CP / RC / Insumos = EMPEZÓ la tarea y abre el módulo.
+  if (opcion === "IR") { resetSelection(); showIngresoRacksModal(legajoStr); return; }   // gvRacksTramo("IRI") abre la tarea
+  if (MOD_TAREA[opcion]) { resetSelection(); modTareaEmpezar(legajoStr, opcion); return; }
+  // v28.93: arranca Recibir / Entregar insumos (su toggle lleva el tiempo) → termina la tarea «Insumos»
+  if ((opcion === "RI" || opcion === "EI") && modTareaActiva(legajoStr, "INS")) modTareaFin(legajoStr, "INS", false);
 
   // v5.26: AP sobre una tanda que YA tiene armado abierto (mismo código) → NO generamos
   // un 2º evento AP (doble arranque, ensucia los tiempos): reabrimos el asistente donde
@@ -28834,6 +28847,113 @@ function gvModTareaFin(leg, k, op, descr, texto) {
     if (typeof renderLegajoHistory === "function") renderLegajoHistory(leg);
   } catch (_e) {}
 }
+/* v28.93 (Luis, 09/10: "todos deberían tener la lógica igual que los otros módulos. botón de anular en
+   caso de error, retomar, que se tenga que enviar, etc. para el tracking de tiempo más efectivo posible") —
+   Mover racks, Completar Pedido, Pasar a urgente e Insumos y Productos son TAREAS como BR/MG:
+   el 1.er toque SELECCIONA, «Enviar» EMPIEZA (evento MDI, texto = el código), el botón queda rojo y
+   tocarlo RETOMA el módulo con el mismo tramo; «Cerrar» del módulo minimiza; la barra de abajo trae
+   ⛔ Anular (MDT texto ANULADO = cancelación de tarea) y 🏁 Terminé (MDT con ts_inicio = el tramo).
+   La vista gv_monitor_horas_operario_dia cuenta MDT como movimiento (≡ fetchMonitorDayStats).
+   Insumos: si se elige Recibir / Entregar, la tarea termina cuando arranca ese toggle (RI/EI llevan su
+   propio tiempo); Salida a Cervantes sigue en esta tarea. */
+var MOD_TAREA = {
+  MOV: { k: "tmov", desc: "Mover racks",         abrir: function (l) { showMoverModal(l); },  cerrar: function () { try { closeMv(); } catch (_e) {} }, ovs: ["mvModal"] },
+  CP:  { k: "tcp",  desc: "Completar Pedido",    abrir: function (l) { showCPModal(l); },     cerrar: function () { try { closeCP(); } catch (_e) {} }, ovs: ["cpModal"] },
+  RC:  { k: "trc",  desc: "Pasar a urgente",     abrir: function (l) { showRCModal(l); },     cerrar: function () { try { closeRC(); } catch (_e) {} }, ovs: ["rcModal"] },
+  INS: { k: "tins", desc: "Insumos y Productos", abrir: function (l) { insumoChooser(l); },   cerrar: function () { try { closeInsumoChooser(); closeSc(); } catch (_e) {}
+           ["insUbicModal", "insDocModal"].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.display = "none"; }); },
+         ovs: ["insChooserModal", "insUbicModal", "insDocModal", "scModal"] }
+};
+function modTareaActiva(leg, code) {
+  var m = MOD_TAREA[code]; if (!m) return false;
+  try { return _gvModVivo(getLegajoState(String(leg || "").trim()) || {}, m.k); } catch (_e) { return false; }
+}
+function _modTareaEmit(op, leg, iniMs, texto, descr) {
+  if (leg === "0") return;
+  if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
+  var nowMs = Date.now();
+  var payload = { legajo: leg, opcion: op, descripcion: descr, texto: String(texto || ""), ts: nowMs,
+    id: (op.toLowerCase() + "_" + leg + "_" + nowMs.toString(36)).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    ts_inicio_iso: (iniMs && iniMs < nowMs) ? new Date(iniMs).toISOString() : null };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
+}
+/* «Enviar»: arranca la tarea (si ya estaba abierta, la retoma con su hora) y abre el módulo. */
+function modTareaEmpezar(leg, code) {
+  var m = MOD_TAREA[code]; leg = String(leg || "").trim(); if (!m || !leg) return;
+  try {
+    var st = getLegajoState(leg) || {};
+    if (!_gvModVivo(st, m.k)) {
+      var ini = Date.now(); st[m.k] = { active: true, ts: ini }; setLegajoState(leg, st);
+      _modTareaEmit("MDI", leg, null, code, m.desc + " (empieza)");
+      tmMarcarEvento(leg, ini);
+    }
+    if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
+  } catch (_e) {}
+  m.abrir(leg); _modTareaVigilar();
+}
+/* Termina la tarea: 🏁 Terminé (texto = código) o ⛔ Anular (texto ANULADO). */
+function modTareaFin(leg, code, anulada) {
+  var m = MOD_TAREA[code]; leg = String(leg || "").trim(); if (!m || !leg) return;
+  try {
+    var st = getLegajoState(leg) || {};
+    if (!(st[m.k] && st[m.k].active)) return;
+    var vivo = _gvModVivo(st, m.k), ini = st[m.k].ts || Date.now(), nowMs = Date.now();
+    st[m.k] = { active: false }; setLegajoState(leg, st);
+    if (vivo) {
+      _modTareaEmit("MDT", leg, ini, anulada ? "ANULADO" : code, m.desc);
+      pushHistoryForLegajo(leg, { ts: nowMs, opcion: anulada ? "MDT" : code, descripcion: m.desc + (anulada ? " (anulada)" : ""),
+        texto: anulada ? "ANULADO" : "", id: "h_mdt_" + nowMs.toString(36), status: "queued", ts_inicio_iso: new Date(ini).toISOString() });
+    }
+    tmMarcarEvento(leg, nowMs);
+    if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
+    if (typeof renderLegajoHistory === "function") renderLegajoHistory(leg);
+  } catch (_e) {}
+  _modTareaVigilar();
+}
+function _modTareaVisible(m) {
+  return m.ovs.some(function (id) { var e = document.getElementById(id); return !!e && getComputedStyle(e).display !== "none"; });
+}
+/* La barra (Anular / Terminé) se ve mientras el módulo de una tarea abierta está en pantalla. */
+var _modTareaTimer = null;
+function _modTareaVigilar() {
+  var leg = String((typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim();
+  var cod = null;
+  if (leg) Object.keys(MOD_TAREA).forEach(function (c) { if (!cod && modTareaActiva(leg, c) && _modTareaVisible(MOD_TAREA[c])) cod = c; });
+  var bar = document.getElementById("modTareaBar");
+  if (!cod) {
+    if (bar) bar.style.display = "none";
+    var algun = leg && Object.keys(MOD_TAREA).some(function (c) { return modTareaActiva(leg, c); });
+    if (!algun && _modTareaTimer) { clearInterval(_modTareaTimer); _modTareaTimer = null; }
+    return;
+  }
+  if (!_modTareaTimer) _modTareaTimer = setInterval(_modTareaVigilar, 600);
+  if (!bar) {
+    bar = document.createElement("div"); bar.id = "modTareaBar";
+    bar.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:1500;background:#0f172a;color:#fff;padding:8px 10px calc(8px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center;justify-content:center;box-shadow:0 -6px 20px rgba(0,0,0,.35);font-family:inherit;";
+    document.body.appendChild(bar);
+  }
+  var st = getLegajoState(leg) || {}, ini = (st[MOD_TAREA[cod].k] || {}).ts;
+  var hh = ini ? new Date(ini).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }) : "";
+  var sig = cod + "|" + hh;
+  if (bar.getAttribute("data-sig") !== sig) {
+    bar.setAttribute("data-sig", sig);
+    var bs = "border:none;border-radius:10px;padding:10px 14px;font-size:15px;font-weight:800;cursor:pointer;width:auto;margin:0;";
+    bar.innerHTML = '<div style="font-size:13px;line-height:1.2;text-align:center;flex:1;min-width:0">' + escapeHtml(MOD_TAREA[cod].desc) +
+      (hh ? '<br><span style="opacity:.75">desde las ' + hh + '</span>' : '') + '</div>' +
+      '<button type="button" onclick="modTareaBoton(\'' + cod + '\',true)" style="' + bs + 'background:#e2e8f0;color:#b91c1c;">⛔ Anular</button>' +
+      '<button type="button" onclick="modTareaBoton(\'' + cod + '\',false)" style="' + bs + 'background:#16a34a;color:#fff;">🏁 Terminé</button>';
+  }
+  bar.style.display = "flex";
+}
+function modTareaBoton(code, anular) {
+  var m = MOD_TAREA[code]; if (!m) return;
+  var leg = String(legajoInput.value || "").trim();
+  if (anular && !confirm("¿Anular «" + m.desc + "»?\n\nQueda registrado que la empezaste y la anulaste (no cuenta como trabajo).")) return;
+  m.cerrar();
+  modTareaFin(leg, code, !!anular);
+}
 function _mgTareaQuizasFin() {
   const leg = String(_mgChooserLegajo || (legajoInput && legajoInput.value) || "").trim();
   setTimeout(function () {
@@ -33445,7 +33565,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
      de las líneas imprime "Binary file matches" — o sea que los conteos daban
      cualquier cosa. **Para contar algo en `index.html`: `grep -a`, o Python.**
      Lo cazó `tests/dead-handlers.cjs`. */
-  const MOV_TOGGLE_CODES    = new Set(["MG", "RI", "EI", "RT", "RKB", "IRT"]);   // v23.66: + trabajo en racks (≡ gv_monitor_horas_operario_dia)
+  const MOV_TOGGLE_CODES    = new Set(["MG", "RI", "EI", "RT", "RKB", "IRT", "MDT"]);   // v28.93: + MDT (Mover racks / CP / RC / Insumos)   // v23.66: + trabajo en racks (≡ gv_monitor_horas_operario_dia)
   const NOPROD_TOGGLE_CODES = new Set(["AT", "PB", "Limp", "PC", "CT", "Perm"]);
   /* v21.47 (Thomas) — TRABAJO PRODUCTIVO QUE NO TIENE m³: Carga Camión, Control
      Remitos y Recepción Remitos. Hasta acá el monitor grande **no medía ninguno**:
@@ -33539,7 +33659,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     }
     return tot;
   };
-  const ANULADO_NOPROD_CODES = new Set(["CC","CR","RR","RT","RI","EI"]);
+  const ANULADO_NOPROD_CODES = new Set(["CC","CR","RR","RT","RI","EI","MDT"]);   // v28.93: + MDT
   const computeClosureDur = (leg, tsInicioMs, tsClienteMs, outBreakdown) => {
     const dayOpen = isoToDayKey(tsInicioMs);
     const dayClose = isoToDayKey(tsClienteMs);
@@ -33793,7 +33913,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
   {   // v23.72-cruce: también días pasados (lo abierto al FJ suma a SU día) ≡ vista
     const nowMs = Date.now(), esHoy = dayKey === isoToDayKey(Date.now());
     const MUERTO = new Set(DEAD_TIME_CODES), NOPROD_AB = new Set(["AT","PB","Limp","PC","CT","Perm"]);
-    const ABRE = { EP: "EP", AP: "AP", MGI: "MG", RKI: "RKB", IRI: "IRT" };
+    const ABRE = { EP: "EP", AP: "AP", MGI: "MG", RKI: "RKB", IRI: "IRT", MDI: "MDT" };   // v28.93: + MDI
     const TOG = new Set(["CR","RR","CC","RT","MG","RI","EI","AT","PB","Limp","PC","Perm","CT"]);
     const porLeg = new Map();
     for (const ev of events) {
@@ -33832,8 +33952,8 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
             fin = Math.min(nowMs, Math.max(ult, finJor));
           }
           // v23.72-sig ≡ vista: termina donde EMPIEZA la siguiente tarea del legajo (no se superpone)
-          const SIG_AB = new Set(["EP","AP","MGI","RKI","IRI","CR","RR","CC","RT","MG","RI","EI","AT","PB","Limp","PC","Perm","CT"]);
-          const SIG_TR = new Set(["MG","RT","CC","CR","RR","RI","EI","RKB","IRT"]);
+          const SIG_AB = new Set(["EP","AP","MGI","RKI","IRI","MDI","CR","RR","CC","RT","MG","RI","EI","AT","PB","Limp","PC","Perm","CT"]);
+          const SIG_TR = new Set(["MG","RT","CC","CR","RR","RI","EI","RKB","IRT","MDT"]);
           for (const s of evs) {
             if (s === a) continue;
             const sm = new Date(s.ts_inicio || s.ts_cliente).getTime();
@@ -55015,7 +55135,7 @@ function _monEnSilencio(eventos, todayKey, fjHoy, nowMs, gapMin) {
    o un toggle abierto (apertura sin cierre — el cierre lleva ts_inicio, la apertura no).
    Si no hay nada abierto queda "libre" (idle) con el tiempo desde su último evento. Excluye
    legajos 0/1 y a los que ya hicieron FJ. Alimenta el panel "En este momento" del monitor. */
-var _MON_ACT_TOGGLES = { CR: 1, RR: 1, CC: 1, RT: 1, MG: 1, RI: 1, EI: 1, AT: 1, PB: 1, Limp: 1, PC: 1, Perm: 1, CT: 1, RKB: 1, IRT: 1 };   // v23.66: RKB/IRT cierran el tramo de racks (abre RKI/IRI)
+var _MON_ACT_TOGGLES = { CR: 1, RR: 1, CC: 1, RT: 1, MG: 1, RI: 1, EI: 1, AT: 1, PB: 1, Limp: 1, PC: 1, Perm: 1, CT: 1, RKB: 1, IRT: 1, MDT: 1 };   // v23.66: RKB/IRT cierran el tramo de racks (abre RKI/IRI)
 var _MON_ACT_INFO = {
   pick: { ic: "🛒", vb: "Pickeando" }, arm: { ic: "🔨", vb: "Armando" },
   CC: { ic: "🚛", tx: "Cargando camión" }, RT: { ic: "🏭", tx: "Recibiendo mercadería" },
@@ -55025,7 +55145,7 @@ var _MON_ACT_INFO = {
   PB: { ic: "🚽", tx: "En el baño" }, Limp: { ic: "🧹", tx: "Limpiando" },
   PC: { ic: "🍽", tx: "Comiendo" }, Perm: { ic: "🚪", tx: "Permiso de salida" },
   CT: { ic: "🔢", tx: "Conteo" },
-  RKB: { ic: "🏗", tx: "Bajando racks" }, IRT: { ic: "🏗", tx: "Ingresando a racks" },
+  RKB: { ic: "🏗", tx: "Bajando racks" }, IRT: { ic: "🏗", tx: "Ingresando a racks" }, MDT: { ic: "🧰", tx: "Mover racks / CP / RC / Insumos" },
   GST: { ic: "📥", tx: "Guardando (bajada de racks)" }   // v23.64: sale de Movimientos_Stock, no de un toggle
 };
 /* v23.64 (Luis, 28/09: *"está guardando"*) — la BAJADA DE RACKS y el guardado se registran en
@@ -55071,6 +55191,7 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
       else if (e.op === "MGC") { if (tog === "MG") tog = null; }
       else if (e.op === "RKI") { tog = "RKB"; togTs = e.ts; rkTog = "RKB"; rkTs = e.ts; }   // v23.66: bajando racks
       else if (e.op === "IRI") { tog = "IRT"; togTs = e.ts; rkTog = "IRT"; rkTs = e.ts; }   // v23.66: ingresando a racks
+      else if (e.op === "MDI") { tog = "MDT"; togTs = e.ts; }                      // v28.93: Mover racks / CP / RC / Insumos
       else if (e.op === "MG" && e.ini) { if (tog === "MG") tog = null; }
       else if ((e.op === "RKB" || e.op === "IRT") && e.ini) { if (rkTog === e.op) rkTog = null; if (tog === e.op) tog = null; }   // v28.98: un toggle (CT) adentro del ingreso/bajada de racks no lo cierra ≡ tv.html
       else if (_MON_ACT_TOGGLES[e.op]) { if (!e.ini) { tog = e.op; togTs = e.ts; } else if (tog === e.op) { tog = null; } }
@@ -61760,7 +61881,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.03"></script>
+<script src="importacion.js?v=29.04"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64689,10 +64810,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.03"></script>
-<script src="hotsale.js?v=29.03"></script>
-<script src="estadisticas.js?v=29.03"></script>
-<script src="ads.js?v=29.03"></script>
+<script src="cobranzas.js?v=29.04"></script>
+<script src="hotsale.js?v=29.04"></script>
+<script src="estadisticas.js?v=29.04"></script>
+<script src="ads.js?v=29.04"></script>
 
 </body>
 </html>

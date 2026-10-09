@@ -456,7 +456,7 @@ var FERIADOS = { "2026-01-01":1,"2026-02-16":1,"2026-02-17":1,"2026-03-24":1,
   "2026-12-08":1,"2026-12-25":1 };
 
 /* ≡ index.html _MON_ACT_INFO / _MON_ACT_TOGGLES */
-var ACT_TOGGLES = { CR:1, RR:1, CC:1, RT:1, MG:1, RI:1, EI:1, AT:1, PB:1, Limp:1, PC:1, Perm:1, CT:1, RKB:1, IRT:1 };
+var ACT_TOGGLES = { CR:1, RR:1, CC:1, RT:1, MG:1, RI:1, EI:1, AT:1, PB:1, Limp:1, PC:1, Perm:1, CT:1, RKB:1, IRT:1, MDT:1 };
 var ACT_INFO = {
   pick:{ ic:"🛒", vb:"Pickeando" }, arm:{ ic:"🔨", vb:"Armando" },
   CC:{ ic:"🚛", tx:"Cargando camión" },   RT:{ ic:"🏭", tx:"Recibiendo mercadería" },
@@ -466,7 +466,7 @@ var ACT_INFO = {
   PB:{ ic:"🚽", tx:"En el baño" },        Limp:{ ic:"🧹", tx:"Limpiando" },
   PC:{ ic:"🍽", tx:"Comiendo" },          Perm:{ ic:"🚪", tx:"Permiso de salida" },
   CT:{ ic:"🔢", tx:"Conteo" },
-  RKB:{ ic:"🏗", tx:"Bajando racks" },  IRT:{ ic:"🏗", tx:"Ingresando a racks" },
+  RKB:{ ic:"🏗", tx:"Bajando racks" },  IRT:{ ic:"🏗", tx:"Ingresando a racks" },  MDT:{ ic:"🧰", tx:"Mover/CP/RC/Insumos" },
   GST:{ ic:"📥", tx:"Guardando (bajada de racks)" }   /* v23.64 ≡ index.html */
 };
 var GST_VIVO_MIN = 45;   /* ≡ index.html MON_GST_VIVO_MIN */
@@ -1215,6 +1215,7 @@ function actividadActual(eventos, hoy, fjHoy, fichados) {
       else if (e.op === "MGC") { if (tog === "MG") tog = null; }
       else if (e.op === "RKI") { tog = "RKB"; togTs = e.ts; rkTog = "RKB"; rkTs = e.ts; }                      /* v23.66: bajando racks */
       else if (e.op === "IRI") { tog = "IRT"; togTs = e.ts; rkTog = "IRT"; rkTs = e.ts; }                      /* v23.66: ingresando a racks */
+      else if (e.op === "MDI") { tog = "MDT"; togTs = e.ts; }
       else if (e.op === "MG" && e.ini) { if (tog === "MG") tog = null; }
       else if ((e.op === "RKB" || e.op === "IRT") && e.ini) { if (rkTog === e.op) rkTog = null; if (tog === e.op) tog = null; }
       else if (ACT_TOGGLES[e.op]) { if (!e.ini) { tog = e.op; togTs = e.ts; } else if (tog === e.op) { tog = null; } }
