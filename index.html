@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.14"></script>
+<script type="module" src="recepcion.js?v=29.15"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10697,7 +10697,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.14";
+const APP_VERSION = "v29.15";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27279,7 +27279,7 @@ function insumoChooser(legajo) {
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué querés hacer?</div>' +
     '<button onclick="insChooserGo(\'RI\')" style="' + btn + 'background:#4f46e5;">📥 Recibir insumos <span style="' + sub + '">(entra stock — o agregá uno nuevo)</span></button>' +
     '<button onclick="insChooserGo(\'EI\')" style="' + btn + 'background:#0d9488;">📤 Entregar insumos <span style="' + sub + '">(sale stock)</span></button>' +
-    '<button onclick="insChooserGo(\'SC\')" style="' + btn + 'background:#dc2626;">🚚 Salida a Cervantes <span style="' + sub + '">(desde góndola o racks)</span></button>' +
+    '<button onclick="insChooserGo(\'SC\')" style="' + btn + 'background:#dc2626;">🚚 Salida a Cervantes <span style="' + sub + '">(desde góndola o A guardar)</span></button>' +
     '<button onclick="closeInsumoChooser()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>' +
     '</div>';
   ov.style.display = "flex";
@@ -28220,125 +28220,66 @@ async function showCervantesModal(legajo, _resume) {
   ov.innerHTML = '<div class="sc-card"><div class="sc-head"><span class="sc-title">🚚 Salida a Cervantes</span><button class="sc-close" onclick="scAskClose()">Cerrar</button></div><div class="sc-body" id="scBody"><div class="sc-loading">Cargando góndola…</div></div></div>';
   if (_resume) { _sc = _resume; scRender(); return; }
   try {
-    const res = await Promise.all([stockFetchSaldos(), scFetchRacks(), rkbFetchCxM().catch(function () { return { cxm: {} }; })]);
-    const saldos = res[0] || {};
-    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.terminado || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.terminado, sacar: 0 }; });
-    _scRacksCh = {}; Object.keys(saldos).forEach(function (k) { const a = saldos[k]; if ((a.racks_ch || 0) > 0) _scRacksCh[_cpNorm(String(a.cod).replace(/\s+(LK|CH)$/i, "").replace(/\s+/g, ""))] = a.racks_ch; });
-    _sc = { legajo: String(legajo || "").trim(), items: items, rk: scArmarRacks(res[1], (res[2] && res[2].cxm) || {}, saldos), tab: "gondola", filtro: "", motivo: "" };
+    const saldos = (await stockFetchSaldos()) || {};
+    const armar = function (dep) { return Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a[dep] || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a[dep], sacar: 0 }; }); };
+    _sc = { legajo: String(legajo || "").trim(), items: armar("terminado"), ag: armar("a_guardar"), tab: "gondola", filtro: "", motivo: "" };
     scRender();
   } catch (e) { const b = document.getElementById("scBody"); if (b) b.innerHTML = '<div class="sc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
-/* v29.05 (Luis, 09/10) — Salida a Cervantes con pestañas GÓNDOLA y RACKS. En racks se manda desde una
-   POSICIÓN (Racks_Planimetria, fuente stock) y se elige la unidad: CAJA o MC (cajas por master de
-   GV_Rack_CxM). El movimiento siempre va en cajas, con la posición en `ubicacion`. */
-async function scFetchRacks() {
-  try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/Racks_Planimetria?select=emp,sector,cod_art,innercajas&fuente=eq.stock&estado=eq.ocupado&innercajas=gt.0&order=cod_art.asc,sector.asc&limit=5000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-    return r.ok ? await r.json() : null;
-  } catch (_e) { return null; }
-}
-function scArmarRacks(rows, cxmMap, saldos) {
-  if (!Array.isArray(rows)) return null;   // null = no se pudo leer (no es "no hay")
-  const descDe = {};
-  Object.keys(saldos || {}).forEach(function (k) { const a = saldos[k]; descDe[_cpNorm(String(a.cod).replace(/\s+(LK|CH)$/i, ""))] = a.desc; });
-  return rows.map(function (x) {
-    const cod = String(x.cod_art || "").trim(), kk = _cpNorm(cod.replace(/\s+/g, ""));
-    const caj = Math.floor(Number(x.innercajas) || 0);
-    const cxm = Number(cxmMap[kk]) || 0;
-    return { cod: cod, emp: String(x.emp || "LK").toUpperCase(), sector: String(x.sector || "").trim(), desc: descDe[kk] || "", disponible: caj, cxm: cxm, unidad: "caja", sacar: 0 };
-  }).filter(function (it) { return it.cod && it.sector && it.disponible > 0; });
-}
-function scRkCajas(it) { return it.unidad === "mc" && it.cxm > 0 ? it.sacar * it.cxm : it.sacar; }
-function scRkMax(it) { return it.unidad === "mc" && it.cxm > 0 ? Math.floor(it.disponible / it.cxm) : it.disponible; }
-function scTab(t) { if (!_sc) return; _sc.tab = t === "racks" ? "racks" : "gondola"; scRender(); }
-function scRkUnidad(i, u) { if (!_sc || !_sc.rk) return; const it = _sc.rk[i]; if (!it) return; if (u === "mc" && !(it.cxm > 0)) return; it.unidad = u; it.sacar = 0; scRender(); }
-function scRkChg(i, d) { if (!_sc || !_sc.rk) return; const it = _sc.rk[i]; if (!it) return; it.sacar = Math.max(0, Math.min(scRkMax(it), it.sacar + d)); scRender(); }
-function scRkSet(i, v) { if (!_sc || !_sc.rk) return; const it = _sc.rk[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > scRkMax(it)) n = scRkMax(it); it.sacar = n; scRender(); }
+/* v29.13 (Luis, 09/10) — Salida a Cervantes sale de GÓNDOLA o de A GUARDAR, NUNCA de racks.
+   Para mandar una MC que está en racks: primero «BR · Bajar de racks» (baja a A guardar) y después
+   se manda desde la pestaña A guardar. Retira la pestaña Racks de la v29.12. */
+const SC_TABS = { gondola: { dep: "terminado", lbl: "Góndola", hint: "Sale de la góndola (Artículo Terminado)", vacio: "No hay artículo terminado en góndola para mandar." },
+                  aguardar: { dep: "a_guardar", lbl: "A guardar", hint: "Sale de A guardar. Para mandar algo que está en racks, bajalo primero con «BR · Bajar de racks»", vacio: "No hay nada en A guardar. Si está en racks, bajalo primero con «BR · Bajar de racks»." } };
+function scLista(t) { if (!_sc) return []; if (!_sc.ag) _sc.ag = []; return (t || _sc.tab) === "aguardar" ? _sc.ag : _sc.items; }
+function scTab(t) { if (!_sc) return; _sc.tab = t === "aguardar" ? "aguardar" : "gondola"; scRender(); }
 function scTotCajas() {
   if (!_sc) return 0;
-  const g = (_sc.items || []).reduce(function (s, it) { return s + it.sacar; }, 0);
-  const r = (_sc.rk || []).reduce(function (s, it) { return s + scRkCajas(it); }, 0);
-  return g + r;
-}
-function scRenderRacks(body) {
-  const tabs = scTabsHtml();
-  let h = tabs + '<div class="sc-hint">Elegí la <b>posición</b> del rack y la unidad: <b>caja</b> o <b>MC</b>. Sale del rack.</div>';
-  h += '<input class="sc-mot" type="text" placeholder="Remito / motivo (opcional)" value="' + escapeHtml(_sc.motivo || "") + '" oninput="if(_sc)_sc.motivo=this.value;">';
-  h += '<input class="sc-search" type="search" placeholder="🔎 Buscar código / descripción / posición" value="' + escapeHtml(_sc.filtro) + '" oninput="if(_sc){_sc.filtro=this.value;scRender();}">';
-  if (_sc.rk == null) h += '<div class="sc-empty">No se pudo leer el stock de racks. Probá de nuevo.</div>';
-  else if (!_sc.rk.length) h += '<div class="sc-empty">No hay stock en racks.</div>';
-  else {
-    const f = (_sc.filtro || "").toLowerCase().trim();
-    const shown = f ? _sc.rk.filter(function (it) { return stkMatchBusq(f, it.cod, it.desc, false) || it.sector.toLowerCase().indexOf(f) >= 0; }) : _sc.rk;
-    if (!shown.length) h += '<div class="sc-empty">No hay artículos que coincidan.</div>';
-    else h += shown.map(function (it) {
-      const i = _sc.rk.indexOf(it);
-      const mcTxt = it.cxm > 0 ? (' · ' + Math.floor(it.disponible / it.cxm) + ' MC×' + it.cxm) : ' · s/master';
-      const uB = function (u, lbl, ok) { return '<button class="sc-u' + (it.unidad === u ? ' on' : '') + '"' + (ok ? '' : ' disabled') + ' onclick="scRkUnidad(' + i + ',\'' + u + '\')">' + lbl + '</button>'; };
-      const eq = (it.unidad === "mc" && it.sacar > 0) ? '<div class="sc-disp">= ' + scRkCajas(it) + ' cajas</div>' : '';
-      return '<div class="sc-row"><div class="sc-info"><span class="sc-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="sc-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span>' +
-        '<div class="sc-disp">📍 ' + escapeHtml(it.sector) + (it.emp === "CH" ? ' · CH' : '') + ' · ' + it.disponible + ' cajas' + mcTxt + '</div>' +
-        '<div class="sc-us">' + uB("caja", "Caja", true) + uB("mc", "MC", it.cxm > 0) + '</div>' + eq + '</div>' +
-        '<div class="sc-stp"><button class="sc-sb" onclick="scRkChg(' + i + ',-1)">–</button><input class="sc-inp" type="number" min="0" max="' + scRkMax(it) + '" inputmode="numeric" value="' + it.sacar + '" oninput="scRkSet(' + i + ',this.value)"><button class="sc-sb" onclick="scRkChg(' + i + ',1)">+</button></div></div>';
-    }).join("");
-  }
-  const tot = scTotCajas();
-  h += '<button class="sc-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="scConfirmar()">✓ Mandar ' + tot + ' caja(s) a Cervantes</button>';
-  _renderKeepFocus(body, h);
+  return scLista("gondola").concat(scLista("aguardar")).reduce(function (s, it) { return s + it.sacar; }, 0);
 }
 function scTabsHtml() {
-  const nG = (_sc.items || []).reduce(function (s, it) { return s + it.sacar; }, 0);
-  const nR = (_sc.rk || []).reduce(function (s, it) { return s + scRkCajas(it); }, 0);
-  const t = function (k, lbl, n) { return '<button class="sc-tab' + (_sc.tab === k ? ' on' : '') + '" onclick="scTab(\'' + k + '\')">' + lbl + (n > 0 ? ' <span class="sc-tabn">' + n + '</span>' : '') + '</button>'; };
-  return '<div class="sc-tabs">' + t("gondola", "Góndola", nG) + t("racks", "Racks", nR) + '</div>';
+  const t = function (k) { const n = scLista(k).reduce(function (s, it) { return s + it.sacar; }, 0); return '<button class="sc-tab' + (_sc.tab === k ? ' on' : '') + '" onclick="scTab(\'' + k + '\')">' + SC_TABS[k].lbl + (n > 0 ? ' <span class="sc-tabn">' + n + '</span>' : '') + '</button>'; };
+  return '<div class="sc-tabs">' + t("gondola") + t("aguardar") + '</div>';
 }
 function scRender() {
   if (!_sc) return; const body = document.getElementById("scBody"); if (!body) return;
-  if (!_sc.rk && _sc.rk !== null) _sc.rk = [];
-  if (_sc.tab === "racks") { scRenderRacks(body); return; }
-  if (!_sc.items.length) { body.innerHTML = scTabsHtml() + '<div class="sc-empty">No hay artículo terminado en góndola para mandar.</div>'; return; }
+  if (_sc.tab !== "aguardar") _sc.tab = "gondola";
+  const cfg = SC_TABS[_sc.tab], lista = scLista();
   const f = (_sc.filtro || "").toLowerCase().trim();
-  const shown = f ? _sc.items.filter(function (it) { return stkMatchBusq(f, it.cod, it.desc, false); }) : _sc.items;   // v21.43
-  let h = scTabsHtml() + '<div class="sc-hint">Marcá cuántas <b>cajas</b> mandás a Cervantes. Sale de la góndola (Artículo Terminado).</div>';
+  const shown = f ? lista.filter(function (it) { return stkMatchBusq(f, it.cod, it.desc, false); }) : lista;   // v21.43
+  let h = scTabsHtml() + '<div class="sc-hint">Marcá cuántas <b>cajas</b> mandás a Cervantes. ' + cfg.hint + '.</div>';
   h += '<input class="sc-mot" type="text" placeholder="Remito / motivo (opcional)" value="' + escapeHtml(_sc.motivo || "") + '" oninput="if(_sc)_sc.motivo=this.value;">';
   h += '<input class="sc-search" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_sc.filtro) + '" oninput="if(_sc){_sc.filtro=this.value;scRender();}">';
-  if (!shown.length) h += '<div class="sc-empty">No hay artículos que coincidan.</div>';
+  if (!lista.length) h += '<div class="sc-empty">' + cfg.vacio + '</div>';
+  else if (!shown.length) h += '<div class="sc-empty">No hay artículos que coincidan.</div>';
   else h += shown.map(function (it) {
-    const i = _sc.items.indexOf(it);
-    return '<div class="sc-row"><div class="sc-info"><span class="sc-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="sc-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span><div class="sc-disp">en góndola: ' + it.disponible + ' cajas</div></div><div class="sc-stp"><button class="sc-sb" onclick="scChg(' + i + ',-1)">–</button><input class="sc-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.sacar + '" oninput="scSet(' + i + ',this.value)"><button class="sc-sb" onclick="scChg(' + i + ',1)">+</button></div></div>';
+    const i = lista.indexOf(it);
+    return '<div class="sc-row"><div class="sc-info"><span class="sc-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="sc-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span><div class="sc-disp">en ' + cfg.lbl.toLowerCase() + ': ' + it.disponible + ' cajas</div></div><div class="sc-stp"><button class="sc-sb" onclick="scChg(' + i + ',-1)">–</button><input class="sc-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.sacar + '" oninput="scSet(' + i + ',this.value)"><button class="sc-sb" onclick="scChg(' + i + ',1)">+</button></div></div>';
   }).join("");
   const tot = scTotCajas();
   h += '<button class="sc-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="scConfirmar()">✓ Mandar ' + tot + ' caja(s) a Cervantes</button>';
   _renderKeepFocus(body, h);
 }
-function scChg(i, d) { if (!_sc) return; const it = _sc.items[i]; if (!it) return; it.sacar = Math.max(0, Math.min(it.disponible, it.sacar + d)); scRender(); }
-function scSet(i, v) { if (!_sc) return; const it = _sc.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.sacar = n; scRender(); }
+function scChg(i, d) { if (!_sc) return; const it = scLista()[i]; if (!it) return; it.sacar = Math.max(0, Math.min(it.disponible, it.sacar + d)); scRender(); }
+function scSet(i, v) { if (!_sc) return; const it = scLista()[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.sacar = n; scRender(); }
 function scConfirmar() {
   if (!_sc) return;
-  const sel = _sc.items.filter(function (it) { return it.sacar > 0; });
-  const selR = (_sc.rk || []).filter(function (it) { return scRkCajas(it) > 0; });
-  if (!sel.length && !selR.length) return;
-  const ref = (_sc.motivo || "").trim() || null;
-  const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: -it.sacar, tipo: "salida_cervantes", ref: ref, legajo: _sc.legajo || null }; });
-  // v29.05 — racks: sale de la POSICIÓN, en cajas (MC × cajas por master). CH puede vivir en racks_ch.
-  const rowsR = selR.map(function (it) {
-    const cj = scRkCajas(it);
-    const dep = it.emp === "CH" && scRkDepCH(it.cod, cj) ? "racks_ch" : "racks";
-    const det = it.unidad === "mc" ? (" · " + it.sacar + " MC×" + it.cxm) : "";
-    return { cod_art: it.cod, descripcion: (it.desc || it.cod) + " · rack " + it.sector + det, deposito: dep, delta: -cj, tipo: "salida_cervantes", ref: ref, legajo: _sc.legajo || null, ubicacion: it.sector, empresa: it.emp === "CH" ? "CH" : "LK" };
+  const ref = (_sc.motivo || "").trim() || null, leg = _sc.legajo || null;
+  const rows = [], tot = {};
+  ["gondola", "aguardar"].forEach(function (k) {
+    scLista(k).filter(function (it) { return it.sacar > 0; }).forEach(function (it) {
+      rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: SC_TABS[k].dep, delta: -it.sacar, tipo: "salida_cervantes", ref: ref, legajo: leg });
+      tot[k] = (tot[k] || 0) + it.sacar;
+    });
   });
-  const nG = sel.reduce(function (s, it) { return s + it.sacar; }, 0);
-  const nR = selR.reduce(function (s, it) { return s + scRkCajas(it); }, 0);
+  if (!rows.length) return;
   try { opDraftClear(_sc && _sc.legajo); } catch (_e) {}
   closeSc();
-  if (rows.length) stockMove(rows);   // offline-safe (vir_stock_pend)
-  if (rowsR.length) stockMove(rowsR);
-  try { alert("✓ Salida a Cervantes registrada: " + (nG + nR) + " caja(s)." + (nG ? " Góndola: " + nG + "." : "") + (nR ? " Racks: " + nR + "." : "")); } catch (_e) {}
+  stockMove(rows);   // offline-safe (vir_stock_pend)
+  try { alert("✓ Salida a Cervantes registrada: " + ((tot.gondola || 0) + (tot.aguardar || 0)) + " caja(s)." + (tot.gondola ? " Góndola: " + tot.gondola + "." : "") + (tot.aguardar ? " A guardar: " + tot.aguardar + "." : "")); } catch (_e) {}
 }
 function closeSc() { const ov = document.getElementById("scModal"); if (ov) ov.classList.remove("show"); _sc = null; }
-function scHasProgress() { return !!(_sc && ((_sc.items && _sc.items.some(function (it) { return (it.sacar > 0); })) || (_sc.rk && _sc.rk.some(function (it) { return it.sacar > 0; })))); }
-let _scRacksCh = null;   // saldo racks_ch por código (para elegir el depósito de una posición CH)
-function scRkDepCH(cod, cajas) { const v = _scRacksCh && _scRacksCh[_cpNorm(String(cod).replace(/\s+/g, ""))]; return v != null && v >= cajas; }
+function scHasProgress() { return !!(_sc && scLista("gondola").concat(scLista("aguardar")).some(function (it) { return it.sacar > 0; })); }
 function scAskClose() { opAskClose(scHasProgress(), "SC", _sc && _sc.legajo, "Salida a Cervantes", _sc, closeSc); }
 
 /* ===== "Volver al cuadro" (v5.55): borrador de una operación cerrada sin terminar.
@@ -62045,7 +61986,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.14"></script>
+<script src="importacion.js?v=29.15"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64975,10 +64916,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.14"></script>
-<script src="hotsale.js?v=29.14"></script>
-<script src="estadisticas.js?v=29.14"></script>
-<script src="ads.js?v=29.14"></script>
+<script src="cobranzas.js?v=29.15"></script>
+<script src="hotsale.js?v=29.15"></script>
+<script src="estadisticas.js?v=29.15"></script>
+<script src="ads.js?v=29.15"></script>
 
 </body>
 </html>

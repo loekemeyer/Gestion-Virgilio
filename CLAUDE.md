@@ -8499,9 +8499,10 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
   `gv_imp_imputar_ingreso_racks`.
 - `sql/gv_racks_ajuste_sin_posicion_v2905.sql`, centinela 379, `tests/stk-ajuste-racks-posicion.cjs`.
 
-## ⚠ REGLA (Luis, 2026-10-09, v29.12): SALIDA A CERVANTES tiene pestañas GÓNDOLA y RACKS
+## ⚠ REGLA (Luis, 2026-10-09, v29.15; la base dice v29.13, llave): SALIDA A CERVANTES sale de GÓNDOLA o A GUARDAR — NUNCA de racks
 
-- Insumos y Productos Movimiento → 🚚 Salida a Cervantes: **Góndola** (como siempre, `terminado`) y **Racks**: una fila por
-  posición con stock (`Racks_Planimetria`, fuente stock), unidad **Caja o MC** por fila (MC = `GV_Rack_CxM`; sin master, sólo caja).
-- El movimiento va en **cajas** (MC × cajas por master), `tipo salida_cervantes`, depósito `racks` (CH: `racks_ch` si su saldo
-  alcanza), `ubicacion` = la posición. Lectura de racks rota → lo dice, no «no hay». `tests/sc-racks-unidad.cjs`.
+- Insumos y Productos Movimiento → 🚚 Salida a Cervantes: pestañas **Góndola** (`terminado`) y **A guardar** (`a_guardar`), en cajas.
+- **Para mandar una MC que está en racks**: «BR · Bajar de racks» (baja a A guardar, p. ej. 1 MC = 12 cajas) y después se manda
+  desde A guardar. Retira la pestaña Racks de la v29.12 (caso 958E del 09/10: JM mandó 1 MC desde AD10 con la MC mal cargada en 13).
+- Lo sostiene la base: trigger `aa_gv_salida_cervantes_no_racks` → `SC_DESDE_RACKS` (centinela v29.13).
+  `sql/gv_salida_cervantes_no_racks_v2913.sql`, `tests/sc-racks-unidad.cjs`.
