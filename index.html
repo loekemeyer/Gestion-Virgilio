@@ -3094,6 +3094,8 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
 .pmap-head b{ color:#0f172a; }
 .pmap-wrap{ overflow-x:auto; padding-bottom:6px; }
 .pmap-cols{ display:grid; grid-template-columns:repeat(auto-fill, minmax(124px, 1fr)); gap:12px; align-items:start; }
+/* v28.98 (Luis): en pantalla ancha TODOS los módulos de la góndola en UNA fila, al ancho de la página (las 60 ubic. de la Ñ). */
+@media (min-width:1000px){ .pmap-cols[style*="--pmc"]{ grid-template-columns:repeat(var(--pmc), minmax(0,1fr)); gap:6px; } .pmap-cols[style*="--pmc"] .pmap-cell{ padding:3px 5px; } .pmap-cols[style*="--pmc"] .pmap-cod{ font-size:17px; } }
 /* Los módulos de 5 celdas ENVUELVEN y se reparten el ancho en vez de irse de
    costado: la góndola A son 17 columnas y antes se veían 6, el resto scrolleaba.
    Va en GRID y no en flex para que la última fila tenga columnas del MISMO ancho
@@ -6396,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.97"></script>
+<script type="module" src="recepcion.js?v=28.98"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10687,7 +10689,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.97";
+const APP_VERSION = "v28.98";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -29351,7 +29353,8 @@ function gvRacksTramo(op, legajo, iniMs, texto) {
   if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
   const payload = { legajo: leg, opcion: op, descripcion: DESC[op] || op, texto: String(texto || ""), ts: nowMs,
     id: (op.toLowerCase() + "_" + leg + "_" + nowMs.toString(36)).replace(/[^a-zA-Z0-9_\-]/g, ""),
-    ts_inicio_iso: (iniMs && iniMs < nowMs) ? new Date(iniMs).toISOString() : null };
+    // v28.98: la APERTURA (RKI/IRI) va SIN ts_inicio: con él parecía cerrada y sonaba la alarma de inactivo con el operario adentro.
+    ts_inicio_iso: (op !== "RKI" && op !== "IRI" && iniMs && iniMs < nowMs) ? new Date(iniMs).toISOString() : null };
   enqueueReport(payload);
   if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
   try { updatePendingIndicator(); } catch (_e) {}
@@ -47545,9 +47548,9 @@ function pmapGondolaHtml(g) {
           Object.keys(ocupadas).length + ' con artículo · ' + libres + ' libres · ' +
           'capacidad <b>' + pmapNum(capTot) + '</b> cajas' +
           (Object.keys(emps).length ? ' · ' + escapeHtml(Object.keys(emps).sort().join("/")) : "") + '</div>';
-  h += '<div class="pmap-wrap"><div class="pmap-cols">';
   const alto = pmapAlto(g);
   const cols = Math.ceil(maxN / alto) || 1;
+  h += '<div class="pmap-wrap"><div class="pmap-cols" style="--pmc:' + cols + '">';
   for (let c = 0; c < cols; c++) {
     h += '<div class="pmap-col">';
     for (let lvl = alto; lvl >= 1; lvl--) h += pmapCellHtml(g, c * alto + lvl, porCelda);
@@ -55044,7 +55047,7 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
   for (var leg in byLeg) {
     if (fjHoy && fjHoy.has(leg)) { vistos[leg] = 1; continue; }       // ya cerró jornada → fuera
     var evs = byLeg[leg].sort(function (a, b) { return a.ts - b.ts; });
-    var pick = null, pickTs = 0, arm = null, armTs = 0, tog = null, togTs = 0, lastTs = 0, gstIni = 0, gstUlt = 0;
+    var pick = null, pickTs = 0, arm = null, armTs = 0, tog = null, togTs = 0, lastTs = 0, gstIni = 0, gstUlt = 0, rkTog = null, rkTs = 0;
     for (var k = 0; k < evs.length; k++) {
       var e = evs[k]; if (e.ts > lastTs) lastTs = e.ts;
       if (e.op === "GST") { if (!gstIni) gstIni = e.ts; gstUlt = e.ts; continue; }   // v23.64
@@ -55057,15 +55060,17 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
       else if (e.op === "APF") { if (arm === e.tx) arm = null; }
       else if (e.op === "MGI") { tog = "MG"; togTs = e.ts; }                       // v23.63
       else if (e.op === "MGC") { if (tog === "MG") tog = null; }
-      else if (e.op === "RKI") { tog = "RKB"; togTs = e.ts; }                      // v23.66: bajando racks
-      else if (e.op === "IRI") { tog = "IRT"; togTs = e.ts; }                      // v23.66: ingresando a racks
+      else if (e.op === "RKI") { tog = "RKB"; togTs = e.ts; rkTog = "RKB"; rkTs = e.ts; }   // v23.66: bajando racks
+      else if (e.op === "IRI") { tog = "IRT"; togTs = e.ts; rkTog = "IRT"; rkTs = e.ts; }   // v23.66: ingresando a racks
       else if (e.op === "MG" && e.ini) { if (tog === "MG") tog = null; }
+      else if ((e.op === "RKB" || e.op === "IRT") && e.ini) { if (rkTog === e.op) rkTog = null; if (tog === e.op) tog = null; }   // v28.98: un toggle (CT) adentro del ingreso/bajada de racks no lo cierra ≡ tv.html
       else if (_MON_ACT_TOGGLES[e.op]) { if (!e.ini) { tog = e.op; togTs = e.ts; } else if (tog === e.op) { tog = null; } }
     }
     var cands = [];                                                  // acciones abiertas → la más reciente manda
     if (pick) cands.push({ k: "pick", ts: pickTs, tanda: pick });
     if (arm) cands.push({ k: "arm", ts: armTs, tanda: arm });
     if (tog) cands.push({ k: tog, ts: togTs });
+    else if (rkTog) cands.push({ k: rkTog, ts: rkTs });
     // v23.64: sin nada abierto y con guardado reciente → "Guardando" desde el primer movimiento de la racha
     if (!cands.length && gstUlt && (nowMs - gstUlt) <= MON_GST_VIVO_MIN * 60000) cands.push({ k: "GST", ts: gstIni });
     cands.sort(function (a, b) { return b.ts - a.ts; });
@@ -61746,7 +61751,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.97"></script>
+<script src="importacion.js?v=28.98"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64675,10 +64680,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.97"></script>
-<script src="hotsale.js?v=28.97"></script>
-<script src="estadisticas.js?v=28.97"></script>
-<script src="ads.js?v=28.97"></script>
+<script src="cobranzas.js?v=28.98"></script>
+<script src="hotsale.js?v=28.98"></script>
+<script src="estadisticas.js?v=28.98"></script>
+<script src="ads.js?v=28.98"></script>
 
 </body>
 </html>
