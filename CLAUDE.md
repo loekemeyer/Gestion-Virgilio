@@ -8608,3 +8608,18 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
 - Lectura: `select * from public.gv_gp2_espejo_insumos(null, true);` (qué haría) · `select * from public."GV_GP2_Espejo_Log" order by id desc;`
 - Rollback: `select cron.unschedule('gv-gp2-espejo-insumos');` + `alter table public."Movimientos_Stock" disable trigger zz_gv_gp2_espejo_insumos;`
 - `sql/gv_gp2_espejo_insumos_v2932.sql`.
+
+## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
+
+- **Nombres**: un insumo de Virgilio vinculado a GP2 lleva el nombre de GP2 (v29.34: cajas, bolsas, C15, C6, A15, G11, G13).
+  Un **fleje** se llama «<medida de GP2> · <nombre de GP2>» (`84 x 1,75 · Fleje N° 13`): la medida adelante sigue
+  ordenando la lista del operario (`_insMedida`). Lo arma `gv_gp2_nombre_insumo(comp)`.
+- **Recibir insumos** (`showInsumoModal` RI): además de los insumos de Virgilio aparecen TODOS los componentes de GP2 del
+  rubro (`gv_gp2_componentes_ri`, anon; rubro → sector: crudo 1 · procesado 2 · fleje 5 · partes plásticas 6 · cajas 11 ·
+  bolsas 14). Elegir uno que falta lo da de alta en Virgilio con el código y el nombre de GP2 y lo vincula
+  (`gv_insumo_desde_gp2`, idempotente); mismo código y mismo rubro sin vincular → sólo se vincula (no se duplica); código de
+  GP2 ya usado por otra cosa en Virgilio → código + sufijo de sector (`A9 CJ`). Así nadie carga como «insumo nuevo» algo
+  que ya tiene nombre. La bolsa ya vinculada se ve al recibir aunque no tenga lugar en el Mapa. Sin respuesta de GP2, la
+  pantalla queda como antes. Lo recibido se copia a GP2 por el espejo de la v29.32.
+- El conteo de insumos del martes 13/10 corrige el stock. `sql/gv_insumos_nombre_gp2_v2934.sql`,
+  `sql/gv_ri_catalogo_gp2_v2935.sql` (respaldo de nombres adentro), centinela 388, `tests/ins-ri-gp2-catalogo.cjs`.

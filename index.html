@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.34"></script>
+<script type="module" src="recepcion.js?v=29.35"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10701,7 +10701,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.34";
+const APP_VERSION = "v29.35";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27261,6 +27261,14 @@ function insCatOf(it) { const k = String((it && it.cat) || "").trim(); return in
 /* Sin categoría = sin clasificar = pendiente de una decisión del admin. En la botonera
    del operario tiene su propia tarjeta ❓ y no se cuenta entre los "en uso". */
 function insSinCat(it) { return insCatOf(it) === ""; }
+/* v29.35 (Thomas, D43): catálogo de GP2 para Recibir insumos. Lo válido es GP2: el operario ve TODOS los
+   componentes del rubro, así no carga como «insumo nuevo» algo que ya tiene nombre. null = no se pudo leer. */
+async function insFetchGp2Ri() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_gp2_componentes_ri", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" });
+    return r.ok ? await r.json() : null;
+  } catch (_e) { return null; }
+}
 async function insFetchCatalogo() {
   try {
     // v22.80: la ubicación que ve el operario es la del módulo de Insumos resuelta contra el Mapa (vista_insumos).
@@ -27656,7 +27664,7 @@ async function showInsumoModal(mode, legajo, _resume) {
     // force: si el admin cambió una categoría o una unidad, el operario la ve en la
     // próxima apertura de RI/EI sin tener que recargar la app.
     await insLoadMeta(true);
-    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni()]);
+    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni(), mode === "RI" ? insFetchGp2Ri() : Promise.resolve(null)]);
     const saldos = res[1] || {};
     const xUni = res[2] || {};
     // idea 7382: default de unidad = la unidad real del saldo si el insumo tiene UNA sola
@@ -27683,7 +27691,19 @@ async function showInsumoModal(mode, legajo, _resume) {
     if (mode === "RI") lista = lista.filter(function (x) { return INS_RI_SIN.indexOf(insCatOf(x)) < 0; });
     // v29.25 (09/10): de PLÁSTICOS se tocan sólo las 9 bolsas reales (con lugar en el Mapa), en RI y EI.
     // Ni los TMP- ni los códigos viejos (1262500, 1266500, 1445): no se reciben ni se entregan.
-    lista = lista.filter(function (x) { return insCatOf(x) !== "plastico" || _insEsBolsaIny(x); });
+    // v29.35 (D43): en RECEPCIÓN aparecen además todos los componentes de GP2 del rubro. Un insumo ya vinculado a
+    // GP2 se ve aunque no tenga lugar en el Mapa; el que falta en Virgilio se da de alta al elegirlo (gv_insumo_desde_gp2).
+    const gp2Ri = (mode === "RI" && Array.isArray(res[3])) ? res[3] : [];
+    const gp2Vinc = {};
+    gp2Ri.forEach(function (g) { if (g.cod_virgilio) gp2Vinc[_insK(g.cod_virgilio)] = true; });
+    lista = lista.filter(function (x) { return insCatOf(x) !== "plastico" || _insEsBolsaIny(x) || (mode === "RI" && gp2Vinc[_insK(x.cod)]); });
+    gp2Ri.forEach(function (g) {
+      if (g.cod_virgilio || INS_RI_SIN.indexOf(g.categoria) >= 0) return;
+      // mismo código y mismo rubro ya en Virgilio sin vincular: es ese insumo; se vincula al elegirlo
+      const igual = lista.filter(function (x) { return _insK(x.cod) === _insK(g.codigo) && insCatOf(x) === g.categoria; })[0];
+      if (igual) { igual.gp2Comp = g.comp_id; return; }
+      lista.push({ cod: "", gp2Comp: g.comp_id, gp2Cod: g.codigo, nombre: g.nombre || "", sector: "", ubic: "", cat: g.categoria, orden: null, noCode: false, stock: 0, stockByUni: null, qty: 0, unidad: _defUni(null, g.categoria) });
+    });
     // v29.30 (Thomas): de CAJAS se tocan sólo las 11 cajas reales (Caja Nº 1 … Nº 29), ningún TMP-.
     lista = lista.filter(function (x) { return insCatOf(x) !== "cajas" || (!_insEsTmp(x) && !x.noCode); });
     // v29.22 (Luis): envío a un INYECTOR = sólo las bolsas plásticas reales (las que tienen
@@ -27844,6 +27864,7 @@ function _insNum(n) { return Math.round(n * 1000) / 1000; }
    sector con 📍 si es de los viejos (sector + descripción). */
 function _insEsTmp(it) { return !!(it && (it.tmp || /^TMP-/.test(String(it.cod || "")))); }
 function _insBtnCod(it) {
+  if (it && it.gp2Comp && !it.cod) return it.gp2Cod || "GP2";
   if (_insEsTmp(it)) return it.cod ? ("🆕 " + it.cod) : "🆕 …";
   return it.noCode ? ("📍 " + (it.sector || String(it.cod).split("·")[0] || "")) : it.cod;
 }
@@ -27900,7 +27921,7 @@ function insRender() {
     const base = f
       ? (cat ? _ins.items.filter(function (it) { return insCatOf(it) === (cat === "?" ? "" : cat); }) : _ins.items)
       : _ins.items.filter(function (it) { const k = insCatOf(it); return cat === "?" ? k === "" : k === cat; });
-    const shown = (f ? base.filter(function (it) { return stkMatchBusq(f, it.cod, (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || ""), true); }) : base)   // v21.43
+    const shown = (f ? base.filter(function (it) { return stkMatchBusq(f, it.cod || it.gp2Cod || "", (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || ""), true); }) : base)   // v21.43
       .slice().sort(_insSortCat(cat));
     if (_ins.soloBolsas) h += '<div class="ins-bar"><span class="ins-bar-t">🧪 Bolsas plásticas</span></div>';
     else h += '<div class="ins-bar"><button class="ins-back" onclick="insBack()">‹ Atrás</button>' +
@@ -28138,7 +28159,31 @@ function _insQtyHtml(it, i, isIn) {
     '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + (it.qty > 0 && (!it.unidad || !insUniPermitida(_k, it.unidad)) ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
     '</div></div>';
 }
-function insOpenQty(i) { if (!_ins || !_ins.items[i]) return; const _mc = _insSaleMC(_ins.items[i]); if (_mc) _ins.items[i].unidad = _mc; if (insCatOf(_ins.items[i]) === "plastico") _ins.items[i].unidad = "Bolsas"; if (insCatOf(_ins.items[i]) === "cajas" && !_insUEq(_ins.items[i].unidad, "Paquetes")) _ins.items[i].unidad = "Uni"; _ins.qty = i; insRender(); }
+/* v29.35 (D43): un componente de GP2 que Virgilio no tiene se da de alta (código y nombre de GP2) antes de cargar
+   la cantidad; uno con el mismo código se vincula. Sin red no se da de alta (no hay código que inventar). */
+async function _insGp2Alta(it) {
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_desde_gp2", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: JSON.stringify({ p_comp_id: it.gp2Comp, p_legajo: _ins ? _ins.legajo : null }) });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const cod = String(await r.json() || "").trim();
+  if (!cod) throw new Error("sin código");
+  return cod;
+}
+function insOpenQty(i) {
+  const it0 = _ins && _ins.items[i];
+  if (it0 && it0.gp2Comp && !it0.gp2Ok) {
+    if (!it0.cod) {
+      if (it0._gp2Busy) return;
+      it0._gp2Busy = true;
+      _insGp2Alta(it0).then(function (cod) { it0.cod = cod; it0.gp2Ok = true; it0._gp2Busy = false; if (_ins && _ins.items[i] === it0) _insOpenQtyYa(i); })
+        .catch(function (e) { it0._gp2Busy = false; try { alert("No se pudo dar de alta " + (it0.gp2Cod || "") + " desde GP2 (" + (e && e.message || e) + ").\n\nRevisá la conexión y probá de nuevo."); } catch (_e) {} });
+      return;
+    }
+    it0.gp2Ok = true;
+    _insGp2Alta(it0).catch(function () { it0.gp2Ok = false; });   // vincula el mismo código; no frena la carga
+  }
+  _insOpenQtyYa(i);
+}
+function _insOpenQtyYa(i) { if (!_ins || !_ins.items[i]) return; const _mc = _insSaleMC(_ins.items[i]); if (_mc) _ins.items[i].unidad = _mc; if (insCatOf(_ins.items[i]) === "plastico") _ins.items[i].unidad = "Bolsas"; if (insCatOf(_ins.items[i]) === "cajas" && !_insUEq(_ins.items[i].unidad, "Paquetes")) _ins.items[i].unidad = "Uni"; _ins.qty = i; insRender(); }
 /* v29.29 (Thomas, 09/10): kg de las bolsas plásticas. El kg por bolsa es el de GP2
    (GP2.parametro material_plastico_kg_x_bolsa, viene en el bundle); sin dato, 25. */
 function _insKgXBolsa() { const g = _ins && _ins.gp2 && _ins.gp2.mv; const k = Number(g && g.kg_x_bolsa); return k > 0 ? k : 25; }
@@ -62103,7 +62148,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.34"></script>
+<script src="importacion.js?v=29.35"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65033,12 +65078,12 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.34"></script>
-<script src="hotsale.js?v=29.34"></script>
-<script src="estadisticas.js?v=29.34"></script>
-<script src="ads.js?v=29.34"></script>
+<script src="cobranzas.js?v=29.35"></script>
+<script src="hotsale.js?v=29.35"></script>
+<script src="estadisticas.js?v=29.35"></script>
+<script src="ads.js?v=29.35"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.34"></script>
+<script src="ayuda.js?v=29.35"></script>
 
 </body>
 </html>

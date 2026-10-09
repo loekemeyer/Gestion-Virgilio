@@ -192,10 +192,11 @@ Tocá **📦** y **Enviar**. Hay **3 opciones**:
 
 - **📥 Recibir insumos**: entra stock de insumos. Primero **«¿Qué recibís?»**: elegís la categoría
   (plásticos, flejes, cajas, partes…; los importados no se reciben acá). Después **de dónde recibís** y
-  la **documentación** (Remito, Factura o los dos) y tocás **Enviar**. Adentro cargás las cantidades
-  (**«+ Agregar insumo nuevo»** si no está) y **«✓ Registrar entrada»**. En **plásticos** aparecen sólo
-  las **9 bolsas** que se usan (ABS, AI, EBA, NY c/Carga 25%, NY Recup, NY Virgen, PE Polie, PP 2630,
-  PS PE), al recibir y al entregar; una bolsa nueva no se agrega desde acá: se avisa al supervisor.
+  la **documentación** (Remito, Factura o los dos) y tocás **Enviar**. Adentro aparecen **todos los
+  insumos del rubro con el nombre de GP2**, también los que nunca se recibieron en Virgilio: buscá el
+  tuyo por nombre o código, cargá la cantidad y **«✓ Registrar entrada»**. **«+ Agregar insumo nuevo»**
+  es sólo si de verdad no está en la lista. En **plásticos**, al entregar aparecen sólo las bolsas que
+  se usan (con lugar en el Mapa); al recibir aparecen además las bolsas de GP2.
   Las bolsas se cargan sólo en **Bolsas** (abajo se ve cuántos kg son). En **cajas** aparecen las 11
   cajas (Caja Nº 1 … Nº 29); se cargan en **Cajas** o en **Paquetes** (cada paquete = 25 cajas). Al
   **recibir** cajas hay que marcar si son de **Loeke** o de **Chef** (es la misma caja; queda anotado).
