@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.12"></script>
+<script type="module" src="recepcion.js?v=29.13"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6524,7 +6524,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="showFaltAvisar()" style="position:relative;"><span class="sup-ico">📦➕</span><span>Completar Pedido</span><span id="cpBadge" class="dp-badge" style="display:none;" title="Pedidos con faltante que tiene stock para completarse"></span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()" style="position:relative;"><span class="sup-ico">📦</span><span>Stock y Compras</span><span id="stkBadge" class="dp-badge" style="display:none;" title="Códigos con stock negativo"></span><span id="stkOkBadge" style="display:none;position:absolute;top:2px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#16a34a;color:#fff;font-size:10px;font-weight:800;line-height:18px;text-align:center;pointer-events:none;">✓</span></button>
       <!-- v26.84 (Luis, 05/10): Importación pasa a GRANDE y Panel Web LK baja a chico. -->
-      <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">🚢</span><span>Importación</span></button>
+      <button class="sup-action-btn" onclick="openPedidosImportacion()" style="position:relative;"><span class="sup-ico">🚢</span><span>Importación</span><span id="impIrBadge" class="dp-badge" style="display:none;" title="Ingresos a racks de importación de los operarios sin revisar (Importación → 📥 Recibido)"></span></button>
       <button class="sup-action-btn" onclick="openRemitosAdmin()" style="position:relative;"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span><span id="rrBadge" class="dp-badge" style="display:none;" title="Remitos cargados al camión sin controlar todavía"></span><span id="rrAlertBadge" style="display:none;position:absolute;top:2px;left:2px;min-width:26px;height:26px;line-height:26px;padding:0 5px;border-radius:13px;background:#dc2626;color:#fff;font-size:15px;font-weight:800;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.35);" title="Hay remitos VENCIDOS (cargados hace +30 h sin controlar)">⚠️</span></button>
     </div>
     <div class="sup-sec-label">Reportes y configuración</div>
@@ -10697,7 +10697,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.12";
+const APP_VERSION = "v29.13";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30044,7 +30044,7 @@ function irRender() {
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas a mover' + (_ir.cod ? ' (máx ' + Math.round(disp) + ')' : '') + '</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div>';
     if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(codCanonSuf(_ir.cod)) + ' en ' + origTxt + '.</div>';
   } else {
-    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>se descuenta solo del pedido de importación en viaje</b> de ese código.</div>';
+    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="ej. 582E" value="' + escapeHtml(codBase(_ir.cod)) + '" oninput="irSetCod(this.value)"></div>';
     if (_ir.cod) h += '<div class="ir-desc">' + escapeHtml(nombre || "(código nuevo, sin nombre)") + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
     h += '<div class="ir-row2"><div class="ir-fld"><div class="ir-lbl">Masters</div><div class="ir-stp"><button class="ir-sb" onclick="irChgM(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.masters) || 0) + '" oninput="irSetM(this.value)"><button class="ir-sb" onclick="irChgM(1)">+</button></div></div>';
@@ -62045,7 +62045,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.12"></script>
+<script src="importacion.js?v=29.13"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62336,6 +62336,7 @@ function showSupervisor(email) {
   try { ppLoadBadge(); } catch (_e) {}   // v10.48: badge Pasaje de Papeles (pendientes de enviar)
   try { if (typeof adsLoadBadge === "function") adsLoadBadge(); } catch (_e) {}   // v27.20: badge violeta ADS (talleristas debajo del umbral)
   try { cgLoad(); } catch (_e) {}   // v28.58: conteos de góndola del picking que difieren
+  try { if (typeof impIrLoadBadge === "function") impIrLoadBadge(); } catch (_e) {}   // v29.11: badge 📥 Recibido por operarios (Importación)
   try { colaImpLoadBadge(); } catch (_e) {}   // v11.60: badge Cola de impresión NP (armadas sin imprimir; rojo si +24h)
   try { expIsisLoadBadge(); } catch (_e) {}   // badge Agregar Expreso ISIS (expresos que eligió el cliente en la página)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
@@ -64974,10 +64975,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.12"></script>
-<script src="hotsale.js?v=29.12"></script>
-<script src="estadisticas.js?v=29.12"></script>
-<script src="ads.js?v=29.12"></script>
+<script src="cobranzas.js?v=29.13"></script>
+<script src="hotsale.js?v=29.13"></script>
+<script src="estadisticas.js?v=29.13"></script>
+<script src="ads.js?v=29.13"></script>
 
 </body>
 </html>

@@ -28,6 +28,7 @@ function _impTabsHtml(cur) {
     '<button style="' + t(cur === 'ped') + '" onclick="openPedidosImportacion()">📦 Pedidos</button>' +
     '<button style="' + t(cur === 'alta') + '" onclick="openImpAgregar()" title="Dar de alta un importado nuevo o modificar uno existente: código, medidas, unidades, FOB, MOQ, proveedor, tipo, INAL, góndola y el primer pedido a mano.">➕ Agregar / modificar</button>' +
     '<button style="' + t(cur === 'curso') + '" onclick="openImpEnCurso()" title="Los pedidos YA HECHOS que vienen en camino: qué día embarcan y qué día llegan. No mira lo que hay que pedir.">🚢 En curso</button>' +
+    '<button style="' + t(cur === 'recop') + '" onclick="openImpRecibidoOp()" title="Lo que recibieron los operarios por Ingreso a racks (Importación): contra qué pedido se descontó, y para elegir el pedido cuando hay más de uno en viaje del mismo código.">📥 Recibido' + (_impIrN > 0 ? ' <span style="background:#dc2626;color:#fff;border-radius:999px;padding:0 6px;font-size:11px">' + _impIrN + '</span>' : '') + '</button>' +
     '<button style="' + t(cur === 'ntl') + '" onclick="openImpNtl()" title="La cuenta corriente de NTL, el forwarder de Hong Kong: depósitos, giros a las fábricas, recuperos y comisiones.">💱 NTL</button>' +
     '<button style="' + t(cur === 'provcc') + '" onclick="openImpProvCC()" title="Una cuenta por fábrica: cuánto le debemos por los pedidos en curso, cada giro, y la historia (hoja del Excel + extracto NTL).">📒 Cta. proveedor</button>' +
     '<button style="' + t(cur === 'hist') + '" onclick="openImpHistRecep()" title="Los pedidos hechos y las recepciones: qué se pidió, cuándo, cuánto llegó y dónde se guardó.">📜 Historial</button>' +
@@ -2331,7 +2332,8 @@ const _PED_IMP_RPC_ESCRITURA = ["gv_imp_carga_pedido_set", "gv_imp_cc_deuda_add"
   "gv_imp_cervantes_denegados",   // v25.37
   "gv_imp_pi_editar", "gv_imp_pi_editores", "gv_imp_pi_ediciones",   // v25.94 — editar una PI (quién, cuándo): sólo supervisor
   "gv_importados_curso_fob",   // v26.37 — el FOB guardado en cada pedido en curso (lectura, sólo supervisor)
-  "gv_importado_alta", "gv_importado_guardar", "gv_importado_ficha"];   // v26.98/v26.99 — ➕ Agregar / modificar producto (sólo supervisor)
+  "gv_importado_alta", "gv_importado_guardar", "gv_importado_ficha",   // v26.98/v26.99 — ➕ Agregar / modificar producto (sólo supervisor)
+  "gv_imp_ir_avisos", "gv_imp_ir_asignar", "gv_imp_ir_visto"];   // v29.11 — 📥 Recibido por operarios (sólo supervisor)
 async function _pedImpRpc(fn, body) {
   var headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
   if (_PED_IMP_RPC_ESCRITURA.indexOf(fn) >= 0) {
@@ -3449,6 +3451,102 @@ async function openImpDisc() {
       return '<tr><td class="c"><b>' + escapeHtml(c) + '</b></td><td>' + escapeHtml(r.descripcion || "") + '</td><td class="c">' + m + '</td><td class="c">' + escapeHtml(r.proveedor || "—") + '</td><td class="num">' + n(r.stock_total) + '</td><td class="num">' + n(r.pedido_curso) + '</td><td>' + escapeHtml(mot[c.toUpperCase()] || "—") + '</td></tr>';
     }).join("") + '</tbody></table>';
   body.innerHTML = h;
+}
+/* v29.11 (Luis, 09/10: "que el operario no tenga que elegir el pedido para recepcionar. que eso se resuelva en el
+   modulo de importacion") — 📥 Recibido. Lo que los operarios cargan por Ingreso a racks → 📦 Importación ya movió
+   el stock; acá se ve contra qué pedido se descontó (gv_imp_imputar_ingreso_racks) y se cambia si hace falta.
+   Con DOS o más pedidos en viaje del mismo código la base NO elige: queda «a elegir» y se resuelve acá
+   (gv_imp_ir_asignar). Nada de esto mueve stock. Badge = renglones sin revisar (gv_imp_ir_avisos). */
+var _impIrN = 0;
+function _impIrBadgePintar() {
+  var b = document.getElementById("impIrBadge");
+  if (b) { b.textContent = _impIrN > 0 ? String(_impIrN) : ""; b.style.display = _impIrN > 0 ? "" : "none"; }
+}
+async function impIrLoadBadge() {
+  try {
+    var rows = await _pedImpRpc("gv_imp_ir_avisos", { p_dias: 30 });
+    if (!Array.isArray(rows)) return;
+    _impIrN = rows.filter(function (r) { return r && r.pendiente; }).length;
+    _impIrBadgePintar();
+  } catch (_e) { /* sin sesión de supervisor o sin red: el badge queda como estaba */ }
+}
+async function openImpRecibidoOp() {
+  _stkPopShell("📥 Recibido por operarios", "stkPopBody", true);
+  var body = document.getElementById("stkPopBody"); if (!body) return;
+  body.innerHTML = _impTabsHtml('recop') + '<div class="stkpop-empty">Cargando…</div>';
+  _stkPop = { kind: "impIr", rows: [], err: "", todos: false, sel: {} };
+  await _impIrLeer();
+}
+async function _impIrLeer() {
+  if (!_stkPop || _stkPop.kind !== "impIr") return;
+  try { _stkPop.rows = (await _pedImpRpc("gv_imp_ir_avisos", { p_dias: 30 })) || []; _stkPop.err = ""; }
+  catch (e) { _stkPop.err = _impRecErr(e); }
+  if (!_stkPop.err) { _impIrN = _stkPop.rows.filter(function (r) { return r && r.pendiente; }).length; _impIrBadgePintar(); }
+  _impIrRender();
+}
+function impIrVerTodos(v) { if (!_stkPop || _stkPop.kind !== "impIr") return; _stkPop.todos = !!v; _impIrRender(); }
+function impIrSel(mov, v) { if (!_stkPop || _stkPop.kind !== "impIr") return; _stkPop.sel[mov] = v; }
+async function impIrGuardar(mov) {
+  if (!_stkPop || _stkPop.kind !== "impIr") return;
+  var r = (_stkPop.rows || []).filter(function (x) { return String(x.mov_id) === String(mov); })[0]; if (!r) return;
+  var v = _stkPop.sel[mov];
+  if (v === undefined || v === "") { alert("Elegí de qué pedido es."); return; }
+  var bache = (v === "none") ? null : Number(v);
+  var txt = bache == null ? "No es de ningún pedido: se deshace el descuento (el stock no se toca)."
+    : "Se descuentan " + (r.cajas || 0) + " cajas de " + (r.cod || "") + " del pedido elegido" + (r.bache_id ? " (y se devuelven al pedido anterior)" : "") + ". El stock no se toca.";
+  if (!confirm(txt + "\n\n¿Seguro?")) return;
+  try { await _pedImpRpc("gv_imp_ir_asignar", { p_mov_id: Number(mov), p_bache_id: bache }); }
+  catch (e) { alert(_impRecErr(e)); return; }
+  delete _stkPop.sel[mov];
+  await _impIrLeer();
+  try { pedImpReload(); } catch (_e) {}
+}
+async function impIrVisto(mov) {
+  try { await _pedImpRpc("gv_imp_ir_visto", { p_mov_id: Number(mov) }); }
+  catch (e) { alert(_impRecErr(e)); return; }
+  await _impIrLeer();
+}
+function _impIrRender() {
+  if (!_stkPop || _stkPop.kind !== "impIr") return;
+  var body = document.getElementById("stkPopBody"); if (!body) return;
+  var h = _impTabsHtml('recop') +
+    '<div class="stkpop-hint">Lo que cargaron los operarios por <b>Ingreso a racks → 📦 Importación</b>. El stock ya entró. Si hay un solo pedido en viaje de ese código se descuenta solo; si hay <b>dos o más</b>, se elige acá. <b>↔</b> cambia el pedido contra el que se descontó.</div>';
+  if (_stkPop.err) { body.innerHTML = h + '<div class="stkpop-empty">No se pudo leer lo recibido: ' + escapeHtml(_stkPop.err) + '</div>'; return; }
+  var all = _stkPop.rows || [];
+  var rows = _stkPop.todos ? all : all.filter(function (r) { return r.pendiente; });
+  var nPend = all.filter(function (r) { return r.pendiente; }).length;
+  h += '<label style="display:inline-flex;gap:6px;align-items:center;font-size:13px;margin:0 0 8px"><input type="checkbox" style="width:auto" ' + (_stkPop.todos ? 'checked' : '') + ' onchange="impIrVerTodos(this.checked)"> Ver también lo revisado (30 días) · ' + nPend + ' sin revisar</label>';
+  if (!rows.length) { body.innerHTML = h + '<div class="stkpop-empty">' + (_stkPop.todos ? 'No hay ingresos de importación en 30 días.' : 'Nada para revisar.') + '</div>'; return; }
+  var _n = function (v) { return Math.round(Number(v) || 0).toLocaleString("es-AR"); };
+  var _f = function (ts) { if (!ts) return "—"; var d = new Date(ts); if (isNaN(d)) return "—"; return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) + ' ' + d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }); };
+  h += '<div class="mva-tblwrap" style="max-height:66vh;overflow-x:auto"><table class="mva-tbl" style="font-size:13px;width:auto;min-width:0;table-layout:auto">' +
+    '<thead><tr><th>Cuándo</th><th>Código</th><th class="num">Cajas</th><th class="num">Unid.</th><th>Rack</th><th>Operario</th><th>Pedido</th><th>Cambiar</th><th></th></tr></thead><tbody>';
+  rows.forEach(function (r) {
+    var mov = String(r.mov_id);
+    var ped;
+    if (r.resultado === "a_elegir") ped = '<span style="background:#fee2e2;color:#b91c1c;border-radius:999px;padding:1px 8px;font-weight:800;font-size:11.5px">⚠ elegir pedido</span>';
+    else if (r.resultado === "imputado") ped = '<b>' + escapeHtml(r.pedido_ref || ("#" + r.bache_id)) + '</b>' + (r.proveedor ? ' <span class="irc-muted">' + escapeHtml(r.proveedor) + '</span>' : '');
+    else ped = '<span class="irc-muted">' + escapeHtml(r.motivo || r.resultado || "") + '</span>';
+    var cands = Array.isArray(r.candidatos) ? r.candidatos : [];
+    var opt = '<option value="">—</option>' + cands.map(function (c) {
+      var pend = (Number(c.unidades) || 0) - (Number(c.llegadas) || 0);
+      return '<option value="' + c.bache_id + '">' + escapeHtml((c.pedido_ref || ("#" + c.bache_id)) + (c.proveedor ? " · " + c.proveedor : "") + (c.marca ? " · " + c.marca : "") +
+        " · faltan " + _n(Math.max(0, pend)) + " u" + (c.reingreso ? " · " + _isoToDdMmAa(String(c.reingreso).slice(0, 10)) : "") + (c.actual ? " (actual)" : "")) + '</option>';
+    }).join('') + (r.resultado === "imputado" || r.resultado === "a_elegir" ? '<option value="none">No es de ningún pedido</option>' : '');
+    var cambiar = (cands.length || r.resultado === "imputado")
+      ? '<select style="width:auto;max-width:280px;height:30px;font-size:12.5px" onchange="impIrSel(\'' + mov + '\', this.value)">' + opt + '</select> <button class="stk-btn" style="width:auto;margin:0;padding:3px 9px;font-size:12.5px" onclick="impIrGuardar(\'' + mov + '\')" title="Descontar de este pedido">↔</button>'
+      : '<span class="irc-muted">—</span>';
+    var visto = r.pendiente
+      ? (r.resultado === "a_elegir" ? '' : '<button class="stk-btn" style="width:auto;margin:0;padding:3px 9px;font-size:12.5px" onclick="impIrVisto(\'' + mov + '\')" title="Marcar como revisado">✓ Visto</button>')
+      : '<span class="irc-muted" title="' + escapeHtml(r.revisado_por || "") + '">✓ ' + _f(r.revisado_en) + '</span>';
+    h += '<tr' + (r.resultado === "a_elegir" ? ' style="background:#fff7ed"' : '') + '><td style="white-space:nowrap">' + _f(r.ts) + '</td>' +
+      '<td style="white-space:normal;max-width:220px"><b>' + escapeHtml(r.cod || "") + '</b>' + (r.descripcion ? '<br><span class="irc-muted">' + escapeHtml(r.descripcion) + '</span>' : '') + '</td>' +
+      '<td class="num">' + _n(r.cajas) + '</td><td class="num">' + (r.unidades != null ? _n(r.unidades) : '—') + '</td>' +
+      '<td style="white-space:nowrap">' + escapeHtml(r.sector || "—") + '</td>' +
+      '<td style="white-space:nowrap">' + escapeHtml(r.operario || r.legajo || "—") + '</td>' +
+      '<td style="white-space:normal;max-width:220px">' + ped + '</td><td style="white-space:nowrap">' + cambiar + '</td><td style="white-space:nowrap">' + visto + '</td></tr>';
+  });
+  body.innerHTML = h + '</tbody></table></div>';
 }
 /* Solapa 📜 Historial (v23.91, Luis: "debería pasar a ser Historial y mostrar recepción y
    pedidos"). Dos vistas del mismo circuito: lo que se PIDIÓ (baches, agrupados por pedido y

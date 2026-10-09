@@ -4050,6 +4050,13 @@ ni por 📥 RECIBIR, y el pedido seguía «en viaje». (Los marcadores y centine
   957E 2.448 de 4.752 → sigue en viaje. ⚠ El IR de **«606» 10 cajas** (X22, 09:16) no se imputó: no es importado
   (¿606E?, que está en el mismo PI).
 - `sql/gv_imp_ingreso_racks_v2896.sql`, `tests/imp-ingreso-racks.cjs`.
+- ⚠⚠ **v29.13 (Luis, 09/10: *"que el operario no tenga que elegir el pedido para recepcionar. que eso se resuelva en el
+  modulo de importacion"*): el pedido se resuelve en Importación → 📥 Recibido.** Un solo pedido en viaje de ese código →
+  se descuenta solo (como antes). **Dos o más → NO se descuenta**: queda `a_elegir` en `GV_Imp_Ingreso_Racks_Log` (con los
+  candidatos) y un supervisor lo elige con **↔** (`gv_imp_ir_asignar`, que también cambia o deshace uno ya descontado: le
+  devuelve lo llegado al pedido anterior y anula su recepción). **✓ Visto** = `gv_imp_ir_visto`. Badge rojo en el botón
+  Importación y en la solapa (`gv_imp_ir_avisos`: renglones sin revisar). Nada de esto mueve stock. El operario no elige
+  nada. Centinelas v29.11 (marcador de la base). `sql/gv_imp_ir_resolver_v2913.sql`, `tests/imp-ir-resolver.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-29, v23.95): los MESES OBJETIVO se eligen en el encabezado del proveedor
 
