@@ -8580,3 +8580,12 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
   plástico, código real, con ubicación en el Mapa, sin TMP-), sin «‹ Atrás» ni buscador (`_ins.soloBolsas`). Al 09/10 son 9
   (ABS, AI, EBA, NY c/Carga 25%, NY Recup, NY Virgen, PE Polie, PP 2630, PS PE). Una bolsa nueva aparece cuando se le da ubicación.
 - `tests/ins-ri-cat-bolsas.cjs`.
+
+## ⚠ REGLA (v29.24, 09/10): el REPLAY de Terminar Día no re-manda los items SÓLO de Historial (`h_*`)
+
+- `bulkSendDayReplay` re-manda el Historial del día con `client_id = item.id`. Las tareas de módulo (guardado MG, bajar/ingreso
+  a racks RKB/IRT, Mover racks / Insumos / CP / RC por MDT) dejan un item de Historial con id `h_*` y su evento real sale con
+  OTRO id (`rkb_`, `irt_`, `mdt_`…): el replay los DUPLICABA en el servidor (09/10: 104 y 277, con `h_mg` de opcion MG y el
+  tramo entero del módulo, y `h_mdt` con opcion INS). Hoy esos items llevan `noReplay: true` y el replay saltea todo `h_*`.
+- Al agregar un item de Historial que no es el evento enviado: `noReplay: true`. `tests/historial-no-replay.cjs`.
+
