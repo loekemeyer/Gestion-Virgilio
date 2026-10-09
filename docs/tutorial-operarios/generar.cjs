@@ -14,34 +14,34 @@ const INDEX = path.join(DIR, "..", "..", "index.html");
 // número → [código del botón (data-code o id), título, explicación]. El orden es el de lectura.
 const ITEMS = [
   ["sec", "Arriba de todo"],
-  [".back-top", "← Volver", "Vuelve a la pantalla de inicio, con el resumen de lo que hiciste hoy."],
-  ["#btnTerminarDia", "Terminar Día", "Al irte. Cierra tu día. Un picking o armado sin terminar queda guardado y se sigue mañana."],
-  ["#tmMuerto", "Tiempo muerto", "Tiempo desde tu última tarea. A los 5 minutos sin marcar nada, suena la alarma en la TV."],
-  ["#btnHistTareas", "Historial de tareas", "Todo lo que marcaste hoy, con cuánto duró cada tarea."],
+  [".back-top", "← Volver", "Vuelve al inicio."],
+  ["#btnTerminarDia", "Terminar Día", "Al irte. Lo abierto se sigue mañana."],
+  ["#tmMuerto", "Tiempo muerto", "Desde tu última tarea. A los 5 min suena alarma."],
+  ["#btnHistTareas", "Historial de tareas", "Lo que marcaste hoy."],
   ["sec", "Picking"],
-  ["EP", "EP · Empecé Picking", "Elegís la tanda y la app te lleva góndola por góndola. Confirmás las cajas de cada código y al final terminás (o la frenás para seguirla después)."],
-  ["AP", "AP · Empecé Armado Pedido", "Elegís una tanda ya pickeada y armás NP por NP con el asistente. Al terminar cada NP sale su hoja."],
+  ["EP", "EP · Empecé Picking", "Elegís tanda y pickeás góndola por góndola."],
+  ["AP", "AP · Empecé Armado Pedido", "Armás NP por NP una tanda pickeada."],
   ["sec", "Depósito y carga"],
-  ["RT", "RT · Recepción Mercadería", "Cargás lo que entrega cada tallerista o proveedor: código y cajas, contra su OC."],
-  ["MG", "MG · Guardado a Góndola", "Guardás lo que llegó (A guardar) o el excedente. Marcás cada código guardado y al final «Terminé de guardar»."],
-  ["CC", "CC · Carga Camión", "Al empezar y al terminar de cargar el camión. Marcás cada NP que sube."],
+  ["RT", "RT · Recepción Mercadería", "Cargás lo que entrega el proveedor."],
+  ["MG", "MG · Guardado a Góndola", "Guardás lo que llegó o el excedente."],
+  ["CC", "CC · Carga Camión", "Al empezar y al terminar de cargar."],
   ["sec", "Acciones secundarias"],
-  ["CR", "CR · Control Remitos", "Antes de cargar: controlás los pedidos facturados del reparto y los marcás «Controlado»."],
-  ["RR", "RR · Recepción Remitos", "Cuando vuelve el reparto: marcás los remitos recibidos, o «s/salida» si el pedido volvió."],
-  ["INS", "Insumos y Productos", "Recibir insumos, entregar insumos o salida a Cervantes."],
-  ["CP", "CP · Completar Pedido", "Sumás cajas que llegaron tarde a un pedido ya armado que tenía faltante."],
-  ["RC", "RC · Pasar a urgente", "Sacás cajas de un pedido que sale después y se las das a uno que sale antes y le faltan."],
-  ["IR", "IR · Ingreso a Racks", "Subís palets a una posición de rack."],
-  ["RKBM", "BR · Bajar de Racks", "Bajás cajas del rack a A guardar. La posición es obligatoria y contás lo que queda en el rack."],
-  ["MOV", "Mover racks", "Pasás mercadería de una posición de rack a otra."],
-  ["PPP", "PPP · Programación por día", "Para mirar qué sale los próximos días: m³, tandas y NP."],
-  ["sec", "Pausas · tocá al empezar y otra vez al volver"],
-  ["AT", "AT · Atendí Timbre", "Mientras atendés la puerta."],
-  ["PB", "PB · Paré Baño", "Mientras estás en el baño."],
-  ["Limp", "Limp · Limpieza", "Mientras limpiás."],
-  ["Perm", "Perm · Permiso de Salida", "Si salís del depósito con permiso."],
-  ["PC", "PC · Paré Comida", "Mientras comés."],
-  ["CT", "CT · Conteo", "Mientras hacés un conteo de stock."],
+  ["CR", "CR · Control Remitos", "Controlás los pedidos antes de cargar."],
+  ["RR", "RR · Recepción Remitos", "Remitos que vuelven del reparto."],
+  ["INS", "Insumos y Productos", "Recibir, entregar o mandar a Cervantes."],
+  ["CP", "CP · Completar Pedido", "Sumás cajas que llegaron tarde."],
+  ["RC", "RC · Pasar a urgente", "Pasás cajas a un pedido que sale antes."],
+  ["IR", "IR · Ingreso a Racks", "Subís palets al rack."],
+  ["RKBM", "BR · Bajar de Racks", "Bajás cajas del rack a A guardar."],
+  ["MOV", "Mover racks", "De una posición de rack a otra."],
+  ["PPP", "PPP · Programación por día", "Qué sale los próximos días."],
+  ["sec", "Pausas · tocá al empezar y al volver"],
+  ["AT", "AT · Atendí Timbre", ""],
+  ["PB", "PB · Paré Baño", ""],
+  ["Limp", "Limp · Limpieza", ""],
+  ["Perm", "Perm · Permiso de Salida", ""],
+  ["PC", "PC · Paré Comida", ""],
+  ["CT", "CT · Conteo", ""],
 ];
 
 (async () => {
@@ -82,14 +82,14 @@ const ITEMS = [
     const r = rects[n]; n++;
     const cx = (r.x + r.w - 2) / clip.width * 100, cy = (r.y - top + 2) / clip.height * 100;
     pins.push(`<div class="pin" style="left:${cx}%;top:${cy}%">${n}</div>`);
-    notas.push(`<div class="kp"><div class="num">${n}</div><div><b>${it[1]}</b><span>${it[2]}</span></div></div>`);
+    notas.push(`<div class="kp"><div class="num">${n}</div><div><b>${it[1]}</b>${it[2] ? "<span>" + it[2] + "</span>" : ""}</div></div>`);
   }
   // izquierda: arriba + picking + depósito · derecha: secundarias · abajo, a lo ancho: las pausas
   const secs = []; notas.forEach((x, i) => { if (x.startsWith('<div class="sec"')) secs.push(i); });
   const [sArr, sPick, sDep, sSec, sPau] = secs;
   const izq = notas.slice(0, sSec).join(""), der = notas.slice(sSec, sPau).join("");
   const pausaTit = notas[sPau], pausas = notas.slice(sPau + 1).join("");
-  const imgW = 168, imgH = imgW * clip.height / clip.width;
+  const imgW = 205, imgH = imgW * clip.height / clip.width;
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
   @page { size: 400mm 500mm; margin: 0 }
   * { box-sizing: border-box }
@@ -98,12 +98,12 @@ const ITEMS = [
   h1 { margin: 0; font-size: 22mm; text-align: center; letter-spacing: -.3mm }
   .sub { text-align: center; font-size: 8mm; margin: 3mm 0 7mm; color: #333 }
   .sub b { background: #111; color: #fff; padding: 0 2.5mm; border-radius: 2mm }
-  .cuerpo { flex: 1; display: grid; grid-template-columns: 1fr ${imgW}mm 1fr; gap: 8mm; align-items: center }
+  .cuerpo { flex: 1; display: grid; grid-template-columns: 1fr ${imgW}mm 1fr; gap: 6mm; align-items: center }
   .col { display: flex; flex-direction: column; gap: 3.2mm }
   .sec { font-size: 6.2mm; font-weight: 700; text-transform: uppercase; color: #555; border-bottom: .5mm solid #999; margin-top: 3mm; padding-bottom: 1mm }
   .kp { display: flex; gap: 3mm; align-items: flex-start }
-  .kp b { display: block; font-size: 6.4mm; line-height: 1.1 }
-  .kp span { display: block; font-size: 5.2mm; line-height: 1.22; color: #222 }
+  .kp b { display: block; font-size: 7mm; line-height: 1.1 }
+  .kp span { display: block; font-size: 5.8mm; line-height: 1.22; color: #222 }
   .num, .pin { background: #111; color: #fff; font-weight: 700; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex: none }
   .num { width: 10mm; height: 10mm; font-size: 5.6mm }
   .tel { position: relative; width: ${imgW}mm; height: ${imgH}mm; border: 1.2mm solid #111; border-radius: 6mm; overflow: visible; background: #fff }
@@ -115,14 +115,14 @@ const ITEMS = [
   .pie div:first-child { max-width: 300mm }
   </style></head><body><div class="pag">
   <h1>Botonera del operario</h1>
-  <div class="sub">Tocá el botón y después <b>Enviar</b>. Marcá siempre lo que estás haciendo.</div>
+  <div class="sub">Tocá el botón y después <b>Enviar</b>.</div>
   <div class="cuerpo">
     <div class="col">${izq}</div>
     <div class="tel"><img src="data:image/png;base64,${png.toString("base64")}">${pins.join("")}</div>
     <div class="col">${der}</div>
   </div>
   <div class="pausas">${pausaTit}<div class="pgrid">${pausas}</div></div>
-  <div class="pie"><div>¿Te equivocaste? Después de enviar aparece <b>«Deshacer»</b> durante 60 segundos.</div><div>Gestión Virgilio</div></div>
+  <div class="pie"><div>¿Te equivocaste? <b>«Deshacer»</b> (60 s).</div><div>Gestión Virgilio</div></div>
   </div></body></html>`;
   
   const b2 = await chromium.launch();
