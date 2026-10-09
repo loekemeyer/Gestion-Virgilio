@@ -5,7 +5,7 @@
    (d) «Envío a inyectores» muestra SÓLO las bolsas plásticas reales (plástico, con ubicación,
        sin TMP-), sin «‹ Atrás» ni buscador;
    (f) v29.28 (D9): «Envío a otros» sin bolsas; «Envío a inyectores» sólo bolsas;
-   (h) v29.30: cajas sin TMP, en cajas o paquetes (×25), guardadas en cajas;
+   (h) v29.30/31: cajas sin TMP, en cajas o paquetes (×25), guardadas en cajas; al recibir, marca Loeke/Chef obligatoria;
    (g) v29.29: la bolsa sólo en Bolsas, con su equivalente en kg (también en el movimiento);
    (e) v29.25: en RECIBIR y en «Envío a otros», de plásticos sólo las bolsas reales (sin TMP- ni
        códigos viejos), sin «+ Agregar insumo» en plásticos ni la categoría en el alta. Sale 1 si falla. */
@@ -89,11 +89,15 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const ic = _ins.items.findIndex(function (x) { return x.cod === "Caja Nº 29"; });
     insOpenQty(ic); insSetUnidad(ic, "Paquetes"); _ins.items[ic].qty = 2; insRender();
     const qc = (document.querySelector("#insBody .ins-qov") || {}).innerHTML || "";
+    const qcSinMarca = (document.querySelector("#insBody .ins-qov .ins-qok") || {}).disabled === true;
     let movH = null; const _smH = window.stockMove; window.stockMove = function (rows) { movH = rows; };
-    insCloseQty(); await insConfirmar(); window.stockMove = _smH;
+    _ins.qty = null; await insConfirmar();
+    const bloqueaSinMarca = movH === null && _ins.qty === ic;     // v29.31: sin marca no registra
+    insSetCajaMarca(ic, "Chef"); insCloseQty(); await insConfirmar(); window.stockMove = _smH;
     const h0 = (movH || [])[0] || {};
     out.h = JSON.stringify(cjs) === JSON.stringify(["Caja Nº 29"]) && !/ins-itbtn add/.test(htmlCj) && /= 50 cajas/.test(qc) &&
-      (qc.match(/ins-uchip/g) || []).length === 2 && h0.unidad === "Uni" && h0.delta === 50 && /2 paquetes × 25/.test(h0.descripcion || "");
+      (qc.match(/ins-uchip/g) || []).length === 4 && h0.unidad === "Uni" && h0.delta === 50 && /2 paquetes × 25/.test(h0.descripcion || "") &&
+      qcSinMarca && bloqueaSinMarca && /marca Chef/.test(h0.descripcion || "") && h0.cod_art === "Caja Nº 29";
     out.g = !/ins-uchip/.test(qh) && /Bolsas/.test(qh) && /= 100 kg/.test(qh) && m0.unidad === "Bolsas" && m0.delta === -4 && /4 bolsas = 100 kg/.test(m0.descripcion || "");
     return out;
   });

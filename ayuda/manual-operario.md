@@ -197,7 +197,8 @@ Tocá **📦** y **Enviar**. Hay **3 opciones**:
   las **9 bolsas** que se usan (ABS, AI, EBA, NY c/Carga 25%, NY Recup, NY Virgen, PE Polie, PP 2630,
   PS PE), al recibir y al entregar; una bolsa nueva no se agrega desde acá: se avisa al supervisor.
   Las bolsas se cargan sólo en **Bolsas** (abajo se ve cuántos kg son). En **cajas** aparecen las 11
-  cajas (Caja Nº 1 … Nº 29); se cargan en **Cajas** o en **Paquetes** (cada paquete = 25 cajas).
+  cajas (Caja Nº 1 … Nº 29); se cargan en **Cajas** o en **Paquetes** (cada paquete = 25 cajas). Al
+  **recibir** cajas hay que marcar si son de **Loeke** o de **Chef** (es la misma caja; queda anotado).
 - **📤 Entregar insumos**: sale stock de insumos. Primero **«¿Qué envío es?»**: **🏭 Envío a
   inyectores** (elegís el inyector y aparecen sólo las bolsas plásticas; es la única forma de sacar
   bolsas) o **📦 Envío a otros** (todo lo demás, sin bolsas plásticas);
