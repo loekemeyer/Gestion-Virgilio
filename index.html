@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.26"></script>
+<script type="module" src="recepcion.js?v=29.27"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10701,7 +10701,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.26";
+const APP_VERSION = "v29.27";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27549,7 +27549,8 @@ async function _insGp2Opciones(mode, soloIny) {
       if (!mv || !mv.inyectores || !mv.inyectores.length) { if (soloIny) _insUbicSinIny(box); return; }
       box.innerHTML = (soloIny ? '' : '<div style="font-size:12.5px;font-weight:800;color:#115e59;margin-bottom:6px;">🧪 Bolsas plásticas — ¿van a un inyector?</div>') +
         mv.inyectores.map(function (nom, i) {
-          return '<button onclick="insUbicGp2Ok(\'EI\',' + i + ')" style="' + btn + '">🏭 ' + escapeHtml(nom) + '</button>';   // v29.26 (Thomas): sin «le faltan / al día con sus OC»
+          const apodo = INS_INY_APODO[nom];   // v29.27 (Thomas, D12): el nombre con que lo conoce el operario
+          return '<button onclick="insUbicGp2Ok(\'EI\',' + i + ')" style="' + btn + '">🏭 ' + escapeHtml(nom) + (apodo ? ' <span style="font-weight:700;color:#475569;">(' + escapeHtml(apodo) + ')</span>' : '') + '</button>';   // v29.26 (Thomas): sin «le faltan / al día con sus OC»
         }).join("") +
         (soloIny ? '' : '<div style="font-size:12px;color:#64748b;margin:2px 0 10px;">— o escribí a dónde lo enviás (otro destino) —</div>');
     }
@@ -27571,6 +27572,8 @@ function insUbicGp2Ok(mode, i) {
     insUbicOk("EI", { modo: "EI", inyector: nom, mv: mv });
   }
 }
+/* v29.27 (Thomas, D12): apodo del inyector de GP2 en el botón («Manolo es Pat Bet Plast»). */
+const INS_INY_APODO = { "Pat Bet Plast": "Manolo" };
 /* v29.22 — bolsa plástica que se manda a un inyector: plástico, con código real y ubicación. */
 function _insEsBolsaIny(it) {
   return !!it && insCatOf(it) === "plastico" && !_insEsTmp(it) && !it.noCode && String(it.ubic || "").trim() !== "";
@@ -62027,7 +62030,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.26"></script>
+<script src="importacion.js?v=29.27"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64957,12 +64960,12 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.26"></script>
-<script src="hotsale.js?v=29.26"></script>
-<script src="estadisticas.js?v=29.26"></script>
-<script src="ads.js?v=29.26"></script>
+<script src="cobranzas.js?v=29.27"></script>
+<script src="hotsale.js?v=29.27"></script>
+<script src="estadisticas.js?v=29.27"></script>
+<script src="ads.js?v=29.27"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.26"></script>
+<script src="ayuda.js?v=29.27"></script>
 
 </body>
 </html>

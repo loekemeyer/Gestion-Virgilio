@@ -1,6 +1,7 @@
 /* v21.74 — Entregar insumos: primero "Envío a inyectores" / "Envío a otros".
    Inyectores → sólo la lista de GP2 (sin texto libre); si GP2 no responde, abre el texto libre.
-   Otros → sólo texto libre, sin llamar a GP2. */
+   Otros → sólo texto libre, sin llamar a GP2.
+   v29.27 (Thomas, D12): el botón de Pat Bet Plast dice «(Manolo)». */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } catch (_e) { ({ chromium } = require("playwright")); }
@@ -11,7 +12,7 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
   const r = await p.evaluate(async () => {
     const vis = (id) => { const e = document.getElementById(id); return !!e && e.offsetParent !== null; };
     let rpc = 0;
-    window.insGp2Rpc = async () => { rpc++; return { inyectores: ["JL Matriceria", "Kollplast"], materiales: [] }; };
+    window.insGp2Rpc = async () => { rpc++; return { inyectores: ["JL Matriceria", "Kollplast", "Pat Bet Plast"], materiales: [] }; };
     insChooserGo("EI");
     const ch = document.getElementById("insChooserModal").innerText;
     const out = { botones: /Envío a inyectores/.test(ch) && /Envío a otros/.test(ch) };
@@ -20,7 +21,7 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
     insUbicCancel();
     insEnvioTipoGo("iny"); await new Promise((s) => setTimeout(s, 50));
     const g = document.getElementById("insUbicGp2").innerText;
-    out.iny = /JL Matriceria/.test(g) && /Kollplast/.test(g) && !vis("insUbicInput") && !vis("insUbicContinuar") && !/otro destino/.test(g);
+    out.iny = /JL Matriceria/.test(g) && /Kollplast/.test(g) && /Pat Bet Plast \(Manolo\)/.test(g) && !/Kollplast \(/.test(g) && !vis("insUbicInput") && !vis("insUbicContinuar") && !/otro destino/.test(g);
     insUbicCancel();
     window.insGp2Rpc = async () => { throw new Error("caido"); };
     insEnvioTipoGo("iny"); await new Promise((s) => setTimeout(s, 50));
