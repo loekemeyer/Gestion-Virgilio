@@ -30,5 +30,8 @@ if (c.estXY.length && c.estXY[0].pend !== "5*/45") fallas.push("v28.84: en panta
 c = vm.runInContext(`_ads.epOc = {}; _ads.tallCerr = { "GARCIA|550": { pedido: 100, entregado: 40 } }; var _r = _adsStockCalc({ cod: "550", saldo10: -5 }, 10); _ads.tallCerr = null; _r`, ctx);
 if (c.estXY[0].pend !== "15*/45") fallas.push("v28.86 % del período cerrado: " + c.estXY[0].pend);
 // v28.87: Y = pedido − ya entregado (Garcia 50 − 5 = 45)
+// v29.10: la OC guarda «058» y stock/talleristas «58» (norm_cod): la clave tiene que ser la misma
+if (vm.runInContext(`_adsEpKey("Garcia", "058", "2026-10-07") === _adsEpKey("Garcia", "58", "2026-10-07")`, ctx) !== true) fallas.push("v29.10: 058 de la OC y 58 del stock no dan la misma clave");
+if (vm.runInContext(`_adsEpKey("X", "0", "d") === _adsEpKey("X", "", "d")`, ctx)) fallas.push("v29.10: el código 0 no se puede volver vacío");
 if (fallas.length) { console.error("✗ ads-entrega-proy\n  " + fallas.join("\n  ")); process.exit(1); }
 console.log("✓ ADS: Entrega est. usa la entrega proy. cargada en la OC vigente; sin dato, OC × %");
