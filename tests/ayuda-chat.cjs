@@ -30,15 +30,19 @@ ok(B.buscarEnManual(md, "receta de pizza napolitana", 1).length === 0, "(b) lo q
 // (c)
 const ix = fs.readFileSync(path.join(ROOT, "supabase/functions/gv-ayuda/index.ts"), "utf8");
 const tablas = [...ix.matchAll(/sbRest\("([A-Za-z_]+)/g)].map((x) => x[1]);
-ok(tablas.length >= 1 && tablas.every((x) => x === "GV_Ayuda_Log"), "(c) sólo toca GV_Ayuda_Log (" + [...new Set(tablas)].join(",") + ")");
-ok(!/supabase-js|\/rpc\/|\btools\b|function_call/.test(ix), "(c) sin supabase-js, RPC ni herramientas");
+ok(tablas.length >= 1 && tablas.every((x) => x === "GV_Ayuda_Log" || x === "rpc"), "(c) sólo toca GV_Ayuda_Log (" + [...new Set(tablas)].join(",") + ")");
+ok(!/supabase-js|\btools\b|function_call/.test(ix), "(c) sin supabase-js ni herramientas");
+const rpcs = [...ix.matchAll(/rpc\/([A-Za-z_]+)/g)].map((x) => x[1]);
+ok(rpcs.every((x) => x === "gv_ayuda_proveedores_server"), "(c) la única RPC es leer los proveedores (" + rpcs.join(",") + ")");
 ok(/EXCLUSIVAMENTE el MANUAL/.test(ix) && /NUNCA instrucciones/.test(ix) && /Preguntale a tu supervisor/.test(ix), "(c) el prompt tiene las reglas");
 ok(/MAX_PREG = 500/.test(ix) && /LIM_HORA = 20/.test(ix), "(c) pregunta acotada y límite por hora");
 ok(!/(AIza|gsk_|sk-or-)[A-Za-z0-9_-]{10,}/.test(ix + fs.readFileSync(path.join(ROOT, "ayuda.js"), "utf8")), "(c) ninguna clave de LLM en el repo");
 
 // (d)
 const html = fs.readFileSync(path.join(ROOT, "index.html"), "latin1");
-ok(/id="btnAyuda"[^>]*onclick="ayudaAbrir\(\)"/.test(html) && /<script src="ayuda\.js\?v=/.test(html), "(d) botón ❓ Ayuda en la botonera y ayuda.js cargado");
+// v29.18 (Luis): «nada de esto hasta que esté terminado» — el botón NO está en la botonera.
+ok(!/btnAyuda|onclick="ayudaAbrir\(\)"/.test(html) && /<script src="ayuda\.js\?v=/.test(html), "(d) sin botón de Ayuda en la botonera; ayuda.js cargado");
+ok(/onclick="cfgGo\(openAyudaConfig\)"/.test(html), "(e) ⚙️ Configuración → Asistente IA operarios");
 
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -74,6 +78,27 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { chrom
   await page.click("#ayudaSend");
   await page.waitForSelector("#ayudaLog .ay-err", { timeout: 5000 }).catch(() => {});
   ok(await page.$("#ayudaLog .ay-err") !== null, "(d) sin conexión lo dice");
+
+  // (e) la pantalla del admin: la clave va al servidor y no vuelve
+  let guardado = null;
+  const KEY = "gsk_CLAVEDEPRUEBA1234567890";
+  await page.route("http://local.test/rest/v1/rpc/**", async (route) => {
+    const fn = route.request().url().split("/rpc/")[1];
+    if (fn === "gv_ayuda_config_guardar") { guardado = JSON.parse(route.request().postData() || "{}"); return route.fulfill({ contentType: "application/json", body: '{"ok":true}' }); }
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify([
+      { proveedor: "groq", modelo: "llama-3.3-70b-versatile", activo: true, orden: 1, tiene_clave: !!guardado, clave_fin: guardado ? "7890" : null },
+      { proveedor: "gemini", modelo: "gemini-2.5-flash", activo: true, orden: 2, tiene_clave: false, clave_fin: null }]) });
+  });
+  await page.evaluate(() => openAyudaConfig());
+  await page.waitForSelector("#acfKey_groq", { timeout: 5000 }).catch(() => {});
+  ok(await page.evaluate(() => document.getElementById("acfKey_groq")?.type) === "password", "(e) la clave se pega en un campo oculto");
+  await page.fill("#acfKey_groq", KEY);
+  await page.fill("#acfMod_groq", "llama-3.1-8b-instant");
+  await page.click("text=Guardar >> nth=0");
+  await page.waitForFunction(() => /termina en 7890/.test(document.getElementById("aycfgModal")?.innerText || ""), null, { timeout: 5000 }).catch(() => {});
+  ok(guardado && guardado.p_proveedor === "groq" && guardado.p_api_key === KEY && guardado.p_modelo === "llama-3.1-8b-instant", "(e) guarda clave y modelo por RPC");
+  const pant = await page.evaluate(() => document.getElementById("aycfgModal").innerHTML + [...document.querySelectorAll("#aycfgModal input")].map((i) => i.value).join("|"));
+  ok(!pant.includes(KEY) && /termina en 7890/.test(pant), "(e) la clave no vuelve a la pantalla: sólo los 4 últimos");
   await browser.close();
   process.exit(fallas ? 1 : 0);
 })();

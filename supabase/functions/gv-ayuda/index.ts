@@ -11,10 +11,9 @@ import { buscarEnManual } from "./buscar.ts";
    respuestas del chat. Lo peor que puede pasar con un intento de "jailbreak" es una
    respuesta fuera de tema; no hay nada que pueda hacer.
 
-   Proveedores (gratis), en orden; si uno falla o no tiene clave, prueba el siguiente:
-     GEMINI_API_KEY  (GEMINI_MODEL, default gemini-2.5-flash)
-     GROQ_API_KEY    (GROQ_MODEL, default llama-3.3-70b-versatile)
-     OPENROUTER_API_KEY (OPENROUTER_MODEL, default meta-llama/llama-3.3-70b-instruct:free)
+   Proveedores (gratis), en orden; si uno falla o no tiene clave, prueba el siguiente.
+   v29.18: las claves y el modelo se cargan en ⚙️ Configuración → Asistente IA operarios (Vault,
+   gv_ayuda_proveedores_server). Respaldo: GEMINI_API_KEY / GROQ_API_KEY / OPENROUTER_API_KEY.
    Sin ninguno, devuelve la sección del manual que coincide por palabras.
 
    Límite: 20 preguntas por hora por usuario (o IP) y 400 por día en total.
@@ -84,10 +83,9 @@ async function conTimeout(p: (s: AbortSignal) => Promise<Response>, ms = 20000) 
   try { return await p(ac.signal); } finally { clearTimeout(t); }
 }
 
-async function gemini(key: string, msgs: Msg[]): Promise<string> {
-  const model = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
+async function gemini(key: string, model: string, msgs: Msg[]): Promise<string> {
   const r = await conTimeout((signal) => fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
     { method: "POST", signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({
       systemInstruction: { parts: [{ text: SISTEMA }] },
       contents: msgs.map((m) => ({ role: m.rol === "user" ? "user" : "model", parts: [{ text: m.texto }] })),
@@ -112,14 +110,36 @@ async function openaiCompat(url: string, key: string, model: string, msgs: Msg[]
   return String(j?.choices?.[0]?.message?.content || "").trim();
 }
 
-function proveedores() {
+const DEF_MODEL: Record<string, string> = {
+  gemini: "gemini-2.5-flash", groq: "llama-3.3-70b-versatile", openrouter: "meta-llama/llama-3.3-70b-instruct:free",
+};
+function llamador(nombre: string, key: string, model: string) {
+  const mod = model || DEF_MODEL[nombre];
+  if (nombre === "gemini") return (m: Msg[]) => gemini(key, mod, m);
+  if (nombre === "groq") return (m: Msg[]) => openaiCompat("https://api.groq.com/openai/v1/chat/completions", key, mod, m);
+  return (m: Msg[]) => openaiCompat("https://openrouter.ai/api/v1/chat/completions", key, mod, m, { "X-Title": "Gestion Virgilio ayuda" });
+}
+
+/* v29.18 — las claves y el modelo se cargan en ⚙️ Configuración → Asistente IA operarios: viven en el
+   Vault y las devuelve gv_ayuda_proveedores_server() (sólo service_role), en el orden elegido. Caché 60 s.
+   Si la base no contesta o no hay ninguna cargada, caen los secretos de entorno (GEMINI_API_KEY…). */
+let _cache: { ts: number; lista: { proveedor: string; modelo: string; api_key: string }[] } | null = null;
+async function proveedores() {
   const out: { nombre: string; fn: (m: Msg[]) => Promise<string> }[] = [];
-  const g = Deno.env.get("GEMINI_API_KEY");
-  if (g) out.push({ nombre: "gemini", fn: (m) => gemini(g, m) });
-  const q = Deno.env.get("GROQ_API_KEY");
-  if (q) out.push({ nombre: "groq", fn: (m) => openaiCompat("https://api.groq.com/openai/v1/chat/completions", q, Deno.env.get("GROQ_MODEL") || "llama-3.3-70b-versatile", m) });
-  const o = Deno.env.get("OPENROUTER_API_KEY");
-  if (o) out.push({ nombre: "openrouter", fn: (m) => openaiCompat("https://openrouter.ai/api/v1/chat/completions", o, Deno.env.get("OPENROUTER_MODEL") || "meta-llama/llama-3.3-70b-instruct:free", m, { "X-Title": "Gestion Virgilio ayuda" }) });
+  try {
+    if (!_cache || Date.now() - _cache.ts > 60000) {
+      const r = await sbRest("rpc/gv_ayuda_proveedores_server", { method: "POST", body: "{}" });
+      if (r.ok) _cache = { ts: Date.now(), lista: await r.json() };
+    }
+  } catch (_e) { /* cae al entorno */ }
+  for (const p of (_cache?.lista || [])) {
+    if (p?.api_key && DEF_MODEL[p.proveedor]) out.push({ nombre: p.proveedor + ":" + (p.modelo || DEF_MODEL[p.proveedor]), fn: llamador(p.proveedor, p.api_key, p.modelo) });
+  }
+  if (out.length) return out;
+  for (const n of ["gemini", "groq", "openrouter"]) {
+    const k = Deno.env.get(n.toUpperCase() + "_API_KEY");
+    if (k) out.push({ nombre: n, fn: llamador(n, k, Deno.env.get(n.toUpperCase() + "_MODEL") || "") });
+  }
   return out;
 }
 
@@ -152,7 +172,7 @@ Deno.serve(async (req) => {
 
   const msgs: Msg[] = [...limpiarHist(body.historial), { rol: "user", texto: pregunta }];
   let respuesta = "", fuente = "manual", error = "";
-  for (const p of proveedores()) {
+  for (const p of await proveedores()) {
     try {
       const r = await p.fn(msgs);
       if (r) { respuesta = r.slice(0, MAX_RESP); fuente = p.nombre; break; }

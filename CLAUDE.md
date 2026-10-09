@@ -8520,13 +8520,18 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
 
 ## ⚠ REGLA (Luis, 2026-10-09, v29.17): ❓ AYUDA — el asistente del operario SÓLO sabe el manual
 
-- Botón **❓ Ayuda** en la botonera (`ayuda.js`) → chat → Edge Function **`gv-ayuda`** (verify_jwt off; identifica por la
+- ⚠ **v29.18 (Luis): SIN BOTÓN en la botonera hasta que esté terminado** (*"nada de esto hasta que esté terminado"*).
+  `ayudaAbrir` queda sin puerta; `tests/ayuda-chat.cjs` (d) es candado invertido.
+- Chat (`ayuda.js`) → Edge Function **`gv-ayuda`** (verify_jwt off; identifica por la
   sesión o la IP). **Sin herramientas**: no lee ni escribe tablas del negocio; sólo `GV_Ayuda_Log` (service_role, para el
   límite de 20 preguntas/hora por usuario y 400/día). Pregunta ≤ 500 caracteres, historial ≤ 6 mensajes.
 - La única fuente es **`ayuda/manual-operario.md`**. Cambiar el manual = editar el .md, `node scripts/ayuda-manual-build.cjs`
   (regenera `manual.ts`) y **redeployar** gv-ayuda. Al cambiar un módulo de la botonera, actualizar el manual en el mismo pedido.
-- LLM gratis en orden con respaldo: `GEMINI_API_KEY` → `GROQ_API_KEY` → `OPENROUTER_API_KEY` (secretos de la función,
-  **nunca en el repo**: es público). Sin ninguno, devuelve la sección del manual que coincide por palabras (`buscar.ts`).
+- **Las API keys y el modelo se cargan en ⚙️ Configuración → 🤖 Asistente IA operarios** (v29.18, `openAyudaConfig`):
+  la clave va al **Vault** por `gv_ayuda_config_guardar` (supervisor) y **nunca vuelve al navegador** (sólo «termina en
+  XXXX», `gv_ayuda_config_leer`). La función la lee con `gv_ayuda_proveedores_server()` (sólo service_role, caché 60 s),
+  en el orden de `GV_Ayuda_Config` («Usar este primero»); si uno falla prueba el siguiente. Respaldo: los secretos de
+  entorno `GEMINI_API_KEY` / `GROQ_API_KEY` / `OPENROUTER_API_KEY`. **Nunca una clave en el repo**: es público. Sin ninguno, devuelve la sección del manual que coincide por palabras (`buscar.ts`).
 - Ningún LLM es inmune al jailbreak: la garantía es que no tiene ninguna capacidad; lo peor es una respuesta fuera de tema.
 - Lo que preguntan: `select ts, usuario, fuente, pregunta, respuesta from public."GV_Ayuda_Log" order by id desc;`
-- `sql/gv_ayuda_log_v2916.sql`, `tests/ayuda-chat.cjs`.
+- `sql/gv_ayuda_log_v2916.sql`, `sql/gv_ayuda_config_v2918.sql`, `tests/ayuda-chat.cjs`.
