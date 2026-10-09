@@ -37,7 +37,7 @@ const STOCK = [
     window.sb = { rpc: async (n, a) => {
       if (modo === "vacio") return { data: [], error: null };
       if (n === "gv_ads_config") return { data: { n_ocs: 7, umbral: 0.5, incluir_actual: false }, error: null };
-      if (n === "gv_ads_talleristas") { if (a && a.p_incluir_actual) window.__incArg = true; /* v28.86: hay una 2.ª llamada con false */ return { data: TALL, error: null }; }
+      if (n === "gv_ads_talleristas") { if (a && !a.p_incluir_actual && a.p_n !== 1) window.__incFalse = true;   /* v28.96: el % va sin la vigente; la vigente (p_n 1) y Stock (true) se leen aparte */ /* v28.86: hay una 2.ª llamada con false */ return { data: TALL, error: null }; }
       if (n === "gv_ads_oc_fechas") return { data: [{ n: 1, fecha: "2026-10-14" }, { n: 2, fecha: "2026-10-07" }, { n: 3, fecha: "2026-09-30" }], error: null };
       if (n === "gv_ads_stock3") return { data: STOCK, error: null };
       if (n === "gv_ads_badge") return { data: 1, error: null };
@@ -56,7 +56,7 @@ const STOCK = [
     window.openAds(); await espera(150);
     out.rango = [...document.querySelectorAll("#adsOv .ads-bar select option")].map((o) => o.textContent);
     out.rangoSel = (document.querySelector("#adsOv .ads-bar select") || {}).value;
-    out.sinInc = !document.querySelector("#adsOv .ads-bar input[type=checkbox]") && window.__incArg !== true;   // v28.95: la OC vigente NUNCA entra (snapshot de las cerradas)
+    out.sinInc = !document.querySelector("#adsOv .ads-bar input[type=checkbox]") && window.__incFalse === true;   // v28.95: la OC vigente NUNCA entra (snapshot de las cerradas)
     const filas = [...document.querySelectorAll("#adsOv tr.t")];
     out.orden = filas.map((f) => f.cells[0].textContent.replace(/[▸▾ ]/g, ""));
     out.oscarRojo = filas[0] && filas[0].classList.contains("al");
@@ -118,7 +118,7 @@ const STOCK = [
   if (JSON.stringify(r.orden) !== JSON.stringify(["Oscar", "Lucho"])) fallas.push("(b) orden: " + JSON.stringify(r.orden));
   if (!r.oscarRojo || r.oscarPct !== "20 %" || r.oscarPed !== "150") fallas.push("(b) Oscar: " + r.oscarPct + " / " + r.oscarPed);
   if (r.sub !== 2) fallas.push("(b) artículos al abrir: " + r.sub);
-  if (JSON.stringify(r.subCols.slice(-4)) !== JSON.stringify(["Última OC", "Fecha", "Pedida", "Recibida"])) fallas.push("(b) columnas de la última OC separadas: " + JSON.stringify(r.subCols));
+  if (JSON.stringify(r.subCols.slice(-4)) !== JSON.stringify(["OC vigente", "Fecha", "Pedida", "Recibida"])) fallas.push("(b) columnas de la última OC separadas: " + JSON.stringify(r.subCols));
   if (!r.recuadro) fallas.push("(b) la última OC (fecha, pedida, recibida) no va en un recuadro");
   if (JSON.stringify(r.subFila) !== JSON.stringify(["23/09", "90", "0"])) fallas.push("(b) fila última OC: " + JSON.stringify(r.subFila));
   if (r.cerrarAncho > 200) fallas.push("(e) Cerrar ancho " + r.cerrarAncho);
@@ -138,7 +138,7 @@ const STOCK = [
   if (!x10 || x10.g2 !== ' s="5"' || !x10.negr) fallas.push("(q) Excel stock: el Saldo (G) en negrita: " + JSON.stringify(x10 && [x10.g2, x10.negr]));
   if (!x30 || x30.n !== "ADS_stock_30d" || x30.len !== 3) fallas.push("(f) Excel stock 30 d: " + JSON.stringify(x30));
   if (!xt || !/^ADS_talleristas_/.test(xt.n) || xt.len !== 6 || xt.merge !== 2 || !xt.tit || !/^Oscar · 20%$/.test(String(xt.filas[1][0])) ||
-      JSON.stringify(xt.cab) !== JSON.stringify(["Cód.","Descripción","OC evaluadas","Pedido","Recibio Virgilio","%","Fecha última OC","Pedido última OC","Recibido última OC"])) fallas.push("(f) Excel talleristas (fila-título por tallerista con su %): " + JSON.stringify(xt && [xt.cab, xt.len, xt.merge, xt.filas]));
+      JSON.stringify(xt.cab) !== JSON.stringify(["Cód.","Descripción","OC evaluadas","Pedido","Recibio Virgilio","%","Fecha OC vigente","Pedido OC vigente","Recibido OC vigente"])) fallas.push("(f) Excel talleristas (fila-título por tallerista con su %): " + JSON.stringify(xt && [xt.cab, xt.len, xt.merge, xt.filas]));
   // v27.90 (Luis): el % de talleristas va como TEXTO «71%», entero
   const ft = xt && xt.filas[2]; if (!ft || !/^\d+%$/.test(String(ft[5]))) fallas.push("(g) % talleristas como texto: " + JSON.stringify(ft));
   // v27.40: el formato de Luis (anchos chicos, rótulo de 45, congelado, entra a lo ancho; texto a la izq., números centrados)

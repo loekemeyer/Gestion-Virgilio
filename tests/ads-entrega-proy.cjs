@@ -6,7 +6,7 @@ const src = fs.readFileSync(path.join(__dirname, "..", "ads.js"), "utf8");
 const ctx = { window: {}, document: { getElementById: () => null }, console, Date, Math, Number, String, isFinite, Promise };
 vm.createContext(ctx); vm.runInContext(src, ctx);
 const hace = (d) => new Date(Date.now() - d * 864e5).toISOString().slice(0, 10);
-vm.runInContext(`_ads.tall = [
+vm.runInContext(`_ads.tallInc = _ads.tall = [
   { proveedor: "Garcia", codigo: "550", pedido: 100, entregado: 20, desde: "${hace(20)}", ult_fecha: "2026-10-07", ult_cant: 50, ult_rec: 5 },
   { proveedor: "Poly",   codigo: "550", pedido: 100, entregado: 50, desde: "${hace(20)}", ult_fecha: "2026-10-07", ult_cant: 40, ult_rec: 0 }];`, ctx);
 const fallas = [];

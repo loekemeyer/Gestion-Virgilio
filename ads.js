@@ -147,6 +147,18 @@ function _adsCargarTall() {
     else _ads.tall = r.data;
     _adsRender();
   });
+  // v28.96 (Luis, 09/10): la pestaña Stock sigue mirando el período CON la OC vigente (su «Últ. OC» es la vigente);
+  // y en Entregas talleristas el recuadro de la derecha es la OC VIGENTE, no la última del período cerrado.
+  _ads.tallInc = null; _ads.vig = null;
+  _adsRpc("gv_ads_talleristas", { p_n: _ads.n, p_incluir_actual: true }).then(function (r) {
+    if (r.error || !Array.isArray(r.data)) return;
+    _ads.tallInc = r.data; if (_ads.stock) _adsRender();
+  });
+  _adsRpc("gv_ads_talleristas", { p_n: 1, p_incluir_actual: true }).then(function (r) {
+    if (r.error || !Array.isArray(r.data)) return;
+    var m = {}; r.data.forEach(function (x) { m[String(x.pkey || x.proveedor).toUpperCase() + "|" + String(x.codigo).toUpperCase()] = x; });
+    _ads.vig = m; _adsRender();
+  });
   // v28.86 (Luis, 08/10): el % para PROYECTAR la OC vigente sale del último período CERRADO (sin la OC vigente):
   // con la vigente adentro, lo que ya llegó de ella entraba al % y después se restaba (Garcia 550: 247 × 14 % − 35 = 0).
   _ads.tallCerr = null;
@@ -226,7 +238,7 @@ function _adsOpcRango(n) {
 function _adsBar(p, al) { var w = Math.max(0, Math.min(1, p || 0)) * 100; return '<span class="bar"><i class="' + (al ? "r" : "") + '" style="width:' + w.toFixed(0) + '%"></i></span>'; }
 
 function _adsHtmlTall() {
-  var h = '<div class="ads-bar">Rango: últimas <select onchange="adsSetN(this.value)">';
+  var h = '<div class="ads-bar">Rango últimas cerradas <select onchange="adsSetN(this.value)">';
   for (var n = 1; n <= 12; n++) h += '<option value="' + n + '"' + (n === _ads.n ? " selected" : "") + ">" + _adsOpcRango(n) + "</option>";
   h += '</select> OC' +
     ' · Alerta debajo de <input type="number" min="1" max="100" style="width:60px" value="' + Math.round(_ads.umbral * 100) + '" onchange="adsSetUmbral(this.value)"> %' +
@@ -242,12 +254,13 @@ function _adsHtmlTall() {
     h += '<tr class="t' + (t.alerta ? " al" : "") + '" onclick="adsToggle(decodeURIComponent(\'' + encodeURIComponent(t.pkey).replace(/'/g, "%27") + '\'))"><td><b>' + (_ads.abiertos[t.pkey] ? "▾ " : "▸ ") + _adsEsc(t.proveedor) + "</b></td><td>" + t.arts.length +
       "</td><td>" + _adsN(t.pedido) + "</td><td>" + _adsN(t.entregado) + '</td><td class="pct">' + _adsPct(t.pct) + "</td><td>" + _adsBar(t.pct, t.alerta) + "</td></tr>";
     if (_ads.abiertos[t.pkey]) {
-      h += '<tr class="sub"><td colspan="6"><table style="margin:4px auto"><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2" title="Cuántas OC del rango incluyen este artículo">OC<br>evaluadas</th><th rowspan="2">Pedido</th><th rowspan="2" title="Cajas que recibió Virgilio de este proveedor en el período, hasta lo pedido">Recib.<br>Virgilio</th><th rowspan="2">%</th><th colspan="3" class="ug" title="Pedida y recibida de la última OC del artículo">Última OC</th></tr><tr><th class="u1">Fecha</th><th class="u2">Pedida</th><th class="u3">Recibida</th></tr></thead><tbody>';
+      h += '<tr class="sub"><td colspan="6"><table style="margin:4px auto"><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2" title="Cuántas OC del rango incluyen este artículo">OC<br>evaluadas</th><th rowspan="2">Pedido</th><th rowspan="2" title="Cajas que recibió Virgilio de este proveedor en el período, hasta lo pedido">Recib.<br>Virgilio</th><th rowspan="2">%</th><th colspan="3" class="ug" title="La OC vigente (la de esta semana): pedida y recibida">OC vigente</th></tr><tr><th class="u1">Fecha</th><th class="u2">Pedida</th><th class="u3">Recibida</th></tr></thead><tbody>';
       t.arts.forEach(function (a) {
+        var v = _adsVig(a) || {};
         var al = a.pct != null && Number(a.pct) < _ads.umbral;
         h += "<tr><td><b>" + _adsEsc(_adsCod(a.codigo)) + '</b></td><td class="desc" title="' + _adsEsc(a.descripcion) + '">' + _adsEsc(a.descripcion) + "</td><td>" + a.ocs +
           "</td><td>" + _adsN(a.pedido) + "</td><td>" + _adsN(a.entregado) + '</td><td class="' + (al ? "neg" : "") + '">' + _adsPct(a.pct) +
-          '</td><td class="u1">' + _adsFecha(a.ult_fecha) + '</td><td class="u2">' + _adsN(a.ult_cant) + '</td><td class="u3">' + _adsN(a.ult_rec) + "</td></tr>";
+          '</td><td class="u1">' + _adsFecha(v.ult_fecha) + '</td><td class="u2">' + _adsN(v.ult_cant) + '</td><td class="u3">' + _adsN(v.ult_rec) + "</td></tr>";
       });
       h += "</tbody></table></td></tr>";
     }
@@ -257,8 +270,9 @@ function _adsHtmlTall() {
 
 /* % que viene entregando cada tallerista en ese código (rango de la pestaña 1). */
 function _adsPctCod(cod) {
-  if (!_ads.tall) return null;
-  return _ads.tall.filter(function (r) { return String(r.codigo).toUpperCase() === String(cod).toUpperCase(); });
+  var t = _ads.tallInc || null;   // v28.96: con la OC vigente (lo que usaba la pestaña Stock antes de la v28.95)
+  if (!t) return null;
+  return t.filter(function (r) { return String(r.codigo).toUpperCase() === String(cod).toUpperCase(); });
 }
 /* Filas de la pestaña Stock en quiebre al horizonte elegido. Puro: lo prueba el test. */
 function adsFiltrarStock(rows, horiz, q, hOrden) {
@@ -310,7 +324,7 @@ function _adsHtmlStock() {
       '</td><td class="' + (saldo < 0 ? "neg" : "pos") + '">' + _adsN(saldo) + "</td>";
     // v27.78 (Luis): el recuadro es del PERÍODO (las N OC del rango), no de la última OC; la fecha sí es la de la última OC
     var fUlt = c.fechaUlt ? _adsFecha(c.fechaUlt) : '<span class="neg">sin OC</span>';
-    if (c.pedP == null) h += '<td>' + fUlt + '</td><td colspan="3">' + (_ads.tall ? "sin OC en el período" : "…") + "</td>";
+    if (c.pedP == null) h += '<td>' + fUlt + '</td><td colspan="3">' + (_ads.tallInc ? "sin OC en el período" : "…") + "</td>";
     else h += '<td>' + fUlt + '</td><td>' + (c.ultPed.length ? c.ultPed.map(function (v) { return _adsN(v); }).join("<br>") : "—") + '</td><td>' + (c.ultRec.length ? c.ultRec.map(function (v) { return _adsN(v); }).join("<br>") : "—") +
       '</td><td class="estp" title="' + _adsEsc((c.estDist.length ? c.estDist : c.estDet).join("\n")) + '">' + (c.estXY.length ? c.estXY.map(function (y) { return '<b>' + _adsEsc(y.pend) + '</b>'; }).join("<br>") : "—") + "</td>";   // v28.64: X/Y, una fila por tallerista   // v27.85 (Luis): el reparto por tallerista va en el tooltip
     h += "</tr>";
@@ -461,18 +475,21 @@ function _adsAnchoTexto(aoa, i, min, max) {
   return Math.round(Math.min(w, max) * 100) / 100;
 }
 function _adsNum(v) { var n = Number(v); return v == null || v === "" || !isFinite(n) ? "" : n; }
+/* v28.96: la fila del artículo en la OC VIGENTE (mismo tallerista); null si no está en la vigente. */
+function _adsVig(a) { return _ads.vig ? _ads.vig[String(a.pkey || a.proveedor).toUpperCase() + "|" + String(a.codigo).toUpperCase()] || null : null; }
 function _adsPctNum(x) { return x == null || !isFinite(x) ? "" : Math.round(x * 100); }
 function adsExcelTall() {
   if (!_ads.tall) { alert("Todavía se están leyendo las OC."); return; }
   var g = adsAgruparTalleristas(_ads.tall, _ads.umbral);
   // v28.92 (Luis, 08/10): sin columna Tallerista — una fila-título por tallerista con su %, y debajo sus artículos
-  var aoa = [["Cód.", "Descripción", "OC evaluadas", "Pedido", "Recibio Virgilio", "%", "Fecha última OC", "Pedido última OC", "Recibido última OC"]], tits = [];
+  var aoa = [["Cód.", "Descripción", "OC evaluadas", "Pedido", "Recibio Virgilio", "%", "Fecha OC vigente", "Pedido OC vigente", "Recibido OC vigente"]], tits = [];
   g.forEach(function (t) {
     tits.push(aoa.length);
     aoa.push([t.proveedor + " · " + (t.pct == null || !isFinite(t.pct) ? "—" : Math.round(t.pct * 100) + "%"), "", "", "", "", "", "", "", ""]);
     t.arts.forEach(function (a) {
+      var v = _adsVig(a) || {};
       aoa.push([_adsCod(a.codigo), a.descripcion || "", _adsNum(a.ocs), _adsNum(a.pedido), _adsNum(a.entregado),
-        (a.pct == null || !isFinite(a.pct) ? "" : Math.round(a.pct * 100) + "%"), a.ult_fecha ? _adsFecha(a.ult_fecha) : "", _adsNum(a.ult_cant), _adsNum(a.ult_rec)]);
+        (a.pct == null || !isFinite(a.pct) ? "" : Math.round(a.pct * 100) + "%"), v.ult_fecha ? _adsFecha(v.ult_fecha) : "", _adsNum(v.ult_cant), _adsNum(v.ult_rec)]);
     });
   });
   return _adsXlsx(aoa, "Talleristas", "ADS_talleristas_" + _ads.n + "OC",
