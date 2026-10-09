@@ -4050,6 +4050,13 @@ ni por 📥 RECIBIR, y el pedido seguía «en viaje». (Los marcadores y centine
   957E 2.448 de 4.752 → sigue en viaje. ⚠ El IR de **«606» 10 cajas** (X22, 09:16) no se imputó: no es importado
   (¿606E?, que está en el mismo PI).
 - `sql/gv_imp_ingreso_racks_v2896.sql`, `tests/imp-ingreso-racks.cjs`.
+- ⚠⚠ **v29.13 (Luis, 09/10: *"que el operario no tenga que elegir el pedido para recepcionar. que eso se resuelva en el
+  modulo de importacion"*): el pedido se resuelve en Importación → 📥 Recibido.** Un solo pedido en viaje de ese código →
+  se descuenta solo (como antes). **Dos o más → NO se descuenta**: queda `a_elegir` en `GV_Imp_Ingreso_Racks_Log` (con los
+  candidatos) y un supervisor lo elige con **↔** (`gv_imp_ir_asignar`, que también cambia o deshace uno ya descontado: le
+  devuelve lo llegado al pedido anterior y anula su recepción). **✓ Visto** = `gv_imp_ir_visto`. Badge rojo en el botón
+  Importación y en la solapa (`gv_imp_ir_avisos`: renglones sin revisar). Nada de esto mueve stock. El operario no elige
+  nada. Centinelas v29.11 (marcador de la base). `sql/gv_imp_ir_resolver_v2913.sql`, `tests/imp-ir-resolver.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-29, v23.95): los MESES OBJETIVO se eligen en el encabezado del proveedor
 
@@ -8156,6 +8163,17 @@ OC, Importados, góndola L57 (56 cajas) y stock van por 865E; el 865ED queda ina
 cajas que fueron a etiquetar a Cervantes el 30/09 vuelven como 865E (se resuelve al recibirlas).
 `sql/gv_865e_unificacion_v2774.sql`.
 
+## ⚠ REGLA (Luis, 2026-10-09, v29.09): un CÓDIGO DADO DE BAJA no aparece en el front — la historia queda
+
+**Luis:** *"no está en uso, no debería aparecer en el front en ningún lado. no hace falta limpiarlo de todas las bases porque tiene registros históricos"* (865ED, unificado en 865E el 07/10).
+
+- La lista vive en **`GV_Codigo_Baja`** (cod, reemplazo). Dar de baja otro código = un `insert`, no un deploy.
+- `gv_stock_cod_conocido` y `v_conocidos` de `refresh_stocks_carga_rapida` lo tratan como desconocido → `visible_en_stock = false` → no sale en Stocks ni en la Est. Madre (sin saldo ni pedidos). Centinelas v29.06.
+- Trigger **`aa_gv_codigo_baja`** (BEFORE INSERT en `Movimientos_Stock`): un movimiento NUEVO a mano con ese código se graba con el reemplazo (la descripción lo dice). No toca el pipeline (picking/separado/facturado, legajo pipeline/sistema): reescribe historia por tanda.
+- Stocks → Ajustar/Fijar avisa *«no se usa más: es el 865E»* (`gv_codigo_baja_de`) · Importados → «Modificar existente» no lo ofrece (`gv_codigos_baja`) · se sacó de `planimetria.js`.
+- **No se borra nada**: movimientos, facturas, Importados/OC_Maximos/GV_Lugar_Item (inactivos) quedan como historia. Los marcadores de la base dicen `v29.06-baja` (llave, no cambiar).
+- `sql/gv_codigo_baja_v2906.sql`, `tests/stk-ajuste-cod-inexistente.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-10-07, v28.34): en la PPP un día se escribe «Mié 07/10»
 
 Una sola función, **`gvDiaTxt(x)`** (ISO, AAAAMMDD, dd/mm/aaaa o Date → `Mié 07/10`; `GV_DOW3`). La usan Programación,
@@ -8480,3 +8498,10 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
 - Datos 09/10: 606 vuelto a 0; 606E = 130 cajas (13 MC) en X22, imputadas al pedido PI B260601 (1.560 u, llegado) con
   `gv_imp_imputar_ingreso_racks`.
 - `sql/gv_racks_ajuste_sin_posicion_v2905.sql`, centinela 379, `tests/stk-ajuste-racks-posicion.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-09, v29.12): SALIDA A CERVANTES tiene pestañas GÓNDOLA y RACKS
+
+- Insumos y Productos Movimiento → 🚚 Salida a Cervantes: **Góndola** (como siempre, `terminado`) y **Racks**: una fila por
+  posición con stock (`Racks_Planimetria`, fuente stock), unidad **Caja o MC** por fila (MC = `GV_Rack_CxM`; sin master, sólo caja).
+- El movimiento va en **cajas** (MC × cajas por master), `tipo salida_cervantes`, depósito `racks` (CH: `racks_ch` si su saldo
+  alcanza), `ubicacion` = la posición. Lectura de racks rota → lo dice, no «no hay». `tests/sc-racks-unidad.cjs`.

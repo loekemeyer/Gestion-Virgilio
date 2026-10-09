@@ -6388,7 +6388,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
 <div id="versionBadge"></div><!-- vacío a propósito: lo llena el JS (updatePendingIndicator) con APP_VERSION. Si queda VACÍO en pantalla = el JS NO corrió (navegador no soporta el código / error de parseo). NO hardcodear una versión acá: engaña el diagnóstico. -->
 
-<script src="planimetria.js?v=15.79"></script>
+<script src="planimetria.js?v=15.80"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.05"></script>
+<script type="module" src="recepcion.js?v=29.13"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6524,7 +6524,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="showFaltAvisar()" style="position:relative;"><span class="sup-ico">📦➕</span><span>Completar Pedido</span><span id="cpBadge" class="dp-badge" style="display:none;" title="Pedidos con faltante que tiene stock para completarse"></span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()" style="position:relative;"><span class="sup-ico">📦</span><span>Stock y Compras</span><span id="stkBadge" class="dp-badge" style="display:none;" title="Códigos con stock negativo"></span><span id="stkOkBadge" style="display:none;position:absolute;top:2px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#16a34a;color:#fff;font-size:10px;font-weight:800;line-height:18px;text-align:center;pointer-events:none;">✓</span></button>
       <!-- v26.84 (Luis, 05/10): Importación pasa a GRANDE y Panel Web LK baja a chico. -->
-      <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">🚢</span><span>Importación</span></button>
+      <button class="sup-action-btn" onclick="openPedidosImportacion()" style="position:relative;"><span class="sup-ico">🚢</span><span>Importación</span><span id="impIrBadge" class="dp-badge" style="display:none;" title="Ingresos a racks de importación de los operarios sin revisar (Importación → 📥 Recibido)"></span></button>
       <button class="sup-action-btn" onclick="openRemitosAdmin()" style="position:relative;"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span><span id="rrBadge" class="dp-badge" style="display:none;" title="Remitos cargados al camión sin controlar todavía"></span><span id="rrAlertBadge" style="display:none;position:absolute;top:2px;left:2px;min-width:26px;height:26px;line-height:26px;padding:0 5px;border-radius:13px;background:#dc2626;color:#fff;font-size:15px;font-weight:800;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.35);" title="Hay remitos VENCIDOS (cargados hace +30 h sin controlar)">⚠️</span></button>
     </div>
     <div class="sup-sec-label">Reportes y configuración</div>
@@ -10697,7 +10697,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.05";
+const APP_VERSION = "v29.13";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -26370,6 +26370,14 @@ function _stkResolveDual(codRaw) {
    Lo decide gv_stock_cod_conocido (los siete maestros). Si no se puede verificar, tambien pregunta:
    "no pude leer" no es "existe". Devuelve true si se puede grabar. */
 async function _stkCodExisteConfirmar(cod, txtAccion) {
+  // v29.06 (Luis, 09/10): un c\u00f3digo DADO DE BAJA (865ED, unificado en 865E) no se carga: se avisa cu\u00e1l va.
+  try {
+    var rb = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_codigo_baja_de", { method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_cod: cod }) });
+    if (rb.ok) { var rep = await rb.json();
+      if (typeof rep === "string") { alert("El c\u00f3digo " + cod + " no se usa m\u00e1s" + (rep ? ": es el " + rep + ". Cargalo como " + rep + "." : ".")); return false; } }
+  } catch (_e) {}
   var existe = null;
   try {
     var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_stock_cod_conocido", { method: "POST",
@@ -27271,7 +27279,7 @@ function insumoChooser(legajo) {
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué querés hacer?</div>' +
     '<button onclick="insChooserGo(\'RI\')" style="' + btn + 'background:#4f46e5;">📥 Recibir insumos <span style="' + sub + '">(entra stock — o agregá uno nuevo)</span></button>' +
     '<button onclick="insChooserGo(\'EI\')" style="' + btn + 'background:#0d9488;">📤 Entregar insumos <span style="' + sub + '">(sale stock)</span></button>' +
-    '<button onclick="insChooserGo(\'SC\')" style="' + btn + 'background:#dc2626;">🚚 Salida a Cervantes <span style="' + sub + '">(envío a central)</span></button>' +
+    '<button onclick="insChooserGo(\'SC\')" style="' + btn + 'background:#dc2626;">🚚 Salida a Cervantes <span style="' + sub + '">(desde góndola o racks)</span></button>' +
     '<button onclick="closeInsumoChooser()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>' +
     '</div>';
   ov.style.display = "flex";
@@ -28203,7 +28211,7 @@ let _sc = null;
 async function showCervantesModal(legajo, _resume) {
   if (!document.getElementById("scCss")) {
     const s = document.createElement("style"); s.id = "scCss";
-    s.textContent = "#scModal{display:none;position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#scModal.show{display:block;}.sc-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.sc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#7c3aed,#6d28d9);color:#fff;}.sc-title{font-size:18px;font-weight:800;}.sc-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.sc-body{padding:13px 14px;}.sc-loading,.sc-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.sc-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.sc-mot{width:100%;box-sizing:border-box;height:40px;border:2px solid #cbd5e1;border-radius:10px;padding:0 11px;font-size:14px;margin-bottom:9px;}.sc-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.sc-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;}.sc-info{flex:1;min-width:0;}.sc-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.sc-desc{font-size:12px;color:#475569;}.sc-disp{font-size:11.5px;color:#6d28d9;font-weight:700;margin-top:2px;}.sc-stp{display:flex;align-items:center;gap:5px;}.sc-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.sc-inp{width:58px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.sc-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.sc-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}";
+    s.textContent = "#scModal{display:none;position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#scModal.show{display:block;}.sc-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.sc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#7c3aed,#6d28d9);color:#fff;}.sc-title{font-size:18px;font-weight:800;}.sc-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.sc-body{padding:13px 14px;}.sc-loading,.sc-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.sc-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.sc-mot{width:100%;box-sizing:border-box;height:40px;border:2px solid #cbd5e1;border-radius:10px;padding:0 11px;font-size:14px;margin-bottom:9px;}.sc-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.sc-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;}.sc-info{flex:1;min-width:0;}.sc-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.sc-desc{font-size:12px;color:#475569;}.sc-disp{font-size:11.5px;color:#6d28d9;font-weight:700;margin-top:2px;}.sc-stp{display:flex;align-items:center;gap:5px;}.sc-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.sc-inp{width:58px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.sc-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.sc-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.sc-tabs{display:flex;gap:6px;margin-bottom:10px;}.sc-tab{flex:1;width:auto;margin:0;padding:10px;border:2px solid #c4b5fd;border-radius:10px;background:#fff;color:#6d28d9;font-size:15px;font-weight:800;cursor:pointer;}.sc-tab.on{background:#7c3aed;border-color:#7c3aed;color:#fff;}.sc-tabn{background:#fde047;color:#422006;border-radius:9px;padding:0 6px;font-size:12px;}.sc-us{display:flex;gap:4px;margin-top:4px;}.sc-u{width:auto;margin:0;padding:3px 10px;border:1.5px solid #cbd5e1;border-radius:8px;background:#fff;color:#475569;font-size:12.5px;font-weight:800;cursor:pointer;}.sc-u.on{background:#6d28d9;border-color:#6d28d9;color:#fff;}.sc-u:disabled{opacity:.4;cursor:not-allowed;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("scModal");
@@ -28212,19 +28220,86 @@ async function showCervantesModal(legajo, _resume) {
   ov.innerHTML = '<div class="sc-card"><div class="sc-head"><span class="sc-title">🚚 Salida a Cervantes</span><button class="sc-close" onclick="scAskClose()">Cerrar</button></div><div class="sc-body" id="scBody"><div class="sc-loading">Cargando góndola…</div></div></div>';
   if (_resume) { _sc = _resume; scRender(); return; }
   try {
-    const res = await Promise.all([stockFetchSaldos()]);
+    const res = await Promise.all([stockFetchSaldos(), scFetchRacks(), rkbFetchCxM().catch(function () { return { cxm: {} }; })]);
     const saldos = res[0] || {};
     const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.terminado || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.terminado, sacar: 0 }; });
-    _sc = { legajo: String(legajo || "").trim(), items: items, filtro: "", motivo: "" };
+    _scRacksCh = {}; Object.keys(saldos).forEach(function (k) { const a = saldos[k]; if ((a.racks_ch || 0) > 0) _scRacksCh[_cpNorm(String(a.cod).replace(/\s+(LK|CH)$/i, "").replace(/\s+/g, ""))] = a.racks_ch; });
+    _sc = { legajo: String(legajo || "").trim(), items: items, rk: scArmarRacks(res[1], (res[2] && res[2].cxm) || {}, saldos), tab: "gondola", filtro: "", motivo: "" };
     scRender();
   } catch (e) { const b = document.getElementById("scBody"); if (b) b.innerHTML = '<div class="sc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
+/* v29.05 (Luis, 09/10) — Salida a Cervantes con pestañas GÓNDOLA y RACKS. En racks se manda desde una
+   POSICIÓN (Racks_Planimetria, fuente stock) y se elige la unidad: CAJA o MC (cajas por master de
+   GV_Rack_CxM). El movimiento siempre va en cajas, con la posición en `ubicacion`. */
+async function scFetchRacks() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Racks_Planimetria?select=emp,sector,cod_art,innercajas&fuente=eq.stock&estado=eq.ocupado&innercajas=gt.0&order=cod_art.asc,sector.asc&limit=5000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    return r.ok ? await r.json() : null;
+  } catch (_e) { return null; }
+}
+function scArmarRacks(rows, cxmMap, saldos) {
+  if (!Array.isArray(rows)) return null;   // null = no se pudo leer (no es "no hay")
+  const descDe = {};
+  Object.keys(saldos || {}).forEach(function (k) { const a = saldos[k]; descDe[_cpNorm(String(a.cod).replace(/\s+(LK|CH)$/i, ""))] = a.desc; });
+  return rows.map(function (x) {
+    const cod = String(x.cod_art || "").trim(), kk = _cpNorm(cod.replace(/\s+/g, ""));
+    const caj = Math.floor(Number(x.innercajas) || 0);
+    const cxm = Number(cxmMap[kk]) || 0;
+    return { cod: cod, emp: String(x.emp || "LK").toUpperCase(), sector: String(x.sector || "").trim(), desc: descDe[kk] || "", disponible: caj, cxm: cxm, unidad: "caja", sacar: 0 };
+  }).filter(function (it) { return it.cod && it.sector && it.disponible > 0; });
+}
+function scRkCajas(it) { return it.unidad === "mc" && it.cxm > 0 ? it.sacar * it.cxm : it.sacar; }
+function scRkMax(it) { return it.unidad === "mc" && it.cxm > 0 ? Math.floor(it.disponible / it.cxm) : it.disponible; }
+function scTab(t) { if (!_sc) return; _sc.tab = t === "racks" ? "racks" : "gondola"; scRender(); }
+function scRkUnidad(i, u) { if (!_sc || !_sc.rk) return; const it = _sc.rk[i]; if (!it) return; if (u === "mc" && !(it.cxm > 0)) return; it.unidad = u; it.sacar = 0; scRender(); }
+function scRkChg(i, d) { if (!_sc || !_sc.rk) return; const it = _sc.rk[i]; if (!it) return; it.sacar = Math.max(0, Math.min(scRkMax(it), it.sacar + d)); scRender(); }
+function scRkSet(i, v) { if (!_sc || !_sc.rk) return; const it = _sc.rk[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > scRkMax(it)) n = scRkMax(it); it.sacar = n; scRender(); }
+function scTotCajas() {
+  if (!_sc) return 0;
+  const g = (_sc.items || []).reduce(function (s, it) { return s + it.sacar; }, 0);
+  const r = (_sc.rk || []).reduce(function (s, it) { return s + scRkCajas(it); }, 0);
+  return g + r;
+}
+function scRenderRacks(body) {
+  const tabs = scTabsHtml();
+  let h = tabs + '<div class="sc-hint">Elegí la <b>posición</b> del rack y la unidad: <b>caja</b> o <b>MC</b>. Sale del rack.</div>';
+  h += '<input class="sc-mot" type="text" placeholder="Remito / motivo (opcional)" value="' + escapeHtml(_sc.motivo || "") + '" oninput="if(_sc)_sc.motivo=this.value;">';
+  h += '<input class="sc-search" type="search" placeholder="🔎 Buscar código / descripción / posición" value="' + escapeHtml(_sc.filtro) + '" oninput="if(_sc){_sc.filtro=this.value;scRender();}">';
+  if (_sc.rk == null) h += '<div class="sc-empty">No se pudo leer el stock de racks. Probá de nuevo.</div>';
+  else if (!_sc.rk.length) h += '<div class="sc-empty">No hay stock en racks.</div>';
+  else {
+    const f = (_sc.filtro || "").toLowerCase().trim();
+    const shown = f ? _sc.rk.filter(function (it) { return stkMatchBusq(f, it.cod, it.desc, false) || it.sector.toLowerCase().indexOf(f) >= 0; }) : _sc.rk;
+    if (!shown.length) h += '<div class="sc-empty">No hay artículos que coincidan.</div>';
+    else h += shown.map(function (it) {
+      const i = _sc.rk.indexOf(it);
+      const mcTxt = it.cxm > 0 ? (' · ' + Math.floor(it.disponible / it.cxm) + ' MC×' + it.cxm) : ' · s/master';
+      const uB = function (u, lbl, ok) { return '<button class="sc-u' + (it.unidad === u ? ' on' : '') + '"' + (ok ? '' : ' disabled') + ' onclick="scRkUnidad(' + i + ',\'' + u + '\')">' + lbl + '</button>'; };
+      const eq = (it.unidad === "mc" && it.sacar > 0) ? '<div class="sc-disp">= ' + scRkCajas(it) + ' cajas</div>' : '';
+      return '<div class="sc-row"><div class="sc-info"><span class="sc-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="sc-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span>' +
+        '<div class="sc-disp">📍 ' + escapeHtml(it.sector) + (it.emp === "CH" ? ' · CH' : '') + ' · ' + it.disponible + ' cajas' + mcTxt + '</div>' +
+        '<div class="sc-us">' + uB("caja", "Caja", true) + uB("mc", "MC", it.cxm > 0) + '</div>' + eq + '</div>' +
+        '<div class="sc-stp"><button class="sc-sb" onclick="scRkChg(' + i + ',-1)">–</button><input class="sc-inp" type="number" min="0" max="' + scRkMax(it) + '" inputmode="numeric" value="' + it.sacar + '" oninput="scRkSet(' + i + ',this.value)"><button class="sc-sb" onclick="scRkChg(' + i + ',1)">+</button></div></div>';
+    }).join("");
+  }
+  const tot = scTotCajas();
+  h += '<button class="sc-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="scConfirmar()">✓ Mandar ' + tot + ' caja(s) a Cervantes</button>';
+  _renderKeepFocus(body, h);
+}
+function scTabsHtml() {
+  const nG = (_sc.items || []).reduce(function (s, it) { return s + it.sacar; }, 0);
+  const nR = (_sc.rk || []).reduce(function (s, it) { return s + scRkCajas(it); }, 0);
+  const t = function (k, lbl, n) { return '<button class="sc-tab' + (_sc.tab === k ? ' on' : '') + '" onclick="scTab(\'' + k + '\')">' + lbl + (n > 0 ? ' <span class="sc-tabn">' + n + '</span>' : '') + '</button>'; };
+  return '<div class="sc-tabs">' + t("gondola", "Góndola", nG) + t("racks", "Racks", nR) + '</div>';
+}
 function scRender() {
   if (!_sc) return; const body = document.getElementById("scBody"); if (!body) return;
-  if (!_sc.items.length) { body.innerHTML = '<div class="sc-empty">No hay artículo terminado en góndola para mandar.</div>'; return; }
+  if (!_sc.rk && _sc.rk !== null) _sc.rk = [];
+  if (_sc.tab === "racks") { scRenderRacks(body); return; }
+  if (!_sc.items.length) { body.innerHTML = scTabsHtml() + '<div class="sc-empty">No hay artículo terminado en góndola para mandar.</div>'; return; }
   const f = (_sc.filtro || "").toLowerCase().trim();
   const shown = f ? _sc.items.filter(function (it) { return stkMatchBusq(f, it.cod, it.desc, false); }) : _sc.items;   // v21.43
-  let h = '<div class="sc-hint">Marcá cuántas <b>cajas</b> mandás a Cervantes. Sale de la góndola (Artículo Terminado).</div>';
+  let h = scTabsHtml() + '<div class="sc-hint">Marcá cuántas <b>cajas</b> mandás a Cervantes. Sale de la góndola (Artículo Terminado).</div>';
   h += '<input class="sc-mot" type="text" placeholder="Remito / motivo (opcional)" value="' + escapeHtml(_sc.motivo || "") + '" oninput="if(_sc)_sc.motivo=this.value;">';
   h += '<input class="sc-search" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_sc.filtro) + '" oninput="if(_sc){_sc.filtro=this.value;scRender();}">';
   if (!shown.length) h += '<div class="sc-empty">No hay artículos que coincidan.</div>';
@@ -28232,7 +28307,7 @@ function scRender() {
     const i = _sc.items.indexOf(it);
     return '<div class="sc-row"><div class="sc-info"><span class="sc-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="sc-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span><div class="sc-disp">en góndola: ' + it.disponible + ' cajas</div></div><div class="sc-stp"><button class="sc-sb" onclick="scChg(' + i + ',-1)">–</button><input class="sc-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.sacar + '" oninput="scSet(' + i + ',this.value)"><button class="sc-sb" onclick="scChg(' + i + ',1)">+</button></div></div>';
   }).join("");
-  const tot = _sc.items.reduce(function (s, it) { return s + it.sacar; }, 0);
+  const tot = scTotCajas();
   h += '<button class="sc-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="scConfirmar()">✓ Mandar ' + tot + ' caja(s) a Cervantes</button>';
   _renderKeepFocus(body, h);
 }
@@ -28241,17 +28316,29 @@ function scSet(i, v) { if (!_sc) return; const it = _sc.items[i]; if (!it) retur
 function scConfirmar() {
   if (!_sc) return;
   const sel = _sc.items.filter(function (it) { return it.sacar > 0; });
-  if (!sel.length) return;
+  const selR = (_sc.rk || []).filter(function (it) { return scRkCajas(it) > 0; });
+  if (!sel.length && !selR.length) return;
   const ref = (_sc.motivo || "").trim() || null;
   const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: -it.sacar, tipo: "salida_cervantes", ref: ref, legajo: _sc.legajo || null }; });
-  const n = sel.reduce(function (s, it) { return s + it.sacar; }, 0);
+  // v29.05 — racks: sale de la POSICIÓN, en cajas (MC × cajas por master). CH puede vivir en racks_ch.
+  const rowsR = selR.map(function (it) {
+    const cj = scRkCajas(it);
+    const dep = it.emp === "CH" && scRkDepCH(it.cod, cj) ? "racks_ch" : "racks";
+    const det = it.unidad === "mc" ? (" · " + it.sacar + " MC×" + it.cxm) : "";
+    return { cod_art: it.cod, descripcion: (it.desc || it.cod) + " · rack " + it.sector + det, deposito: dep, delta: -cj, tipo: "salida_cervantes", ref: ref, legajo: _sc.legajo || null, ubicacion: it.sector, empresa: it.emp === "CH" ? "CH" : "LK" };
+  });
+  const nG = sel.reduce(function (s, it) { return s + it.sacar; }, 0);
+  const nR = selR.reduce(function (s, it) { return s + scRkCajas(it); }, 0);
   try { opDraftClear(_sc && _sc.legajo); } catch (_e) {}
   closeSc();
-  stockMove(rows);   // offline-safe (vir_stock_pend)
-  try { alert("✓ Salida a Cervantes registrada: " + n + " caja(s). Bajó de la góndola."); } catch (_e) {}
+  if (rows.length) stockMove(rows);   // offline-safe (vir_stock_pend)
+  if (rowsR.length) stockMove(rowsR);
+  try { alert("✓ Salida a Cervantes registrada: " + (nG + nR) + " caja(s)." + (nG ? " Góndola: " + nG + "." : "") + (nR ? " Racks: " + nR + "." : "")); } catch (_e) {}
 }
 function closeSc() { const ov = document.getElementById("scModal"); if (ov) ov.classList.remove("show"); _sc = null; }
-function scHasProgress() { return !!(_sc && _sc.items && _sc.items.some(function (it) { return (it.sacar > 0); })); }
+function scHasProgress() { return !!(_sc && ((_sc.items && _sc.items.some(function (it) { return (it.sacar > 0); })) || (_sc.rk && _sc.rk.some(function (it) { return it.sacar > 0; })))); }
+let _scRacksCh = null;   // saldo racks_ch por código (para elegir el depósito de una posición CH)
+function scRkDepCH(cod, cajas) { const v = _scRacksCh && _scRacksCh[_cpNorm(String(cod).replace(/\s+/g, ""))]; return v != null && v >= cajas; }
 function scAskClose() { opAskClose(scHasProgress(), "SC", _sc && _sc.legajo, "Salida a Cervantes", _sc, closeSc); }
 
 /* ===== "Volver al cuadro" (v5.55): borrador de una operación cerrada sin terminar.
@@ -29957,7 +30044,7 @@ function irRender() {
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas a mover' + (_ir.cod ? ' (máx ' + Math.round(disp) + ')' : '') + '</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div>';
     if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(codCanonSuf(_ir.cod)) + ' en ' + origTxt + '.</div>';
   } else {
-    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>se descuenta solo del pedido de importación en viaje</b> de ese código.</div>';
+    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="ej. 582E" value="' + escapeHtml(codBase(_ir.cod)) + '" oninput="irSetCod(this.value)"></div>';
     if (_ir.cod) h += '<div class="ir-desc">' + escapeHtml(nombre || "(código nuevo, sin nombre)") + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
     h += '<div class="ir-row2"><div class="ir-fld"><div class="ir-lbl">Masters</div><div class="ir-stp"><button class="ir-sb" onclick="irChgM(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.masters) || 0) + '" oninput="irSetM(this.value)"><button class="ir-sb" onclick="irChgM(1)">+</button></div></div>';
@@ -61958,7 +62045,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.05"></script>
+<script src="importacion.js?v=29.13"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62249,6 +62336,7 @@ function showSupervisor(email) {
   try { ppLoadBadge(); } catch (_e) {}   // v10.48: badge Pasaje de Papeles (pendientes de enviar)
   try { if (typeof adsLoadBadge === "function") adsLoadBadge(); } catch (_e) {}   // v27.20: badge violeta ADS (talleristas debajo del umbral)
   try { cgLoad(); } catch (_e) {}   // v28.58: conteos de góndola del picking que difieren
+  try { if (typeof impIrLoadBadge === "function") impIrLoadBadge(); } catch (_e) {}   // v29.11: badge 📥 Recibido por operarios (Importación)
   try { colaImpLoadBadge(); } catch (_e) {}   // v11.60: badge Cola de impresión NP (armadas sin imprimir; rojo si +24h)
   try { expIsisLoadBadge(); } catch (_e) {}   // badge Agregar Expreso ISIS (expresos que eligió el cliente en la página)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
@@ -64887,10 +64975,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.05"></script>
-<script src="hotsale.js?v=29.05"></script>
-<script src="estadisticas.js?v=29.05"></script>
-<script src="ads.js?v=29.05"></script>
+<script src="cobranzas.js?v=29.13"></script>
+<script src="hotsale.js?v=29.13"></script>
+<script src="estadisticas.js?v=29.13"></script>
+<script src="ads.js?v=29.13"></script>
 
 </body>
 </html>

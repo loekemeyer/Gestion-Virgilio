@@ -17,10 +17,10 @@
      botón ADS del panel, con cuántos son. Rango y umbral viven en Stock_Config
      (ads_n_ocs, ads_umbral, ads_incluir_actual): el badge es el mismo para todos.
    PESTAÑA 2 · STOCK (quiebres a 10, 20 y 30 días)
-     saldo N = (góndola + racks + a guardar + excedente) − el MAYOR entre las NP programadas
-               sin pickear con entrega hasta hoy + N (vencidas también) y E.M. plazo
-               (v28.56, Luis: E.M. plazo = Est. Madre × max(0, N − días que tarda en salir) / 30;
-               los días salen del promedio de las últimas 2 semanas o los fija un supervisor)
+     saldo N = (góndola + racks + a guardar + excedente) − NP programadas sin pickear con
+               entrega hasta hoy + N (vencidas también) − E.M. plazo (v28.56: se SUMAN, no el mayor;
+               v28.59: E.M. plazo = Est. Madre × días equivalentes de gv_ads_em_dias, con la
+               distribución real de lo que tarda un pedido en salir, o fijados por un supervisor)
      Negativo = quiebre. Sólo artículos CON TALLERISTA (v27.23: los importados sin tallerista no van).
      Con la última OC del código (cuánto se recibió) y el %
      que viene entregando ese tallerista en ese artículo (rango de la pestaña 1).
@@ -32,7 +32,7 @@
    atado a APP_VERSION. Candado: tests/ads-alertas.cjs.
    ============================================================================ */
 
-var _ads = { tab: "tall", cfg: null, tall: null, tallErr: "", stock: null, stockErr: "",
+var _ads = { tab: "stock", cfg: null, tall: null, tallErr: "", stock: null, stockErr: "",
              n: 4, inc: true, umbral: 0.5, abiertos: {}, horiz: 10, q: "", cargando: 0 };
 
 function _adsRpc(name, args) {
@@ -126,6 +126,7 @@ function openAds() {
   var ov = document.getElementById("adsOv");
   if (!ov) { ov = document.createElement("div"); ov.id = "adsOv"; document.body.appendChild(ov); }
   ov.style.display = "flex";
+  _ads.tab = "stock";   // v29.11: lo primero que se ve es POR ARTÍCULO (Stock); después, por tallerista
   _adsRpc("gv_ads_config").then(function (r) {
     var c = r && r.data;
     if (c) { _ads.cfg = c; _ads.n = 4;   // v27.75 (Luis): el rango abre siempre en 4
@@ -140,33 +141,36 @@ function adsClose() { var ov = document.getElementById("adsOv"); if (ov) ov.styl
 function adsTab(t) { _ads.tab = t; _adsRender(); }
 
 function _adsCargarTall() {
-  _ads.tall = null; _ads.tallErr = ""; _adsRender();
+  // v29.10: cada cambio de rango invalida las lecturas anteriores (si una vieja llega última, no pisa a la nueva)
+  var seq = _ads.seq = (_ads.seq || 0) + 1;
+  _ads.tall = null; _ads.tallErr = ""; _ads.tallCerr = null; _adsRender();
+  // v28.86: la misma lectura (período CERRADO) alimenta la pestaña 1 y el % para proyectar la OC vigente
   _adsRpc("gv_ads_talleristas", { p_n: _ads.n, p_incluir_actual: false }).then(function (r) {
+    if (seq !== _ads.seq) return;
     if (r.error || !Array.isArray(r.data)) _ads.tallErr = "No se pudieron leer las OC: " + ((r.error && r.error.message) || "sin respuesta");
     else if (!r.data.length) _ads.tallErr = "La lectura volvió vacía: no hay OC en el rango (o no hay sesión).";
-    else _ads.tall = r.data;
+    else {
+      _ads.tall = r.data;
+      var m = {}; r.data.forEach(function (x) { m[String(x.proveedor).toUpperCase() + "|" + String(x.codigo).toUpperCase()] = x; });
+      _ads.tallCerr = m;
+    }
     _adsRender();
   });
   // v28.96 (Luis, 09/10): la pestaña Stock sigue mirando el período CON la OC vigente (su «Últ. OC» es la vigente);
   // y en Entregas talleristas el recuadro de la derecha es la OC VIGENTE, no la última del período cerrado.
   _ads.tallInc = null; _ads.vig = null;
   _adsRpc("gv_ads_talleristas", { p_n: _ads.n, p_incluir_actual: true }).then(function (r) {
-    if (r.error || !Array.isArray(r.data)) return;
+    if (seq !== _ads.seq || r.error || !Array.isArray(r.data)) return;
     _ads.tallInc = r.data; if (_ads.stock) _adsRender();
   });
   _adsRpc("gv_ads_talleristas", { p_n: 1, p_incluir_actual: true }).then(function (r) {
-    if (r.error || !Array.isArray(r.data)) return;
+    if (seq !== _ads.seq || r.error || !Array.isArray(r.data)) return;
     var m = {}; r.data.forEach(function (x) { m[String(x.pkey || x.proveedor).toUpperCase() + "|" + String(x.codigo).toUpperCase()] = x; });
     _ads.vig = m; _adsRender();
   });
   // v28.86 (Luis, 08/10): el % para PROYECTAR la OC vigente sale del último período CERRADO (sin la OC vigente):
   // con la vigente adentro, lo que ya llegó de ella entraba al % y después se restaba (Garcia 550: 247 × 14 % − 35 = 0).
-  _ads.tallCerr = null;
-  _adsRpc("gv_ads_talleristas", { p_n: _ads.n, p_incluir_actual: false }).then(function (r) {
-    if (r.error || !Array.isArray(r.data)) return;
-    var m = {}; r.data.forEach(function (x) { m[String(x.proveedor).toUpperCase() + "|" + String(x.codigo).toUpperCase()] = x; });
-    _ads.tallCerr = m; if (_ads.stock) _adsRender();
-  });
+  // (v29.10: sale de la primera lectura de arriba; antes se pedía dos veces la misma.)
 }
 /* v28.44 (Luis): la ENTREGA PROY. que se carga a mano en la OC vigente (consultándole al tallerista,
    Ordenes_Compra.gv_entrega_proy) manda sobre la estimación por ritmo. Clave proveedor|código|fecha de la OC.
@@ -185,7 +189,9 @@ function _adsCargarEntregaProy() {
       }).catch(function () {});
   } catch (e) {}
 }
-function _adsEpKey(prov, cod, fecha) { return String(prov || "").trim().toUpperCase() + "|" + String(cod || "").trim().toUpperCase() + "|" + String(fecha || "").slice(0, 10); }
+// v29.10: el código va SIN ceros adelante de los dos lados — Ordenes_Compra guarda «058» y stock / talleristas «58»
+// (norm_cod): sin esto la Entrega proy. cargada en la OC de un código con cero adelante no se encontraba nunca.
+function _adsEpKey(prov, cod, fecha) { return String(prov || "").trim().toUpperCase() + "|" + String(cod || "").trim().toUpperCase().replace(/^0+(?=[0-9])/, "") + "|" + String(fecha || "").slice(0, 10); }
 function _adsCargarStock() {
   _ads.stock = null; _ads.stockErr = ""; _adsCargarEntregaProy();
   _adsRpc("gv_ads_stock3").then(function (r) {
@@ -541,8 +547,8 @@ function _adsAltos(aoa, anchos, cols, minRen, porCar) {
 function _adsRender() {
   var ov = document.getElementById("adsOv"); if (!ov || ov.style.display === "none") return;
   var h = '<div class="ads-top"><span class="tit">ADS · Alertas Damián Stock</span>' +
-    '<button class="tab' + (_ads.tab === "tall" ? " on" : "") + '" onclick="adsTab(\'tall\')">Entregas talleristas</button>' +
     '<button class="tab' + (_ads.tab === "stock" ? " on" : "") + '" onclick="adsTab(\'stock\')">Stock</button>' +
+    '<button class="tab' + (_ads.tab === "tall" ? " on" : "") + '" onclick="adsTab(\'tall\')">Entregas talleristas</button>' +
     '<span class="sp"></span><button onclick="adsClose()">Cerrar</button></div>';
   h += _ads.tab === "stock" ? _adsHtmlStock() : _adsHtmlTall();
   ov.innerHTML = h;

@@ -54,6 +54,9 @@ const STOCK = [
     const sem = document.getElementById("adsSemaf");
     out.semaf = sem && sem.style.display !== "none" ? [...sem.querySelectorAll(".ads-sem")].map((x) => x.textContent + "|" + x.style.background) : [];
     window.openAds(); await espera(150);
+    // v29.11: abre en Stock (por artículo) y esa solapa va primero
+    out.tabs = [...document.querySelectorAll("#adsOv .ads-top button.tab")].map((b) => b.textContent + (b.classList.contains("on") ? "*" : ""));
+    window.adsTab("tall"); await espera(50);
     out.rango = [...document.querySelectorAll("#adsOv .ads-bar select option")].map((o) => o.textContent);
     out.rangoSel = (document.querySelector("#adsOv .ads-bar select") || {}).value;
     out.sinInc = !document.querySelector("#adsOv .ads-bar input[type=checkbox]") && window.__incFalse === true;   // v28.95: la OC vigente NUNCA entra (snapshot de las cerradas)
@@ -107,6 +110,7 @@ const STOCK = [
   await b.close();
   const fallas = [];
   if (r.rango.length !== 12 || r.rango[0] !== "1 - 07.10.26" || r.rango[1] !== "2 - 30.09.26" || r.rango[2] !== "3 - sin OC") fallas.push("(g) selector de rango 1..12 con fecha: " + JSON.stringify(r.rango));
+  if (JSON.stringify(r.tabs) !== JSON.stringify(["Stock*", "Entregas talleristas"])) fallas.push("v29.11: abre en Stock (por artículo) y va primero: " + JSON.stringify(r.tabs));
   if (r.rangoSel !== "4") fallas.push("(g) el rango abre en 4: " + r.rangoSel);
   if (!r.sinInc) fallas.push("(g) la OC vigente no puede entrar en el %, ni haber casilla");
   if (!r.boton) fallas.push("(a) falta el botón ADS con su badge");
