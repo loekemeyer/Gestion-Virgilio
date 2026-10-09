@@ -89,9 +89,14 @@
           carga_id: cargaIdFinal,
           despacho_id: despPersisted ? despPersisted.despacho_id : undefined,
         });
-        S.result = finalResult; render();
-        if (cargaIdFinal) {
-          try { S.richRows = await IC.api.get(`/export-excel?carga_id=${cargaIdFinal}&format=json`); }
+        S.result = finalResult;
+        // Como en React: la vista enriquecida se pide antes de que se monte la tabla editable (items_list).
+        const rica = cargaIdFinal ? IC.api.get(`/export-excel?carga_id=${cargaIdFinal}&format=json`) : null;
+        if (rica) rica.catch(() => {});
+        IC.items.olvidar(ITEMS_KEY);   // la tabla se monta de cero (en React se montaba al aparecer carga_id)
+        render();
+        if (rica) {
+          try { S.richRows = await rica; }
           catch (_) {}
         }
       } catch (e) {
@@ -107,7 +112,9 @@
     async function run() {
       if (typesWithFiles().length < 2 || !S.nroCarga.trim()) return;
       const filesByType = S.filesByType, nroCarga = S.nroCarga;
-      S.loading = true; S.error = null; S.result = null; S.richRows = null; S.progress = 'Preparando...'; render();
+      S.loading = true; S.error = null; S.result = null; S.richRows = null; S.progress = 'Preparando...';
+      IC.items.olvidar(ITEMS_KEY);   // sin resultado la tabla editable se desmonta (React)
+      render();
       const setProgress = (p) => { S.progress = p; render(); };
       try {
         const { extractText } = await IC.mod('pdfText');

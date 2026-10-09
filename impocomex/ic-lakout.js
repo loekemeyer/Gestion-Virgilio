@@ -76,9 +76,13 @@
         // preview=false (default) -> hace insert real
         const j = await api.postForm('/verify-lakout', fd);
         if (!vivo()) return;
-        setResult(j); render();
-        if (j.carga_id) {
-          try { S.richRows = await api.get(`/export-excel?carga_id=${j.carga_id}&format=json`); }
+        setResult(j);
+        // Igual que en React: el pedido de la tabla rica sale ANTES de que se pinten (y pidan) los ítems.
+        const pRich = j.carga_id ? api.get(`/export-excel?carga_id=${j.carga_id}&format=json`) : null;
+        if (pRich) pRich.catch(() => {});
+        render();
+        if (pRich) {
+          try { S.richRows = await pRich; }
           catch (_) {}
         }
       } catch (e) { S.error = e.message || String(e); }

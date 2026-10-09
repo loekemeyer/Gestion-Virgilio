@@ -3977,6 +3977,9 @@ privado `loekemeyer/Impo-Comex`**; acá va sólo el build web (`client/dist-web`
 - Al cambiar una pantalla en `Impo-Comex`, se porta a mano al `ic-<modo>.js`; un cambio de lógica es copiar el archivo a `logica/`.
 - `tests/impo-comex-nuevo.cjs` (abre los 11 modos sin errores y corre la lógica original: PDF, Excel, zip, rar, EAN-13, Word,
   DDJJ) · `tests/impo-comex-web.cjs` (bloque e: sin token, sin datos personales, sin `import.meta.env`).
+- **v29.23: PARIDAD con el viejo, flujo por flujo** (subir, verificar, editar, corregir, guardar, descargar): `tests/impo-comex-paridad-{lakout,multidoc,marks,cajas,inal}.cjs`
+  comparan pedidos a la puerta, pantalla y descargas contra lo que hizo el viejo (`impo-comex/`), grabado en el test o en
+  `tests/tools/`. Mientras exista `impo-comex/` se regraban desde el viejo (ver la cabecera de cada test). **Al borrar el viejo, los tests siguen andando.**
 
 ## ⚠ REGLA (Luis, 2026-09-28, v23.45): la importación se RECIBE desde el panel — 📥 RECIBIR
 

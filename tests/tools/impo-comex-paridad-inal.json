@@ -1,0 +1,1394 @@
+{
+ "inal": [
+  {
+   "et": "venc-inicial",
+   "s": "fb187b52d67af467677437ce05baab02",
+   "muestra": "imiento—1▼LosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/inal-certificados?productos=1&articulos=1",
+     "json": null,
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "venc-vencido",
+   "s": "8034e652d5ec4a5a1d261a5abf17fbfd",
+   "muestra": "0/01/2020—LosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": []
+  },
+  {
+   "et": "venc-toggle",
+   "s": "fb187b52d67af467677437ce05baab02",
+   "muestra": "imiento—1▼LosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": []
+  },
+  {
+   "et": "venc-porvencer",
+   "s": "847a22ed4dc77b9b4fa9bab86bc9215b",
+   "muestra": "/11/20213▼LosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": []
+  },
+  {
+   "et": "venc-rne",
+   "s": "8034e652d5ec4a5a1d261a5abf17fbfd",
+   "muestra": "0/01/2020—LosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": []
+  },
+  {
+   "et": "venc-buscar",
+   "s": "7cf7eed079511b2fa601924b9c46a175",
+   "muestra": "/03/20232▼LosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": []
+  },
+  {
+   "et": "venc-buscar-cod",
+   "s": "a3c3589f515ea73911df97204146cdc6",
+   "muestra": "/03/20232▼LosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": []
+  },
+  {
+   "et": "venc-abre",
+   "s": "5f6b6e66582c4ed0f051934800aa65f4",
+   "muestra": "imiento—1▼LosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": []
+  },
+  {
+   "et": "venc-abre-otro",
+   "s": "886db73099597494a4a26d13598b01a1",
+   "muestra": "elcatálogoLosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": []
+  },
+  {
+   "et": "venc-cierra",
+   "s": "fb187b52d67af467677437ce05baab02",
+   "muestra": "imiento—1▼LosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": []
+  },
+  {
+   "et": "refresh-error",
+   "s": "b1d93104b3efb9671867096617afaf38",
+   "muestra": "imiento—1▼LosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/inal-certificados?productos=1&articulos=1",
+     "json": null,
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "refresh-ok",
+   "s": "fb187b52d67af467677437ce05baab02",
+   "muestra": "imiento—1▼LosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/inal-certificados?productos=1&articulos=1",
+     "json": null,
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "refresh-error-texto",
+   "s": "0f31ec6ca6ae2e9b0693c32517259a64",
+   "muestra": "imiento—1▼LosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/inal-certificados?productos=1&articulos=1",
+     "json": null,
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "refresh-ok-2",
+   "s": "fb187b52d67af467677437ce05baab02",
+   "muestra": "imiento—1▼LosdíassecuentanconlafechadeestaPC.\"Porvencer\"=venceen90díasomenos.Paracargarocorregiruncertificado:\"+Cargarcertificado\"(conelmismonúmeroloactualiza).",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/inal-certificados?productos=1&articulos=1",
+     "json": null,
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "art",
+   "s": "573ca3a748c344662d04a741ba810771",
+   "muestra": "—RNE-02-03334410/01/2025Vencido702EChefRallador4carasLOEKEMEYERHNOSSRLFujianHongshengCE-2023-777-APN-SENASA01/03/2028999ELKSinfecha——CE-SIN-FECHA—Sinvencimiento",
+   "reqs": []
+  },
+  {
+   "et": "art-437",
+   "s": "3d09db24cf382d20f15f1c31590eff68",
+   "muestra": "angliCo.CE-2024-00123456-APN-INAL20/11/2026Porvencer437ELLoekeColadorØ8cm(de437E)LOEKEMEYERHNOSSRLYangjiangKangliCo.CE-2024-00123456-APN-INAL20/11/2026Porvencer",
+   "reqs": []
+  },
+  {
+   "et": "art-25",
+   "s": "ebfdf874908e27356ea285fe5940b23d",
+   "muestra": "nte(1)1artículo⬇DescargarExcelCódigoMarcaDescripciónImportadorElaboradorN°CertificadoVencimiento025E—sinnombreenelcatálogoCHEFSRL—RNE-02-03334410/01/2025Vencido",
+   "reqs": []
+  },
+  {
+   "et": "art-kangli",
+   "s": "b6fe2155394f11e88a580d9d975708c5",
+   "muestra": "angliCo.CE-2024-00123456-APN-INAL20/11/2026Porvencer437ELLoekeColadorØ8cm(de437E)LOEKEMEYERHNOSSRLYangjiangKangliCo.CE-2024-00123456-APN-INAL20/11/2026Porvencer",
+   "reqs": []
+  },
+  {
+   "et": "art-nada",
+   "s": "2f0906d908f388ecfb231ec2799fa818",
+   "muestra": "🔄Todos(5)Vencido(1)Porvencer(2)Vigente(1)0artículos⬇DescargarExcelCódigoMarcaDescripciónImportadorElaboradorN°CertificadoVencimientoNingúnartículoconesefiltro.",
+   "reqs": []
+  },
+  {
+   "et": "art-vencido",
+   "s": "d9ea752d0515a1d64b0d6f1c38f6a155",
+   "muestra": "nte(1)1artículo⬇DescargarExcelCódigoMarcaDescripciónImportadorElaboradorN°CertificadoVencimiento025E—sinnombreenelcatálogoCHEFSRL—RNE-02-03334410/01/2025Vencido",
+   "reqs": []
+  },
+  {
+   "et": "art-vigente",
+   "s": "5e10f578f623ebc03f60305809cce924",
+   "muestra": "garExcelCódigoMarcaDescripciónImportadorElaboradorN°CertificadoVencimiento702EChefRallador4carasLOEKEMEYERHNOSSRLFujianHongshengCE-2023-777-APN-SENASA01/03/2028",
+   "reqs": []
+  },
+  {
+   "et": "excel-0",
+   "v": {
+    "nombre": "articulos-certificados-2026-10-09.xlsx",
+    "md5": "ee5d0a7de0cd8292ed0a63c01a4c8864"
+   }
+  },
+  {
+   "et": "excel-1",
+   "v": {
+    "nombre": "articulos-certificados-2026-10-09.xlsx",
+    "md5": "a7cb853be9c2cce108cfee50039f97df"
+   }
+  },
+  {
+   "et": "excel-2",
+   "v": {
+    "nombre": "articulos-certificados-2026-10-09.xlsx",
+    "md5": "56609cc90e09ae4469699469b4f025c1"
+   }
+  },
+  {
+   "et": "art-tras-excel",
+   "s": "6f2188457d7be8e4974e2bc757c67256",
+   "muestra": "nte(1)1artículo⬇DescargarExcelCódigoMarcaDescripciónImportadorElaboradorN°CertificadoVencimiento025E—sinnombreenelcatálogoCHEFSRL—RNE-02-03334410/01/2025Vencido",
+   "reqs": []
+  },
+  {
+   "et": "ncm",
+   "s": "e8f1e9a7006dbaddc062f621254d3cd5",
+   "muestra": "23456-APN-INALPorvencerFUJIAN702ERallador+cargarCE-2023-777-APN-SENASA≈VigenteBECKY958EBatidor8215.99.10.000⚠manual—ZHIXIN106EPelador+cargarRNE-02-033344Vencido",
+   "reqs": []
+  },
+  {
+   "et": "art-reinicia",
+   "s": "573ca3a748c344662d04a741ba810771",
+   "muestra": "—RNE-02-03334410/01/2025Vencido702EChefRallador4carasLOEKEMEYERHNOSSRLFujianHongshengCE-2023-777-APN-SENASA01/03/2028999ELKSinfecha——CE-SIN-FECHA—Sinvencimiento",
+   "reqs": []
+  },
+  {
+   "et": "ncm-Sin NCM (2)",
+   "s": "468b6886befb4d4d378470e6838ecaac",
+   "muestra": "queestéautorizado.Prov.LKCHProductoNCMFuenteCertificadoEstadoFUJIAN702ERallador+cargarCE-2023-777-APN-SENASA≈VigenteZHIXIN106EPelador+cargarRNE-02-033344Vencido",
+   "reqs": []
+  },
+  {
+   "et": "ncm-Sin certificado (1)",
+   "s": "6852a4a7e8df392b8f2988b4c60a0bf1",
+   "muestra": "ante\"=elCEcubreelmismocódigobaseconotrosufijoomarca;confirmarqueestéautorizado.Prov.LKCHProductoNCMFuenteCertificadoEstadoBECKY958EBatidor8215.99.10.000⚠manual—",
+   "reqs": []
+  },
+  {
+   "et": "ncm-Certificado de otra variante (1)",
+   "s": "873201618610aeda6871ad2b9ebfe841",
+   "muestra": "mismocódigobaseconotrosufijoomarca;confirmarqueestéautorizado.Prov.LKCHProductoNCMFuenteCertificadoEstadoFUJIAN702ERallador+cargarCE-2023-777-APN-SENASA≈Vigente",
+   "reqs": []
+  },
+  {
+   "et": "ncm-NCM en conflicto (1)",
+   "s": "6852a4a7e8df392b8f2988b4c60a0bf1",
+   "muestra": "ante\"=elCEcubreelmismocódigobaseconotrosufijoomarca;confirmarqueestéautorizado.Prov.LKCHProductoNCMFuenteCertificadoEstadoBECKY958EBatidor8215.99.10.000⚠manual—",
+   "reqs": []
+  },
+  {
+   "et": "ncm-Todos (4)",
+   "s": "e8f1e9a7006dbaddc062f621254d3cd5",
+   "muestra": "23456-APN-INALPorvencerFUJIAN702ERallador+cargarCE-2023-777-APN-SENASA≈VigenteBECKY958EBatidor8215.99.10.000⚠manual—ZHIXIN106EPelador+cargarRNE-02-033344Vencido",
+   "reqs": []
+  },
+  {
+   "et": "ncm-edita",
+   "s": "e368e35be87eac19be914e7c009156b6",
+   "muestra": "24-00123456-APN-INALPorvencerFUJIAN702ERallador✓CE-2023-777-APN-SENASA≈VigenteBECKY958EBatidor8215.99.10.000⚠manual—ZHIXIN106EPelador+cargarRNE-02-033344Vencido",
+   "reqs": []
+  },
+  {
+   "et": "ncm-foco",
+   "v": "7323.93.00.910T"
+  },
+  {
+   "et": "ncm-guardado",
+   "s": "e8f1e9a7006dbaddc062f621254d3cd5",
+   "muestra": "23456-APN-INALPorvencerFUJIAN702ERallador+cargarCE-2023-777-APN-SENASA≈VigenteBECKY958EBatidor8215.99.10.000⚠manual—ZHIXIN106EPelador+cargarRNE-02-033344Vencido",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/inal-certificados",
+     "json": {
+      "accion": "guardar_ncm",
+      "producto_id": 202,
+      "ncm": "8205.51.00"
+     },
+     "parts": null
+    },
+    {
+     "m": "GET",
+     "p": "/inal-certificados?productos=1&articulos=1",
+     "json": null,
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "ncm-edita-conflicto",
+   "s": "50da7c2866f8ace68c437c3c854a6034",
+   "muestra": "choCE-2024-00123456-APN-INALPorvencerFUJIAN702ERallador+cargarCE-2023-777-APN-SENASA≈VigenteBECKY958EBatidor✓manual—ZHIXIN106EPelador+cargarRNE-02-033344Vencido",
+   "reqs": []
+  },
+  {
+   "et": "ncm-escape",
+   "s": "e8f1e9a7006dbaddc062f621254d3cd5",
+   "muestra": "23456-APN-INALPorvencerFUJIAN702ERallador+cargarCE-2023-777-APN-SENASA≈VigenteBECKY958EBatidor8215.99.10.000⚠manual—ZHIXIN106EPelador+cargarRNE-02-033344Vencido",
+   "reqs": []
+  },
+  {
+   "et": "ncm-error",
+   "s": "8cdb237c851720fe9df04e5dc9cd9c9f",
+   "muestra": "23456-APN-INALPorvencerFUJIAN702ERallador+cargarCE-2023-777-APN-SENASA≈VigenteBECKY958EBatidor8215.99.10.000⚠manual—ZHIXIN106EPelador+cargarRNE-02-033344Vencido",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/inal-certificados",
+     "json": {
+      "accion": "guardar_ncm",
+      "producto_id": 201,
+      "ncm": "7323.93.00.111X"
+     },
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "ncm-error-cerrado",
+   "s": "82049a0952e60b8e693f0e0e561d5166",
+   "muestra": "23456-APN-INALPorvencerFUJIAN702ERallador+cargarCE-2023-777-APN-SENASA≈VigenteBECKY958EBatidor8215.99.10.000⚠manual—ZHIXIN106EPelador+cargarRNE-02-033344Vencido",
+   "reqs": []
+  },
+  {
+   "et": "cargar",
+   "s": "ec809663d1836c953dedb0961942985e",
+   "muestra": "uestrounborradorporcertificadopararevisarantesdeguardar.📑Documentosdelostrámites📎Arrastráarchivos,carpetas,.zipo.rar,ohacéclick📁Elegircarpeta🔍Leerdocumentos",
+   "reqs": []
+  },
+  {
+   "et": "cargar-subidos",
+   "s": "1549e901971309cd93a3bdc4bd0db9a0",
+   "muestra": "revisarantesdeguardar.📑Documentosdelostrámites2✓2archivos📁Elegircarpeta1ignoradonota.txt:tipodearchivoqueestazonanousace.pdf✕anexo.pdf✕🔍LeerdocumentosLimpiar",
+   "reqs": []
+  },
+  {
+   "et": "cargar-quitado",
+   "s": "859291c6055957a52328a284c407dc77",
+   "muestra": "cadopararevisarantesdeguardar.📑Documentosdelostrámites1✓1archivo📁Elegircarpeta1ignoradonota.txt:tipodearchivoqueestazonanousaanexo.pdf✕🔍LeerdocumentosLimpiar",
+   "reqs": []
+  },
+  {
+   "et": "leer-error",
+   "s": "2833478c7e2bf5c37f9499e73233c486",
+   "muestra": "strounborradorporcertificadopararevisarantesdeguardar.📑Documentosdelostrámites2✓2archivos📁Elegircarpetaanexo.pdf✕ce.pdf✕🔍LeerdocumentosLimpiarLaIAnorespondió",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/inal-certificados",
+     "json": null,
+     "parts": [
+      {
+       "name": "accion",
+       "value": "extraer"
+      },
+      {
+       "name": "archivo_0",
+       "filename": "anexo.pdf",
+       "archivo": "anexo"
+      },
+      {
+       "name": "texto_0",
+       "largo": 2004,
+       "md5": "7d470d89bf94026ff0c198eb812e38f3"
+      },
+      {
+       "name": "archivo_1",
+       "filename": "ce.pdf",
+       "archivo": "ce"
+      },
+      {
+       "name": "texto_1",
+       "largo": 2503,
+       "md5": "c3a22bf015bb73c675b6203c33be9b19"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "et": "leer-cargando",
+   "s": "5b61a9568db82a5f14692b3cdd0341f6",
+   "muestra": "aradoytemuestrounborradorporcertificadopararevisarantesdeguardar.📑Documentosdelostrámites2✓2archivos📁Elegircarpetaanexo.pdf✕ce.pdf✕LeyendocertificadosconIA...",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/inal-certificados",
+     "json": null,
+     "parts": [
+      {
+       "name": "accion",
+       "value": "extraer"
+      },
+      {
+       "name": "archivo_0",
+       "filename": "anexo.pdf",
+       "archivo": "anexo"
+      },
+      {
+       "name": "texto_0",
+       "largo": 2004,
+       "md5": "7d470d89bf94026ff0c198eb812e38f3"
+      },
+      {
+       "name": "archivo_1",
+       "filename": "ce.pdf",
+       "archivo": "ce"
+      },
+      {
+       "name": "texto_1",
+       "largo": 2503,
+       "md5": "c3a22bf015bb73c675b6203c33be9b19"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "et": "leer-ok",
+   "s": "35320f3806c4c311b3496f67eb87dd55",
+   "muestra": "culoscubiertos(0)—marcaydescripcióndecadacódigosegúnelanexo.Siquedanvacíasseusanlasdelproducto.CódigoMarcaDescripción+Agregarcódigo💾GuardarcertificadoDescartar",
+   "reqs": []
+  },
+  {
+   "et": "b0-numero",
+   "s": "5c5ae2452d2f87c7b4f8d7048f116426",
+   "muestra": "culoscubiertos(0)—marcaydescripcióndecadacódigosegúnelanexo.Siquedanvacíasseusanlasdelproducto.CódigoMarcaDescripción+Agregarcódigo💾GuardarcertificadoDescartar",
+   "reqs": []
+  },
+  {
+   "et": "b0-editado",
+   "s": "ccabefbe6dcb3c3870e40f0b278fe733",
+   "muestra": "culoscubiertos(0)—marcaydescripcióndecadacódigosegúnelanexo.Siquedanvacíasseusanlasdelproducto.CódigoMarcaDescripción+Agregarcódigo💾GuardarcertificadoDescartar",
+   "reqs": []
+  },
+  {
+   "et": "b0-guardado",
+   "s": "dba024f863a9282c84e61257045e882a",
+   "muestra": "culoscubiertos(0)—marcaydescripcióndecadacódigosegúnelanexo.Siquedanvacíasseusanlasdelproducto.CódigoMarcaDescripción+Agregarcódigo💾GuardarcertificadoDescartar",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/inal-certificados",
+     "json": {
+      "accion": "guardar",
+      "certificado": {
+       "numero": "CE-2026-0001-APN-INAL-B",
+       "tipo": "RNE",
+       "organismo": null,
+       "fecha_emision": "2026-05-02",
+       "vigencia_anios": "3",
+       "fecha_vencimiento": "2029-05-02",
+       "titular_razon_social": "LOEKEMEYER HNOS SRL",
+       "titular_cuit": "30-12345678-9",
+       "fabricante": "Kangli",
+       "pais_origen": "China",
+       "marcas": "LK",
+       "expediente": "EX-2026-1",
+       "anexo_if": "IF-2026-2",
+       "deposito": "RNE 02-0333",
+       "descripcion": "Coladores",
+       "notas": "nota de prueba",
+       "archivo_nombre": "ce.pdf | anexo.pdf"
+      },
+      "codigos": [
+       "437E",
+       "438E",
+       "500E"
+      ],
+      "productos": [
+       {
+        "codigo": "437E",
+        "marca": "LK",
+        "descripcion": "Colador 8"
+       },
+       {
+        "codigo": "438E",
+        "marca": "Loeke",
+        "descripcion": null
+       },
+       {
+        "codigo": "500E",
+        "marca": null,
+        "descripcion": "Agregado"
+       }
+      ]
+     },
+     "parts": null
+    },
+    {
+     "m": "GET",
+     "p": "/inal-certificados?productos=1&articulos=1",
+     "json": null,
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "b1-error",
+   "s": "32ac16e479f6360cd6ac725688bdd791",
+   "muestra": "culoscubiertos(0)—marcaydescripcióndecadacódigosegúnelanexo.Siquedanvacíasseusanlasdelproducto.CódigoMarcaDescripción+Agregarcódigo💾GuardarcertificadoDescartar",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/inal-certificados",
+     "json": {
+      "accion": "guardar",
+      "certificado": {
+       "numero": "CE-2024-00123456-APN-INAL",
+       "tipo": "RNE",
+       "organismo": "",
+       "archivo_nombre": "otro.pdf"
+      },
+      "codigos": [
+       "702E"
+      ],
+      "productos": [
+       {
+        "codigo": "702E",
+        "marca": null,
+        "descripcion": null
+       }
+      ]
+     },
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "guardar-todos",
+   "s": "1a9f703303328d43c11cc90efae0c7e1",
+   "muestra": "culoscubiertos(0)—marcaydescripcióndecadacódigosegúnelanexo.Siquedanvacíasseusanlasdelproducto.CódigoMarcaDescripción+Agregarcódigo💾GuardarcertificadoDescartar",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/inal-certificados",
+     "json": {
+      "accion": "guardar",
+      "certificado": {
+       "numero": "CE-2024-00123456-APN-INAL",
+       "tipo": "RNE",
+       "organismo": "",
+       "archivo_nombre": "otro.pdf"
+      },
+      "codigos": [
+       "702E"
+      ],
+      "productos": [
+       {
+        "codigo": "702E",
+        "marca": null,
+        "descripcion": null
+       }
+      ]
+     },
+     "parts": null
+    },
+    {
+     "m": "GET",
+     "p": "/inal-certificados?productos=1&articulos=1",
+     "json": null,
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "b2-descartado",
+   "s": "9f0a7ceae34110337162c8049eab4c91",
+   "muestra": "oLOEKEMEYERHNOSSRL·vence2029-05-02·3códigos2.CE-2024-00123456-APN-INAL1documento(s)✓Guardado—·vence—·1códigos3.Sinnúmero1documento(s)Descartado—·vence—·0códigos",
+   "reqs": []
+  },
+  {
+   "et": "ver-certificados",
+   "s": "573ca3a748c344662d04a741ba810771",
+   "muestra": "—RNE-02-03334410/01/2025Vencido702EChefRallador4carasLOEKEMEYERHNOSSRLFujianHongshengCE-2023-777-APN-SENASA01/03/2028999ELKSinfecha——CE-SIN-FECHA—Sinvencimiento",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/inal-certificados?productos=1&articulos=1",
+     "json": null,
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "leer-2",
+   "s": "b3b7d5110d2eea5bd9174e78c11080a6",
+   "muestra": "culoscubiertos(0)—marcaydescripcióndecadacódigosegúnelanexo.Siquedanvacíasseusanlasdelproducto.CódigoMarcaDescripción+Agregarcódigo💾GuardarcertificadoDescartar",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/inal-certificados",
+     "json": null,
+     "parts": [
+      {
+       "name": "accion",
+       "value": "extraer"
+      },
+      {
+       "name": "archivo_0",
+       "filename": "ce.pdf",
+       "archivo": "ce"
+      },
+      {
+       "name": "texto_0",
+       "largo": 2503,
+       "md5": "c3a22bf015bb73c675b6203c33be9b19"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "et": "limpiar",
+   "s": "ec809663d1836c953dedb0961942985e",
+   "muestra": "uestrounborradorporcertificadopararevisarantesdeguardar.📑Documentosdelostrámites📎Arrastráarchivos,carpetas,.zipo.rar,ohacéclick📁Elegircarpeta🔍Leerdocumentos",
+   "reqs": []
+  },
+  {
+   "et": "leer-uno",
+   "s": "eb243b5fc1eadad643acfa0dda4829c5",
+   "muestra": "uloscubiertos(1)—marcaydescripcióndecadacódigosegúnelanexo.Siquedanvacíasseusanlasdelproducto.CódigoMarcaDescripción✕+Agregarcódigo💾GuardarcertificadoDescartar",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/inal-certificados",
+     "json": null,
+     "parts": [
+      {
+       "name": "accion",
+       "value": "extraer"
+      },
+      {
+       "name": "archivo_0",
+       "filename": "ce.pdf",
+       "archivo": "ce"
+      },
+      {
+       "name": "texto_0",
+       "largo": 2503,
+       "md5": "c3a22bf015bb73c675b6203c33be9b19"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "et": "uno-guardado",
+   "s": "765637cf4a6e15c743f323d570fecc8e",
+   "muestra": "cumentosdelostrámites1✓1archivo📁Elegircarpetace.pdf✕🔍LeerdocumentosLimpiar1certificadoencontradoVercertificados1.CE-HOY1documento(s)✓Guardado—·vence—·1códigos",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/inal-certificados",
+     "json": {
+      "accion": "guardar",
+      "certificado": {
+       "numero": "CE-HOY",
+       "tipo": "CE",
+       "organismo": "ANMAT",
+       "archivo_nombre": "ce.pdf"
+      },
+      "codigos": [
+       "111"
+      ],
+      "productos": [
+       {
+        "codigo": "111",
+        "marca": null,
+        "descripcion": null
+       }
+      ]
+     },
+     "parts": null
+    },
+    {
+     "m": "GET",
+     "p": "/inal-certificados?productos=1&articulos=1",
+     "json": null,
+     "parts": null
+    }
+   ]
+  }
+ ],
+ "autorizacion": [
+  {
+   "et": "inicial",
+   "s": "7913163904dd7884aa147858bf9230e5",
+   "muestra": "mulario(.docx)📎Arrastráarchivos,carpetas,.zipo.rar,ohacéclickSinosubísuno,seusaelincluido(versióndel27/08/2026).🔍Leerdocumentosyarmarformulario~30seg·~USD0,20",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/autorizacion-envases",
+     "json": {
+      "accion": "rne_listar"
+     },
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "elige-empresa",
+   "s": "9546227e1498b5829d7be47cbcde4652",
+   "muestra": "mulario(.docx)📎Arrastráarchivos,carpetas,.zipo.rar,ohacéclickSinosubísuno,seusaelincluido(versióndel27/08/2026).🔍Leerdocumentosyarmarformulario~30seg·~USD0,20",
+   "reqs": []
+  },
+  {
+   "et": "razon-vacia",
+   "s": "46f5ec98b13f5065532f41ac25c41ee5",
+   "muestra": "mulario(.docx)📎Arrastráarchivos,carpetas,.zipo.rar,ohacéclickSinosubísuno,seusaelincluido(versióndel27/08/2026).🔍Leerdocumentosyarmarformulario~30seg·~USD0,20",
+   "reqs": []
+  },
+  {
+   "et": "rne-tipeado",
+   "s": "3229ecfc940e507fad0c56abaf21d4b7",
+   "muestra": "mulario(.docx)📎Arrastráarchivos,carpetas,.zipo.rar,ohacéclickSinosubísuno,seusaelincluido(versióndel27/08/2026).🔍Leerdocumentosyarmarformulario~30seg·~USD0,20",
+   "reqs": []
+  },
+  {
+   "et": "rne-guardado",
+   "s": "febfa5b07ef75d06fcd4eb50230b64c8",
+   "muestra": "mulario(.docx)📎Arrastráarchivos,carpetas,.zipo.rar,ohacéclickSinosubísuno,seusaelincluido(versióndel27/08/2026).🔍Leerdocumentosyarmarformulario~30seg·~USD0,20",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/autorizacion-envases",
+     "json": {
+      "accion": "rne_guardar",
+      "razon_social": "Nueva SA",
+      "rne": "00123"
+     },
+     "parts": null
+    },
+    {
+     "m": "POST",
+     "p": "/autorizacion-envases",
+     "json": {
+      "accion": "rne_listar"
+     },
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "rne-guardado-cerrado",
+   "s": "3229ecfc940e507fad0c56abaf21d4b7",
+   "muestra": "mulario(.docx)📎Arrastráarchivos,carpetas,.zipo.rar,ohacéclickSinosubísuno,seusaelincluido(versióndel27/08/2026).🔍Leerdocumentosyarmarformulario~30seg·~USD0,20",
+   "reqs": []
+  },
+  {
+   "et": "rne-error",
+   "s": "8499539b88a89a4d1e0f5d2b06e13fb4",
+   "muestra": "mulario(.docx)📎Arrastráarchivos,carpetas,.zipo.rar,ohacéclickSinosubísuno,seusaelincluido(versióndel27/08/2026).🔍Leerdocumentosyarmarformulario~30seg·~USD0,20",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/autorizacion-envases",
+     "json": {
+      "accion": "rne_guardar",
+      "razon_social": "Nueva SA",
+      "rne": "00123"
+     },
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "docs-cargados",
+   "s": "902179dd8e4f21603a91cb10ad72e106",
+   "muestra": "mulario(.docx)📎Arrastráarchivos,carpetas,.zipo.rar,ohacéclickSinosubísuno,seusaelincluido(versióndel27/08/2026).🔍Leerdocumentosyarmarformulario~30seg·~USD0,20",
+   "reqs": []
+  },
+  {
+   "et": "leer-error",
+   "s": "0c089fe2eeb59b633cd423f8de994d0f",
+   "muestra": ")📎Arrastráarchivos,carpetas,.zipo.rar,ohacéclickSinosubísuno,seusaelincluido(versióndel27/08/2026).🔍Leerdocumentosyarmarformulario~30seg·~USD0,20TimeoutdelaIA",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/autorizacion-envases",
+     "json": null,
+     "parts": [
+      {
+       "name": "accion",
+       "value": "leer"
+      },
+      {
+       "name": "carga_ref",
+       "ok": true
+      },
+      {
+       "name": "fecha_arribo",
+       "value": "2026-10-20"
+      },
+      {
+       "name": "rne_manual",
+       "value": "00-123"
+      },
+      {
+       "name": "factura_0",
+       "filename": "factura.pdf",
+       "archivo": "factura"
+      },
+      {
+       "name": "texto_factura_0",
+       "largo": 2241,
+       "md5": "e955bd029a57ef597bb339942349358f"
+      },
+      {
+       "name": "pl_0",
+       "filename": "pl.xlsx",
+       "archivo": "pl"
+      },
+      {
+       "name": "texto_pl_0",
+       "value": "=== HOJA \"PL\" ===\r\nITEM,QTY,G.W.\r\n437E,2400,256.2\r\n438E,2400,256.2"
+      },
+      {
+       "name": "bl_0",
+       "filename": "bl.pdf",
+       "archivo": "bl"
+      },
+      {
+       "name": "texto_bl_0",
+       "largo": 2629,
+       "md5": "a3bbc7d666a33daaa237151c985f0ad9"
+      },
+      {
+       "name": "cert_0",
+       "filename": "ce1.pdf",
+       "archivo": "ce1"
+      },
+      {
+       "name": "texto_cert_0",
+       "largo": 2589,
+       "md5": "115785f381d6ef4f22d9afd590608297"
+      },
+      {
+       "name": "cert_1",
+       "filename": "ce2.pdf",
+       "archivo": "ce2"
+      },
+      {
+       "name": "texto_cert_1",
+       "largo": 2389,
+       "md5": "1fa93e92ca330e4406c7ae8d0c2990b4"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "et": "leer-cargando",
+   "s": "9938f04153f2bf9c76711e9290e27de3",
+   "muestra": "ace1.pdf✕ce2.pdf✕📄Formulario(.docx)📎Arrastráarchivos,carpetas,.zipo.rar,ohacéclickSinosubísuno,seusaelincluido(versióndel27/08/2026).LeyendodocumentosconIA...",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/autorizacion-envases",
+     "json": null,
+     "parts": [
+      {
+       "name": "accion",
+       "value": "leer"
+      },
+      {
+       "name": "carga_ref",
+       "ok": true
+      },
+      {
+       "name": "fecha_arribo",
+       "value": "2026-10-20"
+      },
+      {
+       "name": "rne_manual",
+       "value": "00-123"
+      },
+      {
+       "name": "factura_0",
+       "filename": "factura.pdf",
+       "archivo": "factura"
+      },
+      {
+       "name": "texto_factura_0",
+       "largo": 2241,
+       "md5": "e955bd029a57ef597bb339942349358f"
+      },
+      {
+       "name": "pl_0",
+       "filename": "pl.xlsx",
+       "archivo": "pl"
+      },
+      {
+       "name": "texto_pl_0",
+       "value": "=== HOJA \"PL\" ===\r\nITEM,QTY,G.W.\r\n437E,2400,256.2\r\n438E,2400,256.2"
+      },
+      {
+       "name": "bl_0",
+       "filename": "bl.pdf",
+       "archivo": "bl"
+      },
+      {
+       "name": "texto_bl_0",
+       "largo": 2629,
+       "md5": "a3bbc7d666a33daaa237151c985f0ad9"
+      },
+      {
+       "name": "cert_0",
+       "filename": "ce1.pdf",
+       "archivo": "ce1"
+      },
+      {
+       "name": "texto_cert_0",
+       "largo": 2589,
+       "md5": "115785f381d6ef4f22d9afd590608297"
+      },
+      {
+       "name": "cert_1",
+       "filename": "ce2.pdf",
+       "archivo": "ce2"
+      },
+      {
+       "name": "texto_cert_1",
+       "largo": 2389,
+       "md5": "1fa93e92ca330e4406c7ae8d0c2990b4"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "et": "leer-ok",
+   "s": "777276bbebeb83c5369d2fc4dc2fe651",
+   "muestra": "2400elCE2023cubre958sinE590E———⬇DescargarWordcompletado3campo(s)paracompletarElformulariotienecarácterdedeclaraciónjurada:revisácadadatoantesdeenviarloalgestor.",
+   "reqs": []
+  },
+  {
+   "et": "editado",
+   "s": "9d384cca8457e9119c2ec2abef991eb6",
+   "muestra": "2400elCE2023cubre958sinE590E———⬇DescargarWordcompletado3campo(s)paracompletarElformulariotienecarácterdedeclaraciónjurada:revisácadadatoantesdeenviarloalgestor.",
+   "reqs": []
+  },
+  {
+   "et": "desc-dlg1",
+   "s": "d9346a950092e36725aa2ae7e6b8360f",
+   "muestra": "2400elCE2023cubre958sinE590E———⬇DescargarWordcompletado3campo(s)paracompletarElformulariotienecarácterdedeclaraciónjurada:revisácadadatoantesdeenviarloalgestor.",
+   "reqs": []
+  },
+  {
+   "et": "desc-volver",
+   "s": "9d384cca8457e9119c2ec2abef991eb6",
+   "muestra": "2400elCE2023cubre958sinE590E———⬇DescargarWordcompletado3campo(s)paracompletarElformulariotienecarácterdedeclaraciónjurada:revisácadadatoantesdeenviarloalgestor.",
+   "reqs": []
+  },
+  {
+   "et": "desc-dlg-vacios",
+   "s": "15178c238f3f08986149b8dd17391c9f",
+   "muestra": "2400elCE2023cubre958sinE590E———⬇DescargarWordcompletado3campo(s)paracompletarElformulariotienecarácterdedeclaraciónjurada:revisácadadatoantesdeenviarloalgestor.",
+   "reqs": []
+  },
+  {
+   "et": "foco-vacio",
+   "v": [
+    "INPUT",
+    "",
+    "1"
+   ]
+  },
+  {
+   "et": "word-1",
+   "v": {
+    "nombre": "Autorizacion importacion envases - Factura HK-2026-0915-.docx",
+    "entradas": [
+     [
+      "[Content_Types].xml",
+      "83cb6eeaa8caf0429ca40a5ca84d293e"
+     ],
+     [
+      "_rels/.rels",
+      "77bf61733a633ea617a4db76ef769a4d"
+     ],
+     [
+      "docProps/app.xml",
+      "31c0b89c852b04b2638afb3259e0be8d"
+     ],
+     [
+      "docProps/core.xml",
+      "b5adcc29e86a13c3f97022021a184245"
+     ],
+     [
+      "word/_rels/document.xml.rels",
+      "5bb6f11c1f40addd059f21b1a0d1cb68"
+     ],
+     [
+      "word/document.xml",
+      "ef7ed467cee97a5f912f491b355febf8"
+     ],
+     [
+      "word/fontTable.xml",
+      "ebe8e52ef383fa4e655eb1fded8fa841"
+     ],
+     [
+      "word/glossary/_rels/document.xml.rels",
+      "4621a3fe66ffe4c43d6599f4001e9bdc"
+     ],
+     [
+      "word/glossary/document.xml",
+      "790a7e436aa49c82df7d6cdc56b72783"
+     ],
+     [
+      "word/glossary/fontTable.xml",
+      "3b21eddb911bcbd2e9aaf530530918bb"
+     ],
+     [
+      "word/glossary/settings.xml",
+      "1d086c600352bdf0372b27bd02d1875a"
+     ],
+     [
+      "word/glossary/styles.xml",
+      "9e2c74c4aaf1d260e296db30e440c726"
+     ],
+     [
+      "word/glossary/webSettings.xml",
+      "0c91d8e75e4c74d745e3e93acb1efd50"
+     ],
+     [
+      "word/media/image1.png",
+      "61a9b4075231cd3eb66310c482a7c1ce"
+     ],
+     [
+      "word/numbering.xml",
+      "2bb21388c405f00ad9147144eb682ab1"
+     ],
+     [
+      "word/settings.xml",
+      "ac70c559849b0d52abc540e9e6b2e477"
+     ],
+     [
+      "word/styles.xml",
+      "37b43dee164abc117527756aa0baed89"
+     ],
+     [
+      "word/theme/theme1.xml",
+      "37db0633090f0f31100c74677ae18598"
+     ],
+     [
+      "word/webSettings.xml",
+      "f0610bba63fec88bb2badc095db9395b"
+     ]
+    ]
+   }
+  },
+  {
+   "et": "descargado",
+   "s": "a172f0e5f2ca48c2c1fbcfd03ba8f9ca",
+   "muestra": "acompletarDescargado:Autorizacionimportacionenvases-FacturaHK-2026-0915-.docxElformulariotienecarácterdedeclaraciónjurada:revisácadadatoantesdeenviarloalgestor.",
+   "reqs": []
+  },
+  {
+   "et": "quitado-1",
+   "s": "69f8f7d39e7d621b13ff3c9bed6c4c7b",
+   "muestra": "acompletarDescargado:Autorizacionimportacionenvases-FacturaHK-2026-0915-.docxElformulariotienecarácterdedeclaraciónjurada:revisácadadatoantesdeenviarloalgestor.",
+   "reqs": []
+  },
+  {
+   "et": "quitado-2",
+   "s": "6a11b8f694577ab866b3f2459a363db1",
+   "muestra": "scompletosDescargado:Autorizacionimportacionenvases-FacturaHK-2026-0915-.docxElformulariotienecarácterdedeclaraciónjurada:revisácadadatoantesdeenviarloalgestor.",
+   "reqs": []
+  },
+  {
+   "et": "desc-sin-cert",
+   "s": "ea8c2cf5cec3f249a8eb1d8d0724aa89",
+   "muestra": "scompletosDescargado:Autorizacionimportacionenvases-FacturaHK-2026-0915-.docxElformulariotienecarácterdedeclaraciónjurada:revisácadadatoantesdeenviarloalgestor.",
+   "reqs": []
+  },
+  {
+   "et": "word-2",
+   "v": {
+    "nombre": "Autorizacion importacion envases - Factura HK-2026-0915-.docx",
+    "entradas": [
+     [
+      "[Content_Types].xml",
+      "83cb6eeaa8caf0429ca40a5ca84d293e"
+     ],
+     [
+      "_rels/.rels",
+      "77bf61733a633ea617a4db76ef769a4d"
+     ],
+     [
+      "docProps/app.xml",
+      "31c0b89c852b04b2638afb3259e0be8d"
+     ],
+     [
+      "docProps/core.xml",
+      "b5adcc29e86a13c3f97022021a184245"
+     ],
+     [
+      "word/_rels/document.xml.rels",
+      "5bb6f11c1f40addd059f21b1a0d1cb68"
+     ],
+     [
+      "word/document.xml",
+      "b1a9690af071937152ffff3b998b68fd"
+     ],
+     [
+      "word/fontTable.xml",
+      "ebe8e52ef383fa4e655eb1fded8fa841"
+     ],
+     [
+      "word/glossary/_rels/document.xml.rels",
+      "4621a3fe66ffe4c43d6599f4001e9bdc"
+     ],
+     [
+      "word/glossary/document.xml",
+      "790a7e436aa49c82df7d6cdc56b72783"
+     ],
+     [
+      "word/glossary/fontTable.xml",
+      "3b21eddb911bcbd2e9aaf530530918bb"
+     ],
+     [
+      "word/glossary/settings.xml",
+      "1d086c600352bdf0372b27bd02d1875a"
+     ],
+     [
+      "word/glossary/styles.xml",
+      "9e2c74c4aaf1d260e296db30e440c726"
+     ],
+     [
+      "word/glossary/webSettings.xml",
+      "0c91d8e75e4c74d745e3e93acb1efd50"
+     ],
+     [
+      "word/media/image1.png",
+      "61a9b4075231cd3eb66310c482a7c1ce"
+     ],
+     [
+      "word/numbering.xml",
+      "2bb21388c405f00ad9147144eb682ab1"
+     ],
+     [
+      "word/settings.xml",
+      "ac70c559849b0d52abc540e9e6b2e477"
+     ],
+     [
+      "word/styles.xml",
+      "37b43dee164abc117527756aa0baed89"
+     ],
+     [
+      "word/theme/theme1.xml",
+      "37db0633090f0f31100c74677ae18598"
+     ],
+     [
+      "word/webSettings.xml",
+      "f0610bba63fec88bb2badc095db9395b"
+     ]
+    ]
+   }
+  },
+  {
+   "et": "descargado-2",
+   "s": "6a11b8f694577ab866b3f2459a363db1",
+   "muestra": "scompletosDescargado:Autorizacionimportacionenvases-FacturaHK-2026-0915-.docxElformulariotienecarácterdedeclaraciónjurada:revisácadadatoantesdeenviarloalgestor.",
+   "reqs": []
+  },
+  {
+   "et": "form-subido",
+   "s": "fb22cb998cad22e42b8d240afa6ae1c0",
+   "muestra": "scompletosDescargado:Autorizacionimportacionenvases-FacturaHK-2026-0915-.docxElformulariotienecarácterdedeclaraciónjurada:revisácadadatoantesdeenviarloalgestor.",
+   "reqs": []
+  },
+  {
+   "et": "word-3",
+   "v": {
+    "nombre": "Autorizacion importacion envases - Factura HK-2026-0915-.docx",
+    "entradas": [
+     [
+      "[Content_Types].xml",
+      "83cb6eeaa8caf0429ca40a5ca84d293e"
+     ],
+     [
+      "_rels/.rels",
+      "77bf61733a633ea617a4db76ef769a4d"
+     ],
+     [
+      "docProps/app.xml",
+      "31c0b89c852b04b2638afb3259e0be8d"
+     ],
+     [
+      "docProps/core.xml",
+      "b5adcc29e86a13c3f97022021a184245"
+     ],
+     [
+      "word/_rels/document.xml.rels",
+      "5bb6f11c1f40addd059f21b1a0d1cb68"
+     ],
+     [
+      "word/document.xml",
+      "b1a9690af071937152ffff3b998b68fd"
+     ],
+     [
+      "word/fontTable.xml",
+      "ebe8e52ef383fa4e655eb1fded8fa841"
+     ],
+     [
+      "word/glossary/_rels/document.xml.rels",
+      "4621a3fe66ffe4c43d6599f4001e9bdc"
+     ],
+     [
+      "word/glossary/document.xml",
+      "790a7e436aa49c82df7d6cdc56b72783"
+     ],
+     [
+      "word/glossary/fontTable.xml",
+      "3b21eddb911bcbd2e9aaf530530918bb"
+     ],
+     [
+      "word/glossary/settings.xml",
+      "1d086c600352bdf0372b27bd02d1875a"
+     ],
+     [
+      "word/glossary/styles.xml",
+      "9e2c74c4aaf1d260e296db30e440c726"
+     ],
+     [
+      "word/glossary/webSettings.xml",
+      "0c91d8e75e4c74d745e3e93acb1efd50"
+     ],
+     [
+      "word/media/image1.png",
+      "61a9b4075231cd3eb66310c482a7c1ce"
+     ],
+     [
+      "word/numbering.xml",
+      "2bb21388c405f00ad9147144eb682ab1"
+     ],
+     [
+      "word/settings.xml",
+      "ac70c559849b0d52abc540e9e6b2e477"
+     ],
+     [
+      "word/styles.xml",
+      "37b43dee164abc117527756aa0baed89"
+     ],
+     [
+      "word/theme/theme1.xml",
+      "37db0633090f0f31100c74677ae18598"
+     ],
+     [
+      "word/webSettings.xml",
+      "f0610bba63fec88bb2badc095db9395b"
+     ]
+    ]
+   }
+  },
+  {
+   "et": "docx-roto",
+   "s": "f687a7367d96142ed2b72cc2309c1d59",
+   "muestra": "scompletosDescargado:Autorizacionimportacionenvases-FacturaHK-2026-0915-.docxElformulariotienecarácterdedeclaraciónjurada:revisácadadatoantesdeenviarloalgestor.",
+   "reqs": []
+  },
+  {
+   "et": "modo-archivos",
+   "s": "5c5495d3a86b41868a6fdc3c9cbd6d2b",
+   "muestra": "po.rar,ohacéclickLaAutorizacióndeLibreCirculación(PD-…-APN-DNIYCA#SENASA).📄Formulario(.docx)1✓1archivoroto.docx✕🔍VerificararchivosvsPDFdevuelto~30seg·~USD0,20",
+   "reqs": []
+  },
+  {
+   "et": "archivos-ok",
+   "s": "c24b2acad61154ed41b4d051117980da",
+   "muestra": "2400elCE2023cubre958sinE590E———⬇DescargarWordcompletado3campo(s)paracompletarElformulariotienecarácterdedeclaraciónjurada:revisácadadatoantesdeenviarloalgestor.",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/autorizacion-envases",
+     "json": null,
+     "parts": [
+      {
+       "name": "accion",
+       "value": "leer"
+      },
+      {
+       "name": "carga_ref",
+       "ok": true
+      },
+      {
+       "name": "fecha_arribo",
+       "value": "2026-10-20"
+      },
+      {
+       "name": "rne_manual",
+       "value": "00-123"
+      },
+      {
+       "name": "factura_0",
+       "filename": "factura.pdf",
+       "archivo": "factura"
+      },
+      {
+       "name": "texto_factura_0",
+       "largo": 2241,
+       "md5": "e955bd029a57ef597bb339942349358f"
+      },
+      {
+       "name": "pl_0",
+       "filename": "pl.xlsx",
+       "archivo": "pl"
+      },
+      {
+       "name": "texto_pl_0",
+       "value": "=== HOJA \"PL\" ===\r\nITEM,QTY,G.W.\r\n437E,2400,256.2\r\n438E,2400,256.2"
+      },
+      {
+       "name": "bl_0",
+       "filename": "bl.pdf",
+       "archivo": "bl"
+      },
+      {
+       "name": "texto_bl_0",
+       "largo": 2629,
+       "md5": "a3bbc7d666a33daaa237151c985f0ad9"
+      },
+      {
+       "name": "cert_0",
+       "filename": "ce1.pdf",
+       "archivo": "ce1"
+      },
+      {
+       "name": "texto_cert_0",
+       "largo": 2589,
+       "md5": "115785f381d6ef4f22d9afd590608297"
+      },
+      {
+       "name": "cert_1",
+       "filename": "ce2.pdf",
+       "archivo": "ce2"
+      },
+      {
+       "name": "texto_cert_1",
+       "largo": 2389,
+       "md5": "1fa93e92ca330e4406c7ae8d0c2990b4"
+      },
+      {
+       "name": "pd_0",
+       "filename": "pd.pdf",
+       "archivo": "pd"
+      },
+      {
+       "name": "texto_pd_0",
+       "largo": 2829,
+       "md5": "262b040e5c482bd16970f0757e2e78b8"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "et": "modo-formpd",
+   "s": "4ad7811dfd68ac64f8da6dcc69a8e293",
+   "muestra": "lformularioquesepresentóaSENASA.✅PDFdevueltoporSENASA1✓1archivopd.pdf✕LaAutorizacióndeLibreCirculación(PD-…-APN-DNIYCA#SENASA).🔍CompararformulariovsPDFdevuelto",
+   "reqs": []
+  },
+  {
+   "et": "formpd-cargado",
+   "s": "11fa398f4b0fd65bc35529c2c0b14482",
+   "muestra": "lformularioquesepresentóaSENASA.✅PDFdevueltoporSENASA1✓1archivopd.pdf✕LaAutorizacióndeLibreCirculación(PD-…-APN-DNIYCA#SENASA).🔍CompararformulariovsPDFdevuelto",
+   "reqs": []
+  },
+  {
+   "et": "formpd-ok",
+   "s": "e893454bd26374b998a5118606713694",
+   "muestra": "678-APN-DNIYCA#SENASAControlResultadoDetalleRNE✓coincide00306900=00306900Factura⚠revisarHK/2026/0915vsHK-2026-0915Cantidad437E✗nocoincide4800vs480Lote—sindatos—",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/autorizacion-envases",
+     "json": {
+      "accion": "contrastar_form_pd",
+      "texto_form": "[2709:43e475e59c4f8a26b1274d7f2430407c]",
+      "texto_pd": "[2829:262b040e5c482bd16970f0757e2e78b8]"
+     },
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "formpd-403",
+   "s": "acb67618c40ad3625198d9251b7ab1c8",
+   "muestra": "archivopd.pdf✕LaAutorizacióndeLibreCirculación(PD-…-APN-DNIYCA#SENASA).🔍CompararformulariovsPDFdevueltoSólolossupervisoresdeGestiónVirgiliopuedenusarIMPOCOMEX.",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/autorizacion-envases",
+     "json": {
+      "accion": "contrastar_form_pd",
+      "texto_form": "[2709:43e475e59c4f8a26b1274d7f2430407c]",
+      "texto_pd": "[2829:262b040e5c482bd16970f0757e2e78b8]"
+     },
+     "parts": null
+    }
+   ]
+  },
+  {
+   "et": "formpd-sin-texto",
+   "s": "373fd4a3fce5b737c5f4e5ae606a2409",
+   "muestra": "hivopd.pdf✕LaAutorizacióndeLibreCirculación(PD-…-APN-DNIYCA#SENASA).🔍CompararformulariovsPDFdevueltoNosepudoleereltextodealgunodelosPDF(¿esunescaneosintexto?).",
+   "reqs": []
+  },
+  {
+   "et": "vuelve-crear",
+   "s": "3a15e07e78421f9a564f4a11370edf41",
+   "muestra": "CertificadosCE/RNE(consuanexoIF)2✓2archivos📁Elegircarpetace1.pdf✕ce2.pdf✕📄Formulario(.docx)1✓1archivoroto.docx✕🔍Leerdocumentosyarmarformulario~30seg·~USD0,20",
+   "reqs": []
+  }
+ ]
+}

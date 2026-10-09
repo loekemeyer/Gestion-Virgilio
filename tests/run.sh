@@ -822,6 +822,16 @@ echo "== impo-comex-web (v23.19: IMPO COMEX web dentro de Importación, sin toke
 node tests/impo-comex-web.cjs
 echo "== impo-comex-nuevo (v29.18: IMPO COMEX sin build, 11 modos y la lógica original en el navegador) =="
 node tests/impo-comex-nuevo.cjs
+echo "== impo-comex-paridad-lakout (v29.20: IMPO COMEX nuevo se comporta igual que el viejo, flujos de punta a punta) =="
+node tests/impo-comex-paridad-lakout.cjs
+echo "== impo-comex-paridad-multidoc (v29.20: IMPO COMEX nuevo se comporta igual que el viejo, flujos de punta a punta) =="
+node tests/impo-comex-paridad-multidoc.cjs
+echo "== impo-comex-paridad-marks (v29.20: IMPO COMEX nuevo se comporta igual que el viejo, flujos de punta a punta) =="
+node tests/impo-comex-paridad-marks.cjs
+echo "== impo-comex-paridad-cajas (v29.20: IMPO COMEX nuevo se comporta igual que el viejo, flujos de punta a punta) =="
+node tests/impo-comex-paridad-cajas.cjs
+echo "== impo-comex-paridad-inal (v29.20: IMPO COMEX nuevo se comporta igual que el viejo, flujos de punta a punta) =="
+node tests/impo-comex-paridad-inal.cjs
 
 echo "== fn-duplicadas (v22.96: ninguna función de nivel superior declarada dos veces — la ccRender de Cobranzas pisó la de Carga Camión) =="
 node tests/fn-duplicadas.cjs

@@ -192,9 +192,7 @@
           color: bloqueado ? '#b91c1c' : '#166534',
         })}">
           ${IC.esc(bloqueado ? `✗ ${resumen.veredicto} — ${resumen.alerta} problema${resumen.alerta > 1 ? 's' : ''}` : `✓ ${resumen.veredicto}`)}
-        </div>
-        <span style="font-size:11px;color:#64748b;margin-left:10px">
-          ${IC.esc(resumen.ok)} ok · ${IC.esc(resumen.revisar)} a revisar · ${IC.esc(resumen.alerta)} alertas ·
+        </div><span style="font-size:11px;color:#64748b;margin-left:10px">${IC.esc(resumen.ok)} ok · ${IC.esc(resumen.revisar)} a revisar · ${IC.esc(resumen.alerta)} alertas ·
           ${IC.esc(empresa.razonSocial)} · ${IC.esc(fmtUsd(montoTransferir))}
         </span>
 
