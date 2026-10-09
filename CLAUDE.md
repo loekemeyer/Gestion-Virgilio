@@ -8156,7 +8156,7 @@ OC, Importados, góndola L57 (56 cajas) y stock van por 865E; el 865ED queda ina
 cajas que fueron a etiquetar a Cervantes el 30/09 vuelven como 865E (se resuelve al recibirlas).
 `sql/gv_865e_unificacion_v2774.sql`.
 
-## ⚠ REGLA (Luis, 2026-10-09, v29.08): un CÓDIGO DADO DE BAJA no aparece en el front — la historia queda
+## ⚠ REGLA (Luis, 2026-10-09, v29.09): un CÓDIGO DADO DE BAJA no aparece en el front — la historia queda
 
 **Luis:** *"no está en uso, no debería aparecer en el front en ningún lado. no hace falta limpiarlo de todas las bases porque tiene registros históricos"* (865ED, unificado en 865E el 07/10).
 
