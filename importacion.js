@@ -3510,7 +3510,7 @@ function _impIrRender() {
   if (!_stkPop || _stkPop.kind !== "impIr") return;
   var body = document.getElementById("stkPopBody"); if (!body) return;
   var h = _impTabsHtml('recop') +
-    '<div class="stkpop-hint">Lo que cargaron los operarios por <b>Ingreso a racks → 📦 Importación</b>. El stock ya entró. Si hay un solo pedido en viaje de ese código se descuenta solo; si hay <b>dos o más</b>, se elige acá. <b>↔</b> cambia el pedido contra el que se descontó.</div>';
+    '<div class="stkpop-hint">Lo que cargaron los operarios por <b>Ingreso a racks → 📦 Importación</b>. El stock ya entró. Si hay un solo pedido en viaje de ese código se descuenta solo; si hay <b>dos o más</b>, se elige acá. <b>↔</b> cambia el pedido contra el que se descontó. Lo cargado <b>antes del 09/10</b> (↺ revisar) no se descontó solo: elegí el pedido o marcá ✓ Visto si ya estaba descontado.</div>';
   if (_stkPop.err) { body.innerHTML = h + '<div class="stkpop-empty">No se pudo leer lo recibido: ' + escapeHtml(_stkPop.err) + '</div>'; return; }
   var all = _stkPop.rows || [];
   var rows = _stkPop.todos ? all : all.filter(function (r) { return r.pendiente; });
@@ -3525,6 +3525,7 @@ function _impIrRender() {
     var mov = String(r.mov_id);
     var ped;
     if (r.resultado === "a_elegir") ped = '<span style="background:#fee2e2;color:#b91c1c;border-radius:999px;padding:1px 8px;font-weight:800;font-size:11.5px">⚠ elegir pedido</span>';
+    else if (r.resultado === "a_revisar") ped = '<span style="background:#fef3c7;color:#92400e;border-radius:999px;padding:1px 8px;font-weight:800;font-size:11.5px" title="' + escapeHtml(r.motivo || "") + '">↺ revisar (anterior al 09/10)</span>';   // v29.17
     else if (r.resultado === "imputado") ped = '<b>' + escapeHtml(r.pedido_ref || ("#" + r.bache_id)) + '</b>' + (r.proveedor ? ' <span class="irc-muted">' + escapeHtml(r.proveedor) + '</span>' : '');
     else ped = '<span class="irc-muted">' + escapeHtml(r.motivo || r.resultado || "") + '</span>';
     var cands = Array.isArray(r.candidatos) ? r.candidatos : [];
@@ -3532,14 +3533,14 @@ function _impIrRender() {
       var pend = (Number(c.unidades) || 0) - (Number(c.llegadas) || 0);
       return '<option value="' + c.bache_id + '">' + escapeHtml((c.pedido_ref || ("#" + c.bache_id)) + (c.proveedor ? " · " + c.proveedor : "") + (c.marca ? " · " + c.marca : "") +
         " · faltan " + _n(Math.max(0, pend)) + " u" + (c.reingreso ? " · " + _isoToDdMmAa(String(c.reingreso).slice(0, 10)) : "") + (c.actual ? " (actual)" : "")) + '</option>';
-    }).join('') + (r.resultado === "imputado" || r.resultado === "a_elegir" ? '<option value="none">No es de ningún pedido</option>' : '');
+    }).join('') + (r.resultado === "imputado" || r.resultado === "a_elegir" || r.resultado === "a_revisar" ? '<option value="none">No es de ningún pedido</option>' : '');
     var cambiar = (cands.length || r.resultado === "imputado")
       ? '<select style="width:auto;max-width:280px;height:30px;font-size:12.5px" onchange="impIrSel(\'' + mov + '\', this.value)">' + opt + '</select> <button class="stk-btn" style="width:auto;margin:0;padding:3px 9px;font-size:12.5px" onclick="impIrGuardar(\'' + mov + '\')" title="Descontar de este pedido">↔</button>'
       : '<span class="irc-muted">—</span>';
     var visto = r.pendiente
       ? (r.resultado === "a_elegir" ? '' : '<button class="stk-btn" style="width:auto;margin:0;padding:3px 9px;font-size:12.5px" onclick="impIrVisto(\'' + mov + '\')" title="Marcar como revisado">✓ Visto</button>')
       : '<span class="irc-muted" title="' + escapeHtml(r.revisado_por || "") + '">✓ ' + _f(r.revisado_en) + '</span>';
-    h += '<tr' + (r.resultado === "a_elegir" ? ' style="background:#fff7ed"' : '') + '><td style="white-space:nowrap">' + _f(r.ts) + '</td>' +
+    h += '<tr' + (r.resultado === "a_elegir" ? ' style="background:#fff7ed"' : r.resultado === "a_revisar" && r.pendiente ? ' style="background:#fffbeb"' : '') + '><td style="white-space:nowrap">' + _f(r.ts) + '</td>' +
       '<td style="white-space:normal;max-width:220px"><b>' + escapeHtml(r.cod || "") + '</b>' + (r.descripcion ? '<br><span class="irc-muted">' + escapeHtml(r.descripcion) + '</span>' : '') + '</td>' +
       '<td class="num">' + _n(r.cajas) + '</td><td class="num">' + (r.unidades != null ? _n(r.unidades) : '—') + '</td>' +
       '<td style="white-space:nowrap">' + escapeHtml(r.sector || "—") + '</td>' +

@@ -10,6 +10,8 @@ chk("SQL: cambiar de pedido devuelve lo llegado al anterior", /unidades_llegadas
 chk("SQL: la recepción vieja libera su client_id", /client_id = client_id \|\| '~x' \|\| id/.test(sql));
 chk("SQL: asignar y avisos son de supervisor", /gv_imp_ir_asignar[\s\S]*?es_supervisor_virgilio/.test(sql) && /gv_imp_ir_avisos[\s\S]*?es_supervisor_virgilio/.test(sql));
 chk("SQL: no mueve stock", !/insert into public\."Movimientos_Stock"/.test(sql));
+const sql2 = fs.readFileSync(__dirname + "/../sql/gv_imp_ir_retroactivo_v2917.sql", "utf8").replace(/--[^\n]*/g, "");
+chk("SQL v29.17: lo anterior entra como a_revisar, sin descontar", /'a_revisar'/.test(sql2) && !/gv_imp_imputar_ingreso_racks\(/.test(sql2) && !/insert into public\."Movimientos_Stock"/.test(sql2));
 const js = fs.readFileSync(__dirname + "/../importacion.js", "utf8");
 chk("JS: las 3 RPC van con la sesión", /"gv_imp_ir_avisos", "gv_imp_ir_asignar", "gv_imp_ir_visto"\]/.test(js));
 const idx = fs.readFileSync(__dirname + "/../index.html", "latin1");
@@ -22,6 +24,8 @@ const rows = [
   { mov_id: 1, ts: "2026-10-09T13:00:00Z", cod: "404E", cajas: 10, unidades: null, sector: "Y30", legajo: "104", operario: "Jhonny", resultado: "a_elegir", pendiente: true,
     candidatos: [{ bache_id: 131, pedido_ref: "PI B260601-2", proveedor: "Becky", unidades: 896, llegadas: 0 }, { bache_id: 999, pedido_ref: "PI X", unidades: 500, llegadas: 0 }] },
   { mov_id: 2, ts: "2026-10-09T12:00:00Z", cod: "958E", cajas: 260, unidades: 3120, sector: "Y02", legajo: "104", resultado: "imputado", bache_id: 54, pedido_ref: "PI B260601", proveedor: "Becky", pendiente: true, candidatos: [{ bache_id: 54, pedido_ref: "PI B260601", unidades: 2880, llegadas: 3120, actual: true }] },
+  { mov_id: 4, ts: "2026-08-31T12:00:00Z", cod: "538E", cajas: 56, unidades: null, sector: "AD6", legajo: "94", resultado: "a_revisar", pendiente: true,
+    motivo: "anterior a la imputación automática (09/10)", candidatos: [{ bache_id: 77, pedido_ref: "PI Z", unidades: 600, llegadas: 0 }] },
   { mov_id: 3, ts: "2026-10-08T12:00:00Z", cod: "932E", cajas: 144, unidades: 1728, resultado: "imputado", pendiente: false, revisado_en: "2026-10-09T10:00:00Z", candidatos: [] }
 ];
 const ctx = {
@@ -38,10 +42,11 @@ ctx.pedImpReload = () => {};
   try {
     await vm.runInContext("openImpRecibidoOp()", ctx);
     const h = html.v;
-    chk("pantalla: muestra la solapa 📥 Recibido con el badge", /📥 Recibido/.test(h) && /2<\/span>/.test(h));
+    chk("pantalla: muestra la solapa 📥 Recibido con el badge", /📥 Recibido/.test(h) && /3<\/span>/.test(h));
     chk("pantalla: el renglón a elegir dice ⚠ elegir pedido", /⚠ elegir pedido/.test(h));
     chk("pantalla: ofrece los dos pedidos en viaje", /PI B260601-2/.test(h) && /PI X/.test(h));
     chk("pantalla: lo revisado no se ve por defecto", !/932E/.test(h));
+    chk("pantalla: lo anterior al 09/10 dice ↺ revisar, ofrece su pedido y ✓ Visto", /↺ revisar \(anterior al 09\/10\)/.test(h) && /PI Z/.test(h) && /impIrVisto\('4'\)/.test(h));
     vm.runInContext("impIrSel('1','131')", ctx);
     await vm.runInContext("impIrGuardar('1')", ctx);
     const a = calls.filter(c => c[0] === "gv_imp_ir_asignar")[0];

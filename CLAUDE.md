@@ -4057,6 +4057,10 @@ ni por 📥 RECIBIR, y el pedido seguía «en viaje». (Los marcadores y centine
   devuelve lo llegado al pedido anterior y anula su recepción). **✓ Visto** = `gv_imp_ir_visto`. Badge rojo en el botón
   Importación y en la solapa (`gv_imp_ir_avisos`: renglones sin revisar). Nada de esto mueve stock. El operario no elige
   nada. Centinelas v29.11 (marcador de la base). `sql/gv_imp_ir_resolver_v2913.sql`, `tests/imp-ir-resolver.cjs`.
+- ⚠ **v29.17 (Luis, 09/10): lo que entró por Ingreso a racks de importación ANTES de la imputación automática se revisa
+  A MANO** en 📥 Recibido: 41 ingresos (22-23/07, 31/08, 25/09) entraron al registro como `a_revisar` («↺ revisar
+  (anterior al 09/10)»), sin descontar nada. El admin elige el pedido (↔) o marca ✓ Visto si ya estaba descontado. Los 21
+  imputados solos del 09/10 también quedan para que el admin los mire. `sql/gv_imp_ir_retroactivo_v2917.sql`.
 
 ## ⚠ REGLA (Luis, 2026-09-29, v23.95): los MESES OBJETIVO se eligen en el encabezado del proveedor
 
