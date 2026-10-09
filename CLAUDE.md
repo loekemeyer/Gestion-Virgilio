@@ -8464,3 +8464,19 @@ front las llama con `gvWriteHdr()` (la sesión), nunca con la clave pública. El
 
 - Primer toque SELECCIONA, «Enviar» EMPIEZA la tarea (evento **MDI**, `texto` = MOV/INS/CP/RC) y abre el módulo; abierta, el botón queda rojo y tocarlo RE-ABRE el mismo módulo (retomar, mismo tramo). Abajo, barra con **⛔ Anular** (MDT `ANULADO` → no productivas) y **🏁 Terminé** (MDT con `ts_inicio`). IR sigue con IRI/IRT y también va por «Enviar».
 - `MOD_TAREA` en index.html; tope 12 h (`_gvModVivo`). Vista `gv_monitor_horas_operario_dia` y `gv_horas_operario_detalle_v2` (marcador `v28.93-mdt`): MDT suma a Hs MOV ≡ `fetchMonitorDayStats`; TV / Mon. Admin «En este momento». `sql/gv_modulo_tarea_mdi_mdt_v2893.sql`, `tests/modulo-tarea-enviar.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-09, v29.05): un AJUSTE de RACKS lleva la POSICIÓN — Stock → Ajustar / Fijar / Stock inicial
+
+Caso 606 (09/10): un ingreso a racks X22 se cargó como **606** siendo **606E** (pedido PI B260601), y la corrección desde
+Stock → Ajustar restó −10 **sin posición**: X22 siguió con +10 y la alerta «bajado de racks sin decir de qué posición»
+quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks vive por posición).
+
+- **Front** (`_stkRackPosElegir`): con depósito Racks / Racks CH, Ajustar y Fijar piden la posición (casilla «Posición rack»
+  o prompt con las posiciones que tiene el código), la validan contra el Mapa (`gv_rack_sector`) y, al restar más de lo que
+  tiene esa posición, avisan. **Fijar en racks fija LA POSICIÓN**, no el total. Stock inicial en racks: `CÓDIGO CANTIDAD POSICIÓN`.
+  Sin posición o sin poder verificarla, no graba.
+- **Base**: trigger `aa_gv_racks_ajuste_sin_posicion` (legajo `0` = panel, tipo ajuste/inicial) → `RACKS_SIN_POSICION`.
+  Rollback: `alter table public."Movimientos_Stock" disable trigger aa_gv_racks_ajuste_sin_posicion;`
+- Datos 09/10: 606 vuelto a 0; 606E = 130 cajas (13 MC) en X22, imputadas al pedido PI B260601 (1.560 u, llegado) con
+  `gv_imp_imputar_ingreso_racks`.
+- `sql/gv_racks_ajuste_sin_posicion_v2905.sql`, centinela 379, `tests/stk-ajuste-racks-posicion.cjs`.
