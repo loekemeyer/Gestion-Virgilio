@@ -1,0 +1,6 @@
+-- v29.02 (Thomas, 09/10). Aplicados sobre la definición viva, idempotentes.
+-- 1) vista_fc_sin_salida: antes de Gestión (07/09) una NP con Control Remitos (CCR) o Recepción Remitos (CRN)
+--    cuenta como salida (marcador v29.02-viejo). FC s/Salida pasó de 35 a 12 NP. Regla de dos columnas intacta.
+-- 2) generar_inconsistencias: las tandas de pedidos web (PPP_Web_Programacion) y las facturadas son válidas
+--    (marcador v29.02-web). Antes marcaba «Pedido inválido» toda tanda web.
+-- Rollback: quitar el UNION agregado en cada objeto (buscar el marcador).
