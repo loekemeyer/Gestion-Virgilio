@@ -8553,4 +8553,12 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
   entorno `GEMINI_API_KEY` / `GROQ_API_KEY` / `OPENROUTER_API_KEY`. **Nunca una clave en el repo**: es público. Sin ninguno, devuelve la sección del manual que coincide por palabras (`buscar.ts`).
 - Ningún LLM es inmune al jailbreak: la garantía es que no tiene ninguna capacidad; lo peor es una respuesta fuera de tema.
 - Lo que preguntan: `select ts, usuario, fuente, pregunta, respuesta from public."GV_Ayuda_Log" order by id desc;`
+- ⚠⚠ **v29.19 (Luis: *"algo que ajuste el manual en base a los cambios"*): EL MANUAL SE MANTIENE AL DÍA EN EL MISMO COMMIT.**
+  gv-ayuda lee el manual **publicado** (Pages, `ayuda/manual-operario.md`, caché 10 min; si Pages no contesta usa el
+  empaquetado `manual.ts` y el log dice «(manual empaquetado)»): **cambiar el manual = push a main, sin redeploy.**
+  `tests/ayuda-manual-al-dia.cjs` (en run.sh) se pone ROJO si un botón de la botonera no está en el manual o si un
+  rótulo que el manual cita entre «…» ya no existe en index.html / recepcion.js. **Al renombrar, sacar o agregar un
+  botón o un paso de un módulo del operario, se actualiza el manual en ese commit** (y `node scripts/ayuda-manual-build.cjs`).
+- ⚠ **Groq retiró `llama-3.3-70b-versatile` (09/10: 404 model_not_found)**: se pasó a `openai/gpt-oss-120b` (con
+  `reasoning_effort: low`). Si un proveedor empieza a fallar, mirar `GV_Ayuda_Log.error` y la lista de modelos del proveedor.
 - `sql/gv_ayuda_log_v2916.sql`, `sql/gv_ayuda_config_v2918.sql`, `tests/ayuda-chat.cjs`.

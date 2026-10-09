@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.19"></script>
+<script type="module" src="recepcion.js?v=29.20"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10698,7 +10698,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.19";
+const APP_VERSION = "v29.20";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -61987,7 +61987,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.19"></script>
+<script src="importacion.js?v=29.20"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62685,7 +62685,7 @@ window.promptNombreEntrevista = promptNombreEntrevista;
    resolvemos contra Empleados (mismo lookup que email->legajo). No usa
    Supabase Auth; la sesión se guarda en localStorage y dura el día. */
 /* v23.82 (Luis): antes de elegir nombre o legajo, la clave de 4 dígitos que muestra la TV
-   (gv_tv_clave_validar; cambia cada 15 min y vale la anterior). Así se entra estando en el depósito. */
+   (gv_tv_clave_validar; cambia cada minuto —v23.93— y vale la anterior). Así se entra estando en el depósito. */
 let __tvClaveOkAt = 0;
 const TV_CLAVE_VALIDA_MS = 10 * 60 * 1000;   // una vez validada, 10 min para elegir nombre/legajo
 function _tvClaveVigente() { return __tvClaveOkAt && (Date.now() - __tvClaveOkAt) < TV_CLAVE_VALIDA_MS; }
@@ -62704,7 +62704,7 @@ window.loginConClaveTv = async function () {
     j = r.ok ? await r.json() : null;
   } catch (_e) { j = null; }
   if (!j) { if (errEl) errEl.textContent = "Sin conexión: probá de nuevo."; return; }
-  if (!j.ok) { if (errEl) errEl.textContent = "Clave incorrecta. Mirá la TV (cambia cada 15 min)."; return; }
+  if (!j.ok) { if (errEl) errEl.textContent = "Clave incorrecta. Mirá la TV (cambia cada minuto)."; return; }
   __tvClaveOkAt = Date.now();
   const lista = $("tvNombreLista");
   if (lista) {
@@ -64917,12 +64917,12 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.19"></script>
-<script src="hotsale.js?v=29.19"></script>
-<script src="estadisticas.js?v=29.19"></script>
-<script src="ads.js?v=29.19"></script>
+<script src="cobranzas.js?v=29.20"></script>
+<script src="hotsale.js?v=29.20"></script>
+<script src="estadisticas.js?v=29.20"></script>
+<script src="ads.js?v=29.20"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.19"></script>
+<script src="ayuda.js?v=29.20"></script>
 
 </body>
 </html>

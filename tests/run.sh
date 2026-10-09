@@ -266,6 +266,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/modulo-tarea-enviar.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/sc-racks-unidad.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ayuda-chat.cjs
+node tests/ayuda-manual-al-dia.cjs
 echo "== tarea-abierta-otro-dia (v26.56: armado/picking abierto del viernes se retoma el lunes con su avance) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tarea-abierta-otro-dia.cjs
 echo "== arm-avance-servidor (v26.61: la copia del armado viaja al servidor sin cambiar nada del operario) =="

@@ -117,7 +117,7 @@ async function ayudaEnviar() {
 var _aycfg = { filas: null, msg: "", err: "", prueba: "" };
 var AYCFG_INFO = {
   gemini: { nom: "Google Gemini", url: "https://aistudio.google.com/apikey", ej: "gemini-2.5-flash" },
-  groq: { nom: "Groq", url: "https://console.groq.com/keys", ej: "llama-3.3-70b-versatile" },
+  groq: { nom: "Groq", url: "https://console.groq.com/keys", ej: "openai/gpt-oss-120b" },
   openrouter: { nom: "OpenRouter", url: "https://openrouter.ai/keys", ej: "meta-llama/llama-3.3-70b-instruct:free" }
 };
 async function _aycfgHdr() {

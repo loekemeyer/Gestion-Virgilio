@@ -14,7 +14,7 @@ create table if not exists public."GV_Ayuda_Config" (
 alter table public."GV_Ayuda_Config" enable row level security;
 revoke all on public."GV_Ayuda_Config" from anon, authenticated;
 insert into public."GV_Ayuda_Config"(proveedor, modelo, orden) values
-  ('gemini','gemini-2.5-flash',1), ('groq','llama-3.3-70b-versatile',2),
+  ('gemini','gemini-2.5-flash',1), ('groq','openai/gpt-oss-120b',2),
   ('openrouter','meta-llama/llama-3.3-70b-instruct:free',3)
 on conflict (proveedor) do nothing;
 
