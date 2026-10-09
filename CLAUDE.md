@@ -8513,3 +8513,16 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
   desde A guardar. Retira la pestaña Racks de la v29.12 (caso 958E del 09/10: JM mandó 1 MC desde AD10 con la MC mal cargada en 13).
 - Lo sostiene la base: trigger `aa_gv_salida_cervantes_no_racks` → `SC_DESDE_RACKS` (centinela v29.13).
   `sql/gv_salida_cervantes_no_racks_v2913.sql`, `tests/sc-racks-unidad.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-09, v29.17): ❓ AYUDA — el asistente del operario SÓLO sabe el manual
+
+- Botón **❓ Ayuda** en la botonera (`ayuda.js`) → chat → Edge Function **`gv-ayuda`** (verify_jwt off; identifica por la
+  sesión o la IP). **Sin herramientas**: no lee ni escribe tablas del negocio; sólo `GV_Ayuda_Log` (service_role, para el
+  límite de 20 preguntas/hora por usuario y 400/día). Pregunta ≤ 500 caracteres, historial ≤ 6 mensajes.
+- La única fuente es **`ayuda/manual-operario.md`**. Cambiar el manual = editar el .md, `node scripts/ayuda-manual-build.cjs`
+  (regenera `manual.ts`) y **redeployar** gv-ayuda. Al cambiar un módulo de la botonera, actualizar el manual en el mismo pedido.
+- LLM gratis en orden con respaldo: `GEMINI_API_KEY` → `GROQ_API_KEY` → `OPENROUTER_API_KEY` (secretos de la función,
+  **nunca en el repo**: es público). Sin ninguno, devuelve la sección del manual que coincide por palabras (`buscar.ts`).
+- Ningún LLM es inmune al jailbreak: la garantía es que no tiene ninguna capacidad; lo peor es una respuesta fuera de tema.
+- Lo que preguntan: `select ts, usuario, fuente, pregunta, respuesta from public."GV_Ayuda_Log" order by id desc;`
+- `sql/gv_ayuda_log_v2916.sql`, `tests/ayuda-chat.cjs`.

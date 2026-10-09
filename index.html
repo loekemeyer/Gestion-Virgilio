@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.16"></script>
+<script type="module" src="recepcion.js?v=29.17"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6978,6 +6978,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div id="tmBar" class="tm-bar">
     <div id="tmMuerto" class="tm-muerto" title="Tiempo del día sin ninguna tarea registrada">⏱ Tiempo muerto <b id="tmMuertoVal">—</b></div>
     <button id="btnHistTareas" type="button" class="tm-hist-btn" onclick="histTareasAbrir()">📋 Historial<br>de tareas</button>
+    <button id="btnAyuda" type="button" class="tm-hist-btn" onclick="ayudaAbrir()">❓ Ayuda</button>
   </div>
   <!-- Deshacer último mensaje — visible 60s después de enviar -->
   <div id="undoBanner" class="hidden">
@@ -10697,7 +10698,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.16";
+const APP_VERSION = "v29.17";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -61986,7 +61987,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.16"></script>
+<script src="importacion.js?v=29.17"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64916,10 +64917,12 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.16"></script>
-<script src="hotsale.js?v=29.16"></script>
-<script src="estadisticas.js?v=29.16"></script>
-<script src="ads.js?v=29.16"></script>
+<script src="cobranzas.js?v=29.17"></script>
+<script src="hotsale.js?v=29.17"></script>
+<script src="estadisticas.js?v=29.17"></script>
+<script src="ads.js?v=29.17"></script>
+<!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
+<script src="ayuda.js?v=29.17"></script>
 
 </body>
 </html>
