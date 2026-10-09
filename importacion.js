@@ -3205,10 +3205,13 @@ async function openImpAgregar() {
   const res = await Promise.all([
     _impCfgCargar().catch(function () {}),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados", "select=id,cod_art,marca,descripcion,proveedor,activo&order=cod_art").catch(function () { return null; }),
-    _pedImpRpc("gv_importado_ficha", { p_id: null }).catch(function () { return null; })
+    _pedImpRpc("gv_importado_ficha", { p_id: null }).catch(function () { return null; }),
+    _pedImpRpc("gv_codigos_baja", {}).catch(function () { return []; })
   ]);
   if (!_stkPop || _stkPop.kind !== "impAlta") return;
-  _impAlta.lista = Array.isArray(res[1]) ? res[1] : null;
+  // v29.06 (Luis, 09/10): un código dado de baja (865ED → 865E) no se ofrece para modificar.
+  const baja = {}; (Array.isArray(res[3]) ? res[3] : []).forEach(function (b) { if (b && b.cod) baja[String(b.cod).trim().toUpperCase()] = 1; });
+  _impAlta.lista = Array.isArray(res[1]) ? res[1].filter(function (r) { return !baja[String((r && r.cod_art) || "").trim().toUpperCase()]; }) : null;
   _impAlta.tipos = (res[2] && res[2].tipos) || [];
   _impAlta.familias = (res[2] && res[2].familias) || [];
   _impAltaRender();

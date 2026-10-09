@@ -12,14 +12,19 @@ const fj = src.slice(src.indexOf("\nasync function stockFijar()"), src.indexOf("
 ok(/_stkCodExisteConfirmar\(cod,/.test(aj) && aj.indexOf("_stkCodExisteConfirmar") < aj.indexOf("stkInsertMov"), "stockAjustar pregunta ANTES de grabar");
 ok(/_stkCodExisteConfirmar\(cod,/.test(fj), "stockFijar pregunta");
 (async () => {
-  const mk = (resp) => new Function("SUPABASE_URL", "SUPABASE_KEY", "fetch", "confirm",
-    fnSrc + "\nreturn _stkCodExisteConfirmar;")("https://x", "k", resp, (m) => { mk.last = m; return mk.ans; });
+  const mk = (resp) => new Function("SUPABASE_URL", "SUPABASE_KEY", "fetch", "confirm", "alert",
+    fnSrc + "\nreturn _stkCodExisteConfirmar;")("https://x", "k", resp, (m) => { mk.last = m; return mk.ans; }, (m) => { mk.alerta = m; });
   let f = mk(async () => ({ ok: true, json: async () => true })); mk.last = null;
   ok(await f("865ED", "pongo -47") === true && mk.last === null, "código que existe: graba sin preguntar");
   f = mk(async () => ({ ok: true, json: async () => false })); mk.ans = false;
   ok(await f("999FT", "pongo -40") === false && /No existe el c.digo 999FT[\s\S]*Lo creo y le pongo -40\?/.test(mk.last), "no existe + cancela: no graba, y el cartel dice «¿Lo creo y le pongo -40?»");
   mk.ans = true;
   ok(await f("999FT", "pongo -40") === true, "no existe + confirma: graba");
+  // v29.06 (Luis, 09/10): un código DADO DE BAJA no se graba: avisa cuál va.
+  f = mk(async (u) => ({ ok: true, json: async () => (/gv_codigo_baja_de/.test(u) ? "865E" : true) })); mk.last = null; mk.alerta = null;
+  ok(await f("865ED", "pongo -1") === false && /865ED no se usa m.s: es el 865E/.test(mk.alerta || "") && mk.last === null, "código dado de baja (865ED): no graba y dice que va 865E");
+  f = mk(async (u) => ({ ok: true, json: async () => (/gv_codigo_baja_de/.test(u) ? null : true) })); mk.alerta = null;
+  ok(await f("865E", "pongo -1") === true && mk.alerta === null, "código vivo: la consulta de bajas devuelve null y graba");
   f = mk(async () => { throw new Error("red"); }); mk.ans = false;
   ok(await f("501", "pongo +1") === false && /No pude verificar/.test(mk.last), "sin respuesta: pregunta (no asume que existe)");
   console.log(fails ? "\n" + fails + " falla(s)" : "\nOK");

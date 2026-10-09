@@ -8156,6 +8156,17 @@ OC, Importados, góndola L57 (56 cajas) y stock van por 865E; el 865ED queda ina
 cajas que fueron a etiquetar a Cervantes el 30/09 vuelven como 865E (se resuelve al recibirlas).
 `sql/gv_865e_unificacion_v2774.sql`.
 
+## ⚠ REGLA (Luis, 2026-10-09, v29.08): un CÓDIGO DADO DE BAJA no aparece en el front — la historia queda
+
+**Luis:** *"no está en uso, no debería aparecer en el front en ningún lado. no hace falta limpiarlo de todas las bases porque tiene registros históricos"* (865ED, unificado en 865E el 07/10).
+
+- La lista vive en **`GV_Codigo_Baja`** (cod, reemplazo). Dar de baja otro código = un `insert`, no un deploy.
+- `gv_stock_cod_conocido` y `v_conocidos` de `refresh_stocks_carga_rapida` lo tratan como desconocido → `visible_en_stock = false` → no sale en Stocks ni en la Est. Madre (sin saldo ni pedidos). Centinelas v29.06.
+- Trigger **`aa_gv_codigo_baja`** (BEFORE INSERT en `Movimientos_Stock`): un movimiento NUEVO a mano con ese código se graba con el reemplazo (la descripción lo dice). No toca el pipeline (picking/separado/facturado, legajo pipeline/sistema): reescribe historia por tanda.
+- Stocks → Ajustar/Fijar avisa *«no se usa más: es el 865E»* (`gv_codigo_baja_de`) · Importados → «Modificar existente» no lo ofrece (`gv_codigos_baja`) · se sacó de `planimetria.js`.
+- **No se borra nada**: movimientos, facturas, Importados/OC_Maximos/GV_Lugar_Item (inactivos) quedan como historia. Los marcadores de la base dicen `v29.06-baja` (llave, no cambiar).
+- `sql/gv_codigo_baja_v2906.sql`, `tests/stk-ajuste-cod-inexistente.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-10-07, v28.34): en la PPP un día se escribe «Mié 07/10»
 
 Una sola función, **`gvDiaTxt(x)`** (ISO, AAAAMMDD, dd/mm/aaaa o Date → `Mié 07/10`; `GV_DOW3`). La usan Programación,

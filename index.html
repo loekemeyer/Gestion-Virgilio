@@ -6388,7 +6388,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
 <div id="versionBadge"></div><!-- vacío a propósito: lo llena el JS (updatePendingIndicator) con APP_VERSION. Si queda VACÍO en pantalla = el JS NO corrió (navegador no soporta el código / error de parseo). NO hardcodear una versión acá: engaña el diagnóstico. -->
 
-<script src="planimetria.js?v=15.79"></script>
+<script src="planimetria.js?v=15.80"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
@@ -26370,6 +26370,14 @@ function _stkResolveDual(codRaw) {
    Lo decide gv_stock_cod_conocido (los siete maestros). Si no se puede verificar, tambien pregunta:
    "no pude leer" no es "existe". Devuelve true si se puede grabar. */
 async function _stkCodExisteConfirmar(cod, txtAccion) {
+  // v29.06 (Luis, 09/10): un c\u00f3digo DADO DE BAJA (865ED, unificado en 865E) no se carga: se avisa cu\u00e1l va.
+  try {
+    var rb = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_codigo_baja_de", { method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_cod: cod }) });
+    if (rb.ok) { var rep = await rb.json();
+      if (typeof rep === "string") { alert("El c\u00f3digo " + cod + " no se usa m\u00e1s" + (rep ? ": es el " + rep + ". Cargalo como " + rep + "." : ".")); return false; } }
+  } catch (_e) {}
   var existe = null;
   try {
     var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_stock_cod_conocido", { method: "POST",
