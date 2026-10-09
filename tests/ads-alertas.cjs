@@ -38,7 +38,7 @@ const STOCK = [
       if (modo === "vacio") return { data: [], error: null };
       if (n === "gv_ads_config") return { data: { n_ocs: 7, umbral: 0.5, incluir_actual: false }, error: null };
       if (n === "gv_ads_talleristas") { if (a && a.p_incluir_actual) window.__incArg = true; /* v28.86: hay una 2.ª llamada con false */ return { data: TALL, error: null }; }
-      if (n === "gv_ads_oc_fechas") return { data: [{ n: 1, fecha: "2026-10-07" }, { n: 2, fecha: "2026-09-30" }], error: null };
+      if (n === "gv_ads_oc_fechas") return { data: [{ n: 1, fecha: "2026-10-14" }, { n: 2, fecha: "2026-10-07" }, { n: 3, fecha: "2026-09-30" }], error: null };
       if (n === "gv_ads_stock3") return { data: STOCK, error: null };
       if (n === "gv_ads_badge") return { data: 1, error: null };
       if (n === "gv_ads_badge_stock") return { data: { q10: 80, q20: 98, q30: 127 }, error: null };
@@ -56,7 +56,7 @@ const STOCK = [
     window.openAds(); await espera(150);
     out.rango = [...document.querySelectorAll("#adsOv .ads-bar select option")].map((o) => o.textContent);
     out.rangoSel = (document.querySelector("#adsOv .ads-bar select") || {}).value;
-    out.sinInc = !document.querySelector("#adsOv .ads-bar input[type=checkbox]") && window.__incArg === true;
+    out.sinInc = !document.querySelector("#adsOv .ads-bar input[type=checkbox]") && window.__incArg !== true;   // v28.95: la OC vigente NUNCA entra (snapshot de las cerradas)
     const filas = [...document.querySelectorAll("#adsOv tr.t")];
     out.orden = filas.map((f) => f.cells[0].textContent.replace(/[▸▾ ]/g, ""));
     out.oscarRojo = filas[0] && filas[0].classList.contains("al");
@@ -108,7 +108,7 @@ const STOCK = [
   const fallas = [];
   if (r.rango.length !== 12 || r.rango[0] !== "1 - 07.10.26" || r.rango[1] !== "2 - 30.09.26" || r.rango[2] !== "3 - sin OC") fallas.push("(g) selector de rango 1..12 con fecha: " + JSON.stringify(r.rango));
   if (r.rangoSel !== "4") fallas.push("(g) el rango abre en 4: " + r.rangoSel);
-  if (!r.sinInc) fallas.push("(g) la OC en curso tiene que entrar siempre, sin casilla");
+  if (!r.sinInc) fallas.push("(g) la OC vigente no puede entrar en el %, ni haber casilla");
   if (!r.boton) fallas.push("(a) falta el botón ADS con su badge");
   if (r.badge !== "1") fallas.push("(a) badge no pinta: " + r.badge);
   if (!r.badgeIzq) fallas.push("(a) el badge violeta no va a la izquierda");
