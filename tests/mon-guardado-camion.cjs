@@ -39,7 +39,7 @@ ok(/CAMION_DE\.get\(/.test(TV), "el camión de la TV tiene que mirar primero la 
 ok(/gvRacksTramo\("RKI"/.test(IDX) && /gvRacksTramo\("RKB", _rkb\.legajo, _rkb\.tsInicio/.test(IDX), "Bajar de racks tiene que abrir (RKI) y cerrar su tramo (RKB con ts_inicio)");
 ok(/gvRacksTramo\("IRI"/.test(IDX) && /gvRacksTramo\("IRT", _ir\.legajo, _ir\.tsInicio/.test(IDX), "Ingreso a racks tiene que abrir (IRI) y cerrar su tramo (IRT con ts_inicio)");
 ok(/function closeRkb\(\) \{[\s\S]{0,300}gvRacksTramo\("RKB"/.test(IDX), "cerrar Bajar de racks sin confirmar también cierra el tramo");
-ok(/MOV_TOGGLE_CODES\s*= new Set\(\["MG", "RI", "EI", "RT", "RKB", "IRT"\]\)/.test(IDX), "Hs MOV del monitor grande tiene que sumar RKB e IRT (≡ la vista)");
+ok(/MOV_TOGGLE_CODES\s*= new Set\(\["MG", "RI", "EI", "RT", "RKB", "IRT"(, "[A-Z]+")*\]\)/.test(IDX), "Hs MOV del monitor grande tiene que sumar RKB e IRT (≡ la vista; v29.04 sumó MDT detrás)");
 ok(/e\.op === "RKI"/.test(IDX) && /e\.op === "RKI"/.test(TV), "los dos monitores tienen que ver el tramo de racks EN CURSO");
 
 // 5) v23.67 — la tabla Mts3 x Hora del admin también cuenta la tarea ABIERTA (≡ la vista)

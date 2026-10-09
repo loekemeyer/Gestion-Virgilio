@@ -34,12 +34,24 @@ function _impTabsHtml(cur) {
     '<button style="' + t(cur === 'hist') + '" onclick="openImpHistRecep()" title="Los pedidos hechos y las recepciones: qué se pidió, cuándo, cuánto llegó y dónde se guardó.">📜 Historial</button>' +
     '<button style="' + t(cur === 'disc') + '" onclick="openImpDisc()" title="Los importados dados de baja (Importados.activo = false): no salen en Pedidos ni en el PDF.">🚫 Discontinuos</button>' +
     '<button style="' + t(cur === 'prov') + '" onclick="stkOpenProvImp()">🏭 Proveedores</button>' +
-    '<button style="' + t(false) + '" onclick="openImpoComex()" title="Verificación de documentos de importación (IMPO COMEX). Sólo supervisores.">🛃 IMPO COMEX</button></div>';
+    '<button style="' + t(false) + '" onclick="openImpoComex()" title="Verificación de documentos de importación (IMPO COMEX). Sólo supervisores.">🛃 IMPO COMEX</button>' +
+    '<button style="' + t(false) + '" onclick="openImpoComex2()" title="IMPO COMEX dentro de Gestión, sin build (en prueba: mismas funciones que el de al lado).">🛃 IMPO COMEX nuevo</button></div>';
 }
 /* v23.19 (Elías, 28/09) — IMPO COMEX dentro de Gestión: la versión web vive en impo-comex/ (copia
    armada; el fuente está en el repo privado loekemeyer/Impo-Comex). Página completa, mismo origin:
    usa la misma sesión de Google. El control de supervisor lo hace el servidor (Impo_Comex_web). */
 function openImpoComex() { location.href = "impo-comex/"; }
+/* v29.18 (Elías, 09/10: «migrar completamente a Gestión») — IMPO COMEX sin build: pantalla completa
+   dentro de Gestión, armada en strings como el resto de importación. Vive en impocomex/ (ic-base.js +
+   un ic-<modo>.js por modo; la lógica de parseo en impocomex/logica/, copiada tal cual del cliente). */
+function openImpoComex2() {
+  if (window.IC && window.IC.abrir) { window.IC.abrir(); return; }
+  var s = document.createElement("script");
+  s.src = "impocomex/ic-base.js?v=" + encodeURIComponent(typeof APP_VERSION !== "undefined" ? APP_VERSION : Date.now());
+  s.onload = function () { window.IC.abrir(); };
+  s.onerror = function () { alert("No se pudo abrir IMPO COMEX. Probá de nuevo."); };
+  document.head.appendChild(s);
+}
 async function stkOpenProvImp() {
   _stkPopShell("🏭 Proveedor de importación", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;

@@ -3959,6 +3959,25 @@ privado `loekemeyer/Impo-Comex`**; acá va sólo el build web (`client/dist-web`
   del controlante de la DDJJ NO están en ningún código: tabla cerrada `impo_comex.ddjj_controlante` + RPC
   `gv_impo_comex_ddjj_controlante()` (sólo supervisor). `sql/gv_impo_comex_ddjj_controlante_v2322.sql` (v23.22).
 
+## ⚠ REGLA (Elías, 2026-10-09, v29.19): IMPO COMEX NUEVO vive en `impocomex/` — SIN BUILD, como el resto de Importación
+
+**Elías:** *"migrar completamente a Gestión Virgilio … como está armado el resto de importación, sin perder funcionalidades
+(que parseos etc. no funcionen incorrectamente)"*. Botón **🛃 IMPO COMEX nuevo** al lado del viejo (`openImpoComex2`,
+`importacion.js`). Está **en prueba**: cuando Elías lo valide se sacan el botón viejo y la copia `impo-comex/`.
+
+| pieza | qué es |
+|---|---|
+| `impocomex/ic-base.js` | `window.IC`: overlay, inicio con las 10 tarjetas, `IC.api` (la misma puerta `Impo_Comex_web` con la sesión de Gestión), drop zones, visor PDF, lightbox, markdown, editores de cabecera / ítems, corregir relevamiento, avisos |
+| `impocomex/ic-<modo>.js` | un archivo por modo (lakout, multidoc, marks, estimar, full, ddjj, cajas, inal + vencimientos, autorizacion, history), script clásico, HTML en strings, se carga al entrar con `?v=APP_VERSION` |
+| `impocomex/logica/` | los módulos ORIGINALES de `Impo-Comex/client/src` copiados TAL CUAL (pdfText, cajasFotos, barcodeLocal, lakoutTramos, lib/ddjjCheck…), cargados con `IC.mod(nombre)`. **No se reescribe el parseo**: se copia el archivo nuevo encima |
+| `impocomex/vendor/` | xlsx, xlsx-js-style, pdf-lib, fflate (ES modules, `IC.lib`) · `impocomex/plantillas/` el .docx de Autorización |
+
+- Endpoints y acciones idénticos al original (medido: todas las rutas y las 12 acciones de `/editar`). El controlante de la
+  DDJJ sigue llegando por la puerta (`/datos-ddjj`): **este repo es público**, nada de token ni datos personales.
+- Al cambiar una pantalla en `Impo-Comex`, se porta a mano al `ic-<modo>.js`; un cambio de lógica es copiar el archivo a `logica/`.
+- `tests/impo-comex-nuevo.cjs` (abre los 11 modos sin errores y corre la lógica original: PDF, Excel, zip, rar, EAN-13, Word,
+  DDJJ) · `tests/impo-comex-web.cjs` (bloque e: sin token, sin datos personales, sin `import.meta.env`).
+
 ## ⚠ REGLA (Luis, 2026-09-28, v23.45): la importación se RECIBE desde el panel — 📥 RECIBIR
 
 Pedidos Importación → Acciones → **📥 RECIBIR** (también en 📦 Baches). Guiado: qué bache, empresa (sólo

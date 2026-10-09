@@ -817,6 +817,8 @@ echo "== imp-escritura-login (v22.81: el maestro de importados se escribe sólo 
 node tests/imp-escritura-login.cjs
 echo "== impo-comex-web (v23.19: IMPO COMEX web dentro de Importación, sin token ni datos personales) =="
 node tests/impo-comex-web.cjs
+echo "== impo-comex-nuevo (v29.18: IMPO COMEX sin build, 11 modos y la lógica original en el navegador) =="
+node tests/impo-comex-nuevo.cjs
 
 echo "== fn-duplicadas (v22.96: ninguna función de nivel superior declarada dos veces — la ccRender de Cobranzas pisó la de Carga Camión) =="
 node tests/fn-duplicadas.cjs

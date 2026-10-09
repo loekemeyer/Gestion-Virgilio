@@ -26,7 +26,7 @@ const ctx = {
   _stkPop: { dep: "terminado", codN: "26", emp: "", kind: "movsArt", desde: "", hasta: "", cod: "026", titulo: "Góndola", _freshMovs: movs },
   _stk: { movs: [] },
   _stkMovMatch: () => true, _stkWin: () => true, escapeHtml: (x) => String(x), codBase: (x) => x,
-  stockFmtTs: (t) => String(t).slice(0, 10), _stkQuienChip: () => "", _stkRtoDetail: () => ""
+  stockFmtTs: (t) => String(t).slice(0, 10), _padCod: (x) => String(x), _stkQuienChip: () => "", _stkRtoDetail: () => ""
 };
 let html = "";
 try { html = new Function(...Object.keys(ctx), fn + "\nreturn _stkMovsBlock();")(...Object.values(ctx)); }
