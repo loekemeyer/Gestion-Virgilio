@@ -435,8 +435,9 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
     x = x.replace(/<sheetFormatPr[^>]*\/>(?=[\s\S]*<sheetFormatPr)/, "");
     if (!/<sheetPr/.test(x)) x = x.replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
     x = x.replace(/<pageMargins[^>]*\/>/, "");
-    if (merges.length) x = x.replace(/<mergeCells[\s\S]*?<\/mergeCells>/, "").replace(/<\/sheetData>/, '</sheetData><mergeCells count="' + merges.length + '">' + merges.join("") + '</mergeCells>');
     x = x.replace(/<\/sheetData>/, '</sheetData>' + (cfg.margenStd ? '<pageMargins left="0.70866141732283461" right="0.70866141732283461" top="0.74803149606299213" bottom="0.74803149606299213" header="0.31496062992125984" footer="0.31496062992125984"/>' : '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>') + '<pageSetup paperSize="9"' + (cfg.escala ? ' scale="' + cfg.escala + '"' : '') + ' orientation="portrait" fitToWidth="1" fitToHeight="0"/>');
+    // v28.93 (Luis): mergeCells va ANTES de pageMargins (orden del esquema); al revés Excel dice «problema con el contenido»
+    if (merges.length) x = x.replace(/<mergeCells[\s\S]*?<\/mergeCells>/, "").replace(/<\/sheetData>/, '</sheetData><mergeCells count="' + merges.length + '">' + merges.join("") + '</mergeCells>');
     cfb.FileIndex[i].content = enc.encode(x);
   });
   return XLSX.CFB.write(cfb, { fileType: "zip", type: "array" });

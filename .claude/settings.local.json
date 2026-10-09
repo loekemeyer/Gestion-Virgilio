@@ -152,7 +152,8 @@
       "Bash(BUMP_FORZAR=1 node scripts/bump-version.cjs 28.29)",
       "Bash(GIT_EDITOR=true git -c core.editor=true rebase --continue)",
       "Bash(node monitor/build-admin.cjs)",
-      "Bash(node -e \"console.log\\('v'+require\\('./version.json'\\).version\\)\")"
+      "Bash(node -e \"console.log\\('v'+require\\('./version.json'\\).version\\)\")",
+      "Bash(PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node tests/ads-alertas.cjs)"
     ]
   }
 }
