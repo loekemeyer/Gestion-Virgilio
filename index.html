@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.00"></script>
+<script type="module" src="recepcion.js?v=29.1"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10689,7 +10689,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.00";
+const APP_VERSION = "v29.1";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -22819,7 +22819,15 @@ async function stkOpenCajasPedidasArt(codEnc) {
   // v12.39 — también traer la variante con "L" (ej. 438EL): es un artículo de Loeke que
   // vende Chef y su pedido cuenta en la fila LK. Se trae articulo IN (438E, 438EL) y la
   // empresa de cada pedido se decide con la L (L → LK; el resto por NP).
-  const _codCands = _stkArtCands(_codB).map(encodeURIComponent).join(",");   // v19.79: variantes de cero (problema 425)
+  const _cands0 = _stkArtCands(_codB);
+  /* v29.01 (Thomas: "636E dice 6 pero entro y dice 0") — la columna cuenta también lo pedido con un código
+     EQUIVALENTE (Equivalencias_Codigos: 636 → 636E). Se suman esos códigos a la búsqueda. */
+  try {
+    const _eq = await fetch(SUPABASE_URL + "/rest/v1/Equivalencias_Codigos?select=cod_pedido,cod_real", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    const _cn = _cands0.map(function (c) { return _stkNormCod(c); });
+    (_eq || []).forEach(function (e) { if (_cn.indexOf(_stkNormCod(e.cod_real)) >= 0) _stkArtCands(String(e.cod_pedido || "")).forEach(function (c) { if (_cands0.indexOf(c) < 0) _cands0.push(c); }); });
+  } catch (_e) {}
+  const _codCands = _cands0.map(encodeURIComponent).join(",");   // v19.79: variantes de cero (problema 425)
   /* v19.65 (Thomas: "¿por qué ahí dice que pide 198 pero cuando entro veo solo tres cajas?
      algo está mal") — la fuente pasó de `gv_ppp_base_pedidos` (SOLO el espejo de ISIS) a
      `gv_demanda_pedidos`, que es ISIS + WEB. Es el MISMO agujero que tenía el generador de
@@ -61752,7 +61760,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.00"></script>
+<script src="importacion.js?v=29.1"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64681,10 +64689,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.00"></script>
-<script src="hotsale.js?v=29.00"></script>
-<script src="estadisticas.js?v=29.00"></script>
-<script src="ads.js?v=29.00"></script>
+<script src="cobranzas.js?v=29.1"></script>
+<script src="hotsale.js?v=29.1"></script>
+<script src="estadisticas.js?v=29.1"></script>
+<script src="ads.js?v=29.1"></script>
 
 </body>
 </html>
