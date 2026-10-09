@@ -124,13 +124,23 @@ function popRitmo(leg, sub) {
   var evs = (D.eventos || []).filter(function (ev) {
     return String(ev.legajo == null ? "" : ev.legajo).trim() === String(leg) && ev.ts_inicio && dayKey(ev.ts_cliente) === hoyKey(); });
   var pausas = evs.filter(function (ev) { return PAUSA[ev.opcion]; }).map(function (ev) { return [ms(ev.ts_inicio), ms(ev.ts_cliente)]; });
-  var mins = {}, pmin = {};
+  var mins = {}, pmin = {}, cola = {};
+  /* v29.03 (Thomas, D9): Min trab suma la COLA hasta la próxima tarea registrada (≡ la vista, regla v26.43),
+     así el total coincide con la celda del tablero. Sólo el primer cierre de cada tanda; sin tarea después, 0. */
+  var AUTO = /^(PUB|AUB|PKC|ENT|RSP|ROC|RAG|FGU|FSS|IMPT|TAL|GST|MGR|PKM|SSG|PSP|NPD|PKAX|FJ)$/;
+  var todos = (D.eventos || []).filter(function (ev) { return String(ev.legajo == null ? "" : ev.legajo).trim() === String(leg) &&
+    dayKey(ev.ts_cliente) === hoyKey() && !AUTO.test(ev.opcion || "") && !/X$/.test(ev.opcion || ""); });
+  var colaDe = function (f, yo) { var sig = Infinity, abierto = false;
+    todos.forEach(function (ev) { if (ev === yo) return; var a = ms(ev.ts_inicio || ev.ts_cliente), b = ms(ev.ts_cliente);
+      if (ev.ts_inicio && a < f && b > f) abierto = true; if (a > f && a < sig) sig = a; });
+    return (abierto || !isFinite(sig)) ? 0 : (sig - f) / 60000; };
   evs.forEach(function (ev) {
     if (ev.opcion !== op) return;
     var t = String(ev.texto || "").trim().toUpperCase(), i = ms(ev.ts_inicio), f = ms(ev.ts_cliente);
     if (!t || !isFinite(i) || !isFinite(f) || f <= i) return;
     var p = 0; pausas.forEach(function (q) { var o = Math.min(f, q[1]) - Math.max(i, q[0]); if (o > 0) p += o; });
-    mins[t] = (mins[t] || 0) + (f - i) / 60000; pmin[t] = (pmin[t] || 0) + p / 60000;
+    var c = (cola[t] == null) ? colaDe(f, ev) : 0; cola[t] = (cola[t] || 0) + c;
+    mins[t] = (mins[t] || 0) + (f - i) / 60000 + c; pmin[t] = (pmin[t] || 0) + p / 60000;
   });
   var rit = function (m3, mi) { return (mi > 0.5 && m3 > 0) ? n1(m3 / (mi / 60)) : "—"; };
   var fm = function (mi, pa) { if (!(mi > 0)) return "—"; var r = Math.round(pa);
@@ -150,7 +160,7 @@ function popRitmo(leg, sub) {
           g.grado + ' <small style="color:#94a3b8">' + esc(String(g.nivel || "")) + '</small></td><td class="pop-k">' + rit((Number(p[1]) || 0) * mu, mi) + '</td>'; }
       else { tAjOk = false; extra = '<td title="todavía sin grado (el caché se recalcula cada 10 min)">—</td><td>—</td>'; }
     }
-    return '<tr><td class="pop-k">' + esc(p[0]) + '</td><td>' + n1(p[1]) + '</td><td>' + fm(mi, pa) + '</td><td>' +
+    return '<tr><td class="pop-k">' + esc(p[0]) + '</td><td>' + n1(p[1]) + '</td><td' + (cola[p[0]] >= 0.5 ? ' title="incluye ' + Math.round(cola[p[0]]) + ' min hasta la próxima tarea"' : '') + '>' + fm(mi, pa) + '</td><td>' +
       rit(Number(p[1]) || 0, mi) + '</td>' + extra + '</tr>'; }).join("");
   var thAj = esPick ? '<th title="Dificultad de la tanda: grado 1-10 (decil de min/caja) y nivel">Dif.</th><th title="Ritmo × (1 + 0,1 × (grado − 5)): Baja ×0,6-0,7 · Media ×0,8-1,0 · Alta ×1,1-1,3 · Muy alta ×1,4-1,5">Ajust. m³/h</th>' : '';
   var tdAj = esPick ? '<td></td><td class="pop-k">' + (tAjOk && pares.length ? rit(tAj, tm) : "—") + '</td>' : '';

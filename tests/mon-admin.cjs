@@ -257,7 +257,7 @@ function responder(url) {
   /* v26.55 (Luis, 04/10): «ya no se mira más el m³ del pedido»: el desglose dice 1,2 (lo pickeado) y NADA del 1,5 */
   ok(t1 && /1,2/.test(t1) && /m³ pick\./.test(t1) && /E31A1,2/.test(t1) && !/E31A1,5/.test(t1) && !/de 1,5/.test(t1), "v26.55: el desglose de picking tiene que decir sólo 1,2 (lo pickeado), sin «de 1,5»: " + (t1 || "").slice(0, 200));
   /* v26.54: en el pop-up, por tanda, «Dif.» (grado y nivel) y «Ajust. m³/h» = ritmo × multiplicador.
-     E31A: 1,2 m³ en 30 min (TP 3 h → 2,5 h atrás) → ritmo 2,4 · grado 7 Alta ×1,2 → 2,9. Y el Total ajustado igual. */
+     E31A: 1,2 m³ en 30 min (TP 3 h → 2,5 h atrás) + 60 min de cola hasta el EP siguiente (v29.03, D9) = 90 min → ritmo 0,8 · grado 7 Alta ×1,2 → 1,0. Y el Total ajustado igual. */
   const popAj = await p.evaluate(() => {
     const tb = document.querySelector("#pop table.pop-cmp");
     if (!tb) return null;
@@ -268,9 +268,9 @@ function responder(url) {
   ok(popAj && popAj.th.indexOf("Dif.") >= 0 && popAj.th.indexOf("Ajust. m³/h") >= 0, "v26.54: el pop-up de picking no trae las columnas Dif. y Ajust. m³/h: " + JSON.stringify(popAj && popAj.th));
   const f31 = popAj && popAj.filas.find((f) => f[0] === "E31A");
   ok(f31 && /^7\b/.test(f31[4]) && /Alta/.test(f31[4]), "v26.54: E31A tiene que decir grado «7 Alta» en Dif.: " + JSON.stringify(f31));
-  ok(f31 && f31[3] === "2,4" && f31[5] === "2,9", "v26.54: E31A ritmo 2,4 y ajustado 2,9 (× 1,2): " + JSON.stringify(f31));
+  ok(f31 && f31[2] === "90" && f31[3] === "0,8" && f31[5] === "1,0", "v29.03: E31A 90 min con la cola, ritmo 0,8 y ajustado 1,0 (× 1,2): " + JSON.stringify(f31));
   const fTot = popAj && popAj.filas.find((f) => f[0] === "Total");
-  ok(fTot && fTot[5] === "2,9", "v26.54: el Total ajustado tiene que ser 2,9: " + JSON.stringify(fTot));
+  ok(fTot && fTot[5] === "1,0", "v29.03: el Total ajustado tiene que ser 1,0: " + JSON.stringify(fTot));
   ok(popAj && /Ajust\. = ritmo × \(1 \+ 0,1 × \(grado − 5\)\)/.test(popAj.nota) && /0,5 m³\/h vale 0,55-0,65/.test(popAj.nota),
      "v26.54: falta la nota de cómo se calcula el ajustado (y el ejemplo de 0,5 m³/h)");
 
