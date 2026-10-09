@@ -193,7 +193,9 @@ Tocá **📦** y **Enviar**. Hay **3 opciones**:
 - **📥 Recibir insumos**: entra stock de insumos. Primero **«¿Qué recibís?»**: elegís la categoría
   (plásticos, flejes, cajas, partes…; los importados no se reciben acá). Después **de dónde recibís** y
   la **documentación** (Remito, Factura o los dos) y tocás **Enviar**. Adentro cargás las cantidades
-  (**«+ Agregar insumo nuevo»** si no está) y **«✓ Registrar entrada»**.
+  (**«+ Agregar insumo nuevo»** si no está) y **«✓ Registrar entrada»**. En **plásticos** aparecen sólo
+  las **9 bolsas** que se usan (ABS, AI, EBA, NY c/Carga 25%, NY Recup, NY Virgen, PE Polie, PP 2630,
+  PS PE), al recibir y al entregar; una bolsa nueva no se agrega desde acá: se avisa al supervisor.
 - **📤 Entregar insumos**: sale stock de insumos. Primero **«¿Qué envío es?»**: **🏭 Envío a
   inyectores** (elegís el inyector y aparecen sólo las bolsas plásticas) o **📦 Envío a otros**;
   después el destino, **Enviar**, las cantidades y

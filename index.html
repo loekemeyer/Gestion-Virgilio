@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.24"></script>
+<script type="module" src="recepcion.js?v=29.25"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10701,7 +10701,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.24";
+const APP_VERSION = "v29.25";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27676,6 +27676,9 @@ async function showInsumoModal(mode, legajo, _resume) {
     const riCat = (mode === "RI") ? (window._insRiCat || "") : ""; window._insRiCat = null;
     let lista = items;
     if (mode === "RI") lista = lista.filter(function (x) { return INS_RI_SIN.indexOf(insCatOf(x)) < 0; });
+    // v29.25 (09/10): de PLÁSTICOS se tocan sólo las 9 bolsas reales (con lugar en el Mapa), en RI y EI.
+    // Ni los TMP- ni los códigos viejos (1262500, 1266500, 1445): no se reciben ni se entregan.
+    lista = lista.filter(function (x) { return insCatOf(x) !== "plastico" || _insEsBolsaIny(x); });
     // v29.22 (Luis): envío a un INYECTOR = sólo las bolsas plásticas reales (las que tienen
     // ubicación en el Mapa; ni los TMP- ni los códigos viejos), nada más.
     const gp2Ei = (mode === "EI" && window._insGp2 && window._insGp2.modo === "EI");
@@ -27689,13 +27692,13 @@ async function showInsumoModal(mode, legajo, _resume) {
       _ins.gp2 = gp2;
       if (gp2.modo === "RI" && gp2.oc) {
         (gp2.oc.items || []).forEach(function (oi) {
-          const it = items.filter(function (x) { return _insK(x.cod) === _insK(oi.cod_virgilio); })[0];
+          const it = lista.filter(function (x) { return _insK(x.cod) === _insK(oi.cod_virgilio); })[0];
           if (!it) return;
           const b = Math.round(Number(oi.pendiente_bolsas) || 0);
           if (b > 0) { it.qty = b; it.unidad = "Bolsas"; }
         });
       }
-      if (items.some(function (x) { return insCatOf(x) === "plastico"; })) _ins.cat = "plastico";
+      if (lista.some(function (x) { return insCatOf(x) === "plastico"; })) _ins.cat = "plastico";
     }
     insRender();
   } catch (e) { const b = document.getElementById("insBody"); if (b) b.innerHTML = '<div class="ins-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -27902,7 +27905,7 @@ function insRender() {
           (it.qty > 0 ? '<span class="ins-itq' + (it.unidad ? "" : " falta") + '">' + it.qty + " " + escapeHtml(it.unidad || "¿unidad?") + '</span>' : "") +
           '</button>';
       }).join("") +
-        (cat && isIn ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
+        (cat && isIn && cat !== "plastico" ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
         '</div>';
     }
   }
@@ -27960,7 +27963,7 @@ function _insNuevoHtml(isIn) {
   h += '<div class="ins-nvl">Detalle <span class="ins-cbadge">— qué es, en tus palabras</span></div>' +
     '<textarea id="insNvDet" class="ins-nvt" rows="3" placeholder="Ej: alambre finito que trajo Pérez, bolsa gris sin etiqueta…" oninput="insNuevoSet(\'det\',this.value)">' + escapeHtml(n.det) + '</textarea>';
   h += '<div class="ins-nvl">Elegí la categoría</div><div class="ins-cats">' +
-    INS_CATS.filter(function (c) { return INS_RI_SIN.indexOf(c.k) < 0; }).map(function (c) {
+    INS_CATS.filter(function (c) { return INS_RI_SIN.indexOf(c.k) < 0 && c.k !== "plastico"; }).map(function (c) {   // v29.25: una bolsa nueva no la da de alta el operario
       return '<button class="ins-cchip' + (n.cat === c.k ? " on" : "") + '" onclick="insNuevoPick(\'cat\',\'' + c.k + '\')">' + c.lbl + '</button>';
     }).join("") +
     '<button class="ins-cchip' + (n.cat === "" ? " on" : "") + '" onclick="insNuevoPick(\'cat\',\'\')">❓ Sin categoría clara</button>' +
@@ -62029,7 +62032,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.24"></script>
+<script src="importacion.js?v=29.25"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64959,12 +64962,12 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.24"></script>
-<script src="hotsale.js?v=29.24"></script>
-<script src="estadisticas.js?v=29.24"></script>
-<script src="ads.js?v=29.24"></script>
+<script src="cobranzas.js?v=29.25"></script>
+<script src="hotsale.js?v=29.25"></script>
+<script src="estadisticas.js?v=29.25"></script>
+<script src="ads.js?v=29.25"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.24"></script>
+<script src="ayuda.js?v=29.25"></script>
 
 </body>
 </html>

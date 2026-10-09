@@ -3,7 +3,9 @@
    (b) elegir una que no es plásticos no busca las OC de bolsas de GP2;
    (c) el modal de recepción abre en esa categoría y no trae importados;
    (d) «Envío a inyectores» muestra SÓLO las bolsas plásticas reales (plástico, con ubicación,
-       sin TMP-), sin «‹ Atrás» ni buscador. Sale 1 si falla. */
+       sin TMP-), sin «‹ Atrás» ni buscador;
+   (e) v29.25: en RECIBIR y en «Envío a otros», de plásticos sólo las bolsas reales (sin TMP- ni
+       códigos viejos), sin «+ Agregar insumo» en plásticos ni la categoría en el alta. Sale 1 si falla. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -47,9 +49,23 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.d = JSON.stringify(cods) === JSON.stringify(["ABS", "PP 2630"]) && _ins.soloBolsas === true && _ins.cat === "plastico" &&
       !/insBack\(\)/.test(html) && !/class="ins-search"/.test(html) && /Bolsas plásticas/.test(html);
     out.cods = cods;
+    // (e) v29.25
+    window._insRiCat = "plastico"; window._insGp2 = null;
+    await showInsumoModal("RI", "104");
+    const plaRI = _ins.items.filter(function (x) { return x.cat === "plastico"; }).map(function (x) { return x.cod; }).sort();
+    const htmlRI = document.getElementById("insBody").innerHTML;
+    insNuevoOpen("");
+    const htmlAlta = document.getElementById("insBody").innerHTML;
+    window._insGp2 = null;
+    await showInsumoModal("EI", "104");
+    const plaEI = _ins.items.filter(function (x) { return x.cat === "plastico"; }).map(function (x) { return x.cod; }).sort();
+    const otrasEI = _ins.items.some(function (x) { return x.cod === "F10"; });
+    out.e = JSON.stringify(plaRI) === JSON.stringify(["ABS", "PP 2630"]) && JSON.stringify(plaEI) === JSON.stringify(["ABS", "PP 2630"]) &&
+      otrasEI && !/ins-itbtn add/.test(htmlRI) && !/insNuevoPick\('cat','plastico'\)/.test(htmlAlta) && /insNuevoPick\('cat','fleje'\)/.test(htmlAlta);
+    out.plaRI = plaRI; out.plaEI = plaEI;
     return out;
   });
-  const pass = r.a && r.b && r.c && r.d && errs.length === 0;
+  const pass = r.a && r.b && r.c && r.d && r.e && errs.length === 0;
   console.log("ins-ri-cat-bolsas:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();
