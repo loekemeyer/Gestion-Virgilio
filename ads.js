@@ -398,8 +398,8 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
            + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
            // v28.01 (Luis): columna en NEGRITA (el Saldo del Excel de stock), centrada como los datos
            + '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"' + W + '/></xf>'
-           // v28.92 (Luis): fila-título de grupo (Excel de talleristas): negrita, a la izquierda, fondo gris
-           + '<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf></cellXfs>')
+           // v28.92 (Luis): fila-título de grupo (Excel de talleristas): negrita, fondo gris · v28.94: centrada
+           + '<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs>')
          .replace(/<cellXfs count="6"/, '<cellXfs count="7"')
          .replace(/<fills[\s\S]*?<\/fills>/, '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill></fills>');
   // v27.91 (Luis): el rótulo lleva el borde de abajo grueso de su Excel
