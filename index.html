@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.04"></script>
+<script type="module" src="recepcion.js?v=29.05"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10697,7 +10697,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.04";
+const APP_VERSION = "v29.05";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -26240,9 +26240,9 @@ function stkBodyAjustes() {
   h += stkBodyConteosRealizados();  // v11.0: Conteos Realizados
   h += '<div class="stk-aj-dep">Depósito: <select id="stkAjDep" onchange="stkIniHintUpdate()"><option value="terminado">Artículo Terminado (góndola)</option><option value="excedente">Excedente</option><option value="racks">Racks</option><option value="racks_ch">Racks CH</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option><option value="para_envasar">Para envasar</option></select></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
-  h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
+  h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="+/- cajas"><input id="stkAjPos" class="stk-aj-inp stk-aj-pos" style="flex:0 0 auto;width:120px;display:none" placeholder="Posición rack"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
   h += '<div class="stk-aj-form" style="margin-top:4px"><input id="stkAjComent" class="stk-aj-inp" style="flex:1;min-width:200px" placeholder="Comentario (opcional — queda en el historial)"></div>';
-  h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
+  h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="Fijar en…"><input id="stkAjPos2" class="stk-aj-inp stk-aj-pos" style="flex:0 0 auto;width:120px;display:none" placeholder="Posición rack"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">➕ Stock inicial</div><div class="stk-aj-hint" id="stkIniHint">Una linea por articulo: <b>CODIGO CANTIDAD</b> (en el deposito de arriba). El stock inicial <b>siempre cuenta</b> como base.</div><textarea id="stkIniTxt" class="stk-ini-txt" rows="6" placeholder="544 30&#10;546 12"></textarea><div class="stk-ini-btns"><button class="stk-btn ok" onclick="stockGuardarInicial()">Guardar inicial</button><button class="stk-btn danger" onclick="stockMarcarInicio()">🔄 Marcar inicio (resetear)</button></div><div class="stk-ini-warn">⚠ Pasos: 1) carga el inicial de cada deposito (cambias el deposito de arriba y repetis); 2) tocas <b>Marcar inicio</b> una sola vez. Desde ahi los movimientos REALES anteriores (de prueba) dejan de sumar — quedan guardados, no se borran.</div></div>';
   h += stkBodyHistAjustes();
   return h;
@@ -26321,6 +26321,12 @@ function stkIniHintUpdate() {
   const dep = _stkDep();
   const hint = document.getElementById("stkIniHint");
   const ta = document.getElementById("stkIniTxt");
+  document.querySelectorAll(".stk-aj-pos").forEach(function (el) { el.style.display = _stkEsRacks(dep) ? "" : "none"; });
+  if (_stkEsRacks(dep)) {
+    if (hint) hint.innerHTML = 'Racks: una línea por artículo con su posición: <b>CÓDIGO CANTIDAD POSICIÓN</b> (ej. <code>606E 10 X22</code>). Sin posición no se graba.';
+    if (ta) ta.placeholder = "606E 10 X22\n589E 168 Z11";
+    return;
+  }
   if (dep === "insumos") {
     if (hint) hint.innerHTML = 'Una línea por insumo: <b>CÓDIGO ; DESCRIPCIÓN ; CANTIDAD ; MEDIDA ; SECTOR</b> — separá con <code>;</code> o pegá 5 columnas de Excel. <b>Código</b> y <b>cantidad</b> son obligatorios; descripción / medida / sector, opcionales. El stock inicial <b>siempre cuenta</b> como base.';
     if (ta) ta.placeholder = "544 ; Bolsa 50x70 ; 30 ; unidades ; V05\n546 ; Etiqueta rollo ; 12 ; rollos ; V06";
@@ -26375,6 +26381,51 @@ async function _stkCodExisteConfirmar(cod, txtAccion) {
   if (existe === false) return confirm("No existe el c\u00f3digo " + cod + ".\n\n\u00bfLo creo y le " + txtAccion + "?");
   return confirm("No pude verificar si el c\u00f3digo " + cod + " existe.\n\n\u00bfGrabo igual y le " + txtAccion + "?");
 }
+/* v29.05 (Luis, 09/10): en Racks el ajuste lleva POSICIÓN. Desde la v22.77 el stock de racks vive por posición
+   (Movimientos_Stock.ubicacion) y Ajustar / Fijar / Stock inicial grababan sin ella: el −10 del 606 (Marianela,
+   09/10, corrigiendo un ingreso a X22 que era 606E) quedó «bajado sin decir de qué posición» y X22 siguió con +10.
+   Pasó 6 veces desde el 25/09. Ahora: posición obligatoria, validada contra el Mapa (gv_rack_sector), y al restar
+   avisa si la posición no tiene esas cajas. Lo frena también el trigger gv_racks_ajuste_sin_posicion. */
+function _stkEsRacks(dep) { return dep === "racks" || dep === "racks_ch"; }
+async function _stkRackSectorDe(txt) {   // sector del Mapa · null = no es una posición · throw = no se pudo verificar
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_rack_sector", { method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ p: String(txt || "") }) });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const s = await r.json();
+  return s ? String(s) : null;
+}
+async function _stkRackPosiciones(cod) {
+  const m = String(cod).match(/^(.*\S)\s+(LK|CH)$/i), base = m ? m[1] : String(cod), emp = m ? m[2].toUpperCase() : null;
+  const r = await fetch(SUPABASE_URL + "/rest/v1/Racks_Planimetria?select=sector,innercajas,emp,fuente&estado=eq.ocupado&cod_art=eq." + encodeURIComponent(base),
+    { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return (await r.json()).filter(function (x) { return x.fuente !== "a_contar" && (!emp || String(x.emp || "").toUpperCase() === emp); })
+    .map(function (x) { return { sector: String(x.sector || ""), cajas: Number(x.innercajas) || 0 }; });
+}
+/* Devuelve { ubic, saldo } o null (canceló o no se pudo verificar: no se graba nada). delta < 0 → avisa si no alcanza. */
+async function _stkRackPosElegir(cod, inputId, delta) {
+  let pos;
+  try { pos = await _stkRackPosiciones(cod); }
+  catch (e) { alert("No pude leer las posiciones de racks de " + cod + ": no se grabó nada. Probá de nuevo."); return null; }
+  const lista = pos.length ? pos.map(function (p) { return p.sector + " (" + p.cajas + " caj)"; }).join(" · ") : "ninguna";
+  const el = document.getElementById(inputId);
+  let txt = ((el && el.value) || "").trim();
+  if (!txt) {
+    txt = (prompt("Racks: ¿en qué posición?\n\nPosiciones con " + cod + " en el sistema: " + lista + "\n\nEscribí la posición (ej. X22):") || "").trim();
+    if (!txt) return null;
+  }
+  let sector;
+  try { sector = await _stkRackSectorDe(txt); }
+  catch (e) { alert("No pude verificar la posición «" + txt + "»: no se grabó nada. Probá de nuevo."); return null; }
+  if (!sector) { alert("«" + txt + "» no es una posición de rack del Mapa. No se grabó nada.\n\nPosiciones con " + cod + ": " + lista); return null; }
+  const hit = pos.find(function (p) { return p.sector === sector; });
+  const saldo = hit ? hit.cajas : 0;
+  if (delta != null && delta < 0 && -delta > saldo + 1e-9) {
+    if (!confirm("En " + sector + " el sistema tiene " + saldo + " caja(s) de " + cod + " y estás restando " + (-delta) + ".\nLa posición quedaría en negativo.\n\nPosiciones con " + cod + ": " + lista + "\n\n¿Grabo igual?")) return null;
+  }
+  return { ubic: sector, saldo: saldo };
+}
 async function stockAjustar() {
   var codRaw = ((document.getElementById("stkAjCod") || {}).value || "").trim().toUpperCase();
   const cant = parseInt(((document.getElementById("stkAjCant") || {}).value || ""), 10);
@@ -26391,6 +26442,11 @@ async function stockAjustar() {
      vista_saldos_stock elige la descripcion MAS CORTA del codigo, asi que un comentario
      corto le ganaba al nombre real y quedaba como nombre del articulo. Problema 422. */
   var row = { cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: dep, delta: cant, tipo: "ajuste", ref: ref, legajo: "0" };
+  if (_stkEsRacks(dep)) {   // v29.05 — en racks, posición obligatoria
+    const rp = await _stkRackPosElegir(cod, "stkAjPos", cant);
+    if (!rp) return;
+    row.ubicacion = rp.ubic;
+  }
   if (dep === "insumos") {
     var ajUni = (sd && sd._uni) || null;
     /* v11.77: si la unidad dominante no es la base, convertir delta a base
@@ -26420,12 +26476,17 @@ async function stockFijar() {
   // grababa nada (566E). Sin lectura no se fija nada: "no pude leer" no es "hay 0".
   let actual = (sd && sd[dep]) || 0;
   if (dep === "insumos" && !(_stk.movs && _stk.movs.length)) { alert("Todavía se están cargando los movimientos de insumos. Esperá unos segundos y probá de nuevo."); return; }
-  if (dep !== "insumos") {
+  let rackUbic = null;
+  if (_stkEsRacks(dep)) {   // v29.05 — en racks se fija la POSICIÓN: el saldo actual es el de esa posición
+    const rp = await _stkRackPosElegir(cod, "stkAjPos2", null);
+    if (!rp) return;
+    rackUbic = rp.ubic; actual = rp.saldo;
+  } else if (dep !== "insumos") {
     try { const _v = await gvSaldosDeClaves([cod]); actual = 0; (_v || []).forEach(function (r) { actual += Number(r[dep]) || 0; }); }
     catch (_e) { alert("No pude leer el saldo actual de " + cod + ": no se fijó nada. Probá de nuevo."); return; }
   }
   const delta = fijar - actual;
-  if (delta === 0) { alert("El stock de " + cod + " (" + dep + ") ya es " + fijar + "."); return; }
+  if (delta === 0) { alert("El stock de " + cod + " (" + dep + (rackUbic ? " " + rackUbic : "") + ") ya es " + fijar + "."); return; }
   if (!(await _stkCodExisteConfirmar(cod, "fijo el stock en " + fijar))) return;
   var ref = "fijar en " + fijar + (comentario ? " | " + comentario : "");
   /* v11.76: insumos — ceroizar cada unidad por separado (misma lógica que
@@ -26451,7 +26512,9 @@ async function stockFijar() {
     await stkInsertMov(rows, "Stock de " + cod + " (insumos) fijado en " + fijar);
     return;
   }
-  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: dep, delta: delta, tipo: "ajuste", ref: ref, legajo: "0" }], "Stock de " + cod + " (" + dep + ") fijado en " + fijar + " (ajuste " + (delta > 0 ? "+" : "") + delta + ")");
+  const _fRow = { cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: dep, delta: delta, tipo: "ajuste", ref: ref, legajo: "0" };
+  if (rackUbic) _fRow.ubicacion = rackUbic;
+  await stkInsertMov([_fRow], "Stock de " + cod + " (" + dep + (rackUbic ? " " + rackUbic : "") + ") fijado en " + fijar + " (ajuste " + (delta > 0 ? "+" : "") + delta + ")");
 }
 /* v11.76: calcula saldos por-unidad de un cod en depósito insumos, respetando cutoff */
 function _stkFijarUniSaldos(cod) {
@@ -26479,9 +26542,23 @@ async function stockGuardarInicial() {
       rows.push({ cod_art: cod, descripcion: p[1] || null, deposito: dep, delta: cant, tipo: "inicial", unidad: p[3] || null, ubicacion: p[4] || null, ref: "carga inicial", legajo: "0" });
       return;
     }
-    const m = line.match(/^(\S+)\s+(-?\d+(?:\.\d+)?)/);
-    if (m) rows.push({ cod_art: m[1].toUpperCase(), deposito: dep, delta: Number(m[2]), tipo: "inicial", ref: "carga inicial", legajo: "0" });
+    const m = line.match(/^(\S+)\s+(-?\d+(?:\.\d+)?)(?:\s+(.+))?$/);
+    if (m) rows.push({ cod_art: m[1].toUpperCase(), deposito: dep, delta: Number(m[2]), tipo: "inicial", ref: "carga inicial", legajo: "0", _pos: (m[3] || "").trim() });
   });
+  // v29.05 — en racks cada línea lleva su posición, validada contra el Mapa
+  if (_stkEsRacks(dep)) {
+    const sinPos = rows.filter(function (r) { return !r._pos; }).map(function (r) { return r.cod_art; });
+    if (sinPos.length) { alert("En Racks cada línea lleva la posición: CÓDIGO CANTIDAD POSICIÓN (ej. 606E 10 X22).\n\nSin posición: " + sinPos.join(", ") + "\n\nNo se grabó nada."); return; }
+    const malas = [];
+    for (const r of rows) {
+      let s;
+      try { s = await _stkRackSectorDe(r._pos); }
+      catch (e) { alert("No pude verificar las posiciones: no se grabó nada. Probá de nuevo."); return; }
+      if (!s) malas.push(r.cod_art + " → «" + r._pos + "»"); else r.ubicacion = s;
+    }
+    if (malas.length) { alert("Estas posiciones no son racks del Mapa:\n  " + malas.join("\n  ") + "\n\nNo se grabó nada."); return; }
+  }
+  rows.forEach(function (r) { delete r._pos; });
   if (!rows.length) { alert("No encontré líneas válidas. " + (esInsumo ? "Insumos: CÓDIGO ; DESCRIPCIÓN ; CANTIDAD ; MEDIDA ; SECTOR (o CÓDIGO CANTIDAD)." : "Formato: CÓDIGO CANTIDAD (una por línea).")); return; }
   // v6.43 — Capa 2/3: canonicalizar el código (mismo criterio que el trigger de la base) y
   // AVISAR antes de guardar: qué códigos se corrigen (0027→027), cuáles se repiten (se suman),
@@ -61881,7 +61958,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.04"></script>
+<script src="importacion.js?v=29.05"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64810,10 +64887,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.04"></script>
-<script src="hotsale.js?v=29.04"></script>
-<script src="estadisticas.js?v=29.04"></script>
-<script src="ads.js?v=29.04"></script>
+<script src="cobranzas.js?v=29.05"></script>
+<script src="hotsale.js?v=29.05"></script>
+<script src="estadisticas.js?v=29.05"></script>
+<script src="ads.js?v=29.05"></script>
 
 </body>
 </html>
