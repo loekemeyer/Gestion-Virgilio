@@ -92,18 +92,18 @@ catch (_e) {
 
     // 1) PANTALLA 1: una tarjeta por categoría, ningún insumo listado
     out.cats = catTxt();
-    out.nCats = nCats();                                                    // 4 (plásticos, flejes, importados, ❓ sin categoría)
+    out.nCats = nCats();                                                    // 3 (flejes, importados, ❓): v29.28 «Envío a otros» no ofrece bolsas
     out.sinItemsEnP1 = nItems() === 0;
     out.hayDep = out.cats.some(function (t) { return /Sin categoría/.test(t); });
     out.noHayDepurar = !/A depurar/.test(document.getElementById("insBody").innerHTML);
-    out.enUso = /5 insumos en uso/.test(document.getElementById("insBody").textContent) &&
+    out.enUso = /4 insumos en uso/.test(document.getElementById("insBody").textContent) &&
       /1 sin clasificar/.test(document.getElementById("insBody").textContent);
     out.finDisabled = document.querySelector("#insBody .ins-fin").disabled === true;
 
     // 2) Unidad por defecto POR CATEGORÍA; si ya hay saldo en UNA unidad, gana esa (7382)
     const byCod = {}; _ins.items.forEach(function (it) { byCod[it.cod] = it; });
     out.uni2745 = byCod["2745"].unidad;      // "Kg"  (fleje, sin saldo)
-    out.uniPP = byCod["PP"].unidad;          // "Bolsas" (saldo en 1 sola unidad)
+    out.ppFueraEnEI = !byCod["PP"];          // v29.28 (D9): las bolsas sólo salen por «Envío a inyectores»
     // "Importados" NO fija unidad: queda vacía a propósito, la elige el operario
     out.uni2955 = byCod["2955"].unidad;      // "" (importados, sin default)
 
@@ -185,6 +185,8 @@ catch (_e) {
 
     // 10) ALTA DE INSUMO NUEVO — en RECEPCIÓN sí está el "+", en la grilla de categorías
     await showInsumoModal("RI", "104");
+    const ppRI = _ins.items.filter(function (it) { return it.cod === "PP"; })[0];
+    out.uniPP = ppRI ? ppRI.unidad : null;   // "Bolsas" (saldo en 1 sola unidad)
     out.riTieneAlta = !!document.querySelector("#insBody .ins-catbtn.add");
     document.querySelector("#insBody .ins-catbtn.add").click();
     out.altaAbre = !!document.getElementById("insNvDet") && !!document.getElementById("insNvQty");
@@ -251,7 +253,7 @@ catch (_e) {
   });
 
   const pass =
-    r.nCats === 4 && r.sinItemsEnP1 === true && r.hayDep === true && r.enUso === true && r.finDisabled === true &&
+    r.nCats === 3 && r.ppFueraEnEI === true && r.sinItemsEnP1 === true && r.hayDep === true && r.enUso === true && r.finDisabled === true &&
     r.uni2745 === "Kg" && r.uniPP === "Bolsas" && r.uni2955 === "" &&
     r.nFleje === 3 && r.ordenFleje === "5,22,2745" && r.hayAtras === true &&
     /Fleje/.test(r.tituloFleje || "") && r.ubicEnBoton === true && r.sinAgregarEnEI === true && r.sinMasEnEI === true &&

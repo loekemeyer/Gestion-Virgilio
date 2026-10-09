@@ -4,6 +4,7 @@
    (c) el modal de recepción abre en esa categoría y no trae importados;
    (d) «Envío a inyectores» muestra SÓLO las bolsas plásticas reales (plástico, con ubicación,
        sin TMP-), sin «‹ Atrás» ni buscador;
+   (f) v29.28 (D9): «Envío a otros» sin bolsas; «Envío a inyectores» sólo bolsas;
    (e) v29.25: en RECIBIR y en «Envío a otros», de plásticos sólo las bolsas reales (sin TMP- ni
        códigos viejos), sin «+ Agregar insumo» en plásticos ni la categoría en el alta. Sale 1 si falla. */
 const path = require("path");
@@ -61,12 +62,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await showInsumoModal("EI", "104");
     const plaEI = _ins.items.filter(function (x) { return x.cat === "plastico"; }).map(function (x) { return x.cod; }).sort();
     const otrasEI = _ins.items.some(function (x) { return x.cod === "F10"; });
-    out.e = JSON.stringify(plaRI) === JSON.stringify(["ABS", "PP 2630"]) && JSON.stringify(plaEI) === JSON.stringify(["ABS", "PP 2630"]) &&
+    // v29.28 (D9): «Envío a otros» NO ofrece bolsas plásticas
+    out.e = JSON.stringify(plaRI) === JSON.stringify(["ABS", "PP 2630"]) && plaEI.length === 0 &&
       otrasEI && !/ins-itbtn add/.test(htmlRI) && !/insNuevoPick\('cat','plastico'\)/.test(htmlAlta) && /insNuevoPick\('cat','fleje'\)/.test(htmlAlta);
     out.plaRI = plaRI; out.plaEI = plaEI;
+    // (f) v29.28 (D9): eligió «Envío a inyectores» (aunque GP2 no devuelva la lista) → sólo bolsas
+    insEnvioTipoGo("iny"); insUbicCancel(); window._insGp2 = null;
+    await showInsumoModal("EI", "104");
+    out.f = _ins.soloBolsas === true && _ins.items.length > 0 && _ins.items.every(function (x) { return x.cat === "plastico"; });
     return out;
   });
-  const pass = r.a && r.b && r.c && r.d && r.e && errs.length === 0;
+  const pass = r.a && r.b && r.c && r.d && r.e && r.f && errs.length === 0;
   console.log("ins-ri-cat-bolsas:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();

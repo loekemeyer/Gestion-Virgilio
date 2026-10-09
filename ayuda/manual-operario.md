@@ -197,7 +197,8 @@ Tocá **📦** y **Enviar**. Hay **3 opciones**:
   las **9 bolsas** que se usan (ABS, AI, EBA, NY c/Carga 25%, NY Recup, NY Virgen, PE Polie, PP 2630,
   PS PE), al recibir y al entregar; una bolsa nueva no se agrega desde acá: se avisa al supervisor.
 - **📤 Entregar insumos**: sale stock de insumos. Primero **«¿Qué envío es?»**: **🏭 Envío a
-  inyectores** (elegís el inyector y aparecen sólo las bolsas plásticas) o **📦 Envío a otros**;
+  inyectores** (elegís el inyector y aparecen sólo las bolsas plásticas; es la única forma de sacar
+  bolsas) o **📦 Envío a otros** (todo lo demás, sin bolsas plásticas);
   después el destino, **Enviar**, las cantidades y
   **«✓ Registrar salida»**. Un insumo que viene en caja master (MC) **sale siempre en MC
   enteras**.
