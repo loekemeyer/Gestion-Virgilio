@@ -32,7 +32,7 @@
    atado a APP_VERSION. Candado: tests/ads-alertas.cjs.
    ============================================================================ */
 
-var _ads = { tab: "tall", cfg: null, tall: null, tallErr: "", stock: null, stockErr: "",
+var _ads = { tab: "stock", cfg: null, tall: null, tallErr: "", stock: null, stockErr: "",
              n: 4, inc: true, umbral: 0.5, abiertos: {}, horiz: 10, q: "", cargando: 0 };
 
 function _adsRpc(name, args) {
@@ -126,6 +126,7 @@ function openAds() {
   var ov = document.getElementById("adsOv");
   if (!ov) { ov = document.createElement("div"); ov.id = "adsOv"; document.body.appendChild(ov); }
   ov.style.display = "flex";
+  _ads.tab = "stock";   // v29.11: lo primero que se ve es POR ARTÍCULO (Stock); después, por tallerista
   _adsRpc("gv_ads_config").then(function (r) {
     var c = r && r.data;
     if (c) { _ads.cfg = c; _ads.n = 4;   // v27.75 (Luis): el rango abre siempre en 4
@@ -546,8 +547,8 @@ function _adsAltos(aoa, anchos, cols, minRen, porCar) {
 function _adsRender() {
   var ov = document.getElementById("adsOv"); if (!ov || ov.style.display === "none") return;
   var h = '<div class="ads-top"><span class="tit">ADS · Alertas Damián Stock</span>' +
-    '<button class="tab' + (_ads.tab === "tall" ? " on" : "") + '" onclick="adsTab(\'tall\')">Entregas talleristas</button>' +
     '<button class="tab' + (_ads.tab === "stock" ? " on" : "") + '" onclick="adsTab(\'stock\')">Stock</button>' +
+    '<button class="tab' + (_ads.tab === "tall" ? " on" : "") + '" onclick="adsTab(\'tall\')">Entregas talleristas</button>' +
     '<span class="sp"></span><button onclick="adsClose()">Cerrar</button></div>';
   h += _ads.tab === "stock" ? _adsHtmlStock() : _adsHtmlTall();
   ov.innerHTML = h;
