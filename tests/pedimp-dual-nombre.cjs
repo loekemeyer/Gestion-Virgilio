@@ -33,4 +33,6 @@ if (an && npe) {
 }
 // ninguna descripción de importados vuelve al artNombre pelado con la fila al lado
 ok(!/artNombre\((it|l\.it)\.cod, (it|l\.it)\.desc\)/.test(imp), "la tabla de pedidos no usa artNombre pelado");
+// v29.39 — la E.M. de la fila 809E CH abría el pop-up del 809E LK: la celda tiene que mandar la CLAVE de la línea
+ok(/pedImpProyAbrir\(\\'' \+ _keyEncV \+/.test(imp), "la celda E.M. abre la proyección con la clave de la línea (809E|CH)");
 process.exit(fail ? 1 : 0);
