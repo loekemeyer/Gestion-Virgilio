@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.40"></script>
+<script type="module" src="recepcion.js?v=29.41"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10701,7 +10701,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.40";
+const APP_VERSION = "v29.41";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -18478,6 +18478,26 @@ async function ocgFetchImportados() {
       if (Number(r.pedido_manual) > 0) { primerPed[c] = Number(r.pedido_manual); primerPed[pl] = Number(r.pedido_manual); }
     });
   } catch (_e) {}
+  // v29.41 (10/10: "solo en el módulo de importaciones ya mirá todo como 820, no como 809") — el corta pizza de LK
+  // pasa a 820E y el 809E se da de baja cuando entren sus pedidos. GV_Importados_EnCurso_Suma dice qué fila VIEJA
+  // (destino_cod + destino_marca: 809E LK) se ve DENTRO de la NUEVA (origen_cod: 820E): stock, Est. Madre, pedidos y en
+  // camino suman a la nueva y la vieja no se dibuja. El 809E de Chef no se toca. Sin lectura, como antes.
+  try {
+    const es = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Importados_EnCurso_Suma", "select=destino_cod,destino_marca,origen_cod");
+    (es || []).forEach(function (r) {
+      const vc = String(r.destino_cod || "").toUpperCase().trim(), nc = String(r.origen_cod || "").toUpperCase().trim();
+      const vk = vc + (_impDosPlantas[vc] ? "|" + _impPlanta(r.destino_marca) : "");
+      const nk = Object.keys(by).find(function (k) { return k === nc || k.indexOf(nc + "|") === 0; });
+      const v = by[vk], n = nk ? by[nk] : null;
+      if (!v || !n || v === n) return;
+      ["proyUni", "stockUni", "stockIns", "stockGp2", "stockConv", "uniPed", "enCurso"].forEach(function (f) { n[f] = (Number(n[f]) || 0) + (Number(v[f]) || 0); });
+      if (!n.fob && v.fob) n.fob = v.fob;
+      if (v.uxc > n.uxc) n.uxc = v.uxc;
+      if (v.mesesArt > n.mesesArt) n.mesesArt = v.mesesArt;
+      n.verComo = (n.verComo ? n.verComo + ", " : "") + v.cod + (v.planta ? " " + v.planta : "");
+      delete by[vk];
+    });
+  } catch (_e) {}
   // v23.30 — si existe la línea de Loeke con L (437EL), la de Chef del mismo número (437E) lleva la chapa CH
   Object.keys(by).forEach(function (k) {
     const m = /^(.*[0-9E])L$/.exec(k);
@@ -18519,7 +18539,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), stockGp2U: Math.round(o.stockGp2), stockConvU: Math.round(o.stockConv || 0), piezasShare: o.piezasShare, piezasReparto: o.piezasReparto, piezasGrupo: o.piezasGrupo, uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, uniInner: (vm && vm.ui > 0) ? vm.ui : 0, innerSuelto: !!(vm && vm.uiSuelto), cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, esInsumo: esInsumo, mesesProv: mesesProv, stockPropioModulo: Math.round(o.stockUni - o.stockIns - o.stockGp2 - (o.stockConv || 0)), parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), moqArt: (moqArt[o.key] || moqArt[kk] || 0), primerPedidoU: (primerPed[o.key] || primerPed[kk] || 0), det: o.det || [] });
+    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), stockGp2U: Math.round(o.stockGp2), stockConvU: Math.round(o.stockConv || 0), piezasShare: o.piezasShare, piezasReparto: o.piezasReparto, piezasGrupo: o.piezasGrupo, uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), verComo: o.verComo || "", aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, uniInner: (vm && vm.ui > 0) ? vm.ui : 0, innerSuelto: !!(vm && vm.uiSuelto), cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, esInsumo: esInsumo, mesesProv: mesesProv, stockPropioModulo: Math.round(o.stockUni - o.stockIns - o.stockGp2 - (o.stockConv || 0)), parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), moqArt: (moqArt[o.key] || moqArt[kk] || 0), primerPedidoU: (primerPed[o.key] || primerPed[kk] || 0), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -62156,7 +62176,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.40"></script>
+<script src="importacion.js?v=29.41"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65086,12 +65106,12 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.40"></script>
-<script src="hotsale.js?v=29.40"></script>
-<script src="estadisticas.js?v=29.40"></script>
-<script src="ads.js?v=29.40"></script>
+<script src="cobranzas.js?v=29.41"></script>
+<script src="hotsale.js?v=29.41"></script>
+<script src="estadisticas.js?v=29.41"></script>
+<script src="ads.js?v=29.41"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.40"></script>
+<script src="ayuda.js?v=29.41"></script>
 
 </body>
 </html>

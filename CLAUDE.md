@@ -8199,6 +8199,12 @@ filtro de «legajo de prueba» en un monitor lleva también `/^sup:/`. `tests/mo
 - **Las 336 cajas de AD05 (ingreso 23/07, 28 MC) son de CHEF** (confirmado 10/10): ajuste racks LK −336 / CH +336 en AD05
   (`client_id corr_809e_ad05_*`) y `GV_Lugar` AD05 → CH (backup `zz_backups."GV_Backup_Lugar_AD05_20261010"`). Retira lo del
   conteo del 17/09 («son de Loekemeyer») y el «AD05 pasó a LK» de la v19.33. Queda 809E LK = 5 cajas en góndola.
+- **SÓLO en Importaciones el 809E LK se ve como 820E** (v29.41, *"ya mirá todo como 820, no como 809"*): la fila 809E LK
+  se pliega dentro de la 820E (stock, Est. Madre, pedidos y en camino; chip «incluye 809E LK»; la proyección abre la del
+  809E LK). El vínculo es la tabla `GV_Importados_EnCurso_Suma` (destino_cod/marca = el VIEJO, origen_cod = el NUEVO; el
+  nombre quedó del primer intento: el ALTER de renombre se cuelga en el MCP). El 809E de Chef no se toca. **Cuando entren los
+  pedidos del 820E se da de baja el 809E LK** (GV_Codigo_Baja no sirve: es por código y el 809E de Chef sigue).
+  `tests/pedimp-encurso-suma.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-07, v27.74): 865ED NO EXISTE MÁS — es el 865E de 12 u
 

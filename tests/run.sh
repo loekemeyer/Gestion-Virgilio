@@ -745,6 +745,8 @@ echo "== pedimp-prioridad-damian (v24.42: orden por meses de stock · alerta < 4
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-prioridad-damian.cjs
 echo "== pedimp-dual-nombre (v29.36: el 809E de Chef no sale con el nombre del de Loeke) =="
 node tests/pedimp-dual-nombre.cjs
+echo "== pedimp-encurso-suma (v29.41: en Importaciones el 809E LK se ve dentro del 820E) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-encurso-suma.cjs
 echo "== imp-discontinuos (v24.49: solapa 🚫 Discontinuos de Importación) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-discontinuos.cjs
 echo "== rr-super-cajas (v24.51: súper sin líos → cajas) =="
