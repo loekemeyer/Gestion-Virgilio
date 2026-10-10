@@ -18,6 +18,19 @@ if (npe && fn) {
   ok(/queso/i.test(_impNombre("809E CH", "", "")), "809E con sufijo CH = Corta Queso");
   ok(_impNombre("816E", "LK", "Pelador") === "Pelador", "un código común sigue por artNombre");
 }
+// v29.37 — artNombre de toda la app: "809E CH" = Corta Queso aunque el padrón pelado diga Corta Pizza
+const an = idx.match(/function artNombre\(cod, fb\) \{[\s\S]*?\n\}\n/);
+ok(!!an, "artNombre existe en index.html");
+if (an && npe) {
+  const _ocgNorm = (c) => String(c || "").toUpperCase().trim().replace(/^0+(?=.)/, "");
+  const NOMBRE_POR_EMPRESA = eval("(" + npe[1] + ")");
+  const _artNombres = { "809E": "Corta Pizza Mgo Ergonomico 6cm", "816E": "Pelador" };
+  const artNombre = eval("(" + an[0] + ")");
+  ok(/queso/i.test(artNombre("809E CH")), "artNombre(809E CH) = Corta Queso");
+  ok(/pizza/i.test(artNombre("809E LK")), "artNombre(809E LK) = Corta Pizza");
+  ok(artNombre("809E", "Corta Queso X 12") === "Corta Queso X 12", "artNombre(809E pelado, fila de Chef) = la fila");
+  ok(artNombre("816E") === "Pelador", "un código común sigue por el padrón");
+}
 // ninguna descripción de importados vuelve al artNombre pelado con la fila al lado
 ok(!/artNombre\((it|l\.it)\.cod, (it|l\.it)\.desc\)/.test(imp), "la tabla de pedidos no usa artNombre pelado");
 process.exit(fail ? 1 : 0);
