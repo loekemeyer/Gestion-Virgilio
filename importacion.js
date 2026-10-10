@@ -894,6 +894,41 @@ async function pedImpStockDesglose(keyEnc, foco) {
      GV_Importados_Equiv_GP2. Sin esa fila se ve como antes. v26.00: un importado puede tener VARIOS
      componentes (942E = Z47 + Z47-M505D + 942E) y se listan todos. */
   let equiv = null, conv = null, insDetG = null, insErrG = false;
+  /* v29.42 (10/10: "una visual equivalente a la de Stocks: cuánto hay en góndola, pickeado, a facturar, racks… y un
+     módulo Cervantes si hay algo por GP2") — el stock por DEPÓSITO sale de stocks_carga_rapida, la misma fila que
+     dibuja Stocks (cajas), y se pasa a unidades con la caja del artículo. null = leyendo · false = no se pudo leer. */
+  let depRows = null;
+  const DEP = [
+    { k: "terminado", l: "Góndola" }, { k: "excedente", l: "Excedente" }, { k: "separar_pedidos", l: "Pickeados" },
+    { k: "a_facturar", l: "A facturar" }, { k: "a_guardar", l: "A guardar" }, { k: "racks", l: "Racks", mas: "racks_ch" },
+    { k: "para_envasar", l: "P/ envasar" }, { k: "insumos_dep", l: "Insumos" }
+  ];
+  const depHtml = function () {
+    const uxc = Number(it.uxc) || 0;
+    let h = '<div style="font-weight:800;font-size:15px;margin:2px 0 6px">📍 Dónde está</div>';
+    if (depRows === null) return h + '<div class="imp-dep-cargando" style="color:#64748b;margin-bottom:12px">Leyendo los depósitos…</div>';
+    if (depRows === false) return h + '<div class="imp-dep-error" style="color:#b91c1c;margin-bottom:12px">No se pudo leer el stock por depósito.</div>';
+    const sum = function (k) { return depRows.reduce(function (a, r) { return a + (Number(r[k]) || 0); }, 0); };
+    const td = 'style="padding:7px 10px"';
+    let filas = '', totC = 0;
+    DEP.forEach(function (d) {
+      const c = sum(d.k) + (d.mas ? sum(d.mas) : 0);
+      if (!c && d.k !== "terminado") return;
+      totC += c;
+      filas += '<tr class="imp-dep-fila"><td style="text-align:left;padding:7px 10px">' + d.l + '</td><td class="num" ' + td + '>' + f(c) + '</td><td class="num" ' + td + '>' + (uxc > 0 ? f(c * uxc) : '—') + '</td></tr>';
+    });
+    const fcs = sum("fc_sin_salida");
+    const gp2 = Number(it.stockGp2U) || 0;
+    const comp = equiv ? equiv.map(function (e) { return escapeHtml(e.componente_codigo); }).join(' + ') : '';
+    filas += '<tr class="imp-dep-cerv" style="background:#fff7ed"><td style="text-align:left;padding:7px 10px">🏭 Cervantes (GP2)' + (comp ? ' · <b style="color:#b45309">' + comp + '</b>' : '') +
+      '</td><td class="num" ' + td + '>' + (uxc > 0 && gp2 ? f(gp2 / uxc) : '—') + '</td><td class="num" ' + td + '>' + f(gp2) + '</td></tr>';
+    return h + '<table class="mva-tbl imp-stk-dep" style="width:auto;min-width:360px;font-size:16px;margin-bottom:6px"><thead><tr><th style="text-align:left;font-size:13px">Lugar</th><th class="num" style="font-size:13px">Cajas</th><th class="num" style="font-size:13px">u' + (uxc > 0 ? ' <small>(×' + f(uxc) + ')</small>' : '') + '</th></tr></thead><tbody>' + filas +
+      '</tbody><tfoot><tr><th style="text-align:left;padding:7px 10px">Total Virgilio + Cervantes</th><th class="num" style="padding:7px 10px">' + (uxc > 0 ? f(totC + gp2 / uxc) : f(totC)) + '</th><th class="num" style="padding:7px 10px">' + (uxc > 0 ? f(totC * uxc + gp2) : '—') + '</th></tr></tfoot></table>' +
+      (fcs ? '<div style="color:#475569;font-size:13px;margin-bottom:6px">Además ' + f(fcs) + ' caja(s) facturadas sin salir (FC s/Salida).</div>' : '') +
+      (it.verComo ? '<div style="color:#7c3aed;font-size:13px;font-weight:700;margin-bottom:6px">Incluye ' + escapeHtml(it.verComo) + '.</div>' : '') +
+      (!depRows.length && !gp2 ? '<div style="color:#64748b;font-size:13px;margin-bottom:6px">Sin stock en Virgilio ni en Cervantes.</div>' : '') +
+      '<div style="font-weight:800;font-size:15px;margin:12px 0 6px">🧮 Lo que cuenta para el pedido</div>';
+  };
   const pintar = function (insDet, insErr) {
     if (insDet !== undefined) { insDetG = insDet; insErrG = !!insErr; } else { insDet = insDetG; insErr = insErrG; }
     const tr = function (a, b, c) { return '<tr><td style="text-align:left;padding:8px 10px">' + a + '</td><td class="num" style="padding:8px 10px;font-weight:700">' + b + '</td><td style="text-align:left;color:#475569;font-size:14px;padding:8px 10px">' + (c || "") + '</td></tr>'; };
@@ -901,6 +936,7 @@ async function pedImpStockDesglose(keyEnc, foco) {
     /* v28.97: el insumo compartido se muestra con SU parte (el total ya la traía: 312 u × 68 % = 211). */
     const _shIns = (it.piezasShare != null && it.piezasShare !== 1) ? Number(it.piezasShare) : 1;
     if (foco !== "proy") {
+      h += depHtml();
       h += '<table class="mva-tbl imp-stk-desg" style="width:100%;font-size:16px"><thead><tr><th style="text-align:left;font-size:13px">Qué cuenta</th><th class="num" style="font-size:13px">u</th><th style="text-align:left;font-size:13px">De dónde</th></tr></thead><tbody>';
       h += tr('Stock propio del artículo', f(it.stockPropioModulo), 'depósitos de Virgilio' + (it.uniPedidas > 0 ? ', ya descontadas ' + f(it.uniPedidas) + ' u de pedidos abiertos' : ''));
       if (insErr) h += tr('Depósito insumos', f(it.stockInsU), '<span style="color:#b91c1c">no se pudo leer el detalle</span>');
@@ -948,6 +984,28 @@ async function pedImpStockDesglose(keyEnc, foco) {
   };
   pintar(null, false);
   if (foco !== "proy") {
+    // v29.42 — stock por depósito (la fila de Stocks). Dual: la de su empresa. Con «incluye 809E LK», esa fila también.
+    const _qs = [{ c: it.cod, l: it.planta || "" }];
+    String(it.verComo || "").split(",").forEach(function (x) { const m = /^\s*(\S+)\s*(LK|CH)?\s*$/i.exec(x); if (m && m[1]) _qs.push({ c: m[1], l: (m[2] || "").toUpperCase() }); });
+    Promise.all(_qs.map(function (q) {
+      // cod_base va sin ceros adelante (026 → 26): se piden las dos grafías
+      const c0 = String(q.c).trim(), c1 = c0.replace(/^0+(?=.)/, "");
+      const cods = c0 === c1 ? encodeURIComponent(c0) : "in.(" + encodeURIComponent(c0) + "," + encodeURIComponent(c1) + ")";
+      return supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,linea,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,fc_sin_salida&cod_base=" + (c0 === c1 ? "eq." + cods : cods) + (q.l ? "&linea=eq." + q.l : ""))
+        .then(function (rows) {
+          // un dual (437E…) que en Importados es UNA fila: el stock de la empresa de esa fila, no las dos
+          if (!q.l && Array.isArray(rows) && rows.length > 1) {
+            const mk = String(((it.det || [])[0] || {}).marca || "").trim().toUpperCase(), em = mk === "CH" ? "CH" : (mk ? "LK" : "");
+            const lin = rows.filter(function (r) { return String(r.linea || "").toUpperCase() === em; });
+            if (em && lin.length) return lin;
+          }
+          return rows;
+        });
+    })).then(function (rs) {
+      if (rs.some(function (r) { return !Array.isArray(r); })) throw new Error("lectura");
+      depRows = [].concat.apply([], rs);
+      if (document.getElementById("impStkDesgOv")) pintar();
+    }).catch(function () { depRows = false; if (document.getElementById("impStkDesgOv")) pintar(); });
     /* v26.86 (Luis, 05/10): el componente de GP2 con el MISMO código (323E en GP2 = el artículo terminado)
        también suma, factor 1 (≡ gv_importados_ordenes, lateral e_mismo). No en un dual (it.planta): la
        vista tampoco lo suma ahí. */

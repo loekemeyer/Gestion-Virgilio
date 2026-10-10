@@ -747,6 +747,8 @@ echo "== pedimp-dual-nombre (v29.36: el 809E de Chef no sale con el nombre del d
 node tests/pedimp-dual-nombre.cjs
 echo "== pedimp-encurso-suma (v29.41: en Importaciones el 809E LK se ve dentro del 820E) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-encurso-suma.cjs
+echo "== pedimp-stock-deposito (v29.42: el stock de un importado por depósito, como Stocks, + Cervantes) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-stock-deposito.cjs
 echo "== imp-discontinuos (v24.49: solapa 🚫 Discontinuos de Importación) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-discontinuos.cjs
 echo "== rr-super-cajas (v24.51: súper sin líos → cajas) =="
