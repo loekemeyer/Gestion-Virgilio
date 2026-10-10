@@ -1,3 +1,4 @@
+-- APLICADO 10/10/2026 con el «sí» de Thomas (D3: "claro!! En todos lados"), v29.43. Verificado: 809E LK = Corta Pizza, 809E CH = Corta Queso; gv_reglas_perdidas = 0.
 -- v29.37 (10/10/2026): "el 809E de Chef en todos lados es SOLAMENTE el Corta Queso; el de Loeke, SOLAMENTE el Corta Pizza".
 -- stocks_carga_rapida tomaba el nombre de un dual del libro de stock (texto libre) y "809E LK" salía "Corta Queso X 12".
 -- Ahora un dual toma el nombre de SU empresa en GV_UxB (curado por Thomas el 12/09).
