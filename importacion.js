@@ -93,7 +93,7 @@ function _provImpRender() {
     if (cur && provs.indexOf(cur) < 0) opts += '<option value="' + escapeHtml(cur) + '" selected>' + escapeHtml(cur) + '</option>';
     const sel = '<select onchange="provImpSet(\'' + encodeURIComponent(cod) + '\',this.value)" style="padding:5px 8px;border:1px solid ' + (cur ? '#16a34a' : '#f59e0b') + ';border-radius:8px;font-size:12.5px;background:' + (cur ? '#f0fdf4' : '#fffbeb') + ';font-weight:700;color:#0f172a;max-width:160px">' + opts + '</select>';
     const mk = r.marca ? ' <span style="color:#94a3b8;font-size:10.5px;font-weight:700">' + escapeHtml(String(r.marca)) + '</span>' : '';
-    return '<tr' + (cur ? '' : ' style="background:#fffbeb"') + '><td><b>' + escapeHtml(_impPad(cod)) + '</b>' + mk + '</td><td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(artNombre(cod, r.descripcion) || "") + '">' + escapeHtml(artNombre(cod, r.descripcion) || "—") + '</td><td>' + sel + '</td></tr>';
+    return '<tr' + (cur ? '' : ' style="background:#fffbeb"') + '><td><b>' + escapeHtml(_impPad(cod)) + '</b>' + mk + '</td><td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(_impNombre(cod, r.marca, r.descripcion) || "") + '">' + escapeHtml(_impNombre(cod, r.marca, r.descripcion) || "—") + '</td><td>' + sel + '</td></tr>';
   }).join("") + '</tbody></table></div>';
   body.innerHTML = h;
   if (_stkPop._focusQ) { const qi = document.getElementById("provImpQ"); if (qi) { qi.focus(); try { qi.setSelectionRange(qi.value.length, qi.value.length); } catch (_e) {} } }
@@ -743,7 +743,7 @@ function _impCfgRender() {
         const _der = (_ac.derechos_pct == null) ? "" : _impCfgPctTxt(_ac.derechos_pct);
         return '<div style="display:flex;align-items:center;gap:8px;padding:6px 13px 6px 10px;border-bottom:1px solid #f1f5f9">' +
           '<b style="font-size:15px;min-width:74px">' + esc(_impPad(a.cod)) + '</b>' +
-          '<span style="font-size:13.5px;color:#475569;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
+          '<span style="font-size:13.5px;color:#475569;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(_impNombre(a.cod, a.marca, a.descripcion) || "—") + '</span>' +
           '<input value="' + esc(_der) + '" placeholder="' + _impCfgPctTxt(_impProvNum(prov, "derechos_pct", g.derechos_pct)) + '" onchange="pedImpCfgArtDer(\'' + encodeURIComponent(String(a.cod)) + '\',this.value)" title="Derechos de este artículo, en porcentaje (35 = 35%). Vacío = el del proveedor." style="width:62px;text-align:center;padding:4px 6px;border:1px solid ' + (_der ? '#0f766e' : '#cbd5e1') + ';border-radius:7px;font-size:14px;font-weight:800;background:' + (_der ? '#f0fdfa' : '#fff') + '">' +
           '<span style="font-size:12px;color:#94a3b8;font-weight:700">% der.</span>' +
           '<button onclick="pedImpCfgSacar(\'' + encodeURIComponent(String(a.cod)) + '\')" title="Sacarlo de ' + esc(prov) + ' (pide confirmación; no lo borra: queda sin proveedor)" style="background:#fee2e2;color:#b91c1c;border:0;border-radius:7px;padding:3px 10px;font-weight:800;font-size:13px;line-height:1.3;cursor:pointer">✕</button></div>';
@@ -757,7 +757,7 @@ function _impCfgRender() {
           const act = String(a.proveedor || "").trim();
           return '<div style="display:flex;align-items:center;gap:8px;padding:6px 13px 6px 10px;border-bottom:1px solid #f1f5f9">' +
             '<b style="font-size:15px;min-width:74px">' + esc(_impPad(a.cod)) + '</b>' +
-            '<span style="font-size:13.5px;color:#475569;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
+            '<span style="font-size:13.5px;color:#475569;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(_impNombre(a.cod, a.marca, a.descripcion) || "—") + '</span>' +
             (act ? '<span style="font-size:10.5px;font-weight:800;color:#b45309;background:#fffbeb;border-radius:999px;padding:1px 7px" title="Hoy es de ' + esc(act) + ': al agregarlo se lo saca de ahí">' + esc(act) + '</span>' : '') +
             '<button onclick="pedImpCfgCodigo(\'' + encodeURIComponent(String(a.cod)) + '\',\'' + encodeURIComponent(prov) + '\')" style="background:#dcfce7;color:#166534;border:0;border-radius:7px;padding:4px 13px;font-weight:800;font-size:15px;cursor:pointer">+</button></div>';
         }).join("") : '<div style="padding:12px;color:#94a3b8;font-size:13.5px">Sin resultados.</div>');
@@ -1090,7 +1090,7 @@ function pedImpQTerms() { return String((_stkPop && _stkPop.q) || "").trim().spl
 function pedImpMatch(it, terms) {
   if (!terms || !terms.length) return true;
   var cod = codCanon(it.cod);
-  var libre = (cod + " " + (artNombre(it.cod, it.desc) || "") + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase();
+  var libre = (cod + " " + (_impNombre(it.cod, _impPlantaVista(it), it.desc) || "") + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase();
   return terms.some(function (t) { return stkMatchBusq(t, cod, libre, false); });
 }
 /* v14.78 — "Cargar pedido ya hecho" (pedido emitido por fuera, plataforma externa) en UN solo
@@ -1329,7 +1329,7 @@ function _pedHechoRenderCuerpo(soloTabla) {
     var mBadge = r.marca ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:' + (r.marca === "CH" ? "#b45309" : "#1e6bd6") + ';border-radius:999px;padding:1px 7px" title="Este artículo se compra por LK o por CH: cargá las unidades en la fila de la marca que pediste">' + escapeHtml(r.marca) + '</span>' : '';
     return '<tr id="phTr' + i + '"' + (uni > 0 ? ' class="on"' : '') + '>' +
       '<td class="phc-cod">' + escapeHtml(_impPad(it.cod)) + mBadge + '</td>' +
-      '<td class="phc-desc" style="color:#475569">' + escapeHtml(String(artNombre(it.cod, it.desc) || "").slice(0, 34)) + '</td>' +
+      '<td class="phc-desc" style="color:#475569">' + escapeHtml(String(_impNombre(it.cod, _impPlantaVista(it), it.desc) || "").slice(0, 34)) + '</td>' +
       '<td class="num" style="color:#64748b">' + (it.uniMaster > 0 ? _pedHechoFmt(it.uniMaster) : (it.uxc > 0 ? _pedHechoFmt(it.uxc) + '*' : '—')) + '</td>' +
       '<td class="num"><input class="phc-uni" inputmode="numeric" value="' + (uni > 0 ? uni : "") + '" oninput="pedHechoSetUni(\'' + keyEnc + '\',this.value,' + i + ')" placeholder="0"></td>' +
       '<td class="num" id="phCj' + i + '">' + _pedHechoDiv(uni, it.uxc) + '</td>' +
@@ -1354,7 +1354,7 @@ function _pedHechoPreview() {
       var alerta = (_pedHecho.prov && (l.it.prov || "(sin proveedor)") !== _pedHecho.prov) ? ' <span class="phc-warn" title="Este código es de ' + escapeHtml(l.it.prov || "") + '">⚠ otro proveedor</span>' : '';
       var mTxt = (l.marca && _pedHechoMarcas(l.it).length > 1) ? ' <b style="color:' + (l.marca === "CH" ? "#b45309" : "#1e6bd6") + '">' + escapeHtml(l.marca) + '</b>' : '';
       return '<tr' + (l.uni > 0 ? ' class="on"' : '') + '><td class="phc-cod">' + escapeHtml(_impPad(l.it.cod)) + mTxt + '</td>' +
-        '<td class="phc-desc" style="color:#475569">' + escapeHtml(String(artNombre(l.it.cod, l.it.desc) || "").slice(0, 30)) + alerta + '</td>' +
+        '<td class="phc-desc" style="color:#475569">' + escapeHtml(String(_impNombre(l.it.cod, _impPlantaVista(l.it), l.it.desc) || "").slice(0, 30)) + alerta + '</td>' +
         '<td class="num">' + (l.uni > 0 ? _pedHechoFmt(l.uni) : '<span class="phc-bad">0</span>') + '</td>' +
         '<td class="num">' + _pedHechoDiv(l.uni, l.it.uxc) + '</td>' +
         '<td class="num">' + _pedHechoDiv(l.uni, l.it.uniMaster) + '</td></tr>';
@@ -1561,6 +1561,16 @@ function _impLRuteo(it) {
     (it.det || []).every(function (d) { return String(d.marca || "").trim().toUpperCase() !== "CH"; });
 }
 function _impCodVista(it) { return _impLRuteo(it) ? String(it.cod).replace(/([0-9E])L$/i, "$1") : it.cod; }
+/* v29.36 (10/10, "está mezclado de nuevo el 809E entre Chef y Loeke") — el nombre de un DUAL sale por EMPRESA:
+   artNombre busca por el código PELADO y las dos filas del 809E salían "Corta Pizza" (LK), también la de Chef (Corta Queso). */
+function _impNombre(cod, emp, fb) {
+  const k = _ocgNorm(String(cod == null ? "" : cod).replace(/\s+(LK|CH)$/i, ""));
+  const m = (typeof NOMBRE_POR_EMPRESA !== "undefined") ? NOMBRE_POR_EMPRESA[k] : null;
+  if (!m) return artNombre(cod, fb);
+  const suf = String(cod == null ? "" : cod).match(/\s+(LK|CH)$/i);
+  const e0 = String(emp || (suf ? suf[1] : "")).trim().toUpperCase(), e = e0 === "CH" ? "CH" : (e0 ? "LK" : "");
+  return (e && m[e]) || fb || artNombre(cod, fb);
+}
 function _impPlantaVista(it) { if (it && it.esInsumo) return ""; return (it && (it.planta || it.plantaVista)) || (_impLRuteo(it) ? "LK" : ""); }   // v25.01: un insumo no es de ninguna empresa
 function _impPlantaChip(it) {
   var pl = _impPlantaVista(it);
@@ -1787,7 +1797,7 @@ function _pedImpRender() {
       // código volvió a ser texto. Tocar el código para ver una proyección no se adivina.
       const _proyCaj = (Number(it.uxc) > 0) ? (Number(it.proyUni) || 0) / Number(it.uxc) : 0;
       const _proyCell = '<td class="num imp2 pedimp-proy" title="Tocá para ver de dónde sale la Estadística Madre (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td>';
-      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span>' + _pedImpQuiebreChip(it) + '</td>' + _proyCell + '<td class="num pedimp-stk" title="Tocá para ver qué está contando este stock" onclick="event.stopPropagation();pedImpStockDesglose(\'' + _keyEncV + '\')">' + stockTxt + '</td>' + _pedImpMesesCell(it) + '<td class="num">' + _pedImpEnCaminoHtml(it) + '</td><td class="num pedimp-apedir">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + '<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:8px">' + _reingWebSwitchHtml(it.cod, it) + '</div></td><td>' + actHtml + '</td></tr>';
+      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(_impNombre(it.cod, _impPlantaVista(it), it.desc)) + '</span>' + _pedImpQuiebreChip(it) + '</td>' + _proyCell + '<td class="num pedimp-stk" title="Tocá para ver qué está contando este stock" onclick="event.stopPropagation();pedImpStockDesglose(\'' + _keyEncV + '\')">' + stockTxt + '</td>' + _pedImpMesesCell(it) + '<td class="num">' + _pedImpEnCaminoHtml(it) + '</td><td class="num pedimp-apedir">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + '<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:8px">' + _reingWebSwitchHtml(it.cod, it) + '</div></td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
@@ -1927,7 +1937,7 @@ async function _pedImpDamianPartes(provs, opt) {
   // con varios proveedores el nombre NO va en el título: va en el renglón-rótulo de cada uno.
   const titulo = function (t, gs) { return t + (multi ? '' : ' ' + escapeHtml(gs[0].prov)) + ' ' + hoyTxt; };
   const banda = function (g, n, resto) { return '<tr class="prov"><td colspan="' + n + '">' + escapeHtml(g.prov) + '</td>' + (resto || '') + '</tr>'; };
-  const desc = function (it) { return escapeHtml(String(artNombre(it.cod, it.desc) || "").replace(/⌀/g, "Ø")).replace(/Ø /g, "Ø "); };   // el ⌀ no está en la fuente del PDF
+  const desc = function (it) { return escapeHtml(String(_impNombre(it.cod, _impPlantaVista(it), it.desc) || "").replace(/⌀/g, "Ø")).replace(/Ø /g, "Ø "); };   // el ⌀ no está en la fuente del PDF
   const foto = function (it) { return it.esParte ? '<span class="sf">insumo</span>' : _pedImpFotoHtml(codCanon(it.cod), _pedImpEmpFoto(it)); };   // v24.44: los insumos van sin foto
   // v25.13 (Thomas) — debajo del código, «INAL» si el artículo tiene certificado (GV_Articulo_INAL).
   const inalTag = function (x) { return x && x.inal ? '<small class="inal" title="' + escapeHtml("Certificado INAL " + (x.cert || "") + (x.vence ? " · vence " + x.vence : "")) + '">INAL</small>' : ''; };
@@ -2317,7 +2327,7 @@ function pedImpExportExcel() {
     var caj = _pedImpMcOf(it);
     var m3m = Number(it.m3Master) || 0, m3t = _pedImpM3Of(it); _totM3 += m3t;
     var fob = Number(it.fobUni) || 0, usd = _pedImpUsdOf(it); _totUsd += usd;
-    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "")) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (_pedImpMesesStock(it) == null ? '' : _pedImpMesesFmt(_pedImpMesesStock(it))) + '</td><td>' + (it.enCurso || 0) + '</td><td>' + esc(_pedImpDdmm(it.reingresoEst)) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td><td>' + (fob > 0 ? fob : "") + '</td><td>' + (usd > 0 ? Math.round(usd) : "") + '</td><td>' + (m3m > 0 ? m3m : "") + '</td><td>' + (m3t > 0 ? (Math.round(m3t * 100) / 100) : "") + '</td></tr>';
+    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "")) + '</td><td>' + esc(_impNombre(it.cod, _impPlantaVista(it), it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (_pedImpMesesStock(it) == null ? '' : _pedImpMesesFmt(_pedImpMesesStock(it))) + '</td><td>' + (it.enCurso || 0) + '</td><td>' + esc(_pedImpDdmm(it.reingresoEst)) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td><td>' + (fob > 0 ? fob : "") + '</td><td>' + (usd > 0 ? Math.round(usd) : "") + '</td><td>' + (m3m > 0 ? m3m : "") + '</td><td>' + (m3t > 0 ? (Math.round(m3t * 100) / 100) : "") + '</td></tr>';
   });
   html += '<tr><td colspan="13"><b>TOTALES</b></td><td><b>' + Math.round(_totUsd) + '</b></td><td></td><td><b>' + (Math.round(_totM3 * 100) / 100) + '</b></td></tr>';
   html += '</table></body></html>';
@@ -4767,7 +4777,7 @@ function _impCursoLineasHtml(ls, r) {
     const fobU = uni > 0 ? (_nacNum(l.usd, 0) / uni) : _nacNum(l.fob_uni, 0);
     const nacUni = uni > 0 ? (nacU / uni) : 0;
     return '<tr><td style="font-weight:800;font-family:Consolas,Menlo,monospace">' + escapeHtml(codCanon(l.cod_art)) + (l.marca ? ' <span style="font-size:10px;color:#64748b">' + escapeHtml(l.marca) + '</span>' : '') + '</td>' +
-      '<td style="color:#475569">' + escapeHtml(String(artNombre(l.cod_art, l.descripcion) || "").slice(0, 40)) + '</td>' +
+      '<td style="color:#475569">' + escapeHtml(String(_impNombre(l.cod_art, l.marca, l.descripcion) || "").slice(0, 40)) + '</td>' +
       '<td style="text-align:right;font-variant-numeric:tabular-nums">' + _impCursoNum(uni) + '</td>' +
       '<td style="text-align:right;color:#065f46">' + (Number(l.usd) > 0 ? _impCursoNum(Math.round(l.usd)) : '—') + '</td>' +
       '<td style="text-align:right;color:#0369a1">' + (Number(l.m3) > 0 ? (Math.round(l.m3 * 100) / 100).toLocaleString("es-AR") : '—') + '</td>' +
@@ -5077,7 +5087,7 @@ function _impPiEdRender() {
         const a = Number(l.unidades) || 0, lleg = Math.max(0, a - (Number(l.pendiente) || 0));
         const tiene = l.bache_id in st.nuevos, n = tiene ? st.nuevos[l.bache_id] : a;
         tA += a; tN += n;
-        h += '<tr id="ipeR' + l.bache_id + '"' + (n !== a ? ' class="cambia"' : '') + '><td class="cod" title="' + escapeHtml(artNombre(l.cod_art, l.descripcion) || "") + '">' + escapeHtml(codCanon(l.cod_art)) + (l.marca ? '<small>' + escapeHtml(l.marca) + '</small>' : '') + '</td>' +
+        h += '<tr id="ipeR' + l.bache_id + '"' + (n !== a ? ' class="cambia"' : '') + '><td class="cod" title="' + escapeHtml(_impNombre(l.cod_art, l.marca, l.descripcion) || "") + '">' + escapeHtml(codCanon(l.cod_art)) + (l.marca ? '<small>' + escapeHtml(l.marca) + '</small>' : '') + '</td>' +
           '<td>' + (lleg ? _impPiEdNum(lleg) : '—') + '</td>' +
           '<td>' + _impPiEdNum(a) + '</td>' +
           '<td><input class="ipe-in" type="number" inputmode="numeric" min="' + lleg + '" step="1" value="' + (tiene ? n : "") + '" placeholder="' + a + '" oninput="impPiEdSetCant(' + l.bache_id + ',this.value)"></td>' +
