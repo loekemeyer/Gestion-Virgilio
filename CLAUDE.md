@@ -8196,6 +8196,9 @@ filtro de «legajo de prueba» en un monitor lleva también `/^sup:/`. `tests/mo
 - ⚠ **No usar `Equivalencias_Familia` para 809E LK → 820E**: no distingue empresa y le pasaría al 820E la Est. Madre del corta queso.
 - Consumos medidos el 10/10 (facturas ISIS, abr-sep): Chef 809E 840–2.316 u/mes · LK 809E 108–636 u/mes: no están cruzados.
 - `sql/gv_820e_alta_v2938.sql`, `sql/gv_nombre_dual_v2937.sql` (el parche del refresco de Stocks espera el sí).
+- **Las 336 cajas de AD05 (ingreso 23/07, 28 MC) son de CHEF** (confirmado 10/10): ajuste racks LK −336 / CH +336 en AD05
+  (`client_id corr_809e_ad05_*`) y `GV_Lugar` AD05 → CH (backup `zz_backups."GV_Backup_Lugar_AD05_20261010"`). Retira lo del
+  conteo del 17/09 («son de Loekemeyer») y el «AD05 pasó a LK» de la v19.33. Queda 809E LK = 5 cajas en góndola.
 
 ## ⚠ REGLA (Luis, 2026-10-07, v27.74): 865ED NO EXISTE MÁS — es el 865E de 12 u
 
