@@ -8186,6 +8186,17 @@ tv.html / admin.html (`actividadActual`, fichadas, `popFaseCiclos` en `build-adm
 (`fetchMonitorDayStats`, `showDayBreakdown`, `_monActividadActual`, `_monEnSilencio`, `fetchMonitorEvents`). Todo
 filtro de «legajo de prueba» en un monitor lleva también `/^sup:/`. `tests/mon-sup-no-operario.cjs`.
 
+## ⚠ REGLA (2026-10-10, v29.38): 809E de Chef = SÓLO Corta Queso · 809E de Loeke = SÓLO Corta Pizza — y el corta pizza nuevo es 820E
+
+- En todos lados el 809E CH se llama Corta Queso y el 809E LK, Corta Pizza. `artNombre` (index.html) e `_impNombre`
+  (importacion.js) resuelven el nombre de un dual por empresa; el padrón (`vista_nombres_articulos`) tiene un solo nombre por
+  código pelado y no sirve para los duales. `tests/pedimp-dual-nombre.cjs`.
+- **La importación PI OL-10139 del corta pizza de LK llega como 820E** (Importados 175): el bache 86 (1.632 u, 18/12) se pasó
+  del 809E LK al 820E. El 809E de Chef sigue con su pedido (7.200 u).
+- ⚠ **No usar `Equivalencias_Familia` para 809E LK → 820E**: no distingue empresa y le pasaría al 820E la Est. Madre del corta queso.
+- Consumos medidos el 10/10 (facturas ISIS, abr-sep): Chef 809E 840–2.316 u/mes · LK 809E 108–636 u/mes: no están cruzados.
+- `sql/gv_820e_alta_v2938.sql`, `sql/gv_nombre_dual_v2937.sql` (el parche del refresco de Stocks espera el sí).
+
 ## ⚠ REGLA (Luis, 2026-10-07, v27.74): 865ED NO EXISTE MÁS — es el 865E de 12 u
 
 El 865E (antes caja de 24 u) pasó a ser el Rallador Plano A/I 3 Usos **de 12 u**, y el 865ED se unificó ahí: UxB,

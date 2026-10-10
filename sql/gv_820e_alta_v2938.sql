@@ -1,0 +1,13 @@
+-- v29.38 (10/10/2026): "esta nueva importación va a llegar como 820E para LK y va a ser cortapizza".
+-- APLICADO por la sesión (MCP), con las claims de supervisor locales a la transacción.
+-- 1) Alta 820E LK (Importados id 175, Ownland, FOB 0,70, 144 u/MC, inner 12, MC 44x26x28) por gv_importado_guardar:
+--    maestro, Importados_Volumen, GV_Volumen_Articulos, GV_UxB (LK 12), OC_Maximos (LK), GV_Producto_Tipo, ALTA IMP (0 cajas).
+-- 2) Bache 86 (PI OL-10139, 1.632 u, reingreso 18/12) pasa de 809E LK (Importados 100) a 820E (175).
+--    Backup: zz_backups."GV_Backup_Bache86_809E_20261010".
+-- 3) gv_importados_resync_calc(100) y (175): 809E LK pedido_curso 1632 -> 0; 820E -> 1632.
+-- NO se cargó familia 809E -> 820E: Equivalencias_Familia no distingue empresa y le pasaría al 820E
+-- también la Est. Madre del 809E de CHEF (corta queso).
+-- Rollback:
+--   update public."GV_Importados_Baches" set importado_id = 100, cod_art = '809E' where id = 86;
+--   select public.gv_importados_resync_calc(100), public.gv_importados_resync_calc(175);
+--   update public."Importados" set activo = false where id = 175;
