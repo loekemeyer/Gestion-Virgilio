@@ -99,7 +99,12 @@ function plantelCalc(d, utilOverride) {
       var hp = (s.horas_pick != null && isFinite(Number(s.horas_pick))) ? Number(s.horas_pick) : (rp > 0 ? m3 / rp : null);
       return { k: "pick", tarea: "Picking", m3: m3, ritmo: (hp > 0 ? m3 / hp : rp), horas: hp, porDif: s.horas_pick != null };
     })(),
-    { k: "arm", tarea: "Armado", m3: Number(s.m3_arm) || 0, ritmo: ra, horas: ra > 0 ? (Number(s.m3_arm) || 0) / ra : null },
+    /* v29.48 (D5): el armado también POR DIFICULTAD (horas_arm: NP, líneas, cajas y súper × el factor medido) */
+    (function () {
+      var m3 = Number(s.m3_arm) || 0;
+      var hr = (s.horas_arm != null && isFinite(Number(s.horas_arm))) ? Number(s.horas_arm) : (ra > 0 ? m3 / ra : null);
+      return { k: "arm", tarea: "Armado", m3: m3, ritmo: (hr > 0 ? m3 / hr : ra), horas: hr, porDif: s.horas_arm != null };
+    })(),
     { k: "carga", tarea: "Carga camión y remitos", fijo: true, porDia: Number(h.carga_dia) || 0, horas: (Number(h.carga_dia) || 0) * hab },
     { k: "mov", tarea: "Guardado, recepción, racks e insumos", fijo: true, porDia: Number(h.mov_dia) || 0, horas: (Number(h.mov_dia) || 0) * hab }
   ];
@@ -196,10 +201,20 @@ function plantelHtml() {
       (_dr ? ' — es ' + (_dr >= 1 ? 'más difícil' : 'más fácil') + ' que el promedio (' + _plN(_dr, 2) + ' veces los minutos por m³)' : '') +
       '. Lo que entra, al promedio: ' + _plHM(se.horas_pick_noacum) + '. Se toma el mayor.</div>';
   }
+  if (se.horas_arm != null) {
+    var _da = (Number(se.min_m3_est_oblig_arm) > 0 && Number(se.min_m3_est_hist_arm) > 0) ? Number(se.min_m3_est_oblig_arm) / Number(se.min_m3_est_hist_arm) : null;
+    h += '<div class="pl-nota"><b>Armado por dificultad</b>: lo que vence lleva ' + _plHM(se.horas_arm_oblig) +
+      ' (estimado por tanda: NP, líneas, cajas y si es súper × ' + _plN(se.factor_real_arm, 2) + ')' +
+      (_da ? ' — es ' + (_da >= 1 ? 'más difícil' : 'más fácil') + ' que el promedio (' + _plN(_da, 2) + ' veces los minutos por m³)' : '') +
+      '. Lo que entra, al promedio: ' + _plHM(se.horas_arm_noacum) + '. Se toma el mayor.</div>';
+  }
 
   h += '<div class="pl-h">Cómo estamos hoy</div>';
   h += '<table class="pl-tbl"><tbody>' +
     '<tr><td class="t">Programado sin pickear / sin armar</td><td>' + _plN(pe.m3_pick, 2) + ' m³ / ' + _plN(pe.m3_arm, 2) + ' m³ · ' + (pe.nps || 0) + ' NP</td></tr>' +
+    (pe.sin_programar ? '<tr><td class="t">Sin programar (A Programar y Cuarentena)</td><td' + (pe.sin_programar.pedidos_vencidos > 0 ? ' class="pl-roja"' : '') + '>' +
+      (pe.sin_programar.pedidos || 0) + ' pedidos · ' + _plN(pe.sin_programar.m3, 2) + ' m³' +
+      (pe.sin_programar.pedidos_vencidos > 0 ? ' (' + pe.sin_programar.pedidos_vencidos + ' ya vencidos)' : '') + '</td></tr>' : '') +
     '<tr><td class="t">Ya pasaron los ' + d.meta + ' días hábiles</td><td' + (pe.nps_vencidas > 0 ? ' class="pl-roja"' : '') + '>' + (pe.nps_vencidas || 0) + ' NP · ' + _plN(pe.m3_vencido, 2) + ' m³</td></tr>' +
     '<tr><td class="t">Pedido pendiente más viejo</td><td' + (pe.habiles_mas_viejo > d.meta ? ' class="pl-roja"' : '') + '>' + (pe.pedido_mas_viejo ? _plDia(pe.pedido_mas_viejo) + ' · ' + pe.habiles_mas_viejo + ' días hábiles' : '—') + '</td></tr>' +
     '<tr><td class="t">Se procesa por día (últ. ' + P.hist + ' sem.)</td><td>' + _plN(hi.m3_dia_pick, 2) + ' m³ pickeo · ' + _plN(hi.m3_dia_arm, 2) + ' m³ armado</td></tr>' +
@@ -218,7 +233,8 @@ function plantelHtml() {
     h += '</tbody></table>';
   }
   h += '<div class="pl-nota">Horas medidas del ' + _plDia(hi.desde) + ' al ' + _plDia(hi.hasta) + ' (' + (hi.dias || 0) + ' días con gente). ' +
-    'No cuenta lo que todavía está en A Programar ni en Cuarentena.</div>';
+    (pe.sin_programar ? 'Incluye lo que espera en A Programar y en Cuarentena: su plazo corre desde la fecha del pedido.' :
+      'No cuenta lo que todavía está en A Programar ni en Cuarentena.') + '</div>';
   return h + '</div>';
 }
 
@@ -230,7 +246,12 @@ function plantelHtml() {
    Todo lo calcula gv_ritmo_picking (sólo supervisor). El monitor de pared (kiosko)
    no muestra las pestañas, así que esto no lo ven los operarios.
    ============================================================================ */
-var _ritmo = { dias: 14, data: null, err: "", cargando: false, abiertos: {} };
+var _ritmo = { dias: 14, fase: "pick", data: null, err: "", cargando: false, abiertos: {} };
+/* v29.48 (D5): misma pantalla para el ARMADO (gv_ritmo_armado: NP, líneas, cajas y súper; real = AP→TAP − pausas + cola) */
+var _RT_FASE = { pick: { rpc: "gv_ritmo_picking", nom: "picking", ger: "pickeando", antes: "pickear",
+                         dif: "líneas, paradas, alturas, cajas", real: "sin pausas ni huecos de más de 5 min" },
+                 arm:  { rpc: "gv_ritmo_armado", nom: "armado", ger: "armando", antes: "armar",
+                         dif: "NP, líneas, cajas y si es súper", real: "del inicio al fin del armado, sin pausas, más la cola hasta la próxima tarea (≤ 30 min)" } };
 
 function _rtPct(x) { var n = Number(x); return isFinite(n) && n > 0 ? Math.round(n * 100) + " %" : "—"; }
 function _rtMin(m) { var n = Number(m); return isFinite(n) && m != null ? _plHM(n / 60) : "—"; }
@@ -245,7 +266,7 @@ function ritmoCargar() {
   var hoy = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
   var d0 = new Date(Date.now() - 3 * 3600 * 1000 - (_ritmo.dias - 1) * 86400000).toISOString().slice(0, 10);
   var p = (sb && typeof sb.rpc === "function")
-    ? sb.rpc("gv_ritmo_picking", { p_desde: d0, p_hasta: hoy })
+    ? sb.rpc((_RT_FASE[_ritmo.fase] || _RT_FASE.pick).rpc, { p_desde: d0, p_hasta: hoy })
     : Promise.resolve({ data: null, error: { message: "sin sesión de supervisor" } });
   Promise.resolve(p).then(function (r) {
     if (!r || r.error) throw new Error((r && r.error && r.error.message) || "sin respuesta");
@@ -258,11 +279,12 @@ function ritmoCargar() {
   }).then(function () { _ritmo.cargando = false; ritmoRender(); });
 }
 function ritmoDias(n) { _ritmo.dias = n; ritmoCargar(); }
+function ritmoFase(f) { if (_ritmo.fase === f) return; _ritmo.fase = f; _ritmo.data = null; _ritmo.abiertos = {}; ritmoCargar(); }
 function ritmoToggleDia(d) { _ritmo.abiertos[d] = !_ritmo.abiertos[d]; ritmoRender(); }
 
 function ritmoRender() {
   var box = document.getElementById("ritmoContent"); if (!box) return;
-  var R = _ritmo, d = R.data;
+  var R = _ritmo, d = R.data, F = _RT_FASE[R.fase] || _RT_FASE.pick;
   var css = '<style>' +
     '#ritmoContent{overflow:auto;}' +
     '.rt-wrap{background:#fff;color:#0f172a;border-radius:10px;padding:10px 12px 16px;max-width:980px;margin:0 auto;font-size:14px;}' +
@@ -285,16 +307,19 @@ function ritmoRender() {
     '</style>';
   var b = function (n, t) { return '<button class="' + (R.dias === n ? 'on' : '') + '" onclick="ritmoDias(' + n + ')">' + t + '</button>'; };
   var h = css + '<div class="rt-wrap">' +
-    '<div class="rt-bar">' + b(7, "7 días") + b(14, "14 días") + b(28, "28 días") +
+    '<div class="rt-bar">' +
+    '<button class="' + (R.fase === "pick" ? 'on' : '') + '" onclick="ritmoFase(\'pick\')">Picking</button>' +
+    '<button class="' + (R.fase === "arm" ? 'on' : '') + '" onclick="ritmoFase(\'arm\')">Armado</button>' +
+    '<span style="width:14px"></span>' + b(7, "7 días") + b(14, "14 días") + b(28, "28 días") +
     '<button onclick="ritmoCargar()" style="background:#fff;border-color:#cbd5e1;color:#334155;">Actualizar</button></div>';
   if (R.err) { box.innerHTML = h + '<div class="rt-err">' + escapeHtml(R.err) + '</div></div>'; return; }
   if (!d) { box.innerHTML = h + '<div class="rt-nota">' + (R.cargando ? 'Calculando…' : '') + '</div></div>'; return; }
   var t = d.total || {};
   h += '<div class="rt-cards">' +
-    '<div class="rt-card"><b style="color:' + _rtCol(t.indice) + '">' + _rtPct(t.indice) + '</b><span>rendimiento picking<br>(esperado ÷ real)</span></div>' +
+    '<div class="rt-card"><b style="color:' + _rtCol(t.indice) + '">' + _rtPct(t.indice) + '</b><span>rendimiento ' + F.nom + '<br>(esperado ÷ real)</span></div>' +
     '<div class="rt-card"><b>' + _rtMin(t.esperado_min) + '</b><span>horas esperadas<br>(estimado inicial ' + _rtMin(t.est_ini_min) + ')</span></div>' +
-    '<div class="rt-card"><b>' + _rtMin(t.real_min) + '</b><span>horas reales<br>pickeando</span></div>' +
-    '<div class="rt-card"><b>' + _rtMin(t.mon_min) + '</b><span>horas de picking<br>del monitor (' + _rtPct(t.indice_mon) + ')</span></div>' +
+    '<div class="rt-card"><b>' + _rtMin(t.real_min) + '</b><span>horas reales<br>' + F.ger + '</span></div>' +
+    '<div class="rt-card"><b>' + _rtMin(t.mon_min) + '</b><span>horas de ' + F.nom + '<br>del monitor (' + _rtPct(t.indice_mon) + ')</span></div>' +
     '<div class="rt-card"><b style="color:#b45309">' + _rtMin((Number(t.mon_min) || 0) - (Number(t.real_min) || 0)) + '</b><span>pérdida: pausas, huecos<br>y cola (monitor − real)</span></div>' +
     '</div>';
   var ops = d.operarios || [];
@@ -307,7 +332,7 @@ function ritmoRender() {
       '<td>' + (o.dias_medidos ? o.dias_llego + ' de ' + o.dias_medidos : '—') + '</td>' +
       '<td>' + _rtMin(o.mon_min) + '</td><td>' + _rtMin(o.perdida_min) + '</td></tr>';
   });
-  if (!ops.length) h += '<tr><td colspan="9">Sin picking en el período.</td></tr>';
+  if (!ops.length) h += '<tr><td colspan="9">Sin ' + F.nom + ' en el período.</td></tr>';
   h += '</tbody></table>';
   var filas = d.filas || [];
   h += '<div class="rt-h">Por día <span style="font-weight:600;color:#64748b">(tocá un día para ver los operarios)</span></div>';
@@ -324,10 +349,11 @@ function ritmoRender() {
     });
   });
   h += '</tbody></table>';
-  h += '<div class="rt-nota"><b>Estimado inicial</b>: el tiempo que calculó el sistema antes de pickear, por la dificultad de la tanda (líneas, paradas, alturas, cajas). ' +
-    '<b>Esperado</b>: la misma cuenta con lo que se pickeó de verdad. <b>Real</b>: el tiempo pickeando, sin pausas ni huecos de más de 5 min. ' +
-    '<b>Monitor</b>: todas las horas de picking que registró el monitor. Rendimiento ≥ 100 % = llegó al ritmo esperado.</div>' +
-    '<div class="rt-nota">Las tandas pickeadas antes del 12/10 tienen el estimado inicial reconstruido (con el stock de ese día, no el del momento). ' +
-    'Una línea de pallet entero (más de 30 cajas) el modelo la cuenta como 30: el estimado se queda corto en esas tandas.</div>';
+  h += '<div class="rt-nota"><b>Estimado inicial</b>: el tiempo que calculó el sistema antes de ' + F.antes + ', por la dificultad de la tanda (' + F.dif + '). ' +
+    '<b>Esperado</b>: la misma cuenta con lo que se hizo de verdad. <b>Real</b>: el tiempo ' + F.ger + ', ' + F.real + '. ' +
+    '<b>Monitor</b>: todas las horas de ' + F.nom + ' que registró el monitor. Rendimiento ≥ 100 % = llegó al ritmo esperado.</div>' +
+    '<div class="rt-nota">Las tandas hechas antes del 12/10 tienen el estimado inicial reconstruido después' + (R.fase === "pick" ? ' (con el stock de hoy, no el del momento)' : '') + '. ' +
+    (R.fase === "pick" ? 'Las cajas de más de 30 por línea (pallet entero) cuentan menos que las primeras 30.'
+                       : 'Una tanda FRENADA en armado no se mide (la armaron dos personas); sus horas sí están en el monitor.') + '</div>';
   box.innerHTML = h + '</div>';
 }

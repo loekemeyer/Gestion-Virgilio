@@ -36,7 +36,7 @@ const DATA = {
     let modo = "ok", llamadas = [];
     window.sb = { rpc: async (n, a) => { llamadas.push([n, a]);
       if (modo === "sup") return { data: null, error: { message: "SUPERVISOR: el ritmo por operario es sólo para supervisores" } };
-      return n === "gv_ritmo_picking" ? { data: DATA, error: null } : { data: null, error: { message: "?" } }; } };
+      return (n === "gv_ritmo_picking" || n === "gv_ritmo_armado") ? { data: DATA, error: null } : { data: null, error: { message: "?" } }; } };
     r.boton = !!document.getElementById("monTabRitmo");
     setMonitorTab("ritmo");
     for (let i = 0; i < 40 && !(_ritmo.data || _ritmo.err); i++) await espera(50);
@@ -50,6 +50,12 @@ const DATA = {
     r.op1 = filasOp[0] && filasOp[0].textContent; r.op2col = filasOp[1] && filasOp[1].children[5].style.color;
     box.querySelector("tr.dia").click(); await espera(30);
     r.sub = [...box.querySelectorAll("tr.sub")].map((x) => x.textContent).join("|");
+    /* v29.48: el botón Armado llama a gv_ritmo_armado y la tarjeta dice «armado» */
+    const bArm = [...box.querySelectorAll("button")].find((x) => x.textContent === "Armado");
+    r.hayArm = !!bArm; if (bArm) bArm.click();
+    for (let i = 0; i < 40 && (_ritmo.cargando || !_ritmo.data); i++) await espera(50);
+    r.llamoArm = llamadas.some((l) => l[0] === "gv_ritmo_armado");
+    r.txtArm = box.textContent;
     modo = "sup"; ritmoCargar();
     for (let i = 0; i < 40 && !_ritmo.err; i++) await espera(50);
     r.err = box.textContent;
@@ -68,6 +74,7 @@ const DATA = {
   ok(/Jhonny Moncayo/.test(o.op1 || "") && /140 %/.test(o.op1 || "") && /7 de 8/.test(o.op1 || ""), "(c) fila de Moncayo: " + o.op1);
   ok(/185, 28, 28|#b91c1c/.test(o.op2col || ""), "(c) Isidro 57 % va en rojo: " + o.op2col);
   ok(/Jhonny Cartaya/.test(o.sub) && /134 %/.test(o.sub), "(d) el día abre sus operarios: " + o.sub);
+  ok(o.hayArm && o.llamoArm && /rendimiento armado/.test(o.txtArm) && /antes de armar/.test(o.txtArm), "(g) Armado llama a gv_ritmo_armado y lo dice");
   ok(/sólo para supervisores/.test(o.err) && !/119 %/.test(o.err), "(e) sin sesión de supervisor tiene que decirlo");
   ok(o.kiosko === "none", "(f) en el kiosko las pestañas del monitor se ocultan: " + o.kiosko);
   ok(!errs.length, "errores de página: " + errs.join(" | "));

@@ -8686,7 +8686,17 @@ Solapa **Plantel** de la PPP (`plantel.js`, `plantelHtml` / `plantelCalc`). Todo
 | Monitor → pestaña **Ritmo** | `ritmoCargar` / `ritmoRender` en `plantel.js`. Dentro de `monTabSwitch`: el kiosko de pared no la muestra |
 | **Plantel** | la hora de picking sale de la base (`semana.horas_pick`): lo que vence = minutos estimados de SUS tandas × F (F = horas reales del monitor ÷ estimado de las tandas pickeadas en la historia, 1,22 al 12/10); lo que entra, al promedio; el mayor |
 
-- ⚠ **El modelo topea cada línea en 30 cajas** (`tope_cajas_linea`): un pallet entero (E85A, 1 línea, 2.000 cajas, 6,16 m³) estima 6 min y E84A (4.000 cajas) tardó 32. Por eso lo pendiente sale «más fácil» que el promedio. Recalibrar las líneas grandes es pendiente.
+- ~~El modelo topea cada línea en 30 cajas~~ → desde la **v29.48** la caja por encima de 30 suma `caja_extra` (E85A 6 → 18 min, E84A 6 → 30 contra 32 reales).
 - Al 12/10, 28 días: 144 tandas, esperado 62:44 h, real 56:35 h (111 %), monitor 80:32 h (la diferencia son pausas, huecos y cola).
-- **Armado no tiene modelo de dificultad todavía**: es el paso siguiente (calibrar con líneas, NP, cajas, líos, súper).
+- ~~Armado no tiene modelo de dificultad todavía~~ → **hecho en la v29.48** (ver la regla de abajo).
 - `sql/gv_ritmo_picking_v2947.sql`, `tests/monitor-ritmo.cjs`, `tests/ppp-plantel.cjs` (f).
+
+## ⚠ REGLA (Thomas, 2026-10-12, v29.48, D5 · D6 · D7): ARMADO por dificultad, Plantel con A Programar/Cuarentena y pallets en el picking
+
+- **Armado (D5)**: tamaño esperado en min = **5,06 × NP + 0,607 × línea + 0,352 × caja (hasta 30 por línea) + 0,076 × caja de 30 a 330 por línea + 30,4 si es súper** (`gv_armado_tamano`; coeficientes `arm_*` en `GV_Picking_Esquema`, NNLS sobre 426 tandas: corr 0,85, error medio 17,5 min sobre una mediana de 50). Real = AP→TAP − pausas + cola ≤ 30 min (`gv_armado_tanda_calc`, caché **`GV_Armado_Tanda`**). Una tanda **frenada en armado (APF) no se mide** (la armaron dos personas). No hay huecos medibles: TAL y ENT llegan al terminar.
+  - Antes de armar: **`gv_armado_estimar`** con las líneas del pedido (corr 0,85 con el real, ×1,02) → foto **`GV_Armado_Estimado`** (`tamano_inicial` no se pisa; `reconstruido = true` lo armado antes del 12/10). Lo refresca el cron **155** junto con el picking.
+  - Monitor → **Ritmo** tiene **Picking | Armado** (`gv_ritmo_armado`, la misma cuenta que `gv_ritmo_picking` sobre las tablas de armado; sólo supervisor).
+  - **Plantel**: `semana.horas_arm` = lo que vence (estimado × F, F = horas de armado del monitor ÷ estimado de las tandas con su 1.er TAP en la historia, 1,14 al 12/10) o lo que entra al promedio, el mayor.
+- **Plantel (D6)**: cuenta también lo que espera en **A Programar y Cuarentena** (`gv_ppp_sin_programar()`: el universo de A Programar sin lo que `gv_pedidos_web_excluidos` saca, m³ por `items_string` × `vista_volumen_articulo_resuelto`). Su plazo corre desde la fecha del pedido. Al 12/10: 11 pedidos, 6,80 m³, 7 ya vencidos.
+- **Picking (D7)**: la caja por encima de 30 por línea suma **`caja_extra` = 0,0061 min** (pallet entero; E84A 6 → 30 min contra 32 reales). El caché se ajustó una vez (llave `GV_Picking_Esquema.caja_extra_aplicado`): no volver a sumar.
+- Centinelas v29.48 (5 filas). `sql/gv_armado_dificultad_v2948.sql`, `sql/gv_plantel_ritmo_v2948_defs.sql` (definiciones vivas), `docs/armado-dificultad/fit_armado.py`, `tests/ppp-plantel.cjs` (g, h), `tests/monitor-ritmo.cjs` (g).

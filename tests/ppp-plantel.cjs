@@ -22,6 +22,7 @@ const DATA = {
   demanda_semana: 32.2,
   pendiente: { nps: 99, m3_pick: 46.87, m3_arm: 49.76, m3_vencido: 11.98, nps_vencidas: 13, pedido_mas_viejo: "2026-09-15",
                habiles_mas_viejo: 18, ultima_fecha_prog: "2026-11-19",
+               sin_programar: { pedidos: 11, m3: 6.8, m3_vencido: 3.13, pedidos_vencidos: 7 },
                por_semana_limite: [{ semana: "2026-09-21", m3_pick: 3.23, m3_arm: 3.23 }, { semana: "2026-10-19", m3_pick: 20.26, m3_arm: 20.79 }] },
   semana: { oblig_pick: 26.77, oblig_arm: 30.41, no_acumular: 32.2, m3_pick: 32.2, m3_arm: 32.2 }
 };
@@ -59,6 +60,10 @@ const DATA = {
     /* v29.47: si la base manda horas_pick (por dificultad), la fila de picking usa ESAS horas */
     const dd = JSON.parse(JSON.stringify(_plantel.data)); dd.semana.horas_pick = 20; dd.semana.horas_pick_oblig = 9.57; dd.semana.horas_pick_noacum = 20; dd.semana.factor_real = 1.215;
     const cd = plantelCalc(dd, null); const fp = cd.filas.filter((x) => x.k === "pick")[0];
+    /* v29.48: lo mismo con horas_arm (armado por dificultad) */
+    const da = JSON.parse(JSON.stringify(_plantel.data)); da.semana.horas_arm = 30; da.semana.horas_arm_oblig = 25; da.semana.horas_arm_noacum = 30; da.semana.factor_real_arm = 1.135;
+    const fa = plantelCalc(da, null).filas.filter((x) => x.k === "arm")[0];
+    o.armHoras = fa.horas; o.armRitmo = Math.round(fa.ritmo * 100) / 100;
     o.difHoras = fp.horas; o.difRitmo = Math.round(fp.ritmo * 100) / 100; o.difTotal = Math.round(cd.total * 100) / 100;
     _plantel.util = 9;
     o.personas9 = plantelCalc(_plantel.data, _plantel.util).personas;
@@ -91,6 +96,9 @@ const DATA = {
   ok(/No se pudo leer/.test(err.err) && /No se pudo leer/.test(err.html) && !/personas toda la semana/.test(err.html), "(e) una lectura rota se dice, no muestra personas");
   ok(out.difHoras === 20 && out.difRitmo === 1.61, "(f) con horas_pick de la base, picking = 20 h y m³/h efectivo 1,61: " + out.difHoras + " / " + out.difRitmo);
   ok(Math.abs(out.difTotal - 134.84) < 0.05, "(f) total con picking por dificultad " + out.difTotal + " (esperado 134,84)");
+  ok(out.armHoras === 30 && out.armRitmo === 1.07, "(g) con horas_arm de la base, armado = 30 h y m³/h 1,07: " + out.armHoras + " / " + out.armRitmo);
+  ok(/Sin programar \(A Programar y Cuarentena\)/.test(out.txt) && /11 pedidos/.test(out.txt) && /7 ya vencidos/.test(out.txt), "(h) muestra lo que espera en A Programar y Cuarentena");
+  ok(!/No cuenta lo que todavía está en A Programar/.test(out.txt), "(h) ya no dice que no cuenta A Programar");
   ok(errs.length === 0, "errores de página: " + errs.join(" | "));
   if (fallas.length) { console.log("FALLA ppp-plantel:\n  " + fallas.join("\n  ")); process.exit(1); }
   console.log("OK ppp-plantel — " + out.personas + " personas, " + out.total + " h, " + llamadas + " llamadas");

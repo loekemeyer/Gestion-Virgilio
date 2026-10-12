@@ -31821,3 +31821,15 @@ Objetos nuevos, nada existente tocado: tabla `GV_Plantel_Dia` (RLS on, select pa
 ## §3.v2947 — Ritmo de picking: estimado por dificultad antes de pickear vs real (Thomas, 12/10/2026)
 
 Objetos nuevos: `gv_picking_estimar(text[])` (anon, 1,45 s para las 37 pendientes), `GV_Picking_Estimado` (RLS sin policy, 37 vivas + 182 reconstruidas), `gv_picking_estimar_snapshot()` + cron 155 `gv-picking-estimar` (`8-58/10 9-23 * * *`), `GV_Plantel_Operario_Dia` (RLS sin policy, 63 días), `gv_ritmo_picking(date,date)` (authenticated, guard SUPERVISOR, 84 ms 28 días). Cambian: `gv_plantel_dia_refrescar` (rearma por operario) y `gv_ppp_plantel` (hora de picking por dificultad; agrega claves al final de `semana`). Rollback: `select cron.unschedule('gv-picking-estimar');` + la versión de `gv_ppp_plantel` en `sql/gv_ppp_plantel_v2946.sql`.
+
+### §3.v2948 — Armado por dificultad · Plantel con A Programar/Cuarentena · caja extra del picking (12/10, Thomas D5-D7)
+
+- Nuevo: `GV_Armado_Tanda`, `GV_Armado_Estimado` (RLS sin policy), `gv_armado_tamano`, `gv_armado_tanda_calc`,
+  `gv_armado_tanda_refresh`, `gv_armado_estimar`, `gv_armado_estimar_snapshot`, `gv_ritmo_armado` (supervisor),
+  `gv_ppp_sin_programar` (interna). Claves `arm_*` y `caja_extra` en `GV_Picking_Esquema`.
+- Cambiado: `gv_picking_tanda_calc` y `gv_picking_estimar` (+ caja_extra), `gv_ppp_plantel` (sin_programar + horas_arm),
+  cron 155 (+ armado). Definiciones vivas en `sql/gv_plantel_ritmo_v2948_defs.sql`.
+- Medido: picking 386 tandas MAE 3.436 → 3.418 min; armado 426 tandas corr 0,845, esperado/real 1,005; estimado antes de
+  armar corr 0,848 (×1,021); Plantel 1,6 s; Ritmo armado 14 días: 60 tandas, 103 %.
+- Rollback: `cron.alter_job(155, command := <el viejo, en la cabecera del sql>)`, poner `caja_extra` en 0 (y restar
+  0,0061 × (cajas − cajas30) del caché), recrear `gv_ppp_plantel` desde `sql/gv_ritmo_picking_v2947.sql`.
