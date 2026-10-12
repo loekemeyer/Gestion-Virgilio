@@ -1216,6 +1216,8 @@ echo "== ads-alertas (v27.21: ADS — Alertas Damián Stock, talleristas + quieb
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ads-alertas.cjs
 echo "== ppp-plantel (v29.46: PPP → Plantel de la semana, horas de picking/armado/fijas → personas; plantel.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-plantel.cjs
+echo "== monitor-ritmo (v29.47: Monitor → Ritmo de picking, estimado por dificultad vs real; plantel.js) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/monitor-ritmo.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ads-xlsx-orden.cjs
 node tests/ads-entrega-proy.cjs
 node tests/ads-em-plazo.cjs

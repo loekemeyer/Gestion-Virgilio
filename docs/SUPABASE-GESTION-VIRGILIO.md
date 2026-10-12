@@ -31817,3 +31817,7 @@ igual) es decisión de la persona y no cambia; «movido a mano» cuenta como man
 ## §3.v2946 — Plantel de la semana: `GV_Plantel_Dia` + `gv_ppp_plantel` (12/10/2026)
 
 Objetos nuevos, nada existente tocado: tabla `GV_Plantel_Dia` (RLS on, select para anon/authenticated, sin escritura), `gv_habil_mas(date,int)`, `gv_plantel_dia_refrescar(date,date)` (sin grant para anon), `gv_ppp_plantel(int,int,int,int)` (anon) y el cron 154 `gv-plantel-dia` (`50 7 * * *` UTC, minuto sin pesados según `gv_cron_colisiones`). Backfill 63 días. Medido como anon: 1,45 s. Impacto en otras pantallas: 0 (sólo lee). Rollback: cabecera de `sql/gv_ppp_plantel_v2946.sql`.
+
+## §3.v2947 — Ritmo de picking: estimado por dificultad antes de pickear vs real (Thomas, 12/10/2026)
+
+Objetos nuevos: `gv_picking_estimar(text[])` (anon, 1,45 s para las 37 pendientes), `GV_Picking_Estimado` (RLS sin policy, 37 vivas + 182 reconstruidas), `gv_picking_estimar_snapshot()` + cron 155 `gv-picking-estimar` (`8-58/10 9-23 * * *`), `GV_Plantel_Operario_Dia` (RLS sin policy, 63 días), `gv_ritmo_picking(date,date)` (authenticated, guard SUPERVISOR, 84 ms 28 días). Cambian: `gv_plantel_dia_refrescar` (rearma por operario) y `gv_ppp_plantel` (hora de picking por dificultad; agrega claves al final de `semana`). Rollback: `select cron.unschedule('gv-picking-estimar');` + la versión de `gv_ppp_plantel` en `sql/gv_ppp_plantel_v2946.sql`.

@@ -56,6 +56,10 @@ const DATA = {
     o.orden = c.filas.map((f) => f.k).join(",");
     const div = document.createElement("div"); div.innerHTML = plantelHtml(); document.body.appendChild(div);
     o.txt = div.textContent;
+    /* v29.47: si la base manda horas_pick (por dificultad), la fila de picking usa ESAS horas */
+    const dd = JSON.parse(JSON.stringify(_plantel.data)); dd.semana.horas_pick = 20; dd.semana.horas_pick_oblig = 9.57; dd.semana.horas_pick_noacum = 20; dd.semana.factor_real = 1.215;
+    const cd = plantelCalc(dd, null); const fp = cd.filas.filter((x) => x.k === "pick")[0];
+    o.difHoras = fp.horas; o.difRitmo = Math.round(fp.ritmo * 100) / 100; o.difTotal = Math.round(cd.total * 100) / 100;
     _plantel.util = 9;
     o.personas9 = plantelCalc(_plantel.data, _plantel.util).personas;
     _plantel.util = null;
@@ -85,6 +89,8 @@ const DATA = {
   ok(/13 NP/.test(out.txt), "(c) muestra las NP que ya pasaron la demora");
   ok(out.personas9 === 4, "(d) con 9 h útiles por persona son 4 personas, dio " + out.personas9);
   ok(/No se pudo leer/.test(err.err) && /No se pudo leer/.test(err.html) && !/personas toda la semana/.test(err.html), "(e) una lectura rota se dice, no muestra personas");
+  ok(out.difHoras === 20 && out.difRitmo === 1.61, "(f) con horas_pick de la base, picking = 20 h y m³/h efectivo 1,61: " + out.difHoras + " / " + out.difRitmo);
+  ok(Math.abs(out.difTotal - 134.84) < 0.05, "(f) total con picking por dificultad " + out.difTotal + " (esperado 134,84)");
   ok(errs.length === 0, "errores de página: " + errs.join(" | "));
   if (fallas.length) { console.log("FALLA ppp-plantel:\n  " + fallas.join("\n  ")); process.exit(1); }
   console.log("OK ppp-plantel — " + out.personas + " personas, " + out.total + " h, " + llamadas + " llamadas");

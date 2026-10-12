@@ -8672,3 +8672,21 @@ Solapa **Plantel** de la PPP (`plantel.js`, `plantelHtml` / `plantelCalc`). Todo
 - **No cuenta** lo que está en A Programar ni en Cuarentena (no tiene tanda ni fecha).
 - Medido 12/10: entra 32,2 m³/sem y se procesan 5,0 m³/día (≈ 25/sem) con 3,5 personas/día; 13 NP ya pasaron los 10 hábiles. Próxima semana: 143:10 h → 5 personas.
 - `sql/gv_ppp_plantel_v2946.sql` (rollback en la cabecera), `tests/ppp-plantel.cjs`.
+
+## ⚠ REGLA (Thomas, 2026-10-12, v29.47, D4): RITMO DE PICKING — estimado por DIFICULTAD antes de pickear vs real
+
+**Thomas:** *"si es un metro cúbico de un picking ultra difícil, el ritmo va a ser peor … que figure cuántas son las horas y qué rendimiento tuvieron en horas reales, acorde al esperado que habíamos estimado de manera inicial. Todo en el back."*
+
+| pieza | qué hace |
+|---|---|
+| **`gv_picking_estimar(tandas[])`** | el tamaño D17 (min) de una tanda SIN pickear: líneas del pedido (`PPP_Web_Base` / `gv_ppp_base_pedidos`), góndola del Mapa y stock de ahora (`stocks_carga_rapida`) para la altura. Misma fórmula y coeficientes que `gv_picking_tanda_calc` (`GV_Picking_Esquema`). Validado sobre 98 tandas ya pickeadas: correlación 0,98 con el D17 post-picking, +5 % (cuenta líneas que después salen en 0) |
+| **`GV_Picking_Estimado`** | la foto por tanda: `tamano_inicial` (la PRIMERA estimación, no se pisa) y `tamano` (la última antes del TP). Cron **155 `gv-picking-estimar`** (`8-58/10 9-23`). Las 182 tandas pickeadas antes del 12/10 están `reconstruido = true` (estimadas después, con el stock de hoy) |
+| **`GV_Plantel_Operario_Dia`** | horas del monitor por operario y día (la llena `gv_plantel_dia_refrescar`, cron 154; `GV_Plantel_Dia` sale de esa foto) |
+| **`gv_ritmo_picking(desde, hasta)`** | **sólo supervisor**. Por día, por operario y total: estimado inicial, esperado (D17 con lo pickeado), real neto (sin pausas ni huecos > 5 min, cola ≤ 30), horas del monitor (hoy en vivo), rendimiento = esperado ÷ real (≥ 100 % llegó), pérdida = monitor − real |
+| Monitor → pestaña **Ritmo** | `ritmoCargar` / `ritmoRender` en `plantel.js`. Dentro de `monTabSwitch`: el kiosko de pared no la muestra |
+| **Plantel** | la hora de picking sale de la base (`semana.horas_pick`): lo que vence = minutos estimados de SUS tandas × F (F = horas reales del monitor ÷ estimado de las tandas pickeadas en la historia, 1,22 al 12/10); lo que entra, al promedio; el mayor |
+
+- ⚠ **El modelo topea cada línea en 30 cajas** (`tope_cajas_linea`): un pallet entero (E85A, 1 línea, 2.000 cajas, 6,16 m³) estima 6 min y E84A (4.000 cajas) tardó 32. Por eso lo pendiente sale «más fácil» que el promedio. Recalibrar las líneas grandes es pendiente.
+- Al 12/10, 28 días: 144 tandas, esperado 62:44 h, real 56:35 h (111 %), monitor 80:32 h (la diferencia son pausas, huecos y cola).
+- **Armado no tiene modelo de dificultad todavía**: es el paso siguiente (calibrar con líneas, NP, cajas, líos, súper).
+- `sql/gv_ritmo_picking_v2947.sql`, `tests/monitor-ritmo.cjs`, `tests/ppp-plantel.cjs` (f).

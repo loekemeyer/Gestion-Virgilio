@@ -5960,6 +5960,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
           <button class="mod-tab on" id="monTabTv" onclick="setMonitorTab('tv')" title="El tablero de planta, el mismo que ve la TV">📺 Monitor</button>
           <button class="mod-tab" id="monTabAdm" onclick="setMonitorTab('admin')" title="El mismo tablero de la TV pero clickeable: cada celda abre su desglose">🛠️ Mon. Admin</button>
           <button class="mod-tab" id="monTabAn" onclick="setMonitorTab('incons')" title="Productividad e inconsistencias">📊 Análisis</button>
+          <button class="mod-tab" id="monTabRitmo" onclick="setMonitorTab('ritmo')" title="Picking: horas estimadas por dificultad contra las reales, por día y operario (sólo supervisores)">Ritmo</button>
         </div>
         <!-- El título, la meta, la barra de avance y el buscador eran del monitor viejo, que ya
              no tiene puerta (sus funciones siguen en el archivo y le siguen escribiendo acá).
@@ -6010,6 +6011,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <!-- v25.77 (Luis): Mon. Admin — el MISMO tablero (monitor/admin.html, generado desde tv.html)
          pero clickeable: cada celda abre el desglose en un pop-up. Iframe aparte para que la pared
          (tv.html) siga liviana y de solo lectura. -->
+    <!-- v29.47 (Thomas, D4): Ritmo de picking — estimado por dificultad vs real (plantel.js, gv_ritmo_picking) -->
+    <div id="ritmoContent" class="hidden" style="flex:1;min-height:0;max-height:84vh;overflow:auto"></div>
     <div id="admContent" class="hidden" style="flex:1;min-height:0">
       <iframe id="monAdmFrame" title="Mon. Admin" style="flex:1;width:100%;min-height:78vh;border:0;border-radius:8px;background:#0b1220"></iframe>
     </div>
@@ -6398,7 +6401,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.46"></script>
+<script type="module" src="recepcion.js?v=29.47"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10702,7 +10705,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.46";
+const APP_VERSION = "v29.47";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -56737,7 +56740,12 @@ function setMonitorTab(tab) {
   _inconsActive = (tab === "incons");
   const tvOn = (tab === "tv");   // v23.64: la vista del monitor de pared
   const admOn = (tab === "admin");   // v25.77: Mon. Admin (el mismo tablero, clickeable)
-  if (cont) cont.classList.toggle("hidden", _inconsActive || tvOn || admOn);
+  const rtOn = (tab === "ritmo");    // v29.47: Ritmo de picking (plantel.js)
+  const rtc = document.getElementById("ritmoContent");
+  if (rtc) rtc.classList.toggle("hidden", !rtOn);
+  const swRt = document.getElementById("monTabRitmo"); if (swRt) swRt.classList.toggle("on", rtOn);
+  if (rtOn && typeof ritmoCargar === "function") ritmoCargar();
+  if (cont) cont.classList.toggle("hidden", _inconsActive || tvOn || admOn || rtOn);
   if (inc)  inc.classList.toggle("hidden", !_inconsActive);
   if (tvc)  tvc.classList.toggle("hidden", !tvOn);
   if (admc) admc.classList.toggle("hidden", !admOn);
@@ -56760,7 +56768,7 @@ function setMonitorTab(tab) {
   const subBar = document.getElementById("anSubBar");
   if (subBar) subBar.classList.toggle("hidden", !_inconsActive);
   const titleEl = document.getElementById("monitorTitleText");
-  if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : (admOn ? "Mon. Admin" : (tvOn ? "Vista TV" : "Monitor Virgilio"));
+  if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : (admOn ? "Mon. Admin" : (tvOn ? "Vista TV" : (rtOn ? "Ritmo" : "Monitor Virgilio")));
   if (_inconsActive) refreshInconsistencias();
 }
 
@@ -62184,7 +62192,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.46"></script>
+<script src="importacion.js?v=29.47"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65114,13 +65122,13 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.46"></script>
-<script src="hotsale.js?v=29.46"></script>
-<script src="estadisticas.js?v=29.46"></script>
-<script src="ads.js?v=29.46"></script>
-<script src="plantel.js?v=29.46"></script>
+<script src="cobranzas.js?v=29.47"></script>
+<script src="hotsale.js?v=29.47"></script>
+<script src="estadisticas.js?v=29.47"></script>
+<script src="ads.js?v=29.47"></script>
+<script src="plantel.js?v=29.47"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.46"></script>
+<script src="ayuda.js?v=29.47"></script>
 
 </body>
 </html>
