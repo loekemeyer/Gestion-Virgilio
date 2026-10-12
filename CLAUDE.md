@@ -8206,6 +8206,15 @@ filtro de «legajo de prueba» en un monitor lleva también `/^sup:/`. `tests/mo
   pedidos del 820E se da de baja el 809E LK** (GV_Codigo_Baja no sirve: es por código y el 809E de Chef sigue).
   `tests/pedimp-encurso-suma.cjs`.
 
+## ⚠ REGLA (Thomas, 2026-10-10, v29.44): el 119 pasa a SECUNDARIO del 119E — recién CUANDO LLEGA
+
+- 119E (Corta queso Loke, Ownland, PI OL-10139: 1.872 u, llega 18/12) se dio de alta en Stocks en 0 y su pedido quedó en
+  🚢 En curso. El 119 (góndola Ñ26, OC a Lucho) sigue como está hasta que llegue.
+- **Familia diferida**: `GV_Familia_Al_Llegar` (secundario, principal). El cron **`gv-familia-al-llegar`** (`39 * * * *`,
+  anti-solape) → `gv_familia_al_llegar_tick()`: cuando el principal tiene stock (> 0) o unidades recibidas, escribe la fila en
+  `Equivalencias_Familia` y marca `aplicado_en`. Otro caso igual = un `insert`.
+- Lectura: `select * from public.gv_familia_al_llegar_tick(true);` (qué haría). `sql/gv_familia_al_llegar_v2944.sql`.
+
 ## ⚠ REGLA (Luis, 2026-10-07, v27.74): 865ED NO EXISTE MÁS — es el 865E de 12 u
 
 El 865E (antes caja de 24 u) pasó a ser el Rallador Plano A/I 3 Usos **de 12 u**, y el 865ED se unificó ahí: UxB,
