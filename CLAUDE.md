@@ -8655,3 +8655,20 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
   pantalla queda como antes. Lo recibido se copia a GP2 por el espejo de la v29.32.
 - El conteo de insumos del martes 13/10 corrige el stock. `sql/gv_insumos_nombre_gp2_v2934.sql`,
   `sql/gv_ri_catalogo_gp2_v2935.sql` (respaldo de nombres adentro), centinela 388, `tests/ins-ri-gp2-catalogo.cjs`.
+
+## ⚠ REGLA (2026-10-12, v29.46): PPP → «Plantel» — horas de picking, armado y tareas fijas → personas de la semana
+
+Solapa **Plantel** de la PPP (`plantel.js`, `plantelHtml` / `plantelCalc`). Todo lo calcula **`gv_ppp_plantel(semana, semanas_hist, meta, dias_antes)`** (anon, ~1,4 s):
+
+| pieza | de dónde |
+|---|---|
+| m³ de la semana | el MAYOR entre **no vencer** (programado sin pickear / sin armar cuyo límite de armado = fecha del pedido + meta hábiles − 2 hábiles cae antes del viernes; para una semana futura se descuenta lo que se hace antes al ritmo de hoy) y **no acumular** (m³ que entra por semana, por fecha del pedido) |
+| m³/h | medido: m³ de las tandas con su 1.er TP / TAP ÷ horas reales de picking / armado (`gv_monitor_horas_operario_dia`) de las últimas N semanas |
+| tareas fijas | promedio por día hábil de **carga + remitos** (hs_prod − pick − arm = CC/CR/RR) y **movimiento** (guardado, recepción, racks, insumos) × hábiles de la semana |
+| personas | horas ÷ (horas útiles por persona por día × hábiles), para ARRIBA. Útiles = medido (pick+arm+carga+mov por persona-día, 6:58 al 12/10, jornada 8:25); se puede pisar en pantalla (por navegador) |
+
+- La historia vive en **`GV_Plantel_Dia`** (caché por día: 28 días de la vista tardan 3,3 s); la llena `gv_plantel_dia_refrescar` con el cron **154 `gv-plantel-dia`** (04:50 ART, últimos 3 días, anti-solape).
+- Feriados: `gv_es_dia_habil` (planify.feriados + GV_Dias_No_Habiles). La meta por defecto es **10 hábiles** del pedido a la salida (editable en pantalla).
+- **No cuenta** lo que está en A Programar ni en Cuarentena (no tiene tanda ni fecha).
+- Medido 12/10: entra 32,2 m³/sem y se procesan 5,0 m³/día (≈ 25/sem) con 3,5 personas/día; 13 NP ya pasaron los 10 hábiles. Próxima semana: 143:10 h → 5 personas.
+- `sql/gv_ppp_plantel_v2946.sql` (rollback en la cabecera), `tests/ppp-plantel.cjs`.

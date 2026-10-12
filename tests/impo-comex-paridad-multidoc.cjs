@@ -447,7 +447,10 @@ const GRUPOS = [
         const tag = `${G.modo}/${nom}`;
         try { await fn(D, F, st); } catch (e) { fail.push(`${tag}: el flujo se cortó: ${e.message.split("\n")[0]}`); }
         const E = ESPERADO[G.modo][nom];
-        const got = ordenar(S.pedidos.filter((x) => x.paso).map(compacto)), exp = ordenar(E.pedidos.slice());
+        /* v29.46: «cargas_hoy» manda la fecha de HOY: la grabación es del 09/10 y el test fallaba
+           cualquier otro día. Se compara sin la fecha (el resto del pedido sí). */
+        const _sinHoy = (t) => String(t).replace(/("accion\\?":\\?"cargas_hoy\\?",\\?"desde\\?":\\?")\d{4}-\d{2}-\d{2}/, "$1HOY");
+        const got = ordenar(S.pedidos.filter((x) => x.paso).map(compacto).map(_sinHoy)), exp = ordenar(E.pedidos.map(_sinHoy));
         for (let i = 0; i < Math.max(got.length, exp.length); i++)
           if (got[i] !== exp[i]) { fail.push(`${tag}: pedido ${i} distinto\n    viejo: ${exp[i]}\n    nuevo: ${got[i]}`); break; }
         const vistos = new Set();

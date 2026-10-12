@@ -6398,7 +6398,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.45"></script>
+<script type="module" src="recepcion.js?v=29.46"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -7543,6 +7543,7 @@ function pppFitPantalla() {
   // v18.12 — Modificar Pedidos: es una pantalla de trabajo propia, no una PPP que tenga que
   // entrar entera. Se exime desde ahora para que el módulo se escriba sin pelearse con el zoom.
   if (typeof _pppTab !== "undefined" && _pppTab === "modif") { body.style.zoom = "1"; body.style.overflowY = "auto"; return; }
+  if (typeof _pppTab !== "undefined" && _pppTab === "plantel") { body.style.zoom = "1"; body.style.overflowY = "auto"; return; }   // v29.46
   // v17.95 (Luis, con capturas del día y la tanda abiertos: "sigue colapsando para adentro y se hacen
   // más chiquitas las filas a medida que se abren"). NO era el CSS: era ESTE zoom. La tabla de
   // Programación crece al abrir un nivel, el zoom la comprime para que entre, y cada nivel que se
@@ -10701,7 +10702,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.45";
+const APP_VERSION = "v29.46";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -45333,6 +45334,7 @@ function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
     b("resumen", "🚚 Resumen") +
     b("ent",     "✅ Pedidos Entregados (" + n(cEnt) + ")") +
     b("ocup",    "📦 Ocupación") +
+    b("plantel", "Plantel") +                          // v29.46: horas y personas de la semana (plantel.js)
     b("modif",   "✏️ Modificar Pedidos") +          // v18.14 (Luis): entre Ocupación y Config. Cuarentena
     b("cuarcfg", "🚧 Config. Cuarentena") +
   '</div>';
@@ -45400,6 +45402,12 @@ function pppRenderProg() {
   }
   // v18.12 — Modificar Pedidos. Pantalla propia, interceptada acá arriba por lo mismo que
   // Config. Cuarentena: no depende de que se haya importado una PPP.
+  // v29.46 — Plantel de la semana (plantel.js): horas de picking, armado y tareas fijas → personas.
+  if (_pppTab === "plantel") {
+    pppPaintTabs();
+    _renderKeepFocus(box, (typeof plantelHtml === "function") ? plantelHtml() : '<div style="padding:20px;text-align:center;">No se cargó plantel.js: recargá la página.</div>');
+    return;
+  }
   if (_pppTab === "modif") {
     pppPaintTabs();
     /* Las dos fuentes son las que ya cargan otras solapas: `_pgaRows` (Programación) y
@@ -62176,7 +62184,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.45"></script>
+<script src="importacion.js?v=29.46"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65106,12 +65114,13 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.45"></script>
-<script src="hotsale.js?v=29.45"></script>
-<script src="estadisticas.js?v=29.45"></script>
-<script src="ads.js?v=29.45"></script>
+<script src="cobranzas.js?v=29.46"></script>
+<script src="hotsale.js?v=29.46"></script>
+<script src="estadisticas.js?v=29.46"></script>
+<script src="ads.js?v=29.46"></script>
+<script src="plantel.js?v=29.46"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.45"></script>
+<script src="ayuda.js?v=29.46"></script>
 
 </body>
 </html>

@@ -1214,6 +1214,8 @@ echo "== est-madre-unica (v25.78: la Est. Madre es UN cuadro — est-madre.js, m
 node tests/est-madre-unica.cjs
 echo "== ads-alertas (v27.21: ADS — Alertas Damián Stock, talleristas + quiebres; ads.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ads-alertas.cjs
+echo "== ppp-plantel (v29.46: PPP → Plantel de la semana, horas de picking/armado/fijas → personas; plantel.js) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-plantel.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ads-xlsx-orden.cjs
 node tests/ads-entrega-proy.cjs
 node tests/ads-em-plazo.cjs

@@ -31813,3 +31813,7 @@ igual) es decisión de la persona y no cambia; «movido a mano» cuenta como man
   escriben con sesión. Las 7 que usaban la clave pública pasaron a `gvWriteHdr()` (index.html y
   modulo_talleristas_arts/edit.js; ahí OC_Maximos ya fallaba con anon). Probado: authenticated entra, anon no
   (log +1). Quedan con INSERT de anon sólo las 14 que el operario usa de verdad. Rollback `gv_anon_bloqueo_d10(false)`.
+
+## §3.v2946 — Plantel de la semana: `GV_Plantel_Dia` + `gv_ppp_plantel` (12/10/2026)
+
+Objetos nuevos, nada existente tocado: tabla `GV_Plantel_Dia` (RLS on, select para anon/authenticated, sin escritura), `gv_habil_mas(date,int)`, `gv_plantel_dia_refrescar(date,date)` (sin grant para anon), `gv_ppp_plantel(int,int,int,int)` (anon) y el cron 154 `gv-plantel-dia` (`50 7 * * *` UTC, minuto sin pesados según `gv_cron_colisiones`). Backfill 63 días. Medido como anon: 1,45 s. Impacto en otras pantallas: 0 (sólo lee). Rollback: cabecera de `sql/gv_ppp_plantel_v2946.sql`.
