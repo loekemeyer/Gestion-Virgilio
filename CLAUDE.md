@@ -8213,6 +8213,9 @@ filtro de «legajo de prueba» en un monitor lleva también `/^sup:/`. `tests/mo
 - **Familia diferida**: `GV_Familia_Al_Llegar` (secundario, principal). El cron **`gv-familia-al-llegar`** (`39 * * * *`,
   anti-solape) → `gv_familia_al_llegar_tick()`: cuando el principal tiene stock (> 0) o unidades recibidas, escribe la fila en
   `Equivalencias_Familia` y marca `aplicado_en`. Otro caso igual = un `insert`.
+- **v29.45 (Luis, D10): al llegar, además la góndola del secundario pasa al principal** (`pasar_gondola`: Ñ26 → 119E, por
+  `gv_lugar_item_guardar` / `_sacar`) **y la OC del secundario se apaga** (`apagar_oc`: `OC_Maximos` 119 `activo = false`; el 119E
+  queda con fila activa). Todo queda en `aplicado_motivo`. `sql/gv_familia_al_llegar_v2945.sql`.
 - Lectura: `select * from public.gv_familia_al_llegar_tick(true);` (qué haría). `sql/gv_familia_al_llegar_v2944.sql`.
 
 ## ⚠ REGLA (Luis, 2026-10-07, v27.74): 865ED NO EXISTE MÁS — es el 865E de 12 u
