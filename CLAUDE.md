@@ -270,6 +270,64 @@ explica (📦/📅 de «no es demora»), un estado que se lee de un vistazo, el 
 el operario ya tiene memorizado. La prueba es: si el emoji se saca y no se pierde información, se
 saca.
 
+## 🟥🟥🟥 REGLA RECTORA DE DISEÑO «GV-UI» (Luis, 2026-10-13, v29.75): UNA PANTALLA SE LEE DE UN VISTAZO
+
+**Luis, textual:** *"quiero que agarremos una filosofía de diseño visual / front / usabilidad
+moderna y que cortemos con la basura. Buscamos que sea rápidamente procesable visualmente
+cualquier pantalla de esta aplicación. Sin texto excesivo, claridad visual, directo al grano con
+la información más importante primero y bien simple."*
+
+**Vale para TODOS los repos y TODA pantalla nueva o que se toque** (copiar este bloque al
+`CLAUDE.md` del repo nuevo). No reemplaza la regla de espacio del 28/09 ni la de «MENOS EMOJIS»:
+las tres son la misma idea — **densidad alta, ruido cero** —. Ésta agrega la **jerarquía**.
+
+> ## **La pregunta de cada pantalla es: «¿qué tiene que saber el que la abre, en 2 segundos?».**
+> Eso va primero, grande y solo. Todo lo demás baja un nivel o se pliega.
+
+### Los 8 puntos
+
+1. **UN dato principal por pantalla, y es el texto más grande que se ve.** Si hay dos cosas
+   del mismo tamaño, no hay jerarquía: el ojo no sabe dónde parar. El título y el código de la
+   cosa (la tanda, el cliente, la OC) **no** son el dato principal: son el rótulo.
+2. **Tres niveles de tamaño y nada más**: el dato (38-46 px), lo que lo acompaña (14-19 px), lo
+   accesorio (11-13 px gris). Un cuarto tamaño es indecisión.
+3. **El veredicto antes que los números.** Arriba va UNA línea que dice qué pasa y qué hacer
+   («2 hallazgos fuertes: mirar de cerca»), no un párrafo que repite los números de abajo.
+   Máximo ~60 caracteres; si no entra en una línea, no es un veredicto.
+4. **Lo explicativo se pliega.** Glosarios, metodología, desgloses, «cómo se calcula» y la
+   letra chica van en un `<details>` cerrado. **Ningún bloque de texto largo se dibuja abierto.**
+   El que necesita el detalle lo abre; el otro no lo lee igual, sólo le tapa la pantalla.
+5. **El color significa.** Verde / rojo / ámbar sólo cuando el valor es bueno, malo o dudoso;
+   gris cuando no hay dato. Un color decorativo (fondos de marca, bordes de colores, botones
+   pintados) saca atención del que sí significa. Fondo claro, texto oscuro, una sola tinta fuerte.
+6. **Un rótulo son 1 o 2 palabras, sin la explicación al lado.** `rendimiento`, no
+   `rendimiento (esperado ÷ real)`. La explicación vive en el `<details>` del punto 4.
+7. **Una lista es una línea por cosa**, con un punto de color para la severidad, y un
+   «y N más» cuando pasa de 8. Nada de tarjeta por ítem ni bordes por todos lados.
+8. **Sin emojis decorativos** (regla del 06/10) y **sin unidad repetida**: va en el rótulo, no
+   en cada celda.
+
+### La pantalla de referencia
+
+**`analisis.js` (Análisis Productivo) ES el molde.** Al escribir una pantalla nueva se mira cómo
+está hecha ésa, no cómo estaba la vieja. Las clases que sirven de base (`an-hd`, `an-state`,
+`an-hero`, `an-fase .big`, `an-av`, `details/summary`, `an-kpi`) están comentadas ahí mismo.
+
+**Qué cambió, para entender la diferencia:** antes eran **7 tarjetas del mismo peso** (nada
+resaltaba), un párrafo de conclusión, **3 notas grises** de metodología siempre abiertas y los
+rótulos con la fórmula entre paréntesis adentro del tile. Hoy: rendimiento en 46 px → veredicto
+en una línea → hallazgos de a uno → todo lo demás plegado.
+
+⚠ **El texto que escribe la base no se muestra crudo.** Los avisos de `gv_analisis_tanda` vienen
+de un plpgsql sin tildes y con `codigo(s)`: el front los acentúa y los pluraliza (`_anTxt`). Es
+cosmético y no cambia ningún número, pero *«El picking dio por completo 1 codigo(s)»* en pantalla
+es exactamente la basura que esta regla viene a sacar.
+
+**Chequeo:** `node tests/analisis-productivo.cjs` — el bloque **(g)** mide los puntos 1, 3, 4 y 8
+sobre la pantalla corriendo: el dato principal es el texto más grande, el veredicto entra en una
+línea, no hay texto largo sin plegar y no hay emojis decorativos. Verificado que falla al achicar
+el dato principal. **Al escribir una pantalla nueva, se le copia ese bloque al test.**
+
 ## 📌 LEER PRIMERO: `docs/ESTADO-Y-PENDIENTES.md`
 
 **Foto del estado al 2026-09-13.** Qué falta de verdad está en la base
