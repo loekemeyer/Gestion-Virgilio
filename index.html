@@ -6401,7 +6401,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.64"></script>
+<script type="module" src="recepcion.js?v=29.65"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10705,7 +10705,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.64";
+const APP_VERSION = "v29.65";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -57549,6 +57549,11 @@ function pkHojaArmar(tanda, tp, pkc, lug, nps, otras, nombre, base){
     cajas: lineas.reduce(function (s, x){ return s + x.esp; }, 0), falt: lineas.reduce(function (s, x){ return s + (x.real == null ? 0 : Math.max(0, x.esp - x.real)); }, 0) };
 }
 function pkHojaHtml(d){
+  // ⚠ v29.65 (Luis, 13/10) — la diagonal del parcial y el tachado de la fila sin pickear NO van
+  // con linear-gradient + calc(): html2canvas (el PDF que arma el helper de impresión) no parsea el
+  // calc() de los color stops y pinta el gradiente SOLIDO — la nota salió con un CUADRADO NEGRO
+  // encima del total de cajas y la fila sin pickear toda gris, ilegible. Van con una barra de fondo
+  // sólido (::after, sin calc), que el navegador y html2canvas dibujan igual. tests/pk-hoja-picking.cjs.
   var css = '<style>.pkh{font-family:Arial,Helvetica,sans-serif;color:#111;}' +
     '.pkh-top{display:flex;justify-content:space-between;align-items:flex-start;gap:1em;border-bottom:.12em solid #111;padding-bottom:.35em;margin-bottom:.4em;}' +
     '.pkh-t{font-size:1.55em;font-weight:800;line-height:1.15;}.pkh-s{font-size:1.25em;}.pkh-r{font-size:1.1em;text-align:right;line-height:1.35;}' +
@@ -57559,9 +57564,9 @@ function pkHojaHtml(d){
     '.pkh-tot{font-size:1.15em;font-weight:800;margin-top:.35em;text-align:center;}.pkh-m3h{font-size:1.3em;font-weight:800;margin-top:.25em;text-align:center;}' +
     '.pkh-ok{font-weight:800;font-size:1.15em;}' +
     '.pkh-diag{position:relative;display:inline-block;padding:0 .18em;}' +
-    '.pkh-diag::after{content:"";position:absolute;left:0;right:0;top:0;bottom:0;background:linear-gradient(to top right,transparent calc(50% - .55px),#111 calc(50% - .55px),#111 calc(50% + .55px),transparent calc(50% + .55px));-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.pkh-diag::after{content:"";position:absolute;left:-.02em;right:-.02em;top:50%;height:.09em;margin-top:-.045em;background:#111;transform:rotate(-20deg);-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
     '.pkh-got{font-weight:800;margin-left:.35em;}' +
-    '.pkh-no td{color:#777;background:linear-gradient(to bottom,transparent calc(50% - .6px),#777 calc(50% - .6px),#777 calc(50% + .6px),transparent calc(50% + .6px));-webkit-print-color-adjust:exact;print-color-adjust:exact;}.pkh-no .pkh-cod{color:#777;}</style>';
+    '.pkh-no td{color:#777;position:relative;}.pkh-no td::after{content:"";position:absolute;left:0;right:0;top:50%;height:.075em;margin-top:-.037em;background:#777;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.pkh-no .pkh-cod{color:#777;}</style>';
   var mitad = Math.ceil(d.lineas.length / 2);
   // v25.71 (Luis): la columna «Pickeo» desaparece; el resultado va en «Total cajas».
   //  · se pickeó todo → el número + ✓   · a medias → total tachado (diagonal fina) + lo pickeado al lado
@@ -62268,7 +62273,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.64"></script>
+<script src="importacion.js?v=29.65"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65198,13 +65203,13 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.64"></script>
-<script src="hotsale.js?v=29.64"></script>
-<script src="estadisticas.js?v=29.64"></script>
-<script src="ads.js?v=29.64"></script>
-<script src="plantel.js?v=29.64"></script>
+<script src="cobranzas.js?v=29.65"></script>
+<script src="hotsale.js?v=29.65"></script>
+<script src="estadisticas.js?v=29.65"></script>
+<script src="ads.js?v=29.65"></script>
+<script src="plantel.js?v=29.65"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.64"></script>
+<script src="ayuda.js?v=29.65"></script>
 
 </body>
 </html>

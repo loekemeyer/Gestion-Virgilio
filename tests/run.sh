@@ -708,6 +708,8 @@ echo "== remito-np-web (v15.46: el remito impreso trae cliente y fecha también 
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/remito-np-web.cjs
 echo "== pk-hoja-picking (v25.51: hoja de picking por tanda al terminar el picking) =="
 node tests/pk-hoja-picking.cjs
+echo "== pk-hoja-pdf (v29.65: la hoja como sale por el helper — sin bloques negros en Total cajas) =="
+node tests/pk-hoja-pdf.cjs
 
 echo "== proy-entregadas (v15.52: popup Proyección — cajas ENTREGADAS por el proveedor entre el mes y la barra; s/d si ese mes no había registro) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/proy-entregadas.cjs
