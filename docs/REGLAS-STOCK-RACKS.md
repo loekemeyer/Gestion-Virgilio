@@ -1055,3 +1055,10 @@ pregunta («¿esas cajas están físicamente?») sólo la puede contestar el dep
 aviso (Telegram o cartel) para el BR que al día siguiente sigue sin su MG, y lo bajó. **No volver a proponerlo.** El
 caso se encuentra con la consulta de arriba, a mano.
 
+
+## Conteo 809E CH y 935E (Luis, 2026-10-13, v30.24)
+
+- **809E de Chef: góndolas M13, M14, M15 y M16** (M16 compartida con el 809 nacional). AD05 se bajó entera a
+  góndola: racks 0, góndola **366 cajas** (sólo 809E; el 809 sigue con 9). Ajuste `conteo_809e_ch_20261013_*`;
+  la celda AD05 / 809E se sacó del Mapa (backup `zz_backups."GV_Backup_LugarItem_809E_20261013"`).
+- **935E en AB09: 2 MC (24 cajas)**, no 5: ajuste −36 (`conteo_935e_ab09_20261013`).

@@ -568,3 +568,16 @@ encola AUI, el cuadro que explota **no** traba el asistente) · `node tests/mon-
 - v26.64: «el m³ de la tanda sigue acreditándose a quien da el TP/TAP final». Retirado en la v26.67.
 
 - v26.67: «el puntaje 1-10 de picking sigue sin las tandas frenadas». Retirado en la v26.74 (D17).
+
+## ⚠ REGLA (Luis, 2026-10-13, v30.24): CUPO DE SUSTITUTO — las próximas 9 cajas de 809E de Chef se pickean del 809 nacional
+
+**Luis:** *"las próximas 9 cajas que entren de pedidos para la 809E de chef manden al que pickea a pickear esas 9 de 809 nacional"*.
+
+- Tabla `GV_Pick_Sustituto_Cupo` (empresa, cod_pedido, cod_pick, cajas_cupo, cajas_usadas, activo) y el uso en
+  `GV_Pick_Sustituto_Uso`. Trigger `zz_gv_pick_sustituto_cupo` en `PPP_Web_Base` (insert o cambio de `np_label`):
+  línea `809E` de **chef, sin L**, con NP → `Correcciones_Pedido` (np, 809E → 809, `origen = 'cupo'`). El picking
+  (`corrArt`) y la etapa 2 del armado (`gv_entregas_norm`) ya aplican esa tabla. La NP y la factura siguen en 809E.
+- **Una línea no se parte**: si no entra entera en lo que queda del cupo se saltea y espera la próxima. Al llenarse
+  el cupo queda `activo = false`. Sirve para cualquier otro par: es un `insert` en la tabla del cupo.
+- Lo que ya estaba cargado al 13/10 no se toca (forward-facing). `sql/gv_pick_sustituto_cupo_809_v3024.sql`.
+- Chequeo: `select * from public."GV_Pick_Sustituto_Cupo"; select * from public."GV_Pick_Sustituto_Uso";`
