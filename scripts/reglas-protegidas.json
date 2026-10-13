@@ -965,6 +965,11 @@
       "objeto": "gv_insumo_equiv_espejo",
       "regla": "Vincular una equivalencia de insumos dispara el espejo de ESE codigo en el acto (28 ms): el cron de los :19/:49 es la red, no el camino.",
       "quien": "Luis"
+    },
+    {
+      "objeto": "gv_gp2_espejo_sync",
+      "regla": "El stock de insumos de Virgilio es una VISTA en vivo (GP2.virgilio_insumo_stock): el bloque 1 del sync NO lo copia mas (v29.88).",
+      "quien": "Luis"
     }
   ]
 }
