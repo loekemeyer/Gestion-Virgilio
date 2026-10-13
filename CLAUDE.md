@@ -1832,7 +1832,7 @@ y SP. Sector SC y SP usa un nomenclador similar al de gondolas y racks y puede q
 | **Rack** | letra(s) + **2 dígitos**, con `AD`/`AT` en los de insumo: `AD05`, `X22`, `R01AD`, `V09AT`, `AF13` | master cajas de artículo · fleje · plástico · importados | `Movimientos_Stock` dep. `racks` / `racks_ch` / `insumos` |
 | **SC y SP** | letra(s) + **UN dígito**: `A1`…`L6` (52 celdas) + `MEDIO` | **piezas de Cervantes**: `partes_crudo` (SC) y `parte_procesado` (SP) | **`GP2.inventario`** (ubicación «Sector Crudo» / «Sector Procesado»), NO Virgilio |
 
-### ⚠⚠ v29.98 (Luis, 13/10): SC y SP es SU PROPIO LUGAR — la celda se llama **`IN-A1`** y su tipo es **`scp`**
+### ⚠⚠ v30.03 (Luis, 13/10): SC y SP es SU PROPIO LUGAR — la celda se llama **`IN-A1`** y su tipo es **`scp`**
 
 **Luis:** *"hagamos que sea su propio sector, lugar. IN-A1 por ejemplo? queda bien asi?"* · *"claro,
 agrega al mapa este sector"* · *"una vez hecho fijate que vincule bien con insumos y con todo lo que
@@ -1878,11 +1878,14 @@ tenga que vincular bien … y una vez tengamos la base bien armada, limpiamos to
 → `IN-A1`, **NULL**, `R01AD` · `select count(*) from public.gv_scp_celda;` (63 en 55 celdas) ·
 `select * from public.gv_reglas_perdidas;` · `node tests/pmap-scp.cjs`.
 `sql/gv_sector_scp_v2998.sql` (rollback: `select public.gv_scp_revertir();`), 5 centinelas.
+⚠ Los objetos de la base, los 5 centinelas, el `.sql` y los comentarios del código dicen **v29.98**
+(la versión con que se aplicaron): es la llave de idempotencia, **no cambiarla**; la app salió en la
+v30.03 porque otras sesiones se adelantaron.
 
 ### El mislabel que esto RETIRA
 
 ⚠⚠ **El bullet de la v22.80 dice que la grilla `A1…L6` son «racks de insumos». ES FALSO y queda RETIRADO.**
-Se dieron de alta así el 25/09 —tipo `rack`, empresa `IN`— y de ahí salió la confusión; **la v29.98 las
+Se dieron de alta así el 25/09 —tipo `rack`, empresa `IN`— y de ahí salió la confusión; **la v30.03 las
 pasó a `tipo = 'scp'` y a nombre `IN-A1`** (bloque de arriba). Medido el 13/10, antes de tocar nada:
 
 - las **52 celdas de un dígito** de `GV_Lugar` son **exactamente** donde viven `parte_procesado` (SP: `A1`-`A6`,
@@ -1894,7 +1897,7 @@ pasó a `tipo = 'scp'` y a nombre `IN-A1`** (bloque de arriba). Medido el 13/10,
 
 ⚠ **`gv_rack_sector('A1')` devolvía `A1`** (y `('A01')` NULL, porque A01 es góndola): el resolvedor de racks
 **aceptaba una celda de SC/SP** y **Ingreso a racks la ofrecía**. No hizo daño porque nadie guardó una caja ahí.
-**Cerrado en la v29.98**: con `tipo = 'scp'` ese `coalesce` no la encuentra más y devuelve NULL.
+**Cerrado en la v30.03**: con `tipo = 'scp'` ese `coalesce` no la encuentra más y devuelve NULL.
 
 ### Y en GP2 no hay celdas: SC y SP son UNA ubicación cada uno
 
@@ -10060,7 +10063,7 @@ vuelve a nacer muerto). ⚠ Ese barrido lleva un guard de *"¿encontré al menos
 **Barrido del 13/10 sobre toda la IIFE** (funciones declaradas ahí y usadas en un handler
 inline sin exponer): **0 casos más**. El panel por rol era el único.
 
-### ⚠ v29.98 (Luis, 13/10): el panel por rol es UNA LÍNEA con BADGE — el checklist se despliega
+### ⚠ v30.03 (Luis, 13/10): el panel por rol es UNA LÍNEA con BADGE — el checklist se despliega
 
 **Luis, con la captura:** *"esa visual es horrible … ajusta eso en un menu colapsable con un
 badge. que el arreglo sea general y no solo para luis"*.
