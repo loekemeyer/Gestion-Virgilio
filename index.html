@@ -6546,32 +6546,41 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
          UNA LÍNEA con su badge; el checklist se despliega. Regla de espacio del 28/09 y
          GV-UI (v29.83): lo explicativo se pliega y nada largo se dibuja abierto.
          ⚠ El `button{width:100%;padding:16px;font-size:22px}` global de la línea 26 también
-         muerde acá: sin el reset, «cambiar» salía de una pantalla de ancho. */
+         muerde acá: sin el reset, «cambiar» salía de una pantalla de ancho.
+         v30.04 — PASE `disenador-gvui`: todo sale de los TOKENS de `gv-ui.css` (cargado en
+         la línea 14). No se escribe un `font-size` ni un hex propio acá. Lo que arregló:
+         el DATO del plegado (el badge) pasó a 16 px y el nombre —que es el RÓTULO— a 12,
+         así la jerarquía no queda al revés; y «cambiar» salió de adentro del <button> de la
+         barra a `.rolp-head`, con sus 44 px de alto (antes 22 y sin teclado). */
       #rolPanel{max-width:620px;margin:4px auto 12px;}
       #rolPanel button{width:auto;margin:0;font-size:inherit;}
-      #rolPanel .rolp-bar, #rolPanel .rolp-row{width:100%;}   /* el reset de arriba les comía el ancho */
-      .rolp-bar{display:flex;align-items:center;gap:10px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:8px 12px;min-height:44px;cursor:pointer;text-align:left;box-shadow:0 2px 8px rgba(15,23,42,.05);}
-      .rolp-bar:hover{background:#f8fafc;}
-      .rolp-car{flex:0 0 auto;font-size:12px;color:#64748b;width:12px;transition:transform .12s;}
+      #rolPanel .rolp-bar, #rolPanel .rolp-row{width:100%;}   /* el reset de arriba les comia el ancho */
+      .rolp-head{display:flex;align-items:center;gap:var(--gv-sp-3);}
+      /* ⚠ `min-width:0`: sin eso el contenido de la barra le pone un min-width implícito, no
+         encoge, y a 390 px «cambiar» se sale del panel y queda pegado al borde de la pantalla. */
+      #rolPanel .rolp-head .rolp-bar{flex:1 1 auto;min-width:0;}
+      .rolp-bar{display:flex;align-items:center;gap:var(--gv-sp-4);background:var(--gv-surface);border:1px solid var(--gv-line);border-radius:var(--gv-r-sm);padding:var(--gv-sp-3) var(--gv-sp-4);min-height:var(--gv-tap);cursor:pointer;text-align:left;}
+      .rolp-bar:hover{background:var(--gv-bg);}
+      .rolp-car{flex:0 0 auto;font-size:var(--gv-fs-sm);color:var(--gv-muted);width:12px;transition:transform .12s;}
       #rolPanel.abierto .rolp-car{transform:rotate(90deg);}
-      .rolp-quien{flex:1 1 auto;font-size:14px;font-weight:800;color:#0f172a;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-      .rolp-area{font-weight:600;color:#64748b;font-size:11.5px;}
-      .rolp-badge{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:800;line-height:1.3;}
-      .rolp-b-rojo{background:#fee2e2;color:#991b1b;}
-      .rolp-b-verde{background:#dcfce7;color:#166534;}
-      .rolp-b-gris{background:#f1f5f9;color:#475569;}
-      .rolp-cambiar{flex:0 0 auto;background:transparent;border:1px solid #cbd5e1;border-radius:8px;color:#475569;font-size:11.5px;font-weight:700;padding:4px 10px;cursor:pointer;}
-      .rolp-body{display:none;background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;margin:-6px 0 0;padding:10px 12px 10px;}
+      .rolp-quien{flex:1 1 auto;min-width:0;font-size:var(--gv-fs-sm);font-weight:700;color:var(--gv-ink-2);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .rolp-area{font-weight:600;color:var(--gv-ink-2);font-size:var(--gv-fs-xs);}
+      /* el BADGE es el DATO del panel plegado: va MAS grande que el rotulo (GV-UI 1 y 2). */
+      .rolp-badge{flex:0 0 auto;display:inline-flex;align-items:center;gap:var(--gv-sp-2);border-radius:var(--gv-r-pill);padding:var(--gv-sp-1) var(--gv-sp-4);font-size:var(--gv-fs-lg);font-weight:800;line-height:1.3;}
+      .rolp-b-rojo{background:var(--gv-error-bg);color:var(--gv-error);}
+      .rolp-b-verde{background:var(--gv-ok-bg);color:var(--gv-ok);}
+      .rolp-b-gris{background:var(--gv-surface-2);color:var(--gv-ink-2);}
+      .rolp-cambiar{flex:0 0 auto;background:transparent;border:1px solid var(--gv-line);border-radius:var(--gv-r-sm);color:var(--gv-ink-2);font-size:var(--gv-fs-sm);font-weight:700;padding:var(--gv-sp-2) var(--gv-sp-4);min-height:var(--gv-tap);cursor:pointer;}
+      .rolp-body{display:none;background:var(--gv-surface);border:1px solid var(--gv-line);border-radius:var(--gv-r-sm);margin:var(--gv-sp-2) 0 0;padding:var(--gv-sp-4);}
       #rolPanel.abierto .rolp-body{display:block;}
-      #rolPanel.abierto .rolp-bar{border-radius:12px 12px 0 0;}
-      .rolp-list{display:flex;flex-direction:column;gap:4px;}
-      .rolp-row{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:8px 11px;cursor:pointer;min-height:44px;}
-      .rolp-row:hover{background:#eff6ff;}
-      .rolp-dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;}
-      .rolp-lbl{flex:1 1 auto;font-size:13.5px;font-weight:700;color:#0f172a;line-height:1.2;}
-      .rolp-hint{display:block;font-size:11px;font-weight:500;color:#64748b;margin-top:1px;}
-      .rolp-sub{font-size:11px;font-weight:600;color:#92400e;}
-      .rolp-num{flex:0 0 auto;font-size:17px;font-weight:800;min-width:26px;text-align:right;font-variant-numeric:tabular-nums;}
+      .rolp-list{display:flex;flex-direction:column;gap:var(--gv-sp-2);}
+      .rolp-row{display:flex;align-items:center;gap:var(--gv-sp-3);text-align:left;background:var(--gv-bg);border:1px solid var(--gv-line-soft);border-radius:var(--gv-r-sm);padding:var(--gv-sp-3) var(--gv-sp-4);cursor:pointer;min-height:var(--gv-tap);}
+      .rolp-row:hover{background:#eff6ff;}   /* tinte de hover: no hay token de info-bg */
+      .rolp-dot{flex:0 0 auto;width:10px;height:10px;border-radius:var(--gv-r-pill);}
+      .rolp-lbl{flex:1 1 auto;font-size:var(--gv-fs-md);font-weight:700;color:var(--gv-ink);line-height:1.2;}
+      .rolp-hint{display:block;font-size:var(--gv-fs-xs);font-weight:500;color:var(--gv-ink-2);margin-top:1px;}
+      .rolp-sub{font-size:var(--gv-fs-xs);font-weight:600;color:var(--gv-warn);}
+      .rolp-num{flex:0 0 auto;font-size:var(--gv-fs-xl);font-weight:800;min-width:var(--gv-sp-6);text-align:right;font-variant-numeric:tabular-nums;}
     </style>
     <div id="rolPanel" style="display:none;"></div>
     <div id="cgAside" style="display:none;"></div>
@@ -63770,12 +63779,12 @@ const GV_AREA_NOMBRE = { admin: "Administración general", ventas: "Ventas", imp
 const GV_ROL_ITEMS = [
   { id: "sin_zona",  areas: ["admin", "ventas"], label: "Pedidos sin zona",                          cnt: function (d) { return d.sin_zona_ped; },                       open: function () { openPPP(); },                hint: "Asignales zona en «A Programar»" },
   { id: "atrasados", areas: ["admin", "ventas"], label: "Pedidos atrasados · reprogramar",           cnt: function (d) { return d.atrasados; },                          open: function () { openPPP(); },                hint: "Abrí «Pasar de día» y confirmá" },
-  { id: "cuar_prog", areas: ["admin", "ventas"], label: "Programados que deberían ir a cuarentena",  cnt: function (d) { return d.cuar_prog; },                          open: function () { openPPP(); },                hint: "Sacalos o aprobalos en «A Programar»" },
+  { id: "cuar_prog", areas: ["admin", "ventas"], label: "Programados con cuarentena",            cnt: function (d) { return d.cuar_prog; },                          open: function () { openPPP(); },                hint: "Sacalos o aprobalos en «A Programar»" },
   { id: "cuar_arm",  areas: ["admin", "ventas"], label: "Armados en cuarentena sin día",             cnt: function (d) { return d.cuar_armado; },                        open: function () { openPPP(); },                hint: "Asignales día a mano" },
-  { id: "imp_ir",    areas: ["admin", "impo"],   label: "Ingresos a racks de importación sin revisar", cnt: function (d) { return d.imp_ir; },                           open: function () { openPedidosImportacion(); }, hint: "Importación → 📥 Recibido" },
+  { id: "imp_ir",    areas: ["admin", "impo"],   label: "Ingresos a racks sin revisar",          cnt: function (d) { return d.imp_ir; },                           open: function () { openPedidosImportacion(); }, hint: "Importación → Recibido" },
   { id: "ads",       areas: ["admin", "impo"],   label: "Quiebres de stock a 10 días",               cnt: function (d) { return (d.ads_stock && d.ads_stock.q10) || 0; }, open: function () { openAds(); },               hint: "ADS → Stock", tall: function (d) { return d.ads_tall; } },
   { id: "expreso",   areas: ["admin", "impo"],   label: "Expresos por cargar en ISIS",               cnt: function (d) { return d.expreso; },                            open: function () { openExpresoIsis(); },        hint: "No frena ningún pedido" },
-  { id: "conc",      areas: ["admin", "impo"],   label: "Conciliación: movimientos por resolver",    cnt: function (d) { return d.conc; },                               open: function () { openCobranzas(); },          hint: "Cobranzas → Conciliación" }
+  { id: "conc",      areas: ["admin", "impo"],   label: "Movimientos por resolver",             cnt: function (d) { return d.conc; },                               open: function () { openCobranzas(); },          hint: "Cobranzas → Conciliación" }
 ];
 
 function _rolGet() { try { return localStorage.getItem("gv_sup_quien") || ""; } catch (_e) { return ""; } }
@@ -63800,16 +63809,22 @@ function rolPickerAbrir(ev) {
   }
   var btns = Object.keys(GV_SUP_ROLES).map(function (k) {
     var r = GV_SUP_ROLES[k];
-    return '<button onclick="rolElegir(\'' + k + '\')" style="display:block;width:100%;margin:8px 0;padding:14px;border:none;border-radius:12px;background:#2563eb;color:#fff;font-size:17px;font-weight:800;cursor:pointer;text-align:left;">' + r.nombre + ' <span style="opacity:.85;font-weight:600;font-size:12.5px;">· ' + GV_AREA_NOMBRE[r.area] + '</span></button>';
+    return '<button onclick="rolElegir(\'' + k + '\')" style="display:block;width:100%;margin:8px 0;padding:14px;border:none;border-radius:12px;background:#2563eb;color:#fff;font-size:17px;font-weight:800;cursor:pointer;text-align:left;">' + r.nombre + ' <span style="font-weight:600;font-size:var(--gv-fs-sm);">· ' + GV_AREA_NOMBRE[r.area] + '</span></button>';
   }).join("");
-  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;max-width:380px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.3);"><div style="font-size:21px;font-weight:800;color:#0f172a;">¿Quién sos?</div><div style="font-size:13px;color:#64748b;margin:3px 0 12px;">Según tu área te muestro qué hay para mirar.</div>' + btns + '</div>';
+  ov.innerHTML = '<div style="background:var(--gv-surface);border-radius:var(--gv-r);padding:var(--gv-sp-6);max-width:380px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.3);"><div style="font-size:var(--gv-fs-2xl);font-weight:800;color:var(--gv-ink);">¿Quién sos?</div><div style="font-size:var(--gv-fs-md);color:var(--gv-ink-2);margin:4px 0 12px;">Según tu área te muestro qué hay para mirar.</div>' + btns + '</div>';
   ov.style.display = "flex";
+  /* v30.04 (pase GV-UI): el cuadro TIENE SALIDA, pero sólo si ya hay alguien elegido. En el
+     primer ingreso obliga a elegir (si no, el panel no sabe de quién es); abierto desde
+     «cambiar», sin salida dejaba atrapado al supervisor que lo tocó por error. */
+  ov.onclick = function (e) { if (e.target === ov && _rolGet()) ov.style.display = "none"; };
+  if (!ov.__escPuesto) {
+    ov.__escPuesto = true;
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && ov.style.display !== "none" && _rolGet()) ov.style.display = "none";
+    });
+  }
 }
 function rolElegir(k) { _rolSet(k); var ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none"; rolPanelRender(k); }
-/* v29.97: este bloque vive dentro de una CLOSURE (como gsLoad/gsResolver), asi que una funcion
-   llamada desde un onclick hay que exponerla o el boton queda MUERTO (tests/dead-handlers.cjs). */
-window.rolPickerAbrir = rolPickerAbrir; window.rolElegir = rolElegir;
-
 /* v29.95 (Luis, 13/10: *"aprieto luis y no entra"*): ⚠ TODO ESTO VIVE ADENTRO DE LA IIFE
    `initAuth`, así que un `onclick="rolElegir('luis')"` del HTML NO lo encuentra — un handler
    inline se resuelve contra WINDOW, no contra el scope del script. Es el mismo pozo de
@@ -63825,13 +63840,18 @@ function rolPanelRender(k) {
   window.__gvRol = r.area;
   cont.style.display = "block";
   cont.className = _rolAbierto() ? "abierto" : "";
+  /* v30.04 (pase GV-UI): «cambiar» es HERMANO de la barra, no un <span onclick> adentro de
+     un <button> — ahí medía 22 px (la mitad del blanco de toque de 44), no se alcanzaba por
+     teclado (tabIndex -1) y un lector leía la barra entera como un solo control. */
   cont.innerHTML =
-    '<button class="rolp-bar" onclick="rolPanelToggle()">' +
-      '<span class="rolp-car">\u25B6</span>' +
-      '<span class="rolp-quien">' + r.nombre + ' <span class="rolp-area">\u00B7 ' + GV_AREA_NOMBRE[r.area] + '</span></span>' +
-      '<span class="rolp-badge rolp-b-gris" id="rolpBadge">\u2026</span>' +
-      '<span class="rolp-cambiar" onclick="rolPickerAbrir(event)">cambiar</span>' +
-    '</button>' +
+    '<div class="rolp-head">' +
+      '<button class="rolp-bar" type="button" aria-expanded="' + (_rolAbierto() ? 'true' : 'false') + '" onclick="rolPanelToggle()">' +
+        '<span class="rolp-car">\u25B6</span>' +
+        '<span class="rolp-quien">' + r.nombre + ' <span class="rolp-area">\u00B7 ' + GV_AREA_NOMBRE[r.area] + '</span></span>' +
+        '<span class="rolp-badge rolp-b-gris" id="rolpBadge">\u2026</span>' +
+      '</button>' +
+      '<button class="rolp-cambiar" type="button" onclick="rolPickerAbrir(event)">cambiar</button>' +
+    '</div>' +
     '<div class="rolp-body"><div class="rolp-list" id="rolpList"></div></div>';
   rolPanelCargar();
 }
@@ -63842,6 +63862,7 @@ function rolPanelToggle() {
   var cont = document.getElementById("rolPanel"); if (!cont) return;
   var ab = !cont.classList.contains("abierto");
   cont.className = ab ? "abierto" : "";
+  var bar = cont.querySelector(".rolp-bar"); if (bar) bar.setAttribute("aria-expanded", ab ? "true" : "false");
   try { localStorage.setItem("gv_rol_abierto", ab ? "1" : "0"); } catch (_e) {}
 }
 
@@ -63856,20 +63877,24 @@ function rolPanelCargar() {
       var idx = GV_ROL_ITEMS.indexOf(it);
       var n = data ? (it.cnt(data) || 0) : null;
       if (n > 0) alerts++;
-      var dot = (n === null) ? "#94a3b8" : (n > 0 ? "#dc2626" : "#16a34a");
+      /* v30.04 (pase GV-UI): el PUNTO puede ser `--gv-muted` (es un ícono), el NÚMERO no:
+         el \u2014 de «no pude leer» salía en #94a3b8 = 2,45 y el \u2713 en #16a34a = 3,15,
+         los dos abajo de AA 4,5. Son dos colores distintos, no uno. */
+      var dot = (n === null) ? "var(--gv-muted)" : (n > 0 ? "var(--gv-error)" : "var(--gv-ok)");
+      var numc = (n === null) ? "var(--gv-ink-2)" : (n > 0 ? "var(--gv-error)" : "var(--gv-ok)");
       var num = (n === null) ? "\u2014" : (n > 0 ? String(n) : "\u2713");
       var tall = (it.tall && data) ? it.tall(data) : 0;
       var extra = (it.id === "ads" && tall > 0) ? ' \u00B7 <span class="rolp-sub">' + tall + ' talleristas flojos</span>' : '';
       return '<button class="rolp-row" onclick="GV_ROL_ITEMS[' + idx + '].open()">' +
         '<span class="rolp-dot" style="background:' + dot + '"></span>' +
         '<span class="rolp-lbl">' + it.label + extra + '<span class="rolp-hint">' + it.hint + '</span></span>' +
-        '<span class="rolp-num" style="color:' + dot + '">' + num + '</span></button>';
+        '<span class="rolp-num" style="color:' + numc + '">' + num + '</span></button>';
     }).join("");
     /* el BADGE es el dato de la barra: el color NUNCA va solo (GV-UI 5), lleva palabra. */
     if (bgEl) {
       if (data === null) { bgEl.className = "rolp-badge rolp-b-gris"; bgEl.textContent = "sin contadores"; bgEl.title = "No se pudieron leer los contadores \u00B7 tocá un ítem igual"; }
       else if (alerts === 0) { bgEl.className = "rolp-badge rolp-b-verde"; bgEl.textContent = "\u2713 al día"; bgEl.title = "Nada pendiente en tu área"; }
-      else { bgEl.className = "rolp-badge rolp-b-rojo"; bgEl.textContent = alerts + (alerts === 1 ? " para mirar" : " para mirar"); bgEl.title = "Tocá para ver el detalle"; }
+      else { bgEl.className = "rolp-badge rolp-b-rojo"; bgEl.textContent = alerts + " para mirar"; bgEl.title = "Tocá para ver el detalle"; }
     }
   }
   paint(null);

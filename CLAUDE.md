@@ -10155,3 +10155,32 @@ el `onclick`**: ahí el identificador que se llama es un método, y el barrido g
 **Chequeo:** `node tests/rol-panel-click.cjs` — mide, con la pantalla corriendo y para los 5
 roles, que arranque plegado en una línea, que el badge lleve palabra, que «cambiar» sea angosto y
 que tocar la barra despliegue el checklist.
+
+### ⚠ v30.04 (13/10): EL PASE `disenador-gvui` sobre el panel por rol
+
+Se corrió el agente sobre la pantalla CORRIENDO (no leyendo el CSS) a 1280 y a 390 px, en los
+tres estados del contador. Devolvió **5 ALTA · 6 MEDIA · 4 BAJA**; se aplicó todo:
+
+| qué estaba mal, medido | cómo quedó |
+|---|---|
+| el ✓ verde `#16a34a` daba **3,15:1** y el `—` de «no pude leer» `#94a3b8` **2,45** (AA pide 4,5) | el PUNTO sigue en `--gv-muted` (es un ícono) y el NÚMERO va aparte: `--gv-ok` **4,68** · `--gv-error` **6,04** · `--gv-ink-2` **7,07** |
+| el **DATO** del plegado (el badge) medía **12,5 px** contra el nombre —que es el RÓTULO— a 14 | badge **16 px** (`--gv-fs-lg`), nombre **12** (`--gv-fs-sm`): la jerarquía deja de estar al revés |
+| «cambiar» era un `<span onclick>` **adentro del `<button>` de la barra**: **22 px** de alto, `tabIndex -1` y un lector leía la barra entera como un solo control | `<button>` hermano dentro de `.rolp-head`, **44 px**, alcanzable por teclado, y la barra con `aria-expanded` |
+| **6 tamaños y 11 hex propios** con `gv-ui.css` ya cargado en `index.html:14` | 0 propios: todo sale de los tokens |
+| el cuadro «¿Quién sos?» **no tenía salida** (ni ✕, ni backdrop, ni Escape) | cierra con Escape o tocando el fondo **sólo si ya hay alguien elegido**: en el primer ingreso sigue obligando a elegir |
+| rótulos de hasta **7 palabras** que repetían el hint, y un 📥 en 1 de 8 | «Movimientos por resolver», «Ingresos a racks sin revisar», «Programados con cuarentena»; sin emoji |
+
+⚠ **Y apareció uno que el pase no vio**, midiendo a 390 px: sin **`min-width:0`** en la barra y en
+`.rolp-quien`, el contenido les pone un min-width implícito, no encogen, y **«cambiar» se salía
+12 px del panel**, pegado al borde de la pantalla. Es el pozo clásico de un hijo de flex con texto.
+
+⚠⚠ **Dos candados nuevos, y el segundo es el que importa:** el bloque **(g)** de
+`tests/rol-panel-click.cjs` mide sobre la pantalla corriendo el **contraste calculado** de los tres
+estados, la escala, la jerarquía badge > nombre, los 44 px y el desborde, **a 1280 y a 390**.
+Verificado que falla contra el index anterior reproduciendo los números del pase (2,45 · 3,15 ·
+13 px · 22 px · `tabIndex -1`).
+
+> ⚠ **El helper de contraste va como FUNCIÓN, no como string en un template literal.** Ahí el `\d`
+> del regex pierde la barra —en un template una escapada desconocida deja sólo la letra—, el match
+> no devuelve nada y **TODO contraste sale 1:1**: el test queda verde con los colores mal puestos.
+> Pasó en el primer intento y lo cazó que los 18 chequeos dieran exactamente «1:1».
