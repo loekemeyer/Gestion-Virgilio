@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.18">
+<link rel="stylesheet" href="gv-ui.css?v=30.19">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.18"></script>
+<script type="module" src="recepcion.js?v=30.19"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10798,7 +10798,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.18";
+const APP_VERSION = "v30.19";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -63553,7 +63553,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.18"></script>
+<script src="importacion.js?v=30.19"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63936,9 +63936,11 @@ const GV_SUP_ROLES = {
   viviana:   { nombre: "Viviana",        area: "impo" },
   /* v30.05 (13/10): Juan está en la PC de la impresora. Su área es UNA cosa: que la nota de
      picking y la de armado salgan solas. No ve nada de la PPP ni de compras. */
-  juan:      { nombre: "Juan",           area: "impresion" }
+  juan:      { nombre: "Juan",           area: "impresion" },
+  /* v30.14 (Luis, 13/10): Pagos (Mel, Nora, Pablo) — carga/control de Recepción de Mercadería. */
+  pagos:     { nombre: "Pagos",          area: "pagos" }
 };
-const GV_AREA_NOMBRE = { admin: "Administración general", ventas: "Ventas", impo: "Importaciones · Comex · Cobranzas", impresion: "Impresión de notas" };
+const GV_AREA_NOMBRE = { admin: "Administración general", ventas: "Ventas", impo: "Importaciones · Comex · Cobranzas", impresion: "Impresión de notas", pagos: "Pagos" };
 const GV_ROL_ITEMS = [
   /* v30.15 (Luis 13/10): un SALDO NEGATIVO en stock va primero y claro en Ventas y Admin.
      Mismo criterio que el badge de «Stock y Compras» (`stock_neg` de `gv_rol_panel`). */
@@ -63951,6 +63953,11 @@ const GV_ROL_ITEMS = [
   { id: "ads",       areas: ["admin", "impo"],   label: "Quiebres de stock a 10 días",               cnt: function (d) { return (d.ads_stock && d.ads_stock.q10) || 0; }, open: function () { openAds(); },               hint: "ADS → Stock", tall: function (d) { return d.ads_tall; } },
   { id: "expreso",   areas: ["admin", "impo"],   label: "Expresos por cargar en ISIS",               cnt: function (d) { return d.expreso; },                            open: function () { openExpresoIsis(); },        hint: "No frena ningún pedido" },
   { id: "conc",      areas: ["admin", "impo"],   label: "Movimientos por resolver",             cnt: function (d) { return d.conc; },                               open: function () { openCobranzas(); },          hint: "Cobranzas → Conciliación" },
+
+  /* v30.14 (Luis, 13/10) — ÁREA «pagos». No es "¿cuántas recepciones hay?": es "¿cuántas
+     pasaron el siguiente día hábil sin que nadie las procese ni las marque No recibido?"
+     (gv_recepcion_pagos_vencida, misma cuenta que el cartel bloqueante de abajo). */
+  { id: "recep_venc", areas: ["admin", "pagos"], label: "Recepciones vencidas sin resolver", cnt: function (d) { return d.recep_pagos_vencida; }, open: function () { abrirRecepcionPagosVencidas(); }, hint: "Procesala o marcá «No recibido»" },
 
   /* v30.05 — ÁREA «impresion» (Juan). Estos dos NO salen de `gv_rol_panel`: se miden ACÁ
      (`local`), porque el estado de la impresión automática es de ESTA PC, no de la base.
@@ -64040,6 +64047,9 @@ function rolPanelRender(k) {
   var cont = document.getElementById("rolPanel"); if (!cont) return;
   var r = GV_SUP_ROLES[k]; if (!r) { rolPickerAbrir(); return; }
   window.__gvRol = r.area;
+  /* v30.14: sólo con Pagos elegido se vigila el deadline de recepciones. */
+  if (r.area === "pagos") { try { pagosAlertaInit(); } catch (_e) {} }
+  else { try { pagosAlertaStop(); } catch (_e) {} }
   cont.style.display = "block";
   cont.className = _rolAbierto() ? "abierto" : "";
   /* v30.04 (pase GV-UI): «cambiar» es HERMANO de la barra, no un <span onclick> adentro de
@@ -64130,6 +64140,73 @@ function rolPanelCargar() {
     .then(function (d) { paint(d && typeof d === "object" ? d : null); })
     .catch(function () { paint(null); });
 }
+
+/* ===== CARTEL DE PAGOS (v30.14, Luis 13/10) =====
+   Vale sólo con el rol «Pagos» elegido: cada 60 s pregunta
+   gv_recepcion_pagos_vencida (lo mismo que ya pasó el deadline, backend
+   gv_recepcion_pagos_alerta_tick cada 10 min). Si hay 1+, tapa la pantalla —
+   no hay ✕ ni Escape: la única salida es ir a resolverlo. Al resolverse
+   (Recibido o «No recibido» en Pendientes), la vuelta siguiente ya no la ve
+   y el cartel se cae solo. "No pude leer" NO es "no hay": no toca lo que
+   ya estaba en pantalla. */
+var _pagosAlertaTimer = null;
+function pagosAlertaInit() {
+  if (_pagosAlertaTimer) return;
+  pagosAlertaCheck();
+  _pagosAlertaTimer = setInterval(pagosAlertaCheck, 60 * 1000);
+}
+function pagosAlertaStop() {
+  if (_pagosAlertaTimer) { clearInterval(_pagosAlertaTimer); _pagosAlertaTimer = null; }
+  var ov = document.getElementById("pagosAlertaOv");
+  if (ov) ov.remove();
+}
+function pagosAlertaCheck() {
+  /* se autochequea en cada vuelta: si cambió a operario, cerró sesión o cambió de rol,
+     se apaga sola — no depende de que el logout de turno se acuerde de llamarla. */
+  if (_rolGet() !== "pagos" || !window.__isSupervisor) { pagosAlertaStop(); return Promise.resolve(); }
+  return fetch(SUPABASE_URL + "/rest/v1/rpc/gv_recepcion_pagos_vencida", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (rows) {
+      if (!Array.isArray(rows)) return;   // lectura rota: se queda como estaba
+      if (!rows.length) { pagosAlertaStop(); return; }
+      pagosAlertaRender(rows);
+    })
+    .catch(function () {});
+}
+function pagosAlertaRender(rows) {
+  var ov = document.getElementById("pagosAlertaOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "pagosAlertaOv";
+    ov.style.cssText = "position:fixed;inset:0;z-index:9500;background:rgba(127,29,29,.90);display:flex;align-items:center;justify-content:center;padding:18px;";
+    document.body.appendChild(ov);
+  }
+  var li = rows.map(function (x) {
+    var h = Math.floor(Number(x.horas_vencida) || 0);
+    return '<div style="background:#fff;border-radius:10px;padding:10px 12px;margin:8px 0;text-align:left;">' +
+      '<b>' + escapeHtml(x.nombre || "?") + '</b>' + (x.remito ? " · RTO/FC " + escapeHtml(x.remito) : "") +
+      '<div style="color:#991b1b;font-size:var(--gv-fs-sm);margin-top:2px;">vencida hace ' + h + ' h' + (x.detalle ? " · " + escapeHtml(x.detalle) : "") + '</div></div>';
+  }).join("");
+  ov.innerHTML = '<div style="background:var(--gv-surface);border-radius:var(--gv-r);padding:var(--gv-sp-6);max-width:460px;width:100%;max-height:82vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.45);">' +
+    '<div style="font-size:var(--gv-fs-2xl);font-weight:800;color:#991b1b;">⚠ ' + rows.length + ' recepción' + (rows.length > 1 ? "es" : "") + ' sin resolver</div>' +
+    '<div style="font-size:var(--gv-fs-md);color:var(--gv-ink-2);margin:4px 0 12px;">Pasó el día hábil siguiente y no se procesó ni se marcó «No recibido». Resolvela ahora.</div>' +
+    li +
+    '<button onclick="abrirRecepcionPagosVencidas()" style="display:block;width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#991b1b;color:#fff;font-size:17px;font-weight:800;cursor:pointer;">Ir a resolver ahora</button>' +
+    '</div>';
+  ov.style.display = "flex";
+}
+/* Botón del cartel y del ítem del checklist: salta directo a Pendientes (deep-link que ya
+   usa Planify, recepcionAbrirPendientes) y re-chequea a los 3 s por si ya se resolvió. */
+function abrirRecepcionPagosVencidas() {
+  if (!requireSupervisor()) return;
+  var ov = document.getElementById("pagosAlertaOv"); if (ov) ov.remove();
+  if (typeof window.recepcionAbrirPendientes === "function") window.recepcionAbrirPendientes();
+  else openRecepcionAdmin();
+  setTimeout(pagosAlertaCheck, 3000);
+}
+window.pagosAlertaInit = pagosAlertaInit;
+window.pagosAlertaStop = pagosAlertaStop;
+window.pagosAlertaCheck = pagosAlertaCheck;
+window.abrirRecepcionPagosVencidas = abrirRecepcionPagosVencidas;
 
 function showOperario(emp) {
   window.__isSupervisor = false;
@@ -66782,15 +66859,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.18"></script>
-<script src="hotsale.js?v=30.18"></script>
-<script src="estadisticas.js?v=30.18"></script>
-<script src="ads.js?v=30.18"></script>
-<script src="plantel.js?v=30.18"></script>
+<script src="cobranzas.js?v=30.19"></script>
+<script src="hotsale.js?v=30.19"></script>
+<script src="estadisticas.js?v=30.19"></script>
+<script src="ads.js?v=30.19"></script>
+<script src="plantel.js?v=30.19"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.18"></script>
+<script src="analisis.js?v=30.19"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.18"></script>
+<script src="ayuda.js?v=30.19"></script>
 
 </body>
 </html>
