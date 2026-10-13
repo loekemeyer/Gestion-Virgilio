@@ -8845,3 +8845,29 @@ primero?» el filtro `x.it.cap > 0` **lo saca de la lista**. No se tocó: en MG 
 
 **Chequeo:** `node tests/rkb-orden-urgencia.cjs` — corre la pantalla y mide el orden y que el 437E LK tome **120**
 (el de LK), no los 168 de las dos empresas sumadas. Verificado que falla contra el index anterior.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.62, D11): el GUARDADO A GÓNDOLA puede entrar A MEDIAS — y queda así
+
+**Luis, textual:** *"d11 no, dejalo así"*. Medido en la auditoría del módulo de operarios: un guardado (MG)
+son **dos filas sueltas** (`a_guardar −N` / `terminado +N`, cada una con su `client_id`, el mismo `creado`) y la
+cola del celular las manda **fila por fila** (v25.20). El guard `trg_guardado_no_negativo` rechaza con
+`raise exception` (23514) **sólo la pata de `a_guardar`** cuando el saldo quedaría negativo; la cola la descarta
+como «400 de datos» y **la pata de góndola entra igual**, así que la góndola queda inflada y nada avisa.
+
+**Riesgo asumido:** puede volver a pasar y el saldo del código queda por encima de lo físico hasta el próximo
+conteo. **Cuánto pasó en toda la historia: 1 vez, 1 caja** — 599E, 30/09/2026 15:51:29, legajo 104, movimiento
+id 104074491, `terminado +1` sin su `a_guardar −1` (góndola 599E = 40, físico 39). El guard está bien: lo que
+falla es que las dos patas viajan por separado. **No volver a proponer el arreglo sin que Luis lo pida.**
+
+⚠ **La caja del 599E NO se corrigió** (es una corrección de datos que Claude detectó solo: pide el «sí» de Luis).
+Cómo se ve si vuelve a pasar: un `guardado` de `terminado` sin su par de `a_guardar` con el mismo `creado`:
+
+```sql
+select m.cod_art, m.creado, m.legajo, m.delta
+  from public."Movimientos_Stock" m
+ where m.tipo = 'guardado' and m.delta > 0
+   and not exists (select 1 from public."Movimientos_Stock" x
+                    where x.tipo = 'guardado' and x.deposito = 'a_guardar'
+                      and x.cod_art = m.cod_art and x.creado = m.creado and x.legajo = m.legajo)
+ order by m.creado desc;   -- al 13/10: 1 fila (599E, 30/09)
+```
