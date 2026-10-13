@@ -4329,6 +4329,14 @@ privado `loekemeyer/Impo-Comex`**; acá va sólo el build web (`client/dist-web`
 - **v29.23: PARIDAD con el viejo, flujo por flujo** (subir, verificar, editar, corregir, guardar, descargar): `tests/impo-comex-paridad-{lakout,multidoc,marks,cajas,inal}.cjs`
   comparan pedidos a la puerta, pantalla y descargas contra lo que hizo el viejo (`impo-comex/`), grabado en el test o en
   `tests/tools/`. Mientras exista `impo-comex/` se regraban desde el viejo (ver la cabecera de cada test). **Al borrar el viejo, los tests siguen andando.**
+- ⚠ **v30.06 (Elías, 13/10): el botón del IMPO COMEX VIEJO se ocultó** — en Pedidos Importación queda un solo
+  **🛃 IMPO COMEX** que abre el nuevo (`openImpoComex2`). `openImpoComex()` y la carpeta `impo-comex/` siguen (los
+  tests de paridad graban desde ahí) hasta que se borren.
+- ⚠ **r81 (Elías, 13/10) — Cajas marca la OTRA MARCA del frente**: la IA lee TODAS las marcas del frente del cartón
+  (`marcas_frente`) y la empresa de referencia es el **prefijo del código de barras** (779558700 LK / 779800543 CH) o,
+  sin barras, el **CUIT del comercializador**. Una marca de la otra empresa → fila `marca_frente` **diferencia GRAVE**.
+  Vive en `Impo-Comex/supabase/functions/_shared/cajas.ts` (deploy `Impo_Comex_verify-cajas`, v26) y lo comparten el
+  viejo y el nuevo; acá sólo cambiaron el rótulo y el formato del campo (`ic-cajas.js`, `logica/cajasEtiquetas.js`).
 
 ## ⚠ REGLA (Luis, 2026-09-28, v23.45): la importación se RECIBE desde el panel — 📥 RECIBIR
 
@@ -9489,16 +9497,51 @@ El servidor lo numeró `TMP-0037` y los 144 Kg quedaron en un código que no exi
    el nombre y la ubicación inicial. `TMP-0037` **nunca se aceptó**: quedó pendiente desde las 09:09. Y no se podía
    — `insumo_identificar` **frena** un TMP contra un código en uso (*"una sugerencia del operario no se puede
    fusionar contra un insumo en uso"*), que es correcto: fusionar dos stocks lo decide una persona, no un botón.
-3. **La puerta ya está cerrada**: la **v29.56** (13/10 09:35, 26 minutos después) sacó el alta de un insumo nuevo
-   por el operario (`insNuevoOpen` arranca con un `alert` y un `return`). `TMP-0037` fue el último que entró por ahí
-   y el único TMP que quedaba vivo. **Lo que sigue abierto no es el código: es el LUGAR** — un código del catálogo
-   de GP2 (`gv_insumo_desde_gp2`) también se recibe sin posición, y queda en esa alarma.
+3. **El alta se cerró a las 09:35 y Luis la REABRIÓ el mismo día** (v30.05, abajo): la v29.56 había tapado
+   `insNuevoOpen` con un `alert`, y `TMP-0037` fue el último que entró por ahí. Hoy el botón está de vuelta **con
+   el aviso de parecidos** adelante. **Y lo que sigue abierto no es el código: es el LUGAR** — un código del
+   catálogo de GP2 (`gv_insumo_desde_gp2`) también se recibe sin posición, y queda en esa alarma.
 
 Los 144 Kg se fusionaron en `N°19` con el mecanismo de la casa (se renombra el `cod_art` del movimiento, el TMP
 sale del catálogo y queda en `Insumos_Historial`), **sin tocar la ubicación** (Luis: *"hay que ver dónde está"*).
 ⚠ Ojo con el efecto: `N°19` ya tenía R06AT, así que **el Mapa ahora dice R06AT y la alarma se apagó** — si no
 están ahí, lo corrige el conteo, no un aviso. Detalle, verificación y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
 §3.v3000. Lo sostiene `tests/stk-busca-decimal.cjs`.
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v30.05): el operario SÍ PUEDE crear un código nuevo al RECIBIR — con el aviso de parecidos
+
+**Luis, textual:** *"hay que darles la opción de poder crear códigos nuevos cuando reciben si no están en la lista
+(antes tenían un botón abajo que les permitía hacer eso no, ponéselos)"*.
+
+> **Se RETIRA la v29.56** (*"en Recepción de insumos el operario ya NO da de alta un código nuevo"*, de esta
+> misma mañana). El **«+ Agregar insumo»** vuelve a estar en la grilla de categorías y dentro de cada categoría.
+
+| dónde | alta |
+|---|---|
+| **RI (recibir)**, categoría común | **SÍ** — el botón en los dos lugares |
+| **RI**, categoría **CERRADA** (bolsas, cajas) | **NO**: su catálogo es conocido y completo (Thomas, v29.25/30). El botón no se dibuja y `insNuevoOpen` se planta si lo llaman a mano |
+| **EI (entregar)** | **NO**, como siempre: dar de alta algo al sacarlo sería sacar stock de algo que nunca entró |
+
+**Y el alta AVISA antes de crear.** Es la lección del `TMP-0037` (arriba): el operario escribió `13.6 x 0.8`
+teniendo el fleje en la lista como `N°19` (*13,6 x 0,8*) y se creó un código que no existía para nadie. Ahora
+`insNuevoOk` busca los parecidos **por los NÚMEROS del detalle** — sin importar coma ni punto ni el orden — y los
+muestra: *«⚠ Puede que ya exista: · N°19 — 13,6 x 0,8 · Fleje N° 19»*. Cancelando **no crea nada y deja la lista
+filtrada por ese número**; «crear igual» crea. **No bloquea**: lo que no puede es crearse en silencio teniendo el
+gemelo a la vista.
+
+⚠ **La identidad la sigue poniendo el servidor** (`nuevo_insumo_tmp` → `TMP-00NN`) y el código de verdad se lo
+pone un admin en Stock y Compras → Insumos. **Un TMP no se fusiona desde el front contra un código en uso**
+(`insumo_identificar` lo frena, y está bien): si de verdad son el mismo, lo resuelve una persona.
+
+⚠⚠ **El REMITO que la recepción pide NO se guarda en Virgilio.** `_insDocState` (n° de remito / factura y sus
+fechas) se usa para GP2 — bolsas contra su OC — y después se tira (`insDocCancel` lo pone en `null`): el
+movimiento no lo lleva en ninguna columna. Lo cargado a mano desde una sesión lo pone en `ref` (`Remito 38880`)
+y en la descripción, pero **lo que carga el operario desde el celular queda sin el remito**. Cerrarlo es un
+cambio aparte (una columna, o el `ref`), y **no está hecho**.
+
+**Chequeo:** `node tests/ins-alta-duplicado.cjs` (corre el alta de verdad: avisa con el candidato, cancelar no
+crea y deja el filtro, «crear igual» crea, y una medida que de verdad no está entra derecho) ·
+`node tests/ins-categorias.cjs` · `node tests/ins-ri-cat-bolsas.cjs` · `node tests/ins-admin.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.57): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
 
@@ -10138,3 +10181,63 @@ el `onclick`**: ahí el identificador que se llama es un método, y el barrido g
 **Chequeo:** `node tests/rol-panel-click.cjs` — mide, con la pantalla corriendo y para los 5
 roles, que arranque plegado en una línea, que el badge lleve palabra, que «cambiar» sea angosto y
 que tocar la barra despliegue el checklist.
+
+### ⚠ v30.04 (13/10): EL PASE `disenador-gvui` sobre el panel por rol
+
+Se corrió el agente sobre la pantalla CORRIENDO (no leyendo el CSS) a 1280 y a 390 px, en los
+tres estados del contador. Devolvió **5 ALTA · 6 MEDIA · 4 BAJA**; se aplicó todo:
+
+| qué estaba mal, medido | cómo quedó |
+|---|---|
+| el ✓ verde `#16a34a` daba **3,15:1** y el `—` de «no pude leer» `#94a3b8` **2,45** (AA pide 4,5) | el PUNTO sigue en `--gv-muted` (es un ícono) y el NÚMERO va aparte: `--gv-ok` **4,68** · `--gv-error` **6,04** · `--gv-ink-2` **7,07** |
+| el **DATO** del plegado (el badge) medía **12,5 px** contra el nombre —que es el RÓTULO— a 14 | badge **16 px** (`--gv-fs-lg`), nombre **12** (`--gv-fs-sm`): la jerarquía deja de estar al revés |
+| «cambiar» era un `<span onclick>` **adentro del `<button>` de la barra**: **22 px** de alto, `tabIndex -1` y un lector leía la barra entera como un solo control | `<button>` hermano dentro de `.rolp-head`, **44 px**, alcanzable por teclado, y la barra con `aria-expanded` |
+| **6 tamaños y 11 hex propios** con `gv-ui.css` ya cargado en `index.html:14` | 0 propios: todo sale de los tokens |
+| el cuadro «¿Quién sos?» **no tenía salida** (ni ✕, ni backdrop, ni Escape) | cierra con Escape o tocando el fondo **sólo si ya hay alguien elegido**: en el primer ingreso sigue obligando a elegir |
+| rótulos de hasta **7 palabras** que repetían el hint, y un 📥 en 1 de 8 | «Movimientos por resolver», «Ingresos a racks sin revisar», «Programados con cuarentena»; sin emoji |
+
+⚠ **Y apareció uno que el pase no vio**, midiendo a 390 px: sin **`min-width:0`** en la barra y en
+`.rolp-quien`, el contenido les pone un min-width implícito, no encogen, y **«cambiar» se salía
+12 px del panel**, pegado al borde de la pantalla. Es el pozo clásico de un hijo de flex con texto.
+
+⚠⚠ **Dos candados nuevos, y el segundo es el que importa:** el bloque **(g)** de
+`tests/rol-panel-click.cjs` mide sobre la pantalla corriendo el **contraste calculado** de los tres
+estados, la escala, la jerarquía badge > nombre, los 44 px y el desborde, **a 1280 y a 390**.
+Verificado que falla contra el index anterior reproduciendo los números del pase (2,45 · 3,15 ·
+13 px · 22 px · `tabIndex -1`).
+
+> ⚠ **El helper de contraste va como FUNCIÓN, no como string en un template literal.** Ahí el `\d`
+> del regex pierde la barra —en un template una escapada desconocida deja sólo la letra—, el match
+> no devuelve nada y **TODO contraste sale 1:1**: el test queda verde con los colores mal puestos.
+> Pasó en el primer intento y lo cazó que los 18 chequeos dieran exactamente «1:1».
+
+### ⚠ v30.05 (Luis, 13/10): el rol de JUAN es la IMPRESIÓN, y el panel NO TOCA EL HELPER
+
+**Luis:** *"agregale un usuario tambien a Juan. Necesita que la impresion automatica de notas de
+picking/armado salga y nada más. fijate que esto no joda con el helper"*.
+
+Área nueva **`impresion`** («Impresión de notas»), con **dos** ítems y nada más — Juan no ve la PPP,
+ni compras, ni cobranzas:
+
+| ítem | qué dice | abre |
+|---|---|---|
+| **Impresión automática** | si en ESTA PC el helper está conectado, contesta y la estación está prendida | ⚙️ Helper de impresión |
+| **Hojas sin imprimir** | picking y armado pendientes de `colaImpFetch` (el facturado no es de Juan) | 📅 Cola por día |
+
+> ## **El panel MIRA el helper; no lo prende, no lo apaga y no le pega a 127.0.0.1 de más.**
+
+- No llama a `gvHelperConectar`, `gvHelperGuardar` ni `psSetAuto`: eso sigue siendo del pop-up de
+  ⚙️ Configuración, donde conectar = esta PC imprime sola (v26.30).
+- ⚠⚠ **Y sólo pinguea el loopback si el helper está CONECTADO en esa PC.** Desconectado, el
+  navegador no sale a `127.0.0.1` — en un celular Chrome pediría permiso de red local para nada
+  (regla v26.24). Es lo único que podía «joder con el helper» y es lo que mide el candado.
+- Los ítems de Juan son **LOCALES** (`it.local`, se miden en el navegador) y no en `gv_rol_panel`.
+  Por eso `rolPanelCargar` tiene ahora dos clases de ítem; **un área sin ítems remotos ni llama a la
+  RPC**. Cada local resuelve por su cuenta y repinta: uno lento no traba a los otros, y una lectura
+  rota deja «—», nunca «✓ al día».
+
+**Chequeo:** `node tests/rol-panel-click.cjs`, bloque **(h)** — con el helper desconectado mide que
+**no salga un solo request a 127.0.0.1**, que Juan vea sus 2 ítems y que `gv_helper_imp_v1` y
+`ps_auto_virgilio` queden **sin tocar**; con el helper conectado y contestando, que sí lo pinguee y
+marque ✓ sin apagarle nada. Verificado que falla sacando el guard: *«el panel le pegó a 127.0.0.1
+con el helper DESCONECTADO»*.

@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.04">
+<link rel="stylesheet" href="gv-ui.css?v=30.08">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6422,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.04"></script>
+<script type="module" src="recepcion.js?v=30.08"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6546,32 +6546,41 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
          UNA LÍNEA con su badge; el checklist se despliega. Regla de espacio del 28/09 y
          GV-UI (v29.83): lo explicativo se pliega y nada largo se dibuja abierto.
          ⚠ El `button{width:100%;padding:16px;font-size:22px}` global de la línea 26 también
-         muerde acá: sin el reset, «cambiar» salía de una pantalla de ancho. */
+         muerde acá: sin el reset, «cambiar» salía de una pantalla de ancho.
+         v30.04 — PASE `disenador-gvui`: todo sale de los TOKENS de `gv-ui.css` (cargado en
+         la línea 14). No se escribe un `font-size` ni un hex propio acá. Lo que arregló:
+         el DATO del plegado (el badge) pasó a 16 px y el nombre —que es el RÓTULO— a 12,
+         así la jerarquía no queda al revés; y «cambiar» salió de adentro del <button> de la
+         barra a `.rolp-head`, con sus 44 px de alto (antes 22 y sin teclado). */
       #rolPanel{max-width:620px;margin:4px auto 12px;}
       #rolPanel button{width:auto;margin:0;font-size:inherit;}
-      #rolPanel .rolp-bar, #rolPanel .rolp-row{width:100%;}   /* el reset de arriba les comía el ancho */
-      .rolp-bar{display:flex;align-items:center;gap:10px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:8px 12px;min-height:44px;cursor:pointer;text-align:left;box-shadow:0 2px 8px rgba(15,23,42,.05);}
-      .rolp-bar:hover{background:#f8fafc;}
-      .rolp-car{flex:0 0 auto;font-size:12px;color:#64748b;width:12px;transition:transform .12s;}
+      #rolPanel .rolp-bar, #rolPanel .rolp-row{width:100%;}   /* el reset de arriba les comia el ancho */
+      .rolp-head{display:flex;align-items:center;gap:var(--gv-sp-3);}
+      /* ⚠ `min-width:0`: sin eso el contenido de la barra le pone un min-width implícito, no
+         encoge, y a 390 px «cambiar» se sale del panel y queda pegado al borde de la pantalla. */
+      #rolPanel .rolp-head .rolp-bar{flex:1 1 auto;min-width:0;}
+      .rolp-bar{display:flex;align-items:center;gap:var(--gv-sp-4);background:var(--gv-surface);border:1px solid var(--gv-line);border-radius:var(--gv-r-sm);padding:var(--gv-sp-3) var(--gv-sp-4);min-height:var(--gv-tap);cursor:pointer;text-align:left;}
+      .rolp-bar:hover{background:var(--gv-bg);}
+      .rolp-car{flex:0 0 auto;font-size:var(--gv-fs-sm);color:var(--gv-muted);width:12px;transition:transform .12s;}
       #rolPanel.abierto .rolp-car{transform:rotate(90deg);}
-      .rolp-quien{flex:1 1 auto;font-size:14px;font-weight:800;color:#0f172a;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-      .rolp-area{font-weight:600;color:#64748b;font-size:11.5px;}
-      .rolp-badge{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:800;line-height:1.3;}
-      .rolp-b-rojo{background:#fee2e2;color:#991b1b;}
-      .rolp-b-verde{background:#dcfce7;color:#166534;}
-      .rolp-b-gris{background:#f1f5f9;color:#475569;}
-      .rolp-cambiar{flex:0 0 auto;background:transparent;border:1px solid #cbd5e1;border-radius:8px;color:#475569;font-size:11.5px;font-weight:700;padding:4px 10px;cursor:pointer;}
-      .rolp-body{display:none;background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;margin:-6px 0 0;padding:10px 12px 10px;}
+      .rolp-quien{flex:1 1 auto;min-width:0;font-size:var(--gv-fs-sm);font-weight:700;color:var(--gv-ink-2);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .rolp-area{font-weight:600;color:var(--gv-ink-2);font-size:var(--gv-fs-xs);}
+      /* el BADGE es el DATO del panel plegado: va MAS grande que el rotulo (GV-UI 1 y 2). */
+      .rolp-badge{flex:0 0 auto;display:inline-flex;align-items:center;gap:var(--gv-sp-2);border-radius:var(--gv-r-pill);padding:var(--gv-sp-1) var(--gv-sp-4);font-size:var(--gv-fs-lg);font-weight:800;line-height:1.3;}
+      .rolp-b-rojo{background:var(--gv-error-bg);color:var(--gv-error);}
+      .rolp-b-verde{background:var(--gv-ok-bg);color:var(--gv-ok);}
+      .rolp-b-gris{background:var(--gv-surface-2);color:var(--gv-ink-2);}
+      .rolp-cambiar{flex:0 0 auto;background:transparent;border:1px solid var(--gv-line);border-radius:var(--gv-r-sm);color:var(--gv-ink-2);font-size:var(--gv-fs-sm);font-weight:700;padding:var(--gv-sp-2) var(--gv-sp-4);min-height:var(--gv-tap);cursor:pointer;}
+      .rolp-body{display:none;background:var(--gv-surface);border:1px solid var(--gv-line);border-radius:var(--gv-r-sm);margin:var(--gv-sp-2) 0 0;padding:var(--gv-sp-4);}
       #rolPanel.abierto .rolp-body{display:block;}
-      #rolPanel.abierto .rolp-bar{border-radius:12px 12px 0 0;}
-      .rolp-list{display:flex;flex-direction:column;gap:4px;}
-      .rolp-row{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:8px 11px;cursor:pointer;min-height:44px;}
-      .rolp-row:hover{background:#eff6ff;}
-      .rolp-dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;}
-      .rolp-lbl{flex:1 1 auto;font-size:13.5px;font-weight:700;color:#0f172a;line-height:1.2;}
-      .rolp-hint{display:block;font-size:11px;font-weight:500;color:#64748b;margin-top:1px;}
-      .rolp-sub{font-size:11px;font-weight:600;color:#92400e;}
-      .rolp-num{flex:0 0 auto;font-size:17px;font-weight:800;min-width:26px;text-align:right;font-variant-numeric:tabular-nums;}
+      .rolp-list{display:flex;flex-direction:column;gap:var(--gv-sp-2);}
+      .rolp-row{display:flex;align-items:center;gap:var(--gv-sp-3);text-align:left;background:var(--gv-bg);border:1px solid var(--gv-line-soft);border-radius:var(--gv-r-sm);padding:var(--gv-sp-3) var(--gv-sp-4);cursor:pointer;min-height:var(--gv-tap);}
+      .rolp-row:hover{background:#eff6ff;}   /* tinte de hover: no hay token de info-bg */
+      .rolp-dot{flex:0 0 auto;width:10px;height:10px;border-radius:var(--gv-r-pill);}
+      .rolp-lbl{flex:1 1 auto;font-size:var(--gv-fs-md);font-weight:700;color:var(--gv-ink);line-height:1.2;}
+      .rolp-hint{display:block;font-size:var(--gv-fs-xs);font-weight:500;color:var(--gv-ink-2);margin-top:1px;}
+      .rolp-sub{font-size:var(--gv-fs-xs);font-weight:600;color:var(--gv-warn);}
+      .rolp-num{flex:0 0 auto;font-size:var(--gv-fs-xl);font-weight:800;min-width:var(--gv-sp-6);text-align:right;font-variant-numeric:tabular-nums;}
     </style>
     <div id="rolPanel" style="display:none;"></div>
     <div id="cgAside" style="display:none;"></div>
@@ -9411,7 +9420,7 @@ function showInstructivo() {
     { t: "🏭 Recepción", c: "RT · RR", x: "RT = recibí mercadería (entra a <b>“a guardar”</b>). RR = controlar los remitos cargados al camión." },
     { t: "🚚 Carga y control", c: "CC · CR", x: "CC = inicio/fin de la carga del camión. CR = control de remitos." },
     { t: "📥 Guardar a góndola", c: "MG", x: "Lo que está en <b>“a guardar”</b> lo pasás a góndola. Si la góndola está llena, marcás <b>Excedente</b> y su ubicación." },
-    { t: "📦 Insumos y Productos Movimiento", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. Recibís sólo lo que ya está en la lista: si llegó algo que no figura, avisá a Stock y Compras." },
+    { t: "📦 Insumos y Productos Movimiento", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. ¿El insumo no está? Entrás por Recibir y usás <b>“+ Agregar insumo”</b> (el código de verdad se lo pone Stock y Compras después)." },
     { t: "⏱ Pausas y otros", c: "AT · PB · Limp · Perm · PC · CT", x: "Marcá cuándo: atendés el timbre (AT), vas al baño (PB), limpiás (Limp), pedís permiso (Perm), parás a comer (PC) o hacés conteo (CT). Tocás al <b>empezar</b> y otra vez al <b>terminar</b>." }
   ];
   ov.innerHTML = '<div class="instr-card"><div class="instr-head"><span class="instr-title">❓ ¿Cómo se usa?</span><button class="instr-close" onclick="closeInstructivo()">Cerrar</button></div><div class="instr-body">' +
@@ -10773,7 +10782,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.04";
+const APP_VERSION = "v30.08";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -28360,9 +28369,12 @@ function insRender() {
         '</button>';
     }).join("") +
       (cnt[""] ? '<button class="ins-catbtn' + (cntQ[""] ? " hasq" : "") + '" onclick="insSetCat(\'?\')"><span class="ins-catem">❓</span><span class="ins-catnm">Sin categoría</span><span class="ins-catn">' + cnt[""] + '</span></button>' : "") +
-      // v29.56 (Luis, 13/10): el operario NO da de alta un insumo al recibir. Sólo recibe
-      // lo que ya está en la lista (o un componente del catálogo de GP2). El "+ Agregar
-      // insumo nuevo" se sacó: un código distinto lo define Stock y Compras, no el operario.
+      // v30.05 (Luis, 13/10): "hay que darles la opción de poder crear códigos nuevos cuando
+      // reciben si no están en la lista (antes tenían un botón abajo que les permitía hacer eso
+      // no, ponéselos)". Vuelve el "+ Agregar insumo", que la v29.56 había sacado: el operario
+      // no se puede quedar sin poder cargar lo que ya tiene en la mano. Antes de crear, el alta
+      // avisa si ya existe algo con esos números (ver insNuevoOk).
+      (isIn ? '<button class="ins-catbtn add" onclick="insNuevoOpen(\'\')"><span class="ins-catem">+</span><span class="ins-catnm">Agregar insumo</span><span class="ins-catn">nuevo</span></button>' : "") +
       '</div>';
     h += '<div class="ins-cbadge" style="margin-top:10px;">' + nOper + ' insumos en uso' + (cnt[""] ? ' · ' + cnt[""] + ' sin clasificar' : "") + '</div>';
   } else {
@@ -28416,7 +28428,9 @@ function insRender() {
           (it.qty > 0 ? '<span class="ins-itq' + (it.unidad ? "" : " falta") + '">' + it.qty + " " + escapeHtml(it.unidad || "¿unidad?") + '</span>' : "") +
           '</button>';
       }).join("") +
-        // v29.56 (Luis, 13/10): sin "+ Agregar insumo" dentro de la categoría al recibir.
+        // v30.05: y también dentro de la categoría. Las CERRADAS (bolsas y cajas) siguen sin
+        // alta: su catálogo es conocido y completo (Thomas, v29.25/30).
+        (cat && isIn && INS_CAT_CERRADA.indexOf(cat) < 0 ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
         '</div>';
     }
   }
@@ -28438,11 +28452,20 @@ function insRender() {
    admin desde Stock y Compras → Insumos (idea 5572). */
 function insNuevoOpen(cat) {
   if (!_ins) return;
-  // v29.56 (Luis, 13/10): el operario NO da de alta insumos. Recibe sólo lo que ya está
-  // en la lista; un código distinto lo define Stock y Compras. Guarda dura, por si algún
-  // camino viejo (una sesión guardada, un botón cacheado) todavía llama acá.
-  try { alert("No se puede agregar un insumo nuevo acá.\n\nRecibí lo que ya está en la lista. Si llegó algo que no figura, avisá a Stock y Compras para que lo carguen."); } catch (_e) {}
-  return;
+  // v30.05 (Luis, 13/10): el alta VUELVE — pero SÓLO al RECIBIR ("hay que darles la opción de
+  // poder crear códigos nuevos CUANDO RECIBEN"). Al ENTREGAR nunca hubo botón y la guarda queda:
+  // dar de alta algo al sacarlo sería sacar stock de algo que nunca entró.
+  if (_ins.mode !== "RI") {
+    try { alert("No se puede agregar un insumo nuevo acá.\n\nAl ENTREGAR sale sólo lo que ya está en la lista. Si llegó algo que no figura, cargá la RECEPCIÓN primero."); } catch (_e) {}
+    return;
+  }
+  // y tampoco en una categoría CERRADA (bolsas y cajas): su catálogo es conocido y completo
+  // (Thomas, v29.25/30). El botón ya no se dibuja ahí; esto frena el camino a mano.
+  if (INS_CAT_CERRADA.indexOf(cat) >= 0) {
+    const _c0 = insCatDef(cat);
+    try { alert("No se agregan insumos nuevos en " + (_c0 ? _c0.lbl : "esa categoría") + ".\n\nEstán todas en la lista. Si falta una, avisá a Stock y Compras."); } catch (_e) {}
+    return;
+  }
   _ins.nuevo = { cat: insCatDef(cat) ? cat : "", qty: "", uni: "", det: "" };
   _ins.qty = null;
   insRender();
@@ -28517,6 +28540,29 @@ function insNuevoOk() {
   // Sin código no hay clave natural: se dedupe por el DETALLE (normalizado). Si ya
   // hay uno escrito igual, no creo otro — lo abro para que sume sobre ese.
   const _norm = function (x) { return String(x || "").trim().toLowerCase().replace(/\s+/g, " "); };
+  /* v30.05 — lo que mordió el 13/10: el operario escribió "13.6 x 0.8" y ese fleje YA existía
+     como `N°19` ("13,6 x 0,8 · Fleje N° 19"), así que se creó un TMP y 144 Kg quedaron en un
+     código que no existe para nadie. Antes de crear se buscan los parecidos por los NÚMEROS del
+     detalle — sin importar coma/punto ni el orden — y se ofrecen. NO bloquea: si de verdad es
+     otro, se crea igual; lo que no puede es crearse en silencio teniendo el gemelo en la lista. */
+  const _nums = function (x) { return String(x || "").toLowerCase().replace(/(\d),(\d)/g, "$1.$2").match(/\d+(?:\.\d+)?/g) || []; };
+  const nd = _nums(det);
+  if (nd.length) {
+    const cands = _ins.items.filter(function (it) {
+      if (!it.cod || _insEsTmp(it)) return false;
+      const ni = _nums((it.nombre || "") + " " + it.cod);
+      return nd.every(function (x) { return ni.indexOf(x) >= 0; });
+    }).slice(0, 6);
+    if (cands.length) {
+      let sigue = false;
+      try {
+        sigue = confirm("⚠ Puede que ya exista:\n\n" +
+          cands.map(function (it) { return "  · " + it.cod + (it.nombre ? " — " + it.nombre : ""); }).join("\n") +
+          "\n\nSi es uno de ésos, cancelá y tocalo en la lista (te la dejo filtrada).\n\n¿Crear igual uno NUEVO?");
+      } catch (_e) { sigue = true; }
+      if (!sigue) { _ins.nuevo = null; _ins.filtro = String(nd[0] || ""); insRender(); return; }
+    }
+  }
   const ya = _ins.items.filter(function (it) { return _norm(it.nombre) === _norm(det); })[0];
   if (ya) {
     alert("Ya hay un insumo con ese detalle. Te lo abro para que pongas la cantidad.");
@@ -63347,7 +63393,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.04"></script>
+<script src="importacion.js?v=30.08"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63727,18 +63773,57 @@ const GV_SUP_ROLES = {
   thomas:    { nombre: "Thomas",         area: "admin" },
   marianela: { nombre: "Marianela",      area: "ventas" },
   tomas:     { nombre: "Tomás González", area: "ventas" },
-  viviana:   { nombre: "Viviana",        area: "impo" }
+  viviana:   { nombre: "Viviana",        area: "impo" },
+  /* v30.05 (13/10): Juan está en la PC de la impresora. Su área es UNA cosa: que la nota de
+     picking y la de armado salgan solas. No ve nada de la PPP ni de compras. */
+  juan:      { nombre: "Juan",           area: "impresion" }
 };
-const GV_AREA_NOMBRE = { admin: "Administración general", ventas: "Ventas", impo: "Importaciones · Comex · Cobranzas" };
+const GV_AREA_NOMBRE = { admin: "Administración general", ventas: "Ventas", impo: "Importaciones · Comex · Cobranzas", impresion: "Impresión de notas" };
 const GV_ROL_ITEMS = [
   { id: "sin_zona",  areas: ["admin", "ventas"], label: "Pedidos sin zona",                          cnt: function (d) { return d.sin_zona_ped; },                       open: function () { openPPP(); },                hint: "Asignales zona en «A Programar»" },
   { id: "atrasados", areas: ["admin", "ventas"], label: "Pedidos atrasados · reprogramar",           cnt: function (d) { return d.atrasados; },                          open: function () { openPPP(); },                hint: "Abrí «Pasar de día» y confirmá" },
-  { id: "cuar_prog", areas: ["admin", "ventas"], label: "Programados que deberían ir a cuarentena",  cnt: function (d) { return d.cuar_prog; },                          open: function () { openPPP(); },                hint: "Sacalos o aprobalos en «A Programar»" },
+  { id: "cuar_prog", areas: ["admin", "ventas"], label: "Programados con cuarentena",            cnt: function (d) { return d.cuar_prog; },                          open: function () { openPPP(); },                hint: "Sacalos o aprobalos en «A Programar»" },
   { id: "cuar_arm",  areas: ["admin", "ventas"], label: "Armados en cuarentena sin día",             cnt: function (d) { return d.cuar_armado; },                        open: function () { openPPP(); },                hint: "Asignales día a mano" },
-  { id: "imp_ir",    areas: ["admin", "impo"],   label: "Ingresos a racks de importación sin revisar", cnt: function (d) { return d.imp_ir; },                           open: function () { openPedidosImportacion(); }, hint: "Importación → 📥 Recibido" },
+  { id: "imp_ir",    areas: ["admin", "impo"],   label: "Ingresos a racks sin revisar",          cnt: function (d) { return d.imp_ir; },                           open: function () { openPedidosImportacion(); }, hint: "Importación → Recibido" },
   { id: "ads",       areas: ["admin", "impo"],   label: "Quiebres de stock a 10 días",               cnt: function (d) { return (d.ads_stock && d.ads_stock.q10) || 0; }, open: function () { openAds(); },               hint: "ADS → Stock", tall: function (d) { return d.ads_tall; } },
   { id: "expreso",   areas: ["admin", "impo"],   label: "Expresos por cargar en ISIS",               cnt: function (d) { return d.expreso; },                            open: function () { openExpresoIsis(); },        hint: "No frena ningún pedido" },
-  { id: "conc",      areas: ["admin", "impo"],   label: "Conciliación: movimientos por resolver",    cnt: function (d) { return d.conc; },                               open: function () { openCobranzas(); },          hint: "Cobranzas → Conciliación" }
+  { id: "conc",      areas: ["admin", "impo"],   label: "Movimientos por resolver",             cnt: function (d) { return d.conc; },                               open: function () { openCobranzas(); },          hint: "Cobranzas → Conciliación" },
+
+  /* v30.05 — ÁREA «impresion» (Juan). Estos dos NO salen de `gv_rol_panel`: se miden ACÁ
+     (`local`), porque el estado de la impresión automática es de ESTA PC, no de la base.
+     ⚠⚠ EL PANEL NO TOCA EL HELPER: no llama a `gvHelperConectar`, `gvHelperGuardar` ni
+     `psSetAuto` — sólo MIRA y abre el pop-up de siempre. Y **no le pega a 127.0.0.1 si el
+     helper no está conectado en esta PC**: desconectado, el navegador nunca sale al
+     loopback (en un celular Chrome pediría permiso de red local para nada, regla v26.24). */
+  { id: "imp_auto", areas: ["impresion"], label: "Impresión automática", open: function () { openHelperImpresion(); },
+    local: async function () {
+      try {
+        if (typeof _facIsMobile === "function" && _facIsMobile())
+          return { n: 1, hint: "Esto va en la PC de la impresora, no en el celular" };
+        if (!gvHelperActivo())
+          return { n: 1, hint: "No está conectada en esta PC · Configuración → Helper de impresión" };
+        var vivo = false; try { vivo = await helperVivo(); } catch (_e) { vivo = false; }
+        if (!vivo)
+          return { n: 1, hint: "Conectada pero no contesta: abrí el helper en esta PC" };
+        if (!psIsAuto())
+          return { n: 1, hint: "El helper anda pero esta PC no imprime sola" };
+        var arranco = !!(typeof _ps !== "undefined" && _ps && _ps.timer);
+        return { n: 0, hint: arranco ? "Sale sola: picking al TP y armado al terminar cada NP"
+                                     : "Prendida · arranca sola en menos de un minuto" };
+      } catch (_e) { return { n: null, hint: "No se pudo mirar el estado de la impresión" }; }
+    } },
+  { id: "imp_cola", areas: ["impresion"], label: "Hojas sin imprimir", open: function () { openColaImpHistorial(); },
+    local: async function () {
+      var rows = null;
+      try { rows = await colaImpFetch(_colaImpDia(-21), _colaImpDia(14)); } catch (_e) { rows = null; }
+      /* una lectura ROTA no es un CERO: va «—», no «✓ al día» */
+      if (!rows) return { n: null, hint: "No se pudieron leer las hojas pendientes" };
+      var pend = _colaImpPendientes(rows).filter(function (x) { return x.tipo !== "fac"; });
+      var lim = Date.now() - 24 * 3600000;
+      var venc = pend.filter(function (x) { return x.ts && new Date(x.ts).getTime() < lim; }).length;
+      return { n: pend.length, hint: venc ? (venc + " hace +24 h \u00B7 tocá para imprimirlas")
+                                          : "Picking y armado · tocá para imprimirlas" };
+    } }
 ];
 
 function _rolGet() { try { return localStorage.getItem("gv_sup_quien") || ""; } catch (_e) { return ""; } }
@@ -63763,16 +63848,22 @@ function rolPickerAbrir(ev) {
   }
   var btns = Object.keys(GV_SUP_ROLES).map(function (k) {
     var r = GV_SUP_ROLES[k];
-    return '<button onclick="rolElegir(\'' + k + '\')" style="display:block;width:100%;margin:8px 0;padding:14px;border:none;border-radius:12px;background:#2563eb;color:#fff;font-size:17px;font-weight:800;cursor:pointer;text-align:left;">' + r.nombre + ' <span style="opacity:.85;font-weight:600;font-size:12.5px;">· ' + GV_AREA_NOMBRE[r.area] + '</span></button>';
+    return '<button onclick="rolElegir(\'' + k + '\')" style="display:block;width:100%;margin:8px 0;padding:14px;border:none;border-radius:12px;background:#2563eb;color:#fff;font-size:17px;font-weight:800;cursor:pointer;text-align:left;">' + r.nombre + ' <span style="font-weight:600;font-size:var(--gv-fs-sm);">· ' + GV_AREA_NOMBRE[r.area] + '</span></button>';
   }).join("");
-  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;max-width:380px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.3);"><div style="font-size:21px;font-weight:800;color:#0f172a;">¿Quién sos?</div><div style="font-size:13px;color:#64748b;margin:3px 0 12px;">Según tu área te muestro qué hay para mirar.</div>' + btns + '</div>';
+  ov.innerHTML = '<div style="background:var(--gv-surface);border-radius:var(--gv-r);padding:var(--gv-sp-6);max-width:380px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.3);"><div style="font-size:var(--gv-fs-2xl);font-weight:800;color:var(--gv-ink);">¿Quién sos?</div><div style="font-size:var(--gv-fs-md);color:var(--gv-ink-2);margin:4px 0 12px;">Según tu área te muestro qué hay para mirar.</div>' + btns + '</div>';
   ov.style.display = "flex";
+  /* v30.04 (pase GV-UI): el cuadro TIENE SALIDA, pero sólo si ya hay alguien elegido. En el
+     primer ingreso obliga a elegir (si no, el panel no sabe de quién es); abierto desde
+     «cambiar», sin salida dejaba atrapado al supervisor que lo tocó por error. */
+  ov.onclick = function (e) { if (e.target === ov && _rolGet()) ov.style.display = "none"; };
+  if (!ov.__escPuesto) {
+    ov.__escPuesto = true;
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && ov.style.display !== "none" && _rolGet()) ov.style.display = "none";
+    });
+  }
 }
 function rolElegir(k) { _rolSet(k); var ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none"; rolPanelRender(k); }
-/* v29.97: este bloque vive dentro de una CLOSURE (como gsLoad/gsResolver), asi que una funcion
-   llamada desde un onclick hay que exponerla o el boton queda MUERTO (tests/dead-handlers.cjs). */
-window.rolPickerAbrir = rolPickerAbrir; window.rolElegir = rolElegir;
-
 /* v29.95 (Luis, 13/10: *"aprieto luis y no entra"*): ⚠ TODO ESTO VIVE ADENTRO DE LA IIFE
    `initAuth`, así que un `onclick="rolElegir('luis')"` del HTML NO lo encuentra — un handler
    inline se resuelve contra WINDOW, no contra el scope del script. Es el mismo pozo de
@@ -63788,13 +63879,18 @@ function rolPanelRender(k) {
   window.__gvRol = r.area;
   cont.style.display = "block";
   cont.className = _rolAbierto() ? "abierto" : "";
+  /* v30.04 (pase GV-UI): «cambiar» es HERMANO de la barra, no un <span onclick> adentro de
+     un <button> — ahí medía 22 px (la mitad del blanco de toque de 44), no se alcanzaba por
+     teclado (tabIndex -1) y un lector leía la barra entera como un solo control. */
   cont.innerHTML =
-    '<button class="rolp-bar" onclick="rolPanelToggle()">' +
-      '<span class="rolp-car">\u25B6</span>' +
-      '<span class="rolp-quien">' + r.nombre + ' <span class="rolp-area">\u00B7 ' + GV_AREA_NOMBRE[r.area] + '</span></span>' +
-      '<span class="rolp-badge rolp-b-gris" id="rolpBadge">\u2026</span>' +
-      '<span class="rolp-cambiar" onclick="rolPickerAbrir(event)">cambiar</span>' +
-    '</button>' +
+    '<div class="rolp-head">' +
+      '<button class="rolp-bar" type="button" aria-expanded="' + (_rolAbierto() ? 'true' : 'false') + '" onclick="rolPanelToggle()">' +
+        '<span class="rolp-car">\u25B6</span>' +
+        '<span class="rolp-quien">' + r.nombre + ' <span class="rolp-area">\u00B7 ' + GV_AREA_NOMBRE[r.area] + '</span></span>' +
+        '<span class="rolp-badge rolp-b-gris" id="rolpBadge">\u2026</span>' +
+      '</button>' +
+      '<button class="rolp-cambiar" type="button" onclick="rolPickerAbrir(event)">cambiar</button>' +
+    '</div>' +
     '<div class="rolp-body"><div class="rolp-list" id="rolpList"></div></div>';
   rolPanelCargar();
 }
@@ -63805,6 +63901,7 @@ function rolPanelToggle() {
   var cont = document.getElementById("rolPanel"); if (!cont) return;
   var ab = !cont.classList.contains("abierto");
   cont.className = ab ? "abierto" : "";
+  var bar = cont.querySelector(".rolp-bar"); if (bar) bar.setAttribute("aria-expanded", ab ? "true" : "false");
   try { localStorage.setItem("gv_rol_abierto", ab ? "1" : "0"); } catch (_e) {}
 }
 
@@ -63812,30 +63909,58 @@ function rolPanelCargar() {
   var area = window.__gvRol || "admin";
   var items = GV_ROL_ITEMS.filter(function (it) { return it.areas.indexOf(area) >= 0; });
   var listEl = document.getElementById("rolpList"); var bgEl = document.getElementById("rolpBadge");
+  /* v30.05 — dos clases de ítem: los REMOTOS (un contador de `gv_rol_panel`) y los LOCALES
+     (`it.local`, que se miden en esta PC: la impresión automática de Juan). Un área puede no
+     tener ninguno remoto; ahí ni se llama a la RPC. */
+  var remotos = items.filter(function (it) { return typeof it.cnt === "function"; });
+  var _loc = {};                      // id -> { n, hint } ya resuelto de los LOCALES
+  var _data = remotos.length ? null : {};   // sin remotos no hay nada que esperar
   function paint(data) {
+    if (data !== undefined) _data = data;
     if (!listEl) return;
-    var alerts = 0;
+    var alerts = 0, falta = false;
     listEl.innerHTML = items.map(function (it) {
       var idx = GV_ROL_ITEMS.indexOf(it);
-      var n = data ? (it.cnt(data) || 0) : null;
+      var n, hint = it.hint || "";
+      if (it.local) {
+        var r = _loc[it.id];
+        n = r ? r.n : null;
+        if (r && r.hint) hint = r.hint;
+        if (!r) falta = true;
+      } else {
+        n = _data ? (it.cnt(_data) || 0) : null;
+        if (!_data) falta = true;
+      }
       if (n > 0) alerts++;
-      var dot = (n === null) ? "#94a3b8" : (n > 0 ? "#dc2626" : "#16a34a");
+      /* v30.04 (pase GV-UI): el PUNTO puede ser `--gv-muted` (es un ícono), el NÚMERO no:
+         el \u2014 de «no pude leer» salía en #94a3b8 = 2,45 y el \u2713 en #16a34a = 3,15,
+         los dos abajo de AA 4,5. Son dos colores distintos, no uno. */
+      var dot = (n === null) ? "var(--gv-muted)" : (n > 0 ? "var(--gv-error)" : "var(--gv-ok)");
+      var numc = (n === null) ? "var(--gv-ink-2)" : (n > 0 ? "var(--gv-error)" : "var(--gv-ok)");
       var num = (n === null) ? "\u2014" : (n > 0 ? String(n) : "\u2713");
-      var tall = (it.tall && data) ? it.tall(data) : 0;
+      var tall = (it.tall && _data) ? it.tall(_data) : 0;
       var extra = (it.id === "ads" && tall > 0) ? ' \u00B7 <span class="rolp-sub">' + tall + ' talleristas flojos</span>' : '';
       return '<button class="rolp-row" onclick="GV_ROL_ITEMS[' + idx + '].open()">' +
         '<span class="rolp-dot" style="background:' + dot + '"></span>' +
-        '<span class="rolp-lbl">' + it.label + extra + '<span class="rolp-hint">' + it.hint + '</span></span>' +
-        '<span class="rolp-num" style="color:' + dot + '">' + num + '</span></button>';
+        '<span class="rolp-lbl">' + it.label + extra + '<span class="rolp-hint">' + hint + '</span></span>' +
+        '<span class="rolp-num" style="color:' + numc + '">' + num + '</span></button>';
     }).join("");
     /* el BADGE es el dato de la barra: el color NUNCA va solo (GV-UI 5), lleva palabra. */
     if (bgEl) {
-      if (data === null) { bgEl.className = "rolp-badge rolp-b-gris"; bgEl.textContent = "sin contadores"; bgEl.title = "No se pudieron leer los contadores \u00B7 tocá un ítem igual"; }
+      if (falta && !alerts) { bgEl.className = "rolp-badge rolp-b-gris"; bgEl.textContent = "sin contadores"; bgEl.title = "No se pudieron leer todos los contadores \u00B7 tocá un ítem igual"; }
       else if (alerts === 0) { bgEl.className = "rolp-badge rolp-b-verde"; bgEl.textContent = "\u2713 al día"; bgEl.title = "Nada pendiente en tu área"; }
-      else { bgEl.className = "rolp-badge rolp-b-rojo"; bgEl.textContent = alerts + (alerts === 1 ? " para mirar" : " para mirar"); bgEl.title = "Tocá para ver el detalle"; }
+      else { bgEl.className = "rolp-badge rolp-b-rojo"; bgEl.textContent = alerts + " para mirar"; bgEl.title = "Tocá para ver el detalle"; }
     }
   }
-  paint(null);
+  paint(undefined);
+  /* cada LOCAL se mide por su cuenta y repinta al resolver: uno lento no traba a los otros */
+  items.filter(function (it) { return it.local; }).forEach(function (it) {
+    Promise.resolve().then(function () { return it.local(); })
+      .then(function (r) { _loc[it.id] = (r && typeof r === "object") ? r : { n: null, hint: it.hint || "" }; })
+      .catch(function () { _loc[it.id] = { n: null, hint: "No se pudo mirar" }; })
+      .then(function () { paint(undefined); });
+  });
+  if (!remotos.length) return;
   fetch(SUPABASE_URL + "/rest/v1/rpc/gv_rol_panel", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) { paint(d && typeof d === "object" ? d : null); })
@@ -66493,15 +66618,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.04"></script>
-<script src="hotsale.js?v=30.04"></script>
-<script src="estadisticas.js?v=30.04"></script>
-<script src="ads.js?v=30.04"></script>
-<script src="plantel.js?v=30.04"></script>
+<script src="cobranzas.js?v=30.08"></script>
+<script src="hotsale.js?v=30.08"></script>
+<script src="estadisticas.js?v=30.08"></script>
+<script src="ads.js?v=30.08"></script>
+<script src="plantel.js?v=30.08"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.04"></script>
+<script src="analisis.js?v=30.08"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.04"></script>
+<script src="ayuda.js?v=30.08"></script>
 
 </body>
 </html>

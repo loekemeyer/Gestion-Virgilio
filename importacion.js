@@ -34,8 +34,9 @@ function _impTabsHtml(cur) {
     '<button style="' + t(cur === 'hist') + '" onclick="openImpHistRecep()" title="Los pedidos hechos y las recepciones: qué se pidió, cuándo, cuánto llegó y dónde se guardó.">📜 Historial</button>' +
     '<button style="' + t(cur === 'disc') + '" onclick="openImpDisc()" title="Los importados dados de baja (Importados.activo = false): no salen en Pedidos ni en el PDF.">🚫 Discontinuos</button>' +
     '<button style="' + t(cur === 'prov') + '" onclick="stkOpenProvImp()">🏭 Proveedores</button>' +
-    '<button style="' + t(false) + '" onclick="openImpoComex()" title="Verificación de documentos de importación (IMPO COMEX). Sólo supervisores.">🛃 IMPO COMEX</button>' +
-    '<button style="' + t(false) + '" onclick="openImpoComex2()" title="IMPO COMEX dentro de Gestión, sin build (en prueba: mismas funciones que el de al lado).">🛃 IMPO COMEX nuevo</button></div>';
+    /* v30.06 (Elías, 13/10: «oculta el impo comex antiguo»): queda sólo el nuevo (impocomex/, sin build).
+       openImpoComex() y la carpeta impo-comex/ siguen en el repo (los tests de paridad la usan); lo que se fue es la puerta. */
+    '<button style="' + t(false) + '" onclick="openImpoComex2()" title="Verificación de documentos de importación (IMPO COMEX). Sólo supervisores.">🛃 IMPO COMEX</button></div>';
 }
 /* v23.19 (Elías, 28/09) — IMPO COMEX dentro de Gestión: la versión web vive en impo-comex/ (copia
    armada; el fuente está en el repo privado loekemeyer/Impo-Comex). Página completa, mismo origin:

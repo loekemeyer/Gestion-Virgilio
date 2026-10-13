@@ -31834,6 +31834,29 @@ Objetos nuevos: `gv_picking_estimar(text[])` (anon, 1,45 s para las 37 pendiente
 - Rollback: `cron.alter_job(155, command := <el viejo, en la cabecera del sql>)`, poner `caja_extra` en 0 (y restar
   0,0061 × (cajas − cajas30) del caché), recrear `gv_ppp_plantel` desde `sql/gv_ritmo_picking_v2947.sql`.
 
+<<<<<<< HEAD
+## §3.v3008 — el excedente cargado por un conteo no se reparte hacia atrás (Giuliana, 13/10/2026, problema 766; el marcador de la base y el .sql dicen v29.62: otra sesión se llevó los números hasta la v30.07)
+
+El conteo de la estantería P (13/10) cargó excedente en 26 códigos (ajustes `ref = 'CONTEO P 13/10'`) y la corrida
+15:11 del cron 68 le devolvió a góndola el de **14** (501, 315, 222, 220, 862, 221, 355, 207, 560, 654, 234, 026, 902,
+570): totales por código intactos, reparto góndola/excedente pisado cada 10 min. Causa, en el pase forward de
+`reconciliar_pipeline_stock_etapa1` (tandas con PKC desde `etapa1_pkc_desde`, 13/08): recalculaba `from_exc` de
+**todas** las tandas contra el excedente de hoy, con una ventana acumulada que además restaba de nuevo lo ya tomado.
+
+**Cambio (marcador `v29.62-exc-fijo`):** CTE `ya_exc`; una tanda que ya tiene fila `excedente/picking` conserva su
+reparto tal cual (`least(picked, greatest(tomado, 0))`, también si el PKC trae la pila: ese dato ya se aplicó la
+primera vez, topado al excedente que había — E12F/512 y F21C/440E decían 1 de excedente con excedente 0 y recalcularlas
+dejaba −1); sólo una tanda NUEVA toma del excedente libre de hoy. Y los cruces `ya_exc` / `exc_avail` van por el código
+sin ceros a la izquierda: el PKC de D72C decía `66` y la fila `066`, así que cada corrida le devolvía 28 cajas a góndola
+que el trigger en vivo volvía a sacar del excedente.
+
+Medido en transacción abortada: 0 saldos cambian sobre el estado actual; con los 14 ajustes cargados en el medio
+cambian exactamente esos 28 saldos (14 excedente +N, 14 góndola −N). Aplicado 13/10 ~15:40 y recargados los 14
+(`client_id conteoP_20261013b_*`). Se descartó el «excedente al momento del PKC»: re-repartía 106 saldos de 50 códigos
+y dejaba 4 góndolas en negativo. Centinela: `least\(f\.picked, greatest\(f\.tomado, 0\)\)`.
+Backup de la definición anterior: `zz_backups."GV_Backup_Etapa1_def_20261013"` (md5 prosrc 7d6a3bb2…).
+`sql/reconciliar_pipeline_stock_etapa1_v2962.sql`.
+=======
 ### §3.v2982 — Recepción de insumos: el ORIGEN es una lista cerrada por categoría (Luis, 13/10/2026)
 
 - **Nuevo, nada existente tocado**: tabla `GV_Insumo_Origen_Excluido` (RLS on, sin escritura para anon/authenticated),
@@ -31903,3 +31926,29 @@ se apagó. Si los 144 Kg no están ahí, lo corrige el conteo; nadie lo va a ir 
 `ajustado`) y los kg están en la ubicación **75** («Sector Fleje en Virgilio»), que tiene **0 filas en
 `v_nivel_stock`**: no infla el máximo ni la OC de Cervantes. Ningún ISIS pisado (los tres estaban en null).
 Flejes vinculados: **19 → 22 de 48**.
+
+### §3.v3005 — Recepción del remito 38880 cargada a mano, y dos códigos de fleje nuevos (Luis, 13/10/2026)
+
+**Por qué a mano**: *"recién se recibieron insumos pero hubo problemas por cambios que hicimos hoy. De momento,
+voy a hacer una recepción por acá"* (Luis). Los dos insumos **no existían** en Virgilio ni en GP2 (se buscó por
+nombre, por medida y por número: `ALAMBRE LARGO·11` y `N°46B` son otros alambres; las varillas de GP2 son piezas
+procesadas o las `IVBCM`/`IVBLM` de Brawin, otras medidas), así que se crearon:
+
+| cod | nombre | categoría | recibido |
+|---|---|---|---|
+| `ALAMBRE·6 X 2,75` | 6 x 2,75 | fleje | **122,1 Kg** (2 rollos) |
+| `VARILLA·205 X 400` | 205 x 400 | fleje | **128,4 Kg** (5 cajones) |
+
+- **La grafía del código sigue la convención de los flejes sin `N°`**: prefijo + `·` + medida, como
+  `ALAMBRE LARGO·11`, `FLEJE·91 X 1,75` o `FLEJE PROLIPROPILENO·SUNCHOS 12 MM`. **No se les puso `N°97` / `N°98`**
+  a propósito: los `N°xx` de Virgilio espejan el *Fleje N°* de Cervantes y estos dos **no tienen componente en
+  GP2** (el último allá es el 96) — inventar el número crearía otra desalineación.
+- Los movimientos: `recepcion_insumo`, **Kg**, `ref = 'Remito 38880'`, `legajo = 'admin'`, `client_id`
+  `rcp-38880-…` (ids 146691976 y 146691977). La **empresa** la forzó `gv_insumo_unidad_base` a **Mixto**, como
+  todo movimiento de insumos (regla v24.89). **Sin marca**: Luis no dijo de qué empresa viene (el front la exige,
+  una carga por SQL no).
+- **Los dos quedan SIN posición**, así que salen en la alarma del Mapa (`gv_mapa_stock_sin_lugar`, que pasa de 19
+  a 21 insumos): hay que darles celda desde el Mapa. Y **sin equivalencia en GP2**, así que no se espejan.
+- **Verificado**: saldo 122,1 y 128,4 Kg, unidad Kg, empresa Mixto, 0 posiciones, los dos en la alarma.
+- **Rollback**: borrar los dos movimientos por su `client_id` y las dos filas de `Insumos`.
+>>>>>>> origin/main

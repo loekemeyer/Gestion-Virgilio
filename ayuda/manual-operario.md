@@ -215,9 +215,11 @@ Tocá **📦** y **Enviar**. Hay **3 opciones**:
   **Cervantes** ves todos. Si lo que te trajeron no está en su lista, el botón **«Otros»** te muestra los
   flejes y alambres que todavía no están asignados a ningún proveedor. Adentro aparecen **todos los
   insumos del rubro con el nombre de GP2**, también los que nunca se recibieron en Virgilio: buscá el
-  tuyo por nombre o código, cargá la cantidad y **«✓ Registrar entrada»**. **Sólo recibís lo que ya
-  está en la lista**: no se puede agregar un insumo nuevo. Si llegó algo que no figura, avisá a Stock
-  y Compras para que lo carguen. En **plásticos**, al entregar aparecen sólo las bolsas que
+  tuyo por nombre o código, cargá la cantidad y **«✓ Registrar entrada»**. Si llegó algo que **no
+  figura en ninguna lista**, está **«+ Agregar insumo»** (en la grilla de categorías y dentro de cada
+  categoría, menos bolsas y cajas): describilo en tus palabras, poné categoría, cantidad y unidad, y
+  listo — el código de verdad se lo pone Stock y Compras después. Si lo que escribís se parece a algo
+  que ya existe, te lo muestra antes de crearlo: fijate bien, casi siempre es ése. En **plásticos**, al entregar aparecen sólo las bolsas que
   se usan (con lugar en el Mapa); al recibir aparecen además las bolsas de GP2.
   Las bolsas se cargan sólo en **Bolsas** (abajo se ve cuántos kg son). En **cajas** aparecen las 11
   cajas (Caja Nº 1 … Nº 29); se cargan en **Cajas** o en **Paquetes** (cada paquete = 25 cajas).
