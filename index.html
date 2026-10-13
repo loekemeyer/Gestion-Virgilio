@@ -21122,11 +21122,11 @@ function stkBodyStocks() {
   // v8.95 — filtro rápido por columna: tocar el header de una columna muestra solo las filas
   // con ese valor > 0. Vale para todas (depósitos + Total Stock/Pedidas/Capacidad/FC s/Salida).
   // v26.81 — el valor de cada columna sale de UN lugar: lo usan el filtro (> 0) y el orden (▼/▲).
-  // Al ordenar, Cajas Pedidas va por el número que muestra la celda (el neto, v24.04).
+  // Al ordenar, Cajas Pedidas va por el número que muestra la celda (el total, v30.14 — Thomas).
   var _stkColVal = function (a, k, ordenar) {
     if (k === "_tot") return SECTKEYS.reduce(function (s, kk) { return s + (Number(a[kk]) || 0); }, 0) + (Number(a.racks_ch) || 0);
     if (k === "_proy") return Number(_proyOf(a.cod)) || 0;
-    if (k === "_ped") { if (ordenar) { var _pn0 = _pedNetoOf(a.cod); if (_pn0) return Number(_pn0.neto) || 0; } return Number(_demOf(a.cod)) || 0; }
+    if (k === "_ped") { if (ordenar) { var _pn0 = _pedNetoOf(a.cod); if (_pn0) return Number(_pn0.tot) || 0; } return Number(_demOf(a.cod)) || 0; }
     if (k === "_cap") return Number(_capOf(a.cod)) || 0;
     if (k === "_fc") return Number(_fcArtCajas(a)) || 0;
     if (k === "racks") return (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
@@ -21300,7 +21300,7 @@ function stkBodyStocks() {
         desc: artNombre(a.cod, a.desc) || "",
         proy: Math.round(_proyOf(a.cod) || 0),
         tot: SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0),
-        ped: _pn ? _pn.neto : _ped, pedTot: _ped, pedTp: _pn ? _pn.tp : 0, pedCurso: _pn ? _pn.curso : 0,
+        ped: _pn ? _pn.neto : _ped, pedTot: _pn ? _pn.tot : _ped, pedTp: _pn ? _pn.tp : 0, pedCurso: _pn ? _pn.curso : 0,
         cap: _capOf(a.cod), dep: dep, fc: _fcArtCajas(a)
       };
     })
@@ -21328,7 +21328,7 @@ function stkBodyStocks() {
       else _famTag = ' <span title="SECUNDARIO — no deben entrar pedidos acá. El principal es ' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '." style="color:#1e40af;font-size:10px;font-weight:800;">⇄' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '</span>';
     }
     const _proy = _proyOf(a.cod);
-    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>' + '<td class="num stk-pick-cell" style="background:#faf5ff;color:' + (_proy > 0.05 ? '#6d28d9' : '#c4b5fd') + ';cursor:pointer" onclick="event.stopPropagation();stkShowProyVentas(\'' + encodeURIComponent(a.cod) + '\',' + (Math.round((_proy || 0) * 100) / 100) + ')" title="Tocá para ver de dónde surge (ventas facturadas de los últimos 6 meses)">' + (_proy > 0.05 ? Math.round(_proy) : '—') + '</td>' + '<td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="' + escapeHtml(_stkPedTitle(_pn, _ped)) + '"><b>' + fmtCajas(_pn ? _pn.neto : _ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e">—</td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
+    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>' + '<td class="num stk-pick-cell" style="background:#faf5ff;color:' + (_proy > 0.05 ? '#6d28d9' : '#c4b5fd') + ';cursor:pointer" onclick="event.stopPropagation();stkShowProyVentas(\'' + encodeURIComponent(a.cod) + '\',' + (Math.round((_proy || 0) * 100) / 100) + ')" title="Tocá para ver de dónde surge (ventas facturadas de los últimos 6 meses)">' + (_proy > 0.05 ? Math.round(_proy) : '—') + '</td>' + '<td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="' + escapeHtml(_stkPedTitle(_pn, _ped)) + '"><b>' + fmtCajas(_pn ? _pn.tot : _ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e">—</td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
     cols.forEach(function (c) {
       const v = (c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0));
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.

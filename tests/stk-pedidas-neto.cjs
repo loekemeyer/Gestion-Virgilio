@@ -6,8 +6,13 @@
    cuya tanda ya tiene TP, regla v19.85 de Thomas) y cada pantalla leia una. El criterio de OCs
    es el bueno y NO se toca; la que contaba de mas era Stocks.
 
+   v30.14 (Thomas, 13/10/2026): la CELDA ahora muestra el TOTAL (251), no el neto (225).
+   "tanto afuera como adentro en las cajas en cualquier circunstancia o estado tiene que figurar";
+   el desglose y el estado quedan en el tooltip/pop-up. El neto NO se toca: sigue manejando la
+   compra (gv_stock_pedidas_neto.neto, regla v24.33) y el Excel lo lleva en su propia columna.
+
    Mide las cinco mitades, porque cada una sin las otras no sirve:
-   A) la celda muestra el NETO (225), no el total (251)
+   A) la celda muestra el TOTAL (251), no el neto (225)
    B) el tooltip trae el desglose y ESCONDE los renglones en 0 (Luis)
    C) la linea de familia aparece cuando algun miembro tiene algo pickeado
    D) SIN el dato (lectura caida o todavia en vuelo) la celda muestra el TOTAL: nunca vacia
@@ -62,8 +67,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
     return {
       // A
-      celdaNeto501: numDe(c501),            // 225, NO 251
-      celdaNeto505: numDe(c505),            // 481
+      celdaTot501: numDe(c501),             // 251 (total), NO 225
+      celdaTot505: numDe(c505),             // 551 (total)
       // B  (el tooltip dice lo que hay y calla lo que da 0)
       tipDiceACubrir:  t501.indexOf("225") >= 0 && t501.indexOf("a cubrir") >= 0,
       tipDicePickeadas: t501.indexOf("26") >= 0 && t501.indexOf("ya pickeadas") >= 0,
@@ -80,7 +85,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       xlsMismoNum: xlsMismoNum
     };
   });
-  const pass = r.celdaNeto501 === "225" && r.celdaNeto505 === "481" && r.tipDiceACubrir &&
+  const pass = r.celdaTot501 === "251" && r.celdaTot505 === "551" && r.tipDiceACubrir &&
     r.tipDicePickeadas && r.tipDiceTotal && r.tipEsconde0 && r.tipMuestraCurso &&
     r.tipFamilia839 && r.tipSinFamilia501 && r.sinDatoMuestraTotal === "251" &&
     r.sinDatoTipViejo && r.xlsMismoNum && errs.length === 0;
