@@ -8033,8 +8033,9 @@ chinos y para avisar en la página que no tenemos stock"*.
   decía «Plásticos» por «Bolsas plásticas», «Flejes» por «Flejes y alambres», y no conocía «Sector Crudo» ni
   «Sector Procesado». Al agregar una categoría en `Insumos_Categorias`, GP2 la ve sola en ≤ 10 min.
   `sql/gv_gp2_espejo_categorias_v2960.sql` · GP2 `db/migracion_virgilio_categorias_20261013.sql`, CONOCIMIENTO 4kn.
-- **v25.17 (Luis, 30/09, D5): GP2 ve el stock de insumos y el Mapa de Virgilio**, en tres tablas de **solo lectura** del
-  schema GP2 (así no rompe su Regla 0): `virgilio_insumo_stock`, `virgilio_insumo_ubicacion` y `virgilio_lugar`. Las
+- **v25.17 (Luis, 30/09, D5): GP2 ve el stock de insumos y el Mapa de Virgilio**, en tres objetos de **solo lectura** del
+  schema GP2 (así no rompe su Regla 0): `virgilio_insumo_stock` (desde la v29.89 una **vista en vivo**, no una copia),
+  `virgilio_insumo_ubicacion` y `virgilio_lugar`. Las
   llena `gv_gp2_espejo_sync()` (cron `gv-gp2-espejo-sync`, c/10 min, reescribe sólo si cambió el md5). Luis: *"que los
   dos tengan acceso a los datos y que puedan hablar"*; el vínculo de códigos (D3) va después. `sql/gv_gp2_espejo_v2517.sql`.
 
@@ -8046,7 +8047,7 @@ el mismo molde (el mismo bloque está en el `CLAUDE.md` de `loekemeyer/Gestion-P
 
 | pieza | cómo |
 |---|---|
-| frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.aceptado_virgilio`, y los espejos de solo lectura `GP2.virgilio_insumo_stock` / `_ubicacion` / `virgilio_lugar` / `virgilio_insumo_categoria` |
+| frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.aceptado_virgilio`, y los espejos de solo lectura `virgilio_insumo_stock` (desde la v29.89 una **vista en vivo**) / `_ubicacion` / `virgilio_lugar` / `virgilio_insumo_categoria` |
 | códigos | GV habla en código de ARTÍCULO (323ES), GP2 en COMPONENTE (GRJ31). El vínculo vive en **`GP2.insumo_equivalencia`** y **nunca se adivina** |
 | confirmar | el que recibe dice **Sí / No** donde trabaja, en la tarjeta del componente. ⚠ **Hoy avisa sólo lo que RECIBE CERVANTES** (Luis, 02/10: *"lo que recibe Cervantes avisa"*): lo que GP2 manda a Virgilio (`enviar_a_virgilio`, tablet y botón «→ Virgilio») no pide Sí/No en GV |
 | Sí | el MISMO camino que la carga manual (en GP2: `crear_recepcion_insumo` + control en kg pendiente) |
@@ -9209,11 +9210,36 @@ Tenía razón, y lo que se mide es el tamaño del desperdicio:
   Un vínculo que cambia **sólo el ISIS no dispara** el espejo (4,8 ms, 0 filas de log).
 - ⚠ **Nunca frena el vínculo**: el error va a `GV_GP2_Espejo_Log` con `resultado = 'error'` y lo rehace el
   cron. Rollback: `alter table "GP2".insumo_equivalencia disable trigger zz_gv_insumo_equiv_espejo;`
-- ⚠⚠ **Lo que queda y es decisión de Luis**: `GP2.virgilio_insumo_stock` sigue siendo una **tabla copiada**
-  cada 10 min, y el bloque 1 de `gv_gp2_espejo_sync` es textualmente un `select` — **podría ser una VISTA**
-  y la pantalla leería el saldo **en vivo** (20 ms), sin cron y sin desfase. Lo único que lo frena es la
-  Regla 0, que ya tiene precedente aprobado por el dueño (`GP2.v_produccion_todas` lee `reg_prod_3_0`).
-  No se cambia sin su sí. Centinela 420. `sql/gv_insumo_equiv_espejo_v2987.sql`.
+- Centinela 420. `sql/gv_insumo_equiv_espejo_v2987.sql`.
+
+#### ⚠⚠ v29.89 (Luis, 13/10: *"si, pasala a vista"*): `GP2.virgilio_insumo_stock` ES UNA VISTA EN VIVO
+
+> **GP2 ya no lee una copia de hasta 10 minutos atrás: lee el saldo del momento, en 19,5 ms.**
+> La tabla que el bloque 1 de `gv_gp2_espejo_sync` rehacía cada 10 min **se borró**; en su lugar hay una
+> **vista** con las mismas 8 columnas (`actualizado_en = now()`), `security_invoker = true`.
+
+- **Es una excepción APROBADA a la Regla 0 de GP2** (GP2 no lee `public`). La pidió Luis; el precedente
+  que aprobó Thomas es **`GP2.v_produccion_todas`**, que lee `reg_prod_3_0`. **El resto del espejo sigue
+  siendo copia**: los bloques 2, 3 y 4 (ubicaciones, Mapa, categorías) y el cron 112 no se tocaron, y
+  tampoco `gv_gp2_espejo_insumos` / cron 152 / los dos triggers, que escriben el **inventario** de GP2 y
+  son otra cosa.
+- **Medido antes de aplicar** (transacción abortada): la vista devuelve las **mismas 163 filas y el mismo
+  md5** que la copia, y **`anon` 163 · `authenticated` 163** — nadie pierde filas. Ese chequeo no es
+  opcional: una vista con `security_invoker` sobre una tabla con RLS **no da error, devuelve MENOS filas**
+  (la trampa de la v20.45), y `Movimientos_Stock` tiene RLS prendida. Medido aparte: `anon` ve las 163
+  filas del depósito insumos y las 129 de `vista_insumos`.
+- **Quién la lee** (medido, no supuesto): `GP2.virgilio_insumos_sin_match_bundle` (el editor de
+  equivalencias) y `public.gv_insumo_isis_sync` (sólo la nombra en un comentario). **Ninguna vista**, y
+  nadie le escribía salvo el bloque 1 que se sacó.
+- ⚠ Los marcadores de la base dicen **v29.88** (otra sesión se llevó ese número mientras se escribía
+  esto): son la **llave**, no se cambian.
+- ⚠ **El marcador de la regla va en CÓDIGO** (`v_regla constant text := 'v29.88-vista'`), no en el
+  comentario que la explica: `gv_reglas_perdidas` limpia los comentarios antes de buscar (regla v21.82),
+  así que un marcador comentado vigila el rótulo y no la regla. Centinela **421**: si otra sesión repone
+  el bloque 1 desde una copia vieja, avisa.
+- Respaldo `zz_backups."GV_Backup_VirgilioInsumoStock_20261013"` (con RLS y sin escrituras).
+  **Rollback completo** —vuelve la tabla, su PK, su policy y el bloque 1— en la cabecera de
+  `sql/gv_insumo_stock_vista_v2988.sql`.
 
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
 
