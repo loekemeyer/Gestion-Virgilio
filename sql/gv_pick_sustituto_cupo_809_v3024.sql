@@ -36,7 +36,7 @@ create policy gv_pick_sust_uso_sel on public."GV_Pick_Sustituto_Uso" for select 
 
 create or replace function public.gv_pick_sustituto_cupo_trg()
 returns trigger language plpgsql security definer set search_path to 'public' as $$
--- v30.24-cupo-sustituto
+-- v30.24-cupo-sustituto · v30.25: sólo pedidos NUEVOS (creado_at >= alta del cupo); el sync reescribe NP viejas
 declare
   _c   record;
   _cod text := upper(btrim(coalesce(new.articulo, '')));
@@ -50,6 +50,7 @@ begin
      order by id
      for update
   loop
+    continue when coalesce(new.creado_at, now()) < _c.creado;
     continue when exists (select 1 from "GV_Pick_Sustituto_Uso" u where u.cupo_id = _c.id and u.np_label = new.np_label);
     continue when _c.cajas_usadas + new.cajas > _c.cajas_cupo;   -- no se parte una línea
     insert into "Correcciones_Pedido" (np, cod_secundario, cod_principal, cajas, confirmado_por, origen)

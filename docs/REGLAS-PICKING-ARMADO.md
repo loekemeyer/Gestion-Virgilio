@@ -584,3 +584,6 @@ encola AUI, el cuadro que explota **no** traba el asistente) · `node tests/mon-
 - **Pendientes sin pickear, del más reciente al más viejo (Luis, 13/10, "para liquidarlo")**: cupo bajado a **8**
   (9 en M16 − 1 que ya pide CH 0066 como 809). Asignado **CH 0064 (F48O) 2 cajas → 809**. CH 0063 (F48M, 8 cajas)
   no entra entera en las 6 que quedan; las 6 esperan la próxima línea que entre. Las demás NP con 809E ya están pickeadas.
+- **D3 (Luis, 13/10)**: en vez de CH 0064 se asignó **CH 0063 (F48M) 8 cajas → 809**, que liquida el 809 justo. Cupo 8/8, apagado.
+- ⚠ **v30.25: el trigger mira sólo pedidos NUEVOS** (`creado_at` ≥ alta del cupo). El sync de la web reescribe NP viejas
+  y a las 17:30 le asignó el cupo a **CH 0019** (pickeada y facturada el 02/10); se sacó a los 2 min, sin movimiento de stock.
