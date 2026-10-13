@@ -9542,6 +9542,26 @@ recepción vieja. La lectura devuelve `remito` nulo ahí.
 ⚠ `create or replace view` **borra las `reloptions`**: el `security_invoker = true` de
 `gv_insumo_recepcion_marca` se repone en el mismo bloque (verificado como `anon`).
 
+### ⚠ v30.10 (Luis, 13/10, D1 «sí»): el papel va TAMBIÉN en la ENTREGA de insumos y en la RECEPCIÓN de mercadería
+
+| dónde | qué lleva `gv_doc` | obligatorio |
+|---|---|---|
+| **RI** recepción de insumos | remito / factura y sus fechas (el papel del proveedor) | **sí** (como siempre) |
+| **EI** entrega de insumos | el **remito NUESTRO**, el que sale con la mercadería | **no** — «Sin remito — seguir» deja `tipo: "sin_papel"` |
+| **RT** recepción de mercadería (`recepcion.js`) | remito, factura y **las dos fechas**, más el proveedor | ya se pedían; antes sólo el número llegaba al `ref` |
+
+- En **EI** el modal del papel aparece después del destino (un paso más, pedido por Luis) y su «‹ Atrás»
+  vuelve a la lista de destinos correcta (`window._insEiSub`: inyectores u otros).
+- En **RT** el movimiento ya llevaba `ref: opState.remito` —el número, sin decir si era remito o factura— y
+  las **fechas y el otro número se perdían**: vivían en `Entregas Prov AT` / el recibo, no en el libro de
+  stock. `ref` se conserva igual (lo leen el dedup y la imputación de OC) y el detalle va en `gv_doc`.
+- **D5 (Luis): «sí, para adelante»** — ningún backfill. Lo recibido o entregado antes de hoy queda con
+  `gv_doc` nulo, y no se inventa el papel de un movimiento viejo.
+- Candados: `node tests/ins-remito-guardado.cjs` (bloque (c): EI pide el papel con `soloRemito` + `opcional`,
+  lo guarda, y «Sin remito» no traba) · `node tests/rcp-remito-en-movimiento.cjs` (candado estático sobre
+  `recepcion.js`: la fila lleva `gv_doc` armado desde `opState`, sin número escrito a mano, y no se perdió el
+  `ref`).
+
 **Chequeo:** `node tests/ins-remito-guardado.cjs` (corre la recepción de verdad y mide el POST: el papel en las
 dos filas, con su fecha y su tipo; sin papel no escribe `gv_doc`; anular no lo deja colgado) ·
 `select cod_art, origen, marca, remito from public.gv_insumo_recepcion_marca order by id desc limit 5;`

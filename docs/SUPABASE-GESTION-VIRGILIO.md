@@ -31976,3 +31976,18 @@ recepción** (es un papel).
 - **Rollback**: `alter table public."Movimientos_Stock" drop column gv_doc;` +
   `drop index if exists public.mov_stock_gv_doc_remito_idx;` y la vista a su versión anterior.
   `sql/gv_mov_stock_gv_doc_v3006.sql`.
+
+### §3.v3010 — El papel también en la entrega de insumos y en la recepción de mercadería (Luis, 13/10/2026, D1)
+
+Sin SQL nuevo: la columna `gv_doc` y el índice son los de §3.v3006. Lo que cambia es **quién la escribe**.
+
+| movimiento | `gv_doc` | nota |
+|---|---|---|
+| `recepcion_insumo` (RI) | remito / factura + fechas del proveedor | ya estaba (v30.06) |
+| `entrega_insumo` (EI) | el remito **nuestro**, el que sale | **nuevo**; no se exige (`tipo: "sin_papel"` si no hay) |
+| `recepcion` (RT, `recepcion.js`) | remito, factura, las dos fechas y el proveedor | **nuevo**; `ref` sigue llevando el número, que es lo que leen el dedup y la imputación de OC |
+
+- **D5 (Luis): «sí, para adelante»** — **sin backfill**. Lo anterior queda con `gv_doc` nulo.
+- Consulta útil: `select tipo, count(*) filter (where gv_doc is not null) con_papel, count(*) total
+  from public."Movimientos_Stock" where creado > now() - interval '7 days' group by 1 order by 3 desc;`
+- Rollback: el de §3.v3006 (la columna es nullable, el front deja de mandarla y nada se rompe).

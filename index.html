@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.10">
+<link rel="stylesheet" href="gv-ui.css?v=30.11">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6422,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.10"></script>
+<script type="module" src="recepcion.js?v=30.11"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10782,7 +10782,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.10";
+const APP_VERSION = "v30.11";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27701,7 +27701,8 @@ function insEnvioTipo() {
 function insEnvioTipoGo(sub) {
   window._insEnvioSub = (sub === "iny") ? "iny" : "otros";   // v29.28 (D9): las bolsas sólo salen a un inyector
   closeInsumoChooser();
-  askInsUbicacion("EI", sub === "iny" ? "iny" : "otros");
+  window._insEiSub = (sub === "iny" ? "iny" : "otros");   // v30.10: el Atras del papel vuelve a la lista correcta
+  askInsUbicacion("EI", window._insEiSub);
 }
 
 /* v9.15: Modal para preguntár DÓNDE se envía/recibe antes de abrir el modal de insumos.
@@ -27779,7 +27780,11 @@ function insUbicOk(mode, _gp2, _fijo) {
     askInsDocumentacion(mode, ubicacion);
     return;
   }
-  _insArrancarToggle(mode);   // v29.82: un solo «Enviar» (el de la botonera)
+  /* v30.10 (Luis, 13/10, D1 «sí»): la ENTREGA también lleva su papel. Acá el remito es el
+     NUESTRO (lo que sale con la mercadería), así que se pide sólo remito y **no se exige**: si
+     el operario no tiene número, «Sin remito» sigue y queda anotado que no hubo. Lo mismo que en
+     RI, el papel termina en la columna `gv_doc` de cada movimiento. */
+  askInsDocumentacion(mode, ubicacion, { soloRemito: true, opcional: true });
 }
 
 /* v29.82 (Luis, 13/10) — "quiero que el menu sea reducido dependiendo de que es lo que estan
@@ -27838,10 +27843,11 @@ function askInsDocumentacion(mode, proveedor, opt) {
 
   // Estado temporal para la documentación de insumos
   window._insDocState = { tipoDoc: '', nroRemito: '', nroFactura: '', fechaRemito: '', fechaFactura: '', proveedor: proveedor || '' };
+  window._insDocOpcional = !!(opt && opt.opcional);   // v30.10: en la ENTREGA el remito no se exige
 
   ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;margin:auto;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
-    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📄 Documentación recibida</div>' +
-    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + (soloRemito ? "🏭 Cervantes · remito" : "¿Qué documentación recibís?") + '</div>' +
+    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📄 Documentación ' + (mode === "EI" ? "que sale" : "recibida") + '</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + (mode === "EI" ? "N° de remito con el que sale (si hay)" : (soloRemito ? "🏭 Cervantes · remito" : "¿Qué documentación recibís?")) + '</div>' +
     '<div id="insDocBody"></div>' +
     '</div>';
   ov.style.display = "flex";
@@ -27879,14 +27885,18 @@ function _insDocStep2(mode) {
     html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">N° de Factura</label><input type="text" inputmode="numeric" id="insDocNroFactura" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;"></div>';
     html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de Factura</label><input type="date" id="insDocFechaFactura" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;" value="' + hoyAR + '"></div>';
   }
+  // v30.10: en la ENTREGA el remito es el nuestro y puede no haber — «Sin remito» sigue igual
+  if (window._insDocOpcional) {
+    html += '<button onclick="insDocOk(\'' + mode + '\', true)" style="width:100%;margin-top:4px;padding:12px;border:1px dashed #cbd5e1;border-radius:10px;background:#fff;color:#475569;font-weight:700;cursor:pointer;font-size:15px;">Sin remito — seguir</button>';
+  }
   html += '<div style="display:flex;gap:10px;margin-top:14px;">' +
-    '<button onclick="' + (window._insDocSolo ? "insDocCancel();insRecibirCat()" : "_insDocStep1('" + mode + "')") + '" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
+    '<button onclick="' + (mode === "EI" ? "insDocCancel();askInsUbicacion('EI', window._insEiSub)" : (window._insDocSolo ? "insDocCancel();insRecibirCat()" : "_insDocStep1('" + mode + "')")) + '" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
     '<button onclick="insDocOk(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;font-size:16px;">Continuar</button>' +
     '</div>';
   body.innerHTML = html;
 }
 
-function insDocOk(mode) {
+function insDocOk(mode, sinPapel) {
   var st = window._insDocState;
   var hasR = st.tipoDoc === 'remito' || st.tipoDoc === 'remito_factura';
   var hasF = st.tipoDoc === 'factura' || st.tipoDoc === 'remito_factura';
@@ -27904,6 +27914,13 @@ function insDocOk(mode) {
     st.nroFactura = elNF ? elNF.value.replace(/\D/g, '') : '';
     st.fechaFactura = elFF ? elFF.value : '';
     if (!st.nroFactura) { ok = false; if (elNF) elNF.style.borderColor = '#dc2626'; }
+  }
+  /* v30.10: en la ENTREGA el remito es el NUESTRO y puede no haber («Sin remito — seguir»): no se
+     exige el número y queda anotado que no hubo papel, en vez de inventar uno. En RI se sigue
+     exigiendo igual que siempre. */
+  if (window._insDocOpcional && (sinPapel || (!st.nroRemito && !st.nroFactura))) {
+    st.nroRemito = ''; st.fechaRemito = ''; st.nroFactura = ''; st.fechaFactura = '';
+    st.tipoDoc = 'sin_papel'; ok = true;
   }
   if (!ok) return;
 
@@ -63419,7 +63436,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.10"></script>
+<script src="importacion.js?v=30.11"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -66644,15 +66661,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.10"></script>
-<script src="hotsale.js?v=30.10"></script>
-<script src="estadisticas.js?v=30.10"></script>
-<script src="ads.js?v=30.10"></script>
-<script src="plantel.js?v=30.10"></script>
+<script src="cobranzas.js?v=30.11"></script>
+<script src="hotsale.js?v=30.11"></script>
+<script src="estadisticas.js?v=30.11"></script>
+<script src="ads.js?v=30.11"></script>
+<script src="plantel.js?v=30.11"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.10"></script>
+<script src="analisis.js?v=30.11"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.10"></script>
+<script src="ayuda.js?v=30.11"></script>
 
 </body>
 </html>

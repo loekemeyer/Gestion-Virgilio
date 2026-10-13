@@ -2584,9 +2584,23 @@ async function opEnviar() {
   // cola offline, así el reintento (POST que llegó pero cuya respuesta se perdió) NO
   // duplica cajas (índice único parcial mov_stock_clientid_dedup + ignore-duplicates).
   const _cid = () => { try { if (typeof crypto !== "undefined" && crypto.randomUUID) return "mst_" + crypto.randomUUID(); } catch (_e) {} return "mst_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10); };
+  /* v30.10 (Luis, 13/10, D1 «sí»): el PAPEL va en el movimiento (columna gv_doc), no sólo en
+     `ref`. Antes `ref` llevaba el número (remito o factura, sin decir cuál) y las FECHAS y el otro
+     número se perdían: vivían en `Entregas Prov AT` / el recibo, no en el libro de stock. */
+  const _doc = (function () {
+    const d = {
+      tipo: opState.tipoDoc || null,
+      remito: opState.nroRemito || null, fecha_remito: opState.fechaRemito || null,
+      factura: opState.nroFactura || null, fecha_factura: opState.fechaFactura || null,
+      proveedor: opState.tallNombre || null
+    };
+    const o2 = {}; Object.keys(d).forEach(function (k) { if (d[k]) o2[k] = d[k]; });
+    return Object.keys(o2).length ? o2 : null;
+  })();
   const stockRows = items.map(i => ({
     cod_art: String(i.cod), descripcion: i.desc || null,
     deposito: 'a_guardar', delta: i.cajas, tipo: 'recepcion', ref: opState.remito || null,
+    gv_doc: _doc,
     legajo: RECP.legajo || null,   // idea 7725: legajo para sumar el total del día cruzando dispositivos al cerrar RT
     // v12.38 — empresa de la recepción = línea que eligió el operario (LK/CH). Para los
     // códigos duales (437E/438E/439E/809E) esto ubica el stock recibido en la góndola

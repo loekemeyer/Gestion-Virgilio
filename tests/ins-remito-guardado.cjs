@@ -75,7 +75,31 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await cargarYMandar(["N°19"]);
     out.sinPapelSinDoc = movs.length === 1 && !movs[0].gv_doc;
 
-    // (c) anular no deja el papel colgado
+    // (c) v30.10: la ENTREGA tambien pide el papel, y es OPCIONAL (el remito es el NUESTRO)
+    movs.length = 0; window._insDoc = null; window._insUbicacion = "Kollplast";
+    window._insDocOpcional = false;
+    // el camino real: insUbicOk de EI abre el modal del papel (antes iba derecho a la lista)
+    let abrioPapel = false;
+    const _ask = window.askInsDocumentacion;
+    window.askInsDocumentacion = function (mode, prov, opt) { abrioPapel = !!(mode === "EI" && opt && opt.soloRemito && opt.opcional); };
+    insUbicOk("EI", null, "Kollplast");
+    window.askInsDocumentacion = _ask;
+    out.eiPidePapel = abrioPapel;
+    // con numero: va en el movimiento de salida
+    window._insDocState = { tipoDoc: "remito", nroRemito: "", nroFactura: "", fechaRemito: "", fechaFactura: "", proveedor: "Kollplast" };
+    window._insDocOpcional = true;
+    const ov2 = document.getElementById("insDocModal") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "insDocModal" }));
+    ov2.innerHTML = '<input id="insDocNroRemito" value="771"><input id="insDocFechaRemito" value="2026-10-13">';
+    insDocOk("EI");
+    out.eiGuardoPapel = !!(window._insDoc && window._insDoc.remito === "771");
+    // y SIN numero no traba: "Sin remito — seguir" deja el tipo en sin_papel
+    window._insDocState = { tipoDoc: "remito", nroRemito: "", nroFactura: "", fechaRemito: "", fechaFactura: "", proveedor: "Kollplast" };
+    ov2.innerHTML = '<input id="insDocNroRemito" value=""><input id="insDocFechaRemito" value="">';
+    insDocOk("EI", true);
+    out.eiSinRemitoSigue = !!(window._insDoc && window._insDoc.tipo === "sin_papel" && !window._insDoc.remito);
+    window._insDocOpcional = false;
+
+    // (d) anular no deja el papel colgado
     window._insDoc = { tipo: "remito", remito: "99999" };
     await showInsumoModal("RI", "104");
     const _cf = window.confirm; window.confirm = function () { return true; };
