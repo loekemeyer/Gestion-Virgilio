@@ -8763,6 +8763,28 @@ front las llama con `gvWriteHdr()` (la sesión), nunca con la clave pública. El
 - Primer toque SELECCIONA, «Enviar» EMPIEZA la tarea (evento **MDI**, `texto` = MOV/INS/CP/RC) y abre el módulo; abierta, el botón queda rojo y tocarlo RE-ABRE el mismo módulo (retomar, mismo tramo). Abajo, barra con **⛔ Anular** (MDT `ANULADO` → no productivas) y **🏁 Terminé** (MDT con `ts_inicio`). IR sigue con IRI/IRT y también va por «Enviar».
 - `MOD_TAREA` en index.html; tope 12 h (`_gvModVivo`). Vista `gv_monitor_horas_operario_dia` y `gv_horas_operario_detalle_v2` (marcador `v28.93-mdt`): MDT suma a Hs MOV ≡ `fetchMonitorDayStats`; TV / Mon. Admin «En este momento». `sql/gv_modulo_tarea_mdi_mdt_v2893.sql`, `tests/modulo-tarea-enviar.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-13, v29.81): una BARRA FIJA abajo NO TAPA NADA — se le hace lugar
+
+**Luis, con la captura del celular:** *"la barra de abajo con «Anular» y «Terminé» tapa opciones y botones
+(aparece arriba de algo que esté al fondo de la lista). Ajustalo en todos los módulos para que no tape
+nada (prioriza visión de smartphone)"*.
+
+> **Una barra `position:fixed` abajo se descuenta del alto de lo que hay detrás; no se dibuja encima.**
+
+- `#modTareaBar` (⛔ Anular · 🏁 Terminé de Mover racks, Completar Pedido, Pasar a urgente e Insumos) mide
+  su alto y **`_modTareaColchon(px)`** le hace lugar: cada overlay de `MOD_TAREA[*].ovs` que está en
+  pantalla pasa a `bottom: <alto>` (termina arriba de la barra, así su scroll llega hasta el final) y el
+  `body` lleva el mismo `padding-bottom` para la botonera de atrás. Al irse la barra, todo vuelve.
+- **La lista de overlays sale de `ovs`**, que ya existía: al agregar un módulo a `MOD_TAREA`, sus overlays
+  van ahí y el colchón lo hereda solo.
+- ⚠ Un overlay **sin scroll** (los de Insumos, con la tarjeta centrada) no se arregla con el colchón: su
+  tarjeta tiene que ENTRAR arriba de la barra. Hoy entra en un 390 x 740; si alguna crece, el test se pone
+  rojo y ahí hay que darle scroll (`overflow:auto` + la tarjeta con `margin:auto`, nunca
+  `align-items:center` con overflow: eso deja el borde de arriba inalcanzable).
+- `tests/modbar-no-tapa.cjs` mide **en 390 x 740** con la pantalla corriendo: la barra pegada abajo, el
+  overlay terminando justo en ella, el último renglón de una lista larga por encima, el colchón del body y
+  que al cerrar vuelva todo (verificado: 12 chequeos en rojo contra la v29.78).
+
 ## ⚠ REGLA (Luis, 2026-10-09, v29.05): un AJUSTE de RACKS lleva la POSICIÓN — Stock → Ajustar / Fijar / Stock inicial
 
 Caso 606 (09/10): un ingreso a racks X22 se cargó como **606** siendo **606E** (pedido PI B260601), y la corrección desde

@@ -6420,7 +6420,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.80"></script>
+<script type="module" src="recepcion.js?v=29.81"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10732,7 +10732,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.80";
+const APP_VERSION = "v29.81";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -29354,6 +29354,24 @@ function _modTareaVisible(m) {
   return m.ovs.some(function (id) { var e = document.getElementById(id); return !!e && getComputedStyle(e).display !== "none"; });
 }
 /* La barra (Anular / Terminé) se ve mientras el módulo de una tarea abierta está en pantalla. */
+/* v29.81 (Luis, 13/10: «la barra de abajo con Anular y Terminé tapa opciones y botones … que no tape
+   nada, priorizá la visión de smartphone») — la barra es fixed y se comía el último renglón de la lista
+   (caso: Completar Pedido en el celular). Mientras se ve, los overlays de esos módulos TERMINAN arriba
+   de la barra (`bottom: <alto>`), así su scroll llega hasta el final, y el body lleva el mismo colchón
+   para la botonera de atrás. Al irse la barra se devuelve todo. Al agregar un módulo a MOD_TAREA, sus
+   overlays van en `ovs` — de ahí sale esta lista. */
+var _MODBAR_OVS = (function () { var a = []; Object.keys(MOD_TAREA).forEach(function (c) { a = a.concat(MOD_TAREA[c].ovs || []); }); return a; })();
+function _modTareaColchon(px) {
+  px = Number(px) || 0;
+  try { document.documentElement.style.setProperty("--gv-modbar", px + "px"); } catch (_e) {}
+  var pb = px ? px + "px" : "";
+  try { if (document.body.style.paddingBottom !== pb) document.body.style.paddingBottom = pb; } catch (_e) {}
+  _MODBAR_OVS.forEach(function (id) {
+    var e = document.getElementById(id); if (!e) return;
+    var val = (px && getComputedStyle(e).display !== "none") ? px + "px" : "";
+    if (e.style.bottom !== val) e.style.bottom = val;
+  });
+}
 var _modTareaTimer = null;
 function _modTareaVigilar() {
   var leg = String((typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim();
@@ -29362,6 +29380,7 @@ function _modTareaVigilar() {
   var bar = document.getElementById("modTareaBar");
   if (!cod) {
     if (bar) bar.style.display = "none";
+    _modTareaColchon(0);
     var algun = leg && Object.keys(MOD_TAREA).some(function (c) { return modTareaActiva(leg, c); });
     if (!algun && _modTareaTimer) { clearInterval(_modTareaTimer); _modTareaTimer = null; }
     return;
@@ -29384,6 +29403,7 @@ function _modTareaVigilar() {
       '<button type="button" onclick="modTareaBoton(\'' + cod + '\',false)" style="' + bs + 'background:#16a34a;color:#fff;">🏁 Terminé</button>';
   }
   bar.style.display = "flex";
+  _modTareaColchon(bar.offsetHeight || 56);
 }
 function modTareaBoton(code, anular) {
   var m = MOD_TAREA[code]; if (!m) return;
@@ -62559,7 +62579,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.80"></script>
+<script src="importacion.js?v=29.81"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65559,15 +65579,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.80"></script>
-<script src="hotsale.js?v=29.80"></script>
-<script src="estadisticas.js?v=29.80"></script>
-<script src="ads.js?v=29.80"></script>
-<script src="plantel.js?v=29.80"></script>
+<script src="cobranzas.js?v=29.81"></script>
+<script src="hotsale.js?v=29.81"></script>
+<script src="estadisticas.js?v=29.81"></script>
+<script src="ads.js?v=29.81"></script>
+<script src="plantel.js?v=29.81"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.80"></script>
+<script src="analisis.js?v=29.81"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.80"></script>
+<script src="ayuda.js?v=29.81"></script>
 
 </body>
 </html>
