@@ -8813,9 +8813,10 @@ tenía dos agujeros, medidos el 13/10 sobre los 57 códigos con stock en racks:
    desempata el código: el orden entre ellos sólo cambia cuando alguno tenga venta.
 
 ⚠ **El ratio mide «qué tan vacía está la celda», no cuántas cajas entran.** El 606E queda 6.º con prio 0,00
-teniendo **218 de hueco** y 120 en racks, detrás del 361E (hueco 41, cap 32). Está así a propósito: el objetivo es
-que ninguna celda se quede sin mercadería para el picking. Si algún día se quiere «el viaje que más llena», el
-orden es `min(cap − góndola − A guardar + pedido, racks)` — es otra decisión, no un bug.
+teniendo **218 de hueco** y 120 en racks, detrás del 361E (hueco 41, cap 32). **Luis lo decidió así el 13/10** (*"está bien que pese un pedido de esa forma, dejalo así"*): el
+objetivo es que ninguna celda se quede sin mercadería para el picking, y el pedido pesa sobre el tamaño de SU
+celda. **No volver a proponer el orden por hueco en cajas** (`min(cap − góndola − A guardar + pedido, racks)`),
+que es la otra lectura y quedó descartada.
 
 ⚠⚠ **El MISMO cruce pelado sigue en Guardado a Góndola y en «¿Qué bajar primero?»** (`showMGModal` y
 `showGuardarOrden`, las dos con `capMap[_ocgNorm(a.cod)]`). Ahí el dual queda con `cap = 0`, y en «¿Qué bajar
