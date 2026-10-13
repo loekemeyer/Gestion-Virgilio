@@ -34,8 +34,9 @@ function _impTabsHtml(cur) {
     '<button style="' + t(cur === 'hist') + '" onclick="openImpHistRecep()" title="Los pedidos hechos y las recepciones: qué se pidió, cuándo, cuánto llegó y dónde se guardó.">📜 Historial</button>' +
     '<button style="' + t(cur === 'disc') + '" onclick="openImpDisc()" title="Los importados dados de baja (Importados.activo = false): no salen en Pedidos ni en el PDF.">🚫 Discontinuos</button>' +
     '<button style="' + t(cur === 'prov') + '" onclick="stkOpenProvImp()">🏭 Proveedores</button>' +
-    '<button style="' + t(false) + '" onclick="openImpoComex()" title="Verificación de documentos de importación (IMPO COMEX). Sólo supervisores.">🛃 IMPO COMEX</button>' +
-    '<button style="' + t(false) + '" onclick="openImpoComex2()" title="IMPO COMEX dentro de Gestión, sin build (en prueba: mismas funciones que el de al lado).">🛃 IMPO COMEX nuevo</button></div>';
+    /* v30.06 (Elías, 13/10: «oculta el impo comex antiguo»): queda sólo el nuevo (impocomex/, sin build).
+       openImpoComex() y la carpeta impo-comex/ siguen en el repo (los tests de paridad la usan); lo que se fue es la puerta. */
+    '<button style="' + t(false) + '" onclick="openImpoComex2()" title="Verificación de documentos de importación (IMPO COMEX). Sólo supervisores.">🛃 IMPO COMEX</button></div>';
 }
 /* v23.19 (Elías, 28/09) — IMPO COMEX dentro de Gestión: la versión web vive en impo-comex/ (copia
    armada; el fuente está en el repo privado loekemeyer/Impo-Comex). Página completa, mismo origin:
@@ -3059,11 +3060,21 @@ function _impRecLugares(l) {
   var c = _impRec.ctx, emp = _impRec.empresa;
   if (l.destino === "gondola") return (c.gondola || []).filter(function (g) { return !c.dual || !emp || g.empresa === emp; })
     .map(function (g) { return { v: g.sector, t: g.sector + (c.dual ? " (" + g.empresa + ")" : "") + " · cap " + (g.cajas_max == null ? "?" : g.cajas_max) + " cj" }; });
-  if (l.destino === "rack") return (c.racks || []).filter(function (r) { return r.estado !== "reservado"; })
-    .map(function (r) {
+  /* v29.78 (Luis, 13/10) — un rack DIVIDIDO ofrece una opción por parte (Y25-1, Y25-2…).
+     El detalle de qué hay en CADA parte no viene en el contexto (el chip es del rack entero):
+     si la parte elegida está tomada, la SIMULACIÓN lo avisa como «Rack ocupado» antes de escribir. */
+  if (l.destino === "rack") {
+    var out = [];
+    (c.racks || []).filter(function (r) { return r.estado !== "reservado"; }).forEach(function (r) {
       var e = r.estado === "libre" ? "libre" : r.estado === "mismo" ? "ya tiene este código (" + (r.cajas || 0) + " cj)" : "⚠ ocupado: " + r.cod + " (" + (r.cajas || 0) + " cj)";
-      return { v: r.sector, t: r.sector + " · " + r.empresa + " · " + e };
+      var n = Math.max(1, Number(r.partes) || 1);
+      if (n <= 1) { out.push({ v: r.sector, t: r.sector + " · " + r.empresa + " · " + e }); return; }
+      for (var k = 1; k <= n; k++) {
+        out.push({ v: r.sector + "-" + k, t: r.sector + "-" + k + " · " + r.empresa + " · parte " + k + " de " + n + " · el rack: " + e });
+      }
     });
+    return out;
+  }
   if (l.destino === "insumos") return (c.insumos_pos || []).map(function (p) { return { v: p.sector, t: p.sector + (p.insumos ? " · tiene " + p.insumos : " · vacía") }; });
   return [];
 }

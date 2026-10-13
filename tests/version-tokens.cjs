@@ -22,21 +22,24 @@ const root = path.join(__dirname, "..");
 // (separador de claves de _pppGeoCod); los patrones que buscamos son ASCII.
 const html = fs.readFileSync(path.join(root, "index.html"), "latin1");
 
-const SIGUEN_APP_VERSION = ["recepcion.js", "cobranzas.js", "importacion.js", "hotsale.js", "estadisticas.js", "ads.js", "ayuda.js", "plantel.js"];
-const VERSION_PROPIA = ["planimetria.js", "supabase-config.js", "alerta-inactivo.js"];   // alerta-inactivo: mismo ?v= que monitor/tv.html
+const SIGUEN_APP_VERSION = ["gv-ui.css", "recepcion.js", "cobranzas.js", "importacion.js", "hotsale.js", "estadisticas.js", "ads.js", "ayuda.js", "plantel.js", "analisis.js"];
+const VERSION_PROPIA = ["planimetria.js", "supabase-config.js", "alerta-inactivo.js", "tv-clave.js"];   // tv-clave: mismo ?v= en index.html y monitor/tv.html   // alerta-inactivo: mismo ?v= que monitor/tv.html
 
 const mApp = html.match(/APP_VERSION\s*=\s*["']v?([0-9][0-9.]*)["']/);
 if (!mApp) { console.log("version-tokens: no encontré APP_VERSION en index.html"); process.exit(1); }
 const appNum = mApp[1];
 
-// todos los src="algo.js?v=N" que NO son de un CDN
+// todos los src="algo.js?v=N" y href="algo.css?v=N" que NO son de un CDN
+// (la hoja del sistema de diseño, gv-ui.css, también se versiona con la app)
 const encontrados = [];
-const re = /src\s*=\s*["']([^"'?]+\.js)\?v=([^"']+)["']/g;
-let m;
-while ((m = re.exec(html)) !== null) {
-  const src = m[1];
-  if (/^https?:\/\//i.test(src) || src.startsWith("//")) continue;
-  encontrados.push({ archivo: path.basename(src), token: m[2], idx: m.index });
+for (const re of [/src\s*=\s*["']([^"'?]+\.js)\?v=([^"']+)["']/g,
+                  /href\s*=\s*["']([^"'?]+\.css)\?v=([^"']+)["']/g]) {
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const src = m[1];
+    if (/^https?:\/\//i.test(src) || src.startsWith("//")) continue;
+    encontrados.push({ archivo: path.basename(src), token: m[2], idx: m.index });
+  }
 }
 
 const errores = [];

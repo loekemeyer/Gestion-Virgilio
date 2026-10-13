@@ -10,6 +10,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
+<link rel="stylesheet" href="gv-ui.css?v=30.08">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -127,6 +129,17 @@ button {
 #cgAside button { width: auto; margin: 0; padding: 3px 14px; font-size: 16px; border-radius: 6px; border: 1px solid #cbd5e1; background: #f8fafc; cursor: pointer; }
 #cgAside button.cg-ok { color: #15803d; } #cgAside button.cg-no { color: #b91c1c; }
 @media (max-width: 1599px) { #cgAside { position: static; width: auto; max-width: 520px; max-height: none; margin: 0 auto 12px; } }
+#gsAside { position: fixed; right: 30px; top: 137px; width: 235px; max-height: calc(100vh - 160px); overflow: auto;
+  background: #fff; border: 2px solid #dc2626; border-radius: 10px; padding: 8px; box-sizing: border-box; text-align: center; z-index: 5; }
+#gsAside .gs-h { font-weight: 800; font-size: 13.5px; color: #1d4ed8; margin-bottom: 6px; line-height: 1.2; }
+#gsAside .gs-it { border-top: 1px solid #e2e8f0; padding: 6px 0; }
+#gsAside .gs-l1 { font-size: 15px; font-weight: 800; }
+#gsAside .gs-l2 { font-size: 12.5px; color: #334155; }
+#gsAside .gs-l3 { font-size: 11px; color: #64748b; }
+#gsAside .gs-btns { display: flex; gap: 6px; justify-content: center; margin-top: 4px; }
+#gsAside button { width: auto; margin: 0; padding: 3px 14px; font-size: 16px; border-radius: 6px; border: 1px solid #cbd5e1; background: #f8fafc; cursor: pointer; }
+#gsAside button.gs-ok { color: #15803d; } #gsAside button.gs-no { color: #1d4ed8; }
+@media (max-width: 1599px) { #gsAside { position: static; width: auto; max-width: 520px; max-height: none; margin: 0 auto 12px; } }
 .sup-secondary .sup-action-btn { min-height: 78px; padding: 9px 6px; font-size: 12.5px; gap: 5px;
   background: #51688f; border-radius: 11px; }
 .sup-secondary .sup-action-btn:hover { background: #44597a; }
@@ -4592,6 +4605,14 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pk-done-t{ font-size: 22px; font-weight: bold; color: #0f172a; }
 .pk-done-s{ font-size: 15px; color: #64748b; }
 /* idea 3798 — card del conteo cíclico de góndola (en el done del picking) */
+.pk-sin-gond { background:#fff7ed; border:1px solid #fdba74; color:#9a3412; border-radius:10px;
+  padding:8px 10px; margin-top:8px; font-size:13.5px; font-weight:700; text-align:center; line-height:1.3; }
+.pk-gond-h { font-size:21px; font-weight:900; text-align:center; margin:14px 0 6px; }
+.pk-gond-s { font-size:14.5px; color:#334155; text-align:center; line-height:1.35; margin-bottom:12px; }
+.pk-gond-row { display:flex; gap:8px; align-items:stretch; margin-bottom:10px; }
+.pk-gond-inp { flex:1; width:auto; margin:0; font-size:30px; font-weight:900; text-align:center;
+  text-transform:uppercase; border:2px solid #cbd5e1; border-radius:12px; padding:8px; }
+.pk-gond-btn { flex:0 0 42%; margin:0; }
 .pk-conteo{ width:100%; box-sizing:border-box; background:#fffbeb; border:1.5px solid #fcd34d; border-radius:13px; padding:12px 13px; text-align:left; }
 .pk-conteo.done{ background:#f0fdf4; border-color:#86efac; color:#166534; font-weight:700; text-align:center; }
 .pk-conteo-h{ font-size:14.5px; font-weight:800; color:#92400e; }
@@ -6401,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.61"></script>
+<script type="module" src="recepcion.js?v=30.08"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6518,7 +6539,53 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div id="supervisorPanel" class="hidden">
     <div class="app-brand">Gestion <span class="app-brand-hi">Virgilio</span></div>
     <h1 class="sup-title">Administración</h1>
+    <!-- v29.85 (Thomas, 13/10): panel por ROL. Según quién sos (área), checklist de qué mirar. -->
+    <style>
+      /* v29.97 (Luis, 13/10: *"esa visual es horrible … ajusta eso en un menu colapsable
+         con un badge. que el arreglo sea general y no solo para luis"*): el panel por rol es
+         UNA LÍNEA con su badge; el checklist se despliega. Regla de espacio del 28/09 y
+         GV-UI (v29.83): lo explicativo se pliega y nada largo se dibuja abierto.
+         ⚠ El `button{width:100%;padding:16px;font-size:22px}` global de la línea 26 también
+         muerde acá: sin el reset, «cambiar» salía de una pantalla de ancho.
+         v30.04 — PASE `disenador-gvui`: todo sale de los TOKENS de `gv-ui.css` (cargado en
+         la línea 14). No se escribe un `font-size` ni un hex propio acá. Lo que arregló:
+         el DATO del plegado (el badge) pasó a 16 px y el nombre —que es el RÓTULO— a 12,
+         así la jerarquía no queda al revés; y «cambiar» salió de adentro del <button> de la
+         barra a `.rolp-head`, con sus 44 px de alto (antes 22 y sin teclado). */
+      #rolPanel{max-width:620px;margin:4px auto 12px;}
+      #rolPanel button{width:auto;margin:0;font-size:inherit;}
+      #rolPanel .rolp-bar, #rolPanel .rolp-row{width:100%;}   /* el reset de arriba les comia el ancho */
+      .rolp-head{display:flex;align-items:center;gap:var(--gv-sp-3);}
+      /* ⚠ `min-width:0`: sin eso el contenido de la barra le pone un min-width implícito, no
+         encoge, y a 390 px «cambiar» se sale del panel y queda pegado al borde de la pantalla. */
+      #rolPanel .rolp-head .rolp-bar{flex:1 1 auto;min-width:0;}
+      .rolp-bar{display:flex;align-items:center;gap:var(--gv-sp-4);background:var(--gv-surface);border:1px solid var(--gv-line);border-radius:var(--gv-r-sm);padding:var(--gv-sp-3) var(--gv-sp-4);min-height:var(--gv-tap);cursor:pointer;text-align:left;}
+      .rolp-bar:hover{background:var(--gv-bg);}
+      .rolp-car{flex:0 0 auto;font-size:var(--gv-fs-sm);color:var(--gv-muted);width:12px;transition:transform .12s;}
+      #rolPanel.abierto .rolp-car{transform:rotate(90deg);}
+      .rolp-quien{flex:1 1 auto;min-width:0;font-size:var(--gv-fs-sm);font-weight:700;color:var(--gv-ink-2);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .rolp-area{font-weight:600;color:var(--gv-ink-2);font-size:var(--gv-fs-xs);}
+      /* el BADGE es el DATO del panel plegado: va MAS grande que el rotulo (GV-UI 1 y 2). */
+      .rolp-badge{flex:0 0 auto;display:inline-flex;align-items:center;gap:var(--gv-sp-2);border-radius:var(--gv-r-pill);padding:var(--gv-sp-1) var(--gv-sp-4);font-size:var(--gv-fs-lg);font-weight:800;line-height:1.3;}
+      .rolp-b-rojo{background:var(--gv-error-bg);color:var(--gv-error);}
+      .rolp-b-verde{background:var(--gv-ok-bg);color:var(--gv-ok);}
+      .rolp-b-gris{background:var(--gv-surface-2);color:var(--gv-ink-2);}
+      .rolp-cambiar{flex:0 0 auto;background:transparent;border:1px solid var(--gv-line);border-radius:var(--gv-r-sm);color:var(--gv-ink-2);font-size:var(--gv-fs-sm);font-weight:700;padding:var(--gv-sp-2) var(--gv-sp-4);min-height:var(--gv-tap);cursor:pointer;}
+      .rolp-body{display:none;background:var(--gv-surface);border:1px solid var(--gv-line);border-radius:var(--gv-r-sm);margin:var(--gv-sp-2) 0 0;padding:var(--gv-sp-4);}
+      #rolPanel.abierto .rolp-body{display:block;}
+      .rolp-list{display:flex;flex-direction:column;gap:var(--gv-sp-2);}
+      .rolp-row{display:flex;align-items:center;gap:var(--gv-sp-3);text-align:left;background:var(--gv-bg);border:1px solid var(--gv-line-soft);border-radius:var(--gv-r-sm);padding:var(--gv-sp-3) var(--gv-sp-4);cursor:pointer;min-height:var(--gv-tap);}
+      .rolp-row:hover{background:#eff6ff;}   /* tinte de hover: no hay token de info-bg */
+      .rolp-dot{flex:0 0 auto;width:10px;height:10px;border-radius:var(--gv-r-pill);}
+      .rolp-lbl{flex:1 1 auto;font-size:var(--gv-fs-md);font-weight:700;color:var(--gv-ink);line-height:1.2;}
+      .rolp-hint{display:block;font-size:var(--gv-fs-xs);font-weight:500;color:var(--gv-ink-2);margin-top:1px;}
+      .rolp-sub{font-size:var(--gv-fs-xs);font-weight:600;color:var(--gv-warn);}
+      .rolp-num{flex:0 0 auto;font-size:var(--gv-fs-xl);font-weight:800;min-width:var(--gv-sp-6);text-align:right;font-variant-numeric:tabular-nums;}
+    </style>
+    <div id="rolPanel" style="display:none;"></div>
     <div id="cgAside" style="display:none;"></div>
+    <!-- v29.69 (Luis, 13/10): góndolas que informó el operario en el picking, para dar de alta en el Mapa -->
+    <div id="gsAside" style="display:none;"></div>
     <!-- GRANDES: uso diario (orden definido por el usuario). "Stock y Compras" = Stocks + OC en un solo botón. -->
     <div class="sup-actions sup-primary">
       <button class="sup-action-btn" onclick="openFacturacion()" style="position:relative;"><span class="sup-ico">📋</span><span>Facturación</span><span id="facBadge" class="dp-badge" style="display:none;" title="Pedidos listos para facturar (picking + separado terminados, todavía sin facturar)"></span></button>
@@ -6536,6 +6603,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openCobranzas()"><span class="sup-ico">💳</span><span>Cobranzas</span></button>
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
+      <button class="sup-action-btn" onclick="openAnalisisProductivo()" style="position:relative;" title="Por tanda: ritmo, dificultad, rendimiento contra lo esperado y qué pasó código por código"><span class="sup-ico">📈</span><span>Análisis Productivo</span><span id="anBadge" class="dp-badge" style="display:none;" title="Tandas con avisos sin revisar"></span></button>
       <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpHoras" style="display:none;font-size:12px;font-weight:800;background:rgba(255,255,255,.18);padding:2px 9px;border-radius:8px;line-height:1.15;white-space:nowrap;" title="Horas de guardado pendientes (lo que entra ahora a góndola ÷ cajas/h)"></span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
       <button class="sup-action-btn" onclick="openAds()" style="position:relative;" title="Alertas Damián Stock: talleristas que no entregan lo pedido y quiebres de stock a 10, 20 y 30 días"><span class="sup-ico">🚨</span><span>ADS — Alertas Damián Stock</span><span id="adsBadge" class="dp-badge" style="display:none;background:#7c3aed;left:2px;right:auto;"></span><span id="adsSemaf" style="display:none;position:absolute;top:2px;right:2px;flex-direction:column;gap:2px;align-items:flex-end;" title="Quiebres de stock previstos: rojo a 10 días · naranja a 20 · amarillo a 30"></span></button>
       <!-- v28.59 (Luis, 08/10): «Corregir códigos de NPs» salió: lo hace solo gv_web_np_sec_auto (cron 119) y lo que no
@@ -6704,6 +6772,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <div class="pmap-modos">
         <button id="pmapModoG" class="pmap-modo pmap-modo-on" onclick="pmapModo('gondola')">🧱 Góndolas</button>
         <button id="pmapModoR" class="pmap-modo" onclick="pmapModo('rack')">📦 Racks</button>
+        <button id="pmapModoS" class="pmap-modo" onclick="pmapModo('scp')">📐 SC y SP</button>
       </div>
       <div class="pmap-bar">
         <input id="pmapSearch" class="planim-inp planim-search" type="text"
@@ -6810,6 +6879,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="sup-action-btn" onclick="cfgGo(openPrintStation)"><span class="sup-ico">🖨️</span><span>Cola de impresión</span></button>
         <!-- v26.28 (Luis, 02/10): conectar esta PC con el helper local de impresión -->
         <button class="sup-action-btn" onclick="cfgGo(openHelperImpresion)" title="Conectar esta PC con el helper local: picking, armado y facturado salen sin el cuadro de impresión"><span class="sup-ico">🖨️</span><span>Helper de impresión</span></button>
+        <!-- v29.84 (Elías): la TV de pared pide el código de ingreso con un secreto propio; acá se la aprueba -->
+        <button class="sup-action-btn" onclick="cfgGo(openVincularTv)" title="Aprobar el código de 6 dígitos que muestra una TV nueva para que pueda mostrar el código de ingreso, y desvincular las que ya no se usan"><span class="sup-ico">📺</span><span>Vincular TV</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openAyudaConfig)" title="Cargar las API keys y elegir el modelo del asistente de ayuda de los operarios (todavía sin botón en la botonera)"><span class="sup-ico">🤖</span><span>Asistente IA operarios</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openMailsEditor)"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openLugarEditor)"><span class="sup-ico">📍</span><span>Lugares del depósito</span></button>
@@ -6982,6 +7053,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div id="tmBar" class="tm-bar">
     <div id="tmMuerto" class="tm-muerto" title="Tiempo del día sin ninguna tarea registrada">⏱ Tiempo muerto <b id="tmMuertoVal">—</b></div>
     <button id="btnHistTareas" type="button" class="tm-hist-btn" onclick="histTareasAbrir()">📋 Historial<br>de tareas</button>
+    <!-- v29.64 (Luis, 13/10): el Análisis Productivo en el módulo de operarios. El botón sólo se muestra
+         para los legajos de GV_Analisis_Acceso (hoy Juan, 8): lo resuelve anMostrarBotonOperario. -->
+    <button id="btnAnalisisOp" type="button" class="tm-hist-btn" style="display:none;position:relative;" onclick="openAnalisisProductivo(this.getAttribute('data-legajo'))">📈 Análisis<br>productivo<span id="anBadgeOp" style="display:none;position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;line-height:20px;padding:0 5px;border-radius:10px;background:#dc2626;color:#fff;font-size:12px;font-weight:800;text-align:center;"></span></button>
   </div>
   <!-- Deshacer último mensaje — visible 60s después de enviar -->
   <div id="undoBanner" class="hidden">
@@ -7030,6 +7104,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <!-- Modal: Planilla Conteo Cajas -->
 
 <script src="supabase-config.js?v=1202"></script>
+<script src="monitor/tv-clave.js?v=1"></script>
 <script>
 /* v18.67 — el botón «Entrar con legajo» está arriba en el HTML y la función de verdad se define en el último
    <script> (44k líneas después): en un celular lento el tap llega antes y tiraba
@@ -9345,7 +9420,7 @@ function showInstructivo() {
     { t: "🏭 Recepción", c: "RT · RR", x: "RT = recibí mercadería (entra a <b>“a guardar”</b>). RR = controlar los remitos cargados al camión." },
     { t: "🚚 Carga y control", c: "CC · CR", x: "CC = inicio/fin de la carga del camión. CR = control de remitos." },
     { t: "📥 Guardar a góndola", c: "MG", x: "Lo que está en <b>“a guardar”</b> lo pasás a góndola. Si la góndola está llena, marcás <b>Excedente</b> y su ubicación." },
-    { t: "📦 Insumos y Productos Movimiento", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. Recibís sólo lo que ya está en la lista: si llegó algo que no figura, avisá a Stock y Compras." },
+    { t: "📦 Insumos y Productos Movimiento", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. ¿El insumo no está? Entrás por Recibir y usás <b>“+ Agregar insumo”</b> (el código de verdad se lo pone Stock y Compras después)." },
     { t: "⏱ Pausas y otros", c: "AT · PB · Limp · Perm · PC · CT", x: "Marcá cuándo: atendés el timbre (AT), vas al baño (PB), limpiás (Limp), pedís permiso (Perm), parás a comer (PC) o hacés conteo (CT). Tocás al <b>empezar</b> y otra vez al <b>terminar</b>." }
   ];
   ov.innerHTML = '<div class="instr-card"><div class="instr-head"><span class="instr-title">❓ ¿Cómo se usa?</span><button class="instr-close" onclick="closeInstructivo()">Cerrar</button></div><div class="instr-body">' +
@@ -9362,6 +9437,8 @@ function goToOptions() {
   optionsScreen.classList.remove("hidden");
   document.getElementById("btnHistDias").classList.add("hidden");
   try { tmStart(legajoInput.value); } catch (_e) {}   // v25.65
+  // v29.64: el botón de Análisis Productivo sólo para los legajos habilitados (GV_Analisis_Acceso).
+  try { if (typeof anMostrarBotonOperario === "function") anMostrarBotonOperario(legajoInput.value); } catch (_e) {}
   renderPendingSuggestion();
   updateCoreButtonsState();
   try { const _lgFr = legajoInput.value; setTimeout(function () { _frenoAvisoDelDia(_lgFr); }, 1200); } catch (_e) {}   // v26.65
@@ -10556,7 +10633,7 @@ async function trySendOneReport(payload, timeoutMs) {
     // y el merge-duplicates no se aplica → 409).
     // FJ y PKC usan client_id determinístico + merge-duplicates (upsert): reenviar
     // o corregir actualiza la fila en vez de fallar con 409 / duplicar.
-    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC" || payload.opcion === "CCN" || payload.opcion === "PSP" || payload.opcion === "CRN" || payload.opcion === "CRA" || payload.opcion === "CCR" || payload.opcion === "PPE");
+    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC" || payload.opcion === "CCN" || payload.opcion === "PSP" || payload.opcion === "PKG" || payload.opcion === "CRN" || payload.opcion === "CRA" || payload.opcion === "CCR" || payload.opcion === "PPE");
     const url    = isUpsert
       ? SUPABASE_TABLE_ENDPOINT + "?on_conflict=client_id"
       : SUPABASE_TABLE_ENDPOINT;
@@ -10705,7 +10782,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.61";
+const APP_VERSION = "v30.08";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11340,6 +11417,61 @@ function emitPickUbic(tanda, ubic, legajo) {
   if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
   try { updatePendingIndicator(); } catch (_e) {}
 }
+/* v29.90 (Luis, 13/10): al EMPEZAR EL ARMADO (AP) se pregunta EN QUÉ MESA va a armar.
+   Es el dato que faltaba para que el monitor diga dónde está FÍSICAMENTE una tanda que
+   se está armando (v29.74): el PUB dice dónde la dejó el picking y el AUB dónde quedó
+   al TERMINAR, pero mientras arman no había nada. Se guarda en un evento aparte 'AUI'
+   (texto=tanda, descripcion=mesa) y SIN ts_inicio: no abre tarea ni cuenta horas.
+   ⚠ LA MESA ES OBLIGATORIA (Luis, 13/10: *"como que \"Despues\"? no es una opcion eso ni
+   debería serlo"*): el cuadro NO tiene escape — o una mesa, o «✏️ Otro lugar…». Igual NO
+   frena el código: sale DESPUÉS de registrar el AP y DESPUÉS de abrir el asistente, sin
+   await, así que si el cuadro no se dibuja el operario tiene el asistente abierto abajo.
+   Y es forward-facing: lo ya armado no se toca ni se backfillea. */
+const ARM_MESA_OPCIONES = ["Mesa 1", "Mesa 2"];
+function askArmadoMesa(tanda) {
+  return new Promise(function (resolve) {
+    if (!document.getElementById("auiCss")) {
+      const s = document.createElement("style"); s.id = "auiCss";
+      s.textContent = "#auiModal{display:none;position:fixed;inset:0;z-index:1450;background:rgba(2,6,23,.78);overflow:auto;padding:14px;}#auiModal.show{display:flex;align-items:center;justify-content:center;}.aui-card{background:#f8fafc;max-width:430px;width:100%;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.aui-head{padding:14px 16px;background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;}.aui-title{font-size:17px;font-weight:800;}.aui-sub{font-size:12.5px;opacity:.92;margin-top:3px;}.aui-body{padding:14px;}.aui-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;}.aui-opt{padding:19px 6px;border:2px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px;font-weight:800;color:#0f172a;cursor:pointer;width:auto;margin:0;}.aui-opt:active{background:#faf5ff;border-color:#7c3aed;}.aui-otra{grid-column:1/-1;border-color:#fcd34d;background:#fffbeb;color:#92400e;font-size:15px;padding:15px 6px;}";
+      document.head.appendChild(s);
+    }
+    let ov = document.getElementById("auiModal");
+    if (!ov) { ov = document.createElement("div"); ov.id = "auiModal"; document.body.appendChild(ov); }
+    function done(v) { ov.classList.remove("show"); ov.innerHTML = ""; resolve(v); }
+    const opts = ARM_MESA_OPCIONES.map(function (o) { return '<button class="aui-opt" data-u="' + escapeHtml(o) + '">' + escapeHtml(o) + '</button>'; }).join("") + '<button class="aui-opt aui-otra" data-otra="1">✏️ Otro lugar…</button>';
+    ov.innerHTML = '<div class="aui-card"><div class="aui-head"><div class="aui-title">📍 ¿En qué mesa vas a armar ' + escapeHtml(String(tanda || "")) + '?</div><div class="aui-sub">Hay que elegir una: así el monitor dice dónde está la tanda mientras la armás.</div></div><div class="aui-body"><div class="aui-grid">' + opts + '</div></div></div>';
+    ov.classList.add("show");
+    ov.querySelectorAll(".aui-opt").forEach(function (b) { b.onclick = function () {
+      if (b.getAttribute("data-otra")) {
+        let t = "";
+        try { t = String(prompt("✏️ ¿Dónde vas a armar? (escribilo, ej. Mesa 3 / AB7)") || ""); } catch (_e) { t = ""; }
+        t = t.trim();
+        if (t) done(t);   // si cancela o deja vacío, NO cierra: puede elegir otra opción
+      } else {
+        done(b.getAttribute("data-u"));
+      }
+    }; });
+    /* sin botón de escape a propósito: la mesa es obligatoria (Luis, 13/10) */
+  });
+}
+/* Emite el evento AUI (mesa donde se está armando). Mismo patrón que emitPickUbic:
+   encola + intenta enviar, con id único (si vuelve a tocar AP con otra mesa, el más
+   reciente manda; gv_tanda_ubicacion toma el último ts). El legajo de PRUEBA no
+   persiste (lo frena enqueueReport). */
+function emitArmadoMesa(tanda, mesa, legajo) {
+  if (!mesa) return;
+  const t = String(tanda || "").trim().toUpperCase(); if (!t) return;
+  const nowMs = Date.now();
+  const payload = {
+    legajo: String(legajo || "").trim(), opcion: "AUI", descripcion: String(mesa),
+    texto: t, ts: nowMs,
+    id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+    ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
+}
 /* v5.86 — Al TERMINAR ARMADO (TAP) el armador elige EN QUÉ UBICACIÓN queda cada
    nota de pedido de la tanda (columnas AB/AA/AC/AD del sector de armado). Igual
    idea que el PUB del picking, pero POR NP (los pedidos de una misma tanda pueden
@@ -11447,7 +11579,8 @@ function _horaCortaAR(iso) {
   } catch (_e) { return ""; }
 }
 
-async function send() {
+async function send(_opts) {
+  const _sinAviso   = !!(_opts && _opts.sinAviso);   // v29.82: lo llamó un módulo, no un toque
   const legajoStr   = String(legajoInput.value || "").trim();
   const opcion      = selected;
   const descripcion = desc[selected] || "";
@@ -11989,7 +12122,7 @@ async function send() {
   if (r.ok) {
     removeFromQueue(payload.id);
     setHistoryItemStatus(legajoStr, getTodayKey(), payload.id, "sent", new Date().toISOString(), r.created_at);
-    alert("Reporte enviado correctamente");
+    if (!_sinAviso) alert("Reporte enviado correctamente");
   } else {
     // Si fue rechazo del server (datos inválidos, etc.) marco "failed" en el historial.
     // Si fue caída de red, dejo "queued" — se reintenta solo.
@@ -12016,6 +12149,12 @@ async function send() {
     // v8.75: antes tenía un Paso 1 de reparto manual de faltantes; hoy el reparto es
     // automático (proporcional) y el wizard arranca directo en Separar.
     showCompletarWizard(legajoStr, texto);
+    /* v29.90: ¿en qué mesa va a armar? (evento AUI, lo lee el monitor). Va ACÁ, al final y
+       SIN await: el cuadro sale ENCIMA del asistente — que ya está abierto — y el armado no
+       espera a nadie. Si el cuadro falla o lo saltea con «Después», no pasa nada más. */
+    try {
+      askArmadoMesa(texto).then(function (m) { if (m) emitArmadoMesa(texto, m, legajoStr); }).catch(function () {});
+    } catch (_e) {}
   }
   // Al INICIAR carga camión (1er toque de CC): checklist de NPs listas (TAP).
   if (opcion === "CC") {
@@ -12540,12 +12679,15 @@ async function monClaveRefrescar() {
   const e = document.getElementById("monClave");
   if (!e) return;
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_tv_clave_actual", {
-      method: "POST", cache: "no-store",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
-      body: "{}" });
-    if (!r.ok) return;
-    const j = await r.json();
+    /* v29.84 (Elías): con la sesión del supervisor, o con el secreto de esta pantalla si es el kiosko
+       (monitor/tv-clave.js ≡ monitor/tv.html). Ya no se pide pelado con la clave pública. */
+    if (typeof window.gvTvClaveLeer !== "function") return;
+    const j = await window.gvTvClaveLeer(SUPABASE_URL, SUPABASE_KEY, function () {
+      return (window.sbAuth && window.sbAuth.getAccessToken) ? window.sbAuth.getAccessToken() : null; });
+    const box = document.getElementById("monClaveBox");
+    if (box) box.title = (j && j.vincular)
+      ? "Esta pantalla no está vinculada. Código para vincularla: " + j.vincular + " (⚙️ Configuración → 📺 Vincular TV)"
+      : "Código para entrar desde el celular — dura un minuto";
     if (!j || !j.clave) return;
     e.textContent = j.clave;
     _monClvQueda = Math.max(1, Math.min(MON_CLV_CICLO, Number(j.cambia_en_s) || MON_CLV_CICLO));
@@ -12873,6 +13015,7 @@ function pkSave() {
       day: getTodayKey(), tanda: _pk.tanda, legajo: _pk.legajo,
       items: _pk.items, idx: _pk.idx, results: _pk.results, mode: _pk.mode,
       forced: _pk.forced || {}, cid: _pk.cid || {},   // v26.62
+      gondDone: _pk.gondDone || {},   // v29.69
       app: (typeof APP_VERSION !== "undefined" ? APP_VERSION : "")   // v18.53 — con qué versión se armó esta lista
     }));
   } catch (_e) { /* localStorage lleno / privado: no rompe el picking */ }
@@ -12953,7 +13096,7 @@ function pkResume(legajo) {
   m.querySelector(".tanda-modal-title").textContent = "Picking — Tanda " + saved.tanda;
   _pk = { tanda: saved.tanda, legajo: saved.legajo, items: saved.items,
           idx: saved.idx || 0, results: saved.results || {}, mode: saved.mode || "item",
-          forced: saved.forced || {}, cid: saved.cid || {} };   // v26.62
+          forced: saved.forced || {}, cid: saved.cid || {}, gondDone: saved.gondDone || {} };   // v26.62 · v29.69
   m.classList.add("show");
   pkRender();
 }
@@ -13710,6 +13853,7 @@ function pkRender() {
   // v21.73 (Marianela 23/09): 55215/55219/55289 van en UNIDADES en todo el sistema (uxb 1).
   const _pkUni = pkEsUnidad(rec);
   const _pkUd = _pkUni ? "unidades" : "cajas";
+  if (_pk.mode === "gond") { body.innerHTML = pkGondCardHtml(it); setTimeout(function () { const i = document.getElementById("pkGondInp"); if (i) i.focus(); }, 40); return; }
   if (_pk.mode === "fInput") {
     body.innerHTML = `<div class="pk-flow">${nav}
       ${bigRow}
@@ -13732,6 +13876,7 @@ function pkRender() {
     ${bigRow}
     ${dualTag}
     <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> ${_pkUd}${it.isExc ? " <span class='pk-cajas-exc'>(en el excedente)</span>" : (it.excHint ? ` <span class='pk-cajas-exc'>(hay ${pkFmt(it.excHint)} en excedente ${escapeHtml(String(it.excUbic || "").replace(/-/g, ""))} — al final)</span>` : (it.hasManualExc ? ` <span class='pk-cajas-exc'>(+ excedente @ ${escapeHtml(it.manualExcUbic || "")}, al final)</span>` : ""))}</div>
+    ${pkSinGondola(it) ? `<div class="pk-sin-gond">📍 Este código <b>no tiene góndola en el Mapa</b>. Cuando lo confirmes te preguntamos de dónde lo sacaste.</div>` : ``}
     ${it.forcedGond ? `<div class="pk-forced-note">🟢 Estás retirando de <b>góndola</b> (había excedente) — se avisó al supervisor</div>` : ``}
     ${it.orig ? (it.orig.mixed
       ? `<div class="pk-orig mix">⚠ <b>Mezcla Loeke/Chef</b> — <b>Loeke ×${pkFmt(it.orig.nL)}</b> en ${escapeHtml(it.orig.loekeRango)} · <b>Chef ×${pkFmt(it.orig.nC)}</b> en ${escapeHtml(it.orig.chefRango)}</div>`
@@ -13920,6 +14065,7 @@ function pkOk() {
   _pk.results[it.key] = it.esp;
   pkSendDetail(rec, it.esp, it.esp);
   try { pkmConf("ok", it, it.esp); } catch (_e) {}
+  if (pkGondPreguntar(it)) { _pk.mode = "gond"; pkRender(); return; }   // v29.69
   pkAdvance();
 }
 /* Sin stock: no había NADA de este código → registra 0 y avanza (faltante completo,
@@ -14054,8 +14200,79 @@ function pkConfirmF() {
   _pk.results[it.key] = real;
   pkSendDetail(rec, it.esp, real);
   try { pkmConf("faltan", it, real); } catch (_e) {}
+  if (real > 0 && pkGondPreguntar(it)) { _pk.mode = "gond"; pkRender(); return; }   // v29.69: si no agarró nada, no hay góndola que informar
   pkAdvance();
 }
+/* ═══ v29.69 (Luis, 13/10): EL CÓDIGO QUE NO TIENE GÓNDOLA EN EL MAPA ═══════════════════════
+   "si el modulo de pickeo los promptea a pickear un codigo para el que no tiene registro de
+    lugar y el que pickea lo agarra, debería preguntarle de que gondola lo agarro y debería
+    aparecerle la sugerencia al admin para ajustar gondolas de la misma forma que le aparece
+    para ajustar stock."
+   Medido el 13/10 sobre 60 días: 25 códigos sin celda en el Mapa, 131 líneas de picking
+   (231/232/233, 567, 565, 998E…) — unas 2 por día, así que el aviso no es ruido.
+   La pregunta va DESPUÉS de registrar el pick (el PKC se manda igual): si el celular muere en
+   el medio, lo pickeado no se pierde. El operario puede saltearla; no frena nada.
+   Evento PKG (sin ts_inicio, no abre tarea): texto = "COD|lo que escribió|TANDA".
+   La resuelve el supervisor en la landing (gv_gondola_sugerida_pendientes / _resolver). */
+function pkSinGondola(it) {
+  if (!it || it.isExc || it.skip) return false;
+  const sec = String(it.sector || "").replace(/[—\-\s]/g, "").trim();
+  return sec === "";
+}
+function pkGondPreguntar(it) {
+  if (!_pk || !pkSinGondola(it)) return false;
+  const k = String(it.key || it.art);
+  return !(_pk.gondDone && _pk.gondDone[k]);
+}
+function pkGondCardHtml(it) {
+  const rec = (it.dual && it.pick) ? it.pick : it.art;
+  return '<div class="pk-flow">' +
+    '<div class="pk-gond-h">📍 ¿De qué góndola lo sacaste?</div>' +
+    '<div class="pk-gond-s">El <b>' + escapeHtml(_padCod(codBase(rec))) + '</b> no tiene lugar cargado en el Mapa. ' +
+      'Anotá la celda de donde lo levantaste (por ejemplo <b>F9</b> o <b>M13</b>) y el supervisor la da de alta. ' +
+      'Lo que pickeaste ya quedó registrado.</div>' +
+    '<div class="pk-gond-row"><input id="pkGondInp" class="pk-gond-inp" type="text" inputmode="text" autocapitalize="characters" placeholder="F9" maxlength="6">' +
+      '<button class="pk-btn pk-ok pk-gond-btn" onclick="pkGondSubmit()">✓ Anotar</button></div>' +
+    '<button class="pk-btn pk-cancel" onclick="pkGondSkip()">No sé / seguir sin anotar</button>' +
+    '</div>';
+}
+function pkGondSubmit() {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const inp = document.getElementById("pkGondInp");
+  const v = inp ? String(inp.value || "").toUpperCase().trim() : "";
+  if (!v) { try { if (inp) inp.focus(); } catch (_e) {} return; }
+  const it = _pk.items[_pk.idx];
+  pkEmitGondola((it.dual && it.pick) ? it.pick : it.art, v);
+  pkGondSkip();
+}
+function pkGondSkip() {
+  if (!_pk || _pk.idx >= _pk.items.length) { if (_pk) { _pk.mode = "item"; pkRender(); } return; }
+  const it = _pk.items[_pk.idx];
+  if (!_pk.gondDone) _pk.gondDone = {};
+  _pk.gondDone[String(it.key || it.art)] = true;
+  _pk.mode = "item";
+  pkAdvance();
+}
+/* Evento PKG: "COD|lo que escribió|TANDA". Dedup por pkg_<legajo>_<tanda>_<cod>. */
+function pkEmitGondola(art, sector) {
+  try {
+    const leg = String((_pk && _pk.legajo) || "").trim();
+    const tnd = String((_pk && _pk.tanda) || "").trim().toUpperCase().replace(/\|/g, "");
+    const cod = String(art).toUpperCase().replace(/\|/g, "");
+    const sec = String(sector).toUpperCase().replace(/\|/g, "").slice(0, 12);
+    const payload = {
+      legajo: leg, opcion: "PKG", descripcion: "Góndola informada en picking",
+      texto: cod + "|" + sec + "|" + tnd,
+      ts: Date.now(),
+      id: ("pkg_" + leg + "_" + tnd + "_" + cod).replace(/[^a-zA-Z0-9_\-]/g, ""),
+      ts_inicio_iso: null
+    };
+    enqueueReport(payload);
+    if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+    try { updatePendingIndicator(); } catch (_e) {}
+  } catch (_e) { /* best-effort: nunca rompe el picking */ }
+}
+
 function pkClose() { _pk = null; closeTandaModal(); }
 
 /* ===== v7.13 — ANULAR PICKING =====
@@ -16684,8 +16901,14 @@ function codEmpiezaCon(cod, term) {
 function stkMatchBusq(term, cod, libre, numLibre) {
   var t = String(term == null ? "" : term).trim().toLowerCase();
   if (!t) return true;
-  if (/^\d/.test(t)) return codEmpiezaCon(cod, t) || (numLibre ? String(libre || "").toLowerCase().indexOf(t) >= 0 : false);
-  return String(libre || "").toLowerCase().indexOf(t) >= 0 || codEmpiezaCon(cod, t);
+  // v30.00: el SEPARADOR DECIMAL no decide un match. En los flejes la MEDIDA es el nombre
+  // ("13,6 x 0,8 · Fleje N° 19") y el operario escribe "13.6": buscar con punto no
+  // encontraba la coma, así que el 13/10 dio de alta un TMP de un fleje que YA existía
+  // (N°19, 144 Kg al código equivocado). Se normalizan los dos lados: sólo AGREGA matches.
+  var _dec = function (x) { return String(x == null ? "" : x).toLowerCase().replace(/(\d),(\d)/g, "$1.$2"); };
+  var tl = _dec(t), lib = _dec(libre);
+  if (/^\d/.test(t)) return codEmpiezaCon(cod, t) || (numLibre ? lib.indexOf(tl) >= 0 : false);
+  return lib.indexOf(tl) >= 0 || codEmpiezaCon(cod, t);
 }
 async function loadCodCanon() {
   if (_codCanon) return _codCanon;
@@ -25257,12 +25480,16 @@ function _stkInsUbicMapa(it) {
     'onclick="stkInsIrAlMapa(\'' + escapeHtml(it.cod) + '\')" title="La ubicación se define en el Mapa de góndolas y racks">📍 Editar en el Mapa</button></div>';
 }
 async function stkInsIrAlMapa(cod) {
+  /* v29.98: un insumo puede estar en un rack de insumo (R01AD, AF13) o en una celda de SC/SP
+     (IN-A1). Se abre el modo donde ESTÁ; si no está en ninguno, se ofrece ubicarlo. */
   await openPlanimMapa();
-  pmapModo("rack");
-  if (!_prk || !_prk.length) { try { await prkFetch(); } catch (_e) {} }
+  const K = String(cod).toUpperCase();
+  try { await Promise.all([(!_prk || !_prk.length) ? prkFetch() : null, (!_pscp) ? pscpFetch() : null]); } catch (_e) {}
+  const enScp  = (_pscp || []).some(function (r) { return String(r.cod || "").toUpperCase() === K; });
+  const enRack = (_prk  || []).some(function (r) { return r.fuente === "insumo" && String(r.cod || "").toUpperCase() === K; });
+  pmapModo(enScp && !enRack ? "scp" : "rack");
   pmapBuscar(cod);
-  const esta = (_prk || []).some(function (r) { return r.fuente === "insumo" && String(r.cod || "").toUpperCase() === String(cod).toUpperCase(); });
-  if (!esta) prkInsUbicarAbrir(cod, 0, null);
+  if (!enScp && !enRack) prkInsUbicarAbrir(cod, 0, null);
 }
 /* v11.34 — actualizar sector o cantidad del input sin re-render (para no perder foco) */
 function stkInsUbicChg(cod, idx, field, val) {
@@ -26431,13 +26658,15 @@ async function _stkCodExisteConfirmar(cod, txtAccion) {
    Pasó 6 veces desde el 25/09. Ahora: posición obligatoria, validada contra el Mapa (gv_rack_sector), y al restar
    avisa si la posición no tiene esas cajas. Lo frena también el trigger gv_racks_ajuste_sin_posicion. */
 function _stkEsRacks(dep) { return dep === "racks" || dep === "racks_ch"; }
-async function _stkRackSectorDe(txt) {   // sector del Mapa · null = no es una posición · throw = no se pudo verificar
-  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_rack_sector", { method: "POST",
+/* v29.78: una sola RPC resuelve la DIRECCIÓN — gv_rack_dir devuelve {rack, pos, parte, partes, falta}.
+   `pos` es lo que se ESCRIBE en ubicacion (Y25 o Y25-2) y `falta` dice que el rack está dividido y
+   no se nombró la parte: sin eso el ajuste caería en «el rack, sin parte» (y lo frena el trigger). */
+async function _stkRackDirDe(txt) {   // {rack,pos,parte,partes,falta} · rack null = no es una posición · throw = no se pudo verificar
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_rack_dir", { method: "POST",
     headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({ p: String(txt || "") }) });
   if (!r.ok) throw new Error("HTTP " + r.status);
-  const s = await r.json();
-  return s ? String(s) : null;
+  return (await r.json()) || {};
 }
 async function _stkRackPosiciones(cod) {
   const m = String(cod).match(/^(.*\S)\s+(LK|CH)$/i), base = m ? m[1] : String(cod), emp = m ? m[2].toUpperCase() : null;
@@ -26459,10 +26688,15 @@ async function _stkRackPosElegir(cod, inputId, delta) {
     txt = (prompt("Racks: ¿en qué posición?\n\nPosiciones con " + cod + " en el sistema: " + lista + "\n\nEscribí la posición (ej. X22):") || "").trim();
     if (!txt) return null;
   }
-  let sector;
-  try { sector = await _stkRackSectorDe(txt); }
+  let dir;
+  try { dir = await _stkRackDirDe(txt); }
   catch (e) { alert("No pude verificar la posición «" + txt + "»: no se grabó nada. Probá de nuevo."); return null; }
-  if (!sector) { alert("«" + txt + "» no es una posición de rack del Mapa. No se grabó nada.\n\nPosiciones con " + cod + ": " + lista); return null; }
+  if (!dir || !dir.rack) { alert("«" + txt + "» no es una posición de rack del Mapa. No se grabó nada.\n\nPosiciones con " + cod + ": " + lista); return null; }
+  if (dir.falta) {   // v29.78: rack dividido → hay que decir en qué parte
+    alert(dir.rack + " está dividido en " + dir.partes + " partes: escribí la parte (" + dir.rack + "-1 … " + dir.rack + "-" + dir.partes + "). No se grabó nada.\n\nPosiciones con " + cod + ": " + lista);
+    return null;
+  }
+  const sector = String(dir.pos);
   const hit = pos.find(function (p) { return p.sector === sector; });
   const saldo = hit ? hit.cajas : 0;
   if (delta != null && delta < 0 && -delta > saldo + 1e-9) {
@@ -26593,14 +26827,17 @@ async function stockGuardarInicial() {
   if (_stkEsRacks(dep)) {
     const sinPos = rows.filter(function (r) { return !r._pos; }).map(function (r) { return r.cod_art; });
     if (sinPos.length) { alert("En Racks cada línea lleva la posición: CÓDIGO CANTIDAD POSICIÓN (ej. 606E 10 X22).\n\nSin posición: " + sinPos.join(", ") + "\n\nNo se grabó nada."); return; }
-    const malas = [];
+    const malas = [], sinParte = [];
     for (const r of rows) {
-      let s;
-      try { s = await _stkRackSectorDe(r._pos); }
+      let d;
+      try { d = await _stkRackDirDe(r._pos); }
       catch (e) { alert("No pude verificar las posiciones: no se grabó nada. Probá de nuevo."); return; }
-      if (!s) malas.push(r.cod_art + " → «" + r._pos + "»"); else r.ubicacion = s;
+      if (!d || !d.rack) malas.push(r.cod_art + " → «" + r._pos + "»");
+      else if (d.falta) sinParte.push(r.cod_art + " → " + d.rack + " (dividido en " + d.partes + ": poné " + d.rack + "-1 … " + d.rack + "-" + d.partes + ")");
+      else r.ubicacion = String(d.pos);
     }
     if (malas.length) { alert("Estas posiciones no son racks del Mapa:\n  " + malas.join("\n  ") + "\n\nNo se grabó nada."); return; }
+    if (sinParte.length) { alert("Estos racks están DIVIDIDOS y falta decir en qué parte:\n  " + sinParte.join("\n  ") + "\n\nNo se grabó nada."); return; }
   }
   rows.forEach(function (r) { delete r._pos; });
   if (!rows.length) { alert("No encontré líneas válidas. " + (esInsumo ? "Insumos: CÓDIGO ; DESCRIPCIÓN ; CANTIDAD ; MEDIDA ; SECTOR (o CÓDIGO CANTIDAD)." : "Formato: CÓDIGO CANTIDAD (una por línea).")); return; }
@@ -26762,7 +26999,7 @@ function stkUnits(cajas, cod, factors) {
    y arma el resumen "¿cuántos palets vacíos entran hoy?" + simulador de importación
    + lista de posiciones por liberarse (poca mercadería). Solo lectura (anon SELECT). */
 const SUPABASE_RACKS_PLANI_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Planimetria";
-async function racksFetchPlani() { return supaFetchAllSafe(SUPABASE_RACKS_PLANI_ENDPOINT, "select=sector,emp,cod_art,master_cajas,innercajas,estado"); }
+async function racksFetchPlani() { return supaFetchAllSafe(SUPABASE_RACKS_PLANI_ENDPOINT, "select=sector,emp,cod_art,master_cajas,innercajas,estado,rack,parte,partes"); }   // v29.78: rack/parte/partes — sector ES la DIRECCIÓN (Y25 o Y25-2)
 async function stkPlaniLoad() {
   if (!_stk) return;
   _stk.planiLoaded = "loading"; stkRender();
@@ -27207,6 +27444,7 @@ let _insMetaOk = false;
 async function insLoadMeta(force) {
   await insFetchFactores();            // v8.26 — factores SIEMPRE frescos (los edita el admin)
   if (_insMetaOk && !force) return;   // sólo cachea dentro de una misma apertura
+  await insFetchConfig();              // v29.87 — cajas por paquete, marcas y apodos (tablas, no código)
   try {
     const h = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const r = await Promise.all([
@@ -27301,6 +27539,29 @@ async function insFetchGp2Ri() {
     return r.ok ? await r.json() : null;
   } catch (_e) { return null; }
 }
+/* v29.82 (Luis) — de qué proveedor es cada fleje, para que al elegir un proveedor el operario vea
+   SÓLO los de él. La clave es el código de Virgilio y, para el fleje que todavía no existe acá, el
+   componente de GP2 que la lista de recepción ya muestra (v29.35). null = no se pudo leer. */
+async function insFetchFlejeProv() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_fleje_proveedor", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return null;
+    const m = {};
+    rows.forEach(function (x) {
+      const pv = String(x.proveedor || "").trim(); if (!pv) return;
+      if (x.cod) m[_insK(x.cod)] = pv;
+      if (x.comp_id) m["#" + x.comp_id] = pv;
+    });
+    return m;
+  } catch (_e) { return null; }
+}
+/* El proveedor de un fleje de la lista: por su código, o por el componente de GP2 que trae. */
+function _insProvDe(it) {
+  if (!_ins || !_ins.flejeProv || !it) return "";
+  return (it.cod ? _ins.flejeProv[_insK(it.cod)] : "") || (it.gp2Comp ? _ins.flejeProv["#" + it.gp2Comp] : "") || "";
+}
 async function insFetchCatalogo() {
   try {
     // v22.80: la ubicación que ve el operario es la del módulo de Insumos resuelta contra el Mapa (vista_insumos).
@@ -27315,10 +27576,10 @@ async function insFetchCatalogo() {
    sentido recibiendo). Popup liviano al estilo de showMGChooser. */
 function insumoChooser(legajo) {
   let ov = document.getElementById("insChooserModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
   const btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
   const sub = 'font-weight:600;opacity:.85;';
-  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;margin:auto;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📦 Insumos y Productos Movimiento</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué querés hacer?</div>' +
     '<button onclick="insChooserGo(\'RI\')" style="' + btn + 'background:#4f46e5;">📥 Recibir insumos <span style="' + sub + '">(entra stock — o agregá uno nuevo)</span></button>' +
@@ -27347,15 +27608,43 @@ function insChooserGo(which) {
 const INS_RI_SIN = ["importados"];
 /* v29.25/29.30 (Thomas): categorías con lista CERRADA — el operario no da de alta nada nuevo ahí. */
 const INS_CAT_CERRADA = ["plastico", "cajas"];
-const INS_CAJA_X_PAQ = 25;   // v29.30 (Thomas, D22): cada paquete trae 25 cajas
-const INS_CAJA_MARCAS = ["Loeke", "Chef"];   // v29.31 (Thomas, D26): sólo se anota, no parte el stock
+/* v29.87 (Luis, 13/10: "crea tabla si sólo está en el front el dato") — estos tres son DATOS del
+   negocio, no código: viven en `GV_Insumo_Config` (cajas por paquete, marcas) y en
+   `GV_Insumo_Origen_Apodo` (el apodo del inyector), y los hidrata `insLoadMeta`. Lo que queda
+   escrito acá es el FALLBACK: si la base no contesta, el operario carga igual que antes. */
+let INS_CAJA_X_PAQ = 25;   // v29.30 (Thomas, D22): cada paquete trae 25 cajas
+let INS_CAJA_MARCAS = ["Loeke", "Chef"];   // v29.31 (Thomas, D26): sólo se anota, no parte el stock
 /* v29.56 (Luis, 13/10): la marca se pide al RECIBIR CUALQUIER insumo, no sólo cajas.
    Es el mismo insumo en el mismo lugar físico y el movimiento sigue siendo empresa
    `Mixto` (lo fuerza el trigger gv_insumo_unidad_base): la marca NO parte el stock, sólo
    queda escrita en la descripción del movimiento y se consulta por gv_insumo_recepcion_marca.
    Las cajas siguen con Loeke/Chef (Thomas, D26); el resto suma «Mixto» (las dos). */
-const INS_MARCAS = ["Loeke", "Chef", "Mixto"];
+let INS_MARCAS = ["Loeke", "Chef", "Mixto"];
 function _insMarcasDe(k) { return k === "cajas" ? INS_CAJA_MARCAS : INS_MARCAS; }
+/* v29.87: la config del módulo (números y listas) y los apodos, de la base. Cada dato que llega
+   pisa su default; el que no llega queda con el de acá. */
+async function insFetchConfig() {
+  const h = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
+  try {
+    const r = await Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_config", { method: "POST", headers: h, body: "{}", cache: "no-store" }),
+      fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_apodos", { method: "POST", headers: h, body: "{}", cache: "no-store" })
+    ]);
+    if (r[0].ok) {
+      const cfg = await r[0].json();
+      if (Array.isArray(cfg)) cfg.forEach(function (c) {
+        const lista = String(c.valor_texto || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+        if (c.clave === "caja_x_paquete" && Number(c.valor) > 0) INS_CAJA_X_PAQ = Number(c.valor);
+        if (c.clave === "marcas" && lista.length) INS_MARCAS = lista;
+        if (c.clave === "marcas_cajas" && lista.length) INS_CAJA_MARCAS = lista;
+      });
+    }
+    if (r[1].ok) {
+      const ap = await r[1].json();
+      if (Array.isArray(ap) && ap.length) { INS_INY_APODO = {}; ap.forEach(function (a) { if (a.nombre && a.apodo) INS_INY_APODO[a.nombre] = a.apodo; }); }
+    }
+  } catch (_e) { /* sin red: quedan los defaults de arriba */ }
+}
 function _insMarcaHtml(it, i, isIn) {
   if (!isIn || !it) return "";
   const k = insCatOf(it), ms = _insMarcasDe(k);
@@ -27366,8 +27655,8 @@ function _insMarcaHtml(it, i, isIn) {
 function insSetCajaMarca(i, m) { if (!_ins || !_ins.items[i]) return; _ins.items[i].marca = (_ins.items[i].marca === m) ? "" : m; insRender(); }
 async function insRecibirCat() {
   let ov = document.getElementById("insChooserModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
-  const card = function (inner) { return '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' + inner + '</div>'; };
+  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
+  const card = function (inner) { return '<div style="background:#f8fafc;max-width:380px;width:100%;margin:auto;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' + inner + '</div>'; };
   ov.innerHTML = card('<div style="font-size:18px;font-weight:800;">📥 Recibir insumos</div><div style="font-size:13px;color:#64748b;margin-top:8px;">Cargando…</div>');
   ov.style.display = "flex";
   try { await insLoadMeta(true); } catch (_e) { /* quedan los defaults */ }
@@ -27382,6 +27671,15 @@ function insRecibirCatGo(k) {
   window._insEnvioSub = null;
   closeInsumoChooser();
   window._insRiCat = k;
+  window._insProvFleje = null;
+  /* v29.82 (Luis, 13/10): "SC y SP no preguntar de quien es, no entregan con factura nunca
+     (solo remito, siempre es Cervantes, que ni pregunte)" — se saltean las DOS preguntas:
+     el origen queda fijo en Cervantes y la documentacion arranca en el N de remito. */
+  if (k === "partes_crudo" || k === "parte_procesado") {
+    window._insUbicacion = "Cervantes"; window._insGp2 = null;
+    askInsDocumentacion("RI", "Cervantes", { soloRemito: true });
+    return;
+  }
   askInsUbicacion("RI");
 }
 /* v21.74 — Entregar insumos: DOS botones antes del destino.
@@ -27389,9 +27687,9 @@ function insRecibirCatGo(k) {
    "Envío a otros"      → sólo el destino en texto libre. */
 function insEnvioTipo() {
   let ov = document.getElementById("insChooserModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
   const btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
-  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;margin:auto;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📤 Entregar insumos</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué envío es?</div>' +
     '<button onclick="insEnvioTipoGo(\'iny\')" style="' + btn + 'background:#0d9488;">🏭 Envío a inyectores</button>' +
@@ -27416,14 +27714,17 @@ function askInsUbicacion(mode, sub) {
   const hint = isIn ? "Origen/Proveedor" : "Destino/Ubicación";
 
   let ov = document.getElementById("insUbicModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insUbicModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement("div"); ov.id = "insUbicModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
 
-  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;margin:auto;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">' + (isIn ? "📥 Recepción" : "📤 Entrega") + '</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + (soloIny ? "¿A qué inyector lo envías?" : titulo) + '</div>' +
     // v14.95 — bolsas plásticas: los inyectores (EI) / las OC de material de GP2 (RI) como botones,
     // arriba del texto libre. Se llenan async; si GP2 no responde queda el texto libre de siempre.
     '<div id="insUbicGp2">' + (soloIny ? '<div style="font-size:13px;color:#64748b;margin-bottom:10px;">Cargando inyectores…</div>' : '') + '</div>' +
+    // v29.82 (Luis): el ORIGEN es una lista cerrada por categoria (gv_insumo_origenes, que sale
+    // de GP2). Se llena async; si la base no contesta queda el texto libre de siempre.
+    '<div id="insUbicProv"></div>' +
     '<div id="insUbicLibre"' + (soloIny ? ' style="display:none;"' : '') + '>' +
     '<input type="text" id="insUbicInput" placeholder="' + hint + ' (ej: Cervantes, Centro, Proveedor X)" ' +
       'style="width:100%;box-sizing:border-box;height:48px;border:2px solid #cbd5e1;border-radius:12px;padding:0 12px;font-size:16px;margin-bottom:12px;" />' +
@@ -27438,6 +27739,9 @@ function askInsUbicacion(mode, sub) {
   // v29.22: las OC de bolsas de GP2 sólo si lo que se recibe son plásticos
   const _riCat = isIn ? (window._insRiCat || "") : "";
   if (!soloOtros && (!isIn || !_riCat || _riCat === "plastico")) _insGp2Opciones(mode, soloIny);
+  // v29.82: los origenes de ESA categoria, como botones. Sin categoria (EI, o una sesion vieja)
+  // no hay lista cerrada que mostrar: queda el texto libre.
+  if (isIn && _riCat) _insOrigenBotones(mode, _riCat);
 
   // Auto-focus en el input
   setTimeout(() => {
@@ -27449,11 +27753,14 @@ function insUbicCancel() {
   const ov = document.getElementById("insUbicModal");
   if (ov) ov.style.display = "none";
 }
-function insUbicOk(mode, _gp2) {
+function insUbicOk(mode, _gp2, _fijo) {
   let ubicacion = "";
   if (_gp2) {
     ubicacion = _gp2.modo === "EI" ? _gp2.inyector : (_gp2.oc.proveedor || ("OC " + _gp2.oc.numero));
     window._insGp2 = _gp2;
+  } else if (_fijo) {
+    ubicacion = String(_fijo).trim();      // v29.82: salió de la lista cerrada de GP2
+    window._insGp2 = null;
   } else {
     const inp = document.getElementById("insUbicInput");
     ubicacion = (inp && inp.value) ? String(inp.value).trim() : "";
@@ -27472,26 +27779,75 @@ function insUbicOk(mode, _gp2) {
     askInsDocumentacion(mode, ubicacion);
     return;
   }
-  selectOption(mode);
+  _insArrancarToggle(mode);   // v29.82: un solo «Enviar» (el de la botonera)
 }
 
+/* v29.82 (Luis, 13/10) — "quiero que el menu sea reducido dependiendo de que es lo que estan
+   recibiendo": el origen de una recepción es una lista CERRADA, la que corresponde a esa categoría.
+   NO está escrita acá: sale de `gv_insumo_origenes`, que la arma con los proveedores y los
+   inyectores de GP2 menos lo anotado en GV_Insumo_Origen_Excluido. Agregar o sacar un origen es
+   un insert, no un deploy.
+     bolsas plásticas → sus proveedores (los que entregan acá)      cajas → sus proveedores
+     partes plásticas → los inyectores + Cervantes                  flejes → sus proveedores + Cervantes
+   ⚠ Si la base no contesta queda el TEXTO LIBRE de siempre: "no pude leer" no es "no hay de dónde
+   recibir", y el operario no se puede quedar sin poder cargar lo que ya tiene en la mano. Por lo
+   mismo, con la lista puesta sigue habiendo un "✏ Otro origen" para el camión que no estaba previsto. */
+async function _insOrigenBotones(mode, cat) {
+  const box = document.getElementById("insUbicProv");
+  if (!box) return;
+  box.innerHTML = '<div style="font-size:13px;color:#64748b;margin-bottom:10px;">Cargando…</div>';
+  let rows = null;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_origenes", {
+      method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_cat: cat }), cache: "no-store" });
+    if (r.ok) rows = await r.json();
+  } catch (_e) { rows = null; }
+  if (!Array.isArray(rows) || !rows.length) { box.innerHTML = ""; return; }   // sin lista: el texto libre de siempre
+  window._insOrigenes = rows;
+  const btn = "width:100%;margin-bottom:8px;padding:13px 14px;border:2px solid #a5b4fc;border-radius:12px;background:#eef2ff;color:#0f172a;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
+  box.innerHTML = rows.map(function (o, i) {
+    const ap = Object.prototype.hasOwnProperty.call(INS_INY_APODO, o.nombre) ? INS_INY_APODO[o.nombre] : "";
+    const em = o.fuente === "cervantes" ? "🏭 " : (o.fuente === "inyector" ? "🧩 " : "🚛 ");
+    return '<button onclick="insUbicOrigen(' + i + ',\'' + mode + '\',\'' + cat + '\')" style="' + btn + '">' + em + escapeHtml(o.nombre) +
+      (ap ? ' <span style="font-weight:700;color:#475569;">(' + escapeHtml(ap) + ')</span>' : '') + '</button>';
+  }).join("") +
+    '<button onclick="_insOrigenOtro()" style="width:100%;margin:2px 0 10px;padding:15px;border:none;border-radius:10px;background:#f1f5f9;color:#475569;font-weight:700;cursor:pointer;font-size:13px;">✏ Otro origen</button>';
+  // la lista cerrada es lo que se usa: el texto libre queda atrás del botón de arriba
+  const lib = document.getElementById("insUbicLibre"); if (lib) lib.style.display = "none";
+  const bt = document.getElementById("insUbicContinuar"); if (bt) bt.style.display = "none";
+}
+function _insOrigenOtro() {
+  const lib = document.getElementById("insUbicLibre"); if (lib) lib.style.display = "";
+  const bt = document.getElementById("insUbicContinuar"); if (bt) bt.style.display = "";
+  const inp = document.getElementById("insUbicInput"); if (inp) inp.focus();
+}
+function insUbicOrigen(i, mode, cat) {
+  const o = (window._insOrigenes || [])[i]; if (!o) return;
+  /* v29.82: "Si es cervantes, aparecen todos los flejes. Sino, por proveedor (cada proveedor en
+     GP2 tiene asignados sus flejes correspondientes)". El filtro viaja con la sesión. */
+  window._insProvFleje = (cat === "fleje" && o.fuente === "proveedor") ? o.nombre : null;
+  insUbicOk(mode, null, o.nombre);
+}
 /* Paso intermedio RI: capturar datos de documentación (remito/factura) antes de
    abrir el modal de insumos. Mismo flujo de 3 botones que mercadería. */
-function askInsDocumentacion(mode, proveedor) {
+function askInsDocumentacion(mode, proveedor, opt) {
+  var soloRemito = !!(opt && opt.soloRemito);   // v29.82: SC/SP nunca vienen con factura
   var ov = document.getElementById("insDocModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insDocModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement("div"); ov.id = "insDocModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
 
   // Estado temporal para la documentación de insumos
   window._insDocState = { tipoDoc: '', nroRemito: '', nroFactura: '', fechaRemito: '', fechaFactura: '', proveedor: proveedor || '' };
 
-  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;margin:auto;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📄 Documentación recibida</div>' +
-    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué documentación recibís?</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + (soloRemito ? "🏭 Cervantes · remito" : "¿Qué documentación recibís?") + '</div>' +
     '<div id="insDocBody"></div>' +
     '</div>';
   ov.style.display = "flex";
 
-  _insDocStep1(mode);
+  if (soloRemito) { window._insDocState.tipoDoc = 'remito'; window._insDocSolo = true; _insDocStep2(mode); }
+  else { window._insDocSolo = false; _insDocStep1(mode); }
 }
 
 function _insDocStep1(mode) {
@@ -27524,7 +27880,7 @@ function _insDocStep2(mode) {
     html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de Factura</label><input type="date" id="insDocFechaFactura" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;" value="' + hoyAR + '"></div>';
   }
   html += '<div style="display:flex;gap:10px;margin-top:14px;">' +
-    '<button onclick="_insDocStep1(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
+    '<button onclick="' + (window._insDocSolo ? "insDocCancel();insRecibirCat()" : "_insDocStep1('" + mode + "')") + '" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
     '<button onclick="insDocOk(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;font-size:16px;">Continuar</button>' +
     '</div>';
   body.innerHTML = html;
@@ -27553,7 +27909,34 @@ function insDocOk(mode) {
 
   // Cerrar modal y continuar al modal de insumos
   insDocCancel();
-  selectOption(mode);
+  _insArrancarToggle(mode);
+}
+/* v29.82 (Luis, 13/10: "actualmente tienen que apretar «enviar» dos veces … ¿hace falta que sea
+   así?") — NO hacía falta. El tiempo ya arranca con el «Enviar» de la botonera (la tarea Insumos,
+   MDI de MOD_TAREA v28.93); el segundo apretón sólo servía para que `send()` abriera el toggle
+   RI/EI. Ahora, terminada la ubicación y la documentación, el toggle se abre SOLO y la recepción
+   queda en pantalla: el operario no vuelve a la botonera a mitad de camino.
+   `send()` hace exactamente lo mismo que hacía al tocar Enviar (evento, historial, cola offline);
+   lo único que se saca es el cartel "Reporte enviado correctamente", que acá no aporta nada —
+   lo que confirma que arrancó es la lista de insumos abierta. El aviso de FALLA se mantiene. */
+function _insArrancarToggle(mode) {
+  const _leg = String((typeof legajoInput !== "undefined" && legajoInput) ? (legajoInput.value || "") : "").trim();
+  /* ⚠ Si el toggle RI/EI quedó ABIERTO (la app se reinició con la recepción a medias), `send()`
+     lo CERRARÍA: acá se RETOMA, con lo que estaba cargado. Cerrarla sin que nadie lo pida sería
+     perder la sesión del operario, y el cierre ya tiene su camino propio dentro del módulo. */
+  try {
+    const st = getLegajoState(_leg) || {};
+    if (_leg && st.toggles && st.toggles[mode]) {
+      let d = null; try { d = opDraftLoad(_leg); } catch (_e) {}
+      if (d && d.op === "INS") opDraftResume(_leg); else showInsumoModal(mode, _leg);
+      return;
+    }
+  } catch (_e) {}
+  try {
+    selected = mode;
+    if (typeof textInput !== "undefined" && textInput) textInput.value = "";
+    send({ sinAviso: true });
+  } catch (_e) { selectOption(mode); }   // si algo falla, el camino viejo (seleccionar + Enviar)
 }
 
 function insDocCancel() {
@@ -27565,7 +27948,7 @@ function insDocCancel() {
    La materia prima plástica (PP, ABS, AI, NV, NR, N25, PE, PS: bolsas de 25 kg) la COMPRA GP2 y
    se guarda acá, en Virgilio. GP2 es el que manda (stock por inyector, OC, reposición); el ledger
    de Virgilio (Movimientos_Stock deposito='insumos') se sigue escribiendo igual que siempre.
-   Lo que se agrega, SÓLO cuando el insumo es una bolsa (su cod está en GP2.componente.codigo_virgilio):
+   Lo que se agrega, SÓLO cuando el insumo es una bolsa (su cod está en GP2.insumo_equivalencia, v29.74):
      EI (entregar): el destino es UN INYECTOR (lista cerrada que da GP2, con cuántas bolsas le
         faltan para sus OC) → rpc GP2.enviar_material_virgilio(cod_virgilio, bolsas, inyector, legajo).
      RI (recibir): se elige la OC de material de GP2 que llegó (rpc GP2.oc_pendientes_virgilio) y
@@ -27603,11 +27986,26 @@ async function _insGp2Opciones(mode, soloIny) {
           return '<button onclick="insUbicGp2Ok(\'RI\',' + i + ')" style="' + btn + '">OC N° ' + escapeHtml(String(o.numero)) + ' · ' + escapeHtml(o.proveedor || "") +
             '<span style="' + sub + '">' + escapeHtml(its) + (o.fecha_entrega_estimada ? ' · est. ' + escapeHtml(o.fecha_entrega_estimada) : "") + '</span></button>';
         }).join("") +
-        '<div style="font-size:12px;color:#64748b;margin:2px 0 10px;">— o escribí de dónde recibís (otro insumo) —</div>';
+        '<div style="font-size:12px;color:#64748b;margin:2px 0 10px;">— o elegí de dónde recibís (otro insumo) —</div>';
     } else {
       const mv = await insGp2Rpc("material_virgilio_bundle", {});
       window._insGp2Cache = { mv: mv || null };
       if (!mv || !mv.inyectores || !mv.inyectores.length) { if (soloIny) _insUbicSinIny(box); return; }
+      /* v29.82 (Luis, 13/10): "Bolsas plásticas sólo se envían a Kollplast, Pat Bet Plast y
+         Pettofrezza". GP2 marca como inyector también a JL Matriceria; la diferencia queda anotada
+         en GV_Insumo_Origen_Excluido y se aplica acá. Si esa lectura falla, se ofrecen los de GP2
+         (lo de antes): un destino de menos deja al operario sin poder registrar la salida. */
+      try {
+        const rOk = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_origenes", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: JSON.stringify({ p_cat: "inyector" }), cache: "no-store" });
+        if (rOk.ok) {
+          const ok = await rOk.json();
+          if (Array.isArray(ok) && ok.length) {
+            const vale = {}; ok.forEach(function (o) { vale[_insK(o.nombre)] = true; });
+            const fil = mv.inyectores.filter(function (nom) { return vale[_insK(nom)]; });
+            if (fil.length) mv.inyectores = fil;
+          }
+        }
+      } catch (_e) { /* queda la lista de GP2 */ }
       box.innerHTML = (soloIny ? '' : '<div style="font-size:12.5px;font-weight:800;color:#115e59;margin-bottom:6px;">🧪 Bolsas plásticas — ¿van a un inyector?</div>') +
         mv.inyectores.map(function (nom, i) {
           const apodo = INS_INY_APODO[nom];   // v29.27 (Thomas, D12): el nombre con que lo conoce el operario
@@ -27633,8 +28031,9 @@ function insUbicGp2Ok(mode, i) {
     insUbicOk("EI", { modo: "EI", inyector: nom, mv: mv });
   }
 }
-/* v29.27 (Thomas, D12): apodo del inyector de GP2 en el botón («Manolo es Pat Bet Plast»). */
-const INS_INY_APODO = { "Pat Bet Plast": "Manolo" };
+/* v29.27 (Thomas, D12): apodo del inyector de GP2 en el botón («Manolo es Pat Bet Plast»).
+   v29.87: lo carga `insFetchConfig` de `GV_Insumo_Origen_Apodo`; esto es el fallback. */
+let INS_INY_APODO = { "Pat Bet Plast": "Manolo" };
 /* v29.22 — bolsa plástica que se manda a un inyector: plástico, con código real y ubicación. */
 function _insEsBolsaIny(it) {
   return !!it && insCatOf(it) === "plastico" && !_insEsTmp(it) && !it.noCode && String(it.ubic || "").trim() !== "";
@@ -27672,6 +28071,16 @@ function _insGp2Bolsas(gp2, it) {
 /* Avisa a GP2. Devuelve {ok, msg} — nunca tira: el llamador decide qué hacer con el fallo. */
 async function _insGp2Enviar(gp2, sel, legajo, remito) {
   const rows = sel.map(function (it) { const m = _insGp2Mat(gp2, it); if (!m) return null; const b = _insGp2Bolsas(gp2, it); return { it: it, cod: m.codigo_virgilio || m.cod_virgilio, bolsas: b }; }).filter(Boolean);
+  // v29.74 (Luis) — una bolsa que NO está en GP2.insumo_equivalencia no puede pasar en silencio:
+  // el kg sale de Virgilio, el espejo lo baja igual y NO queda en poder de ningún inyector (se evapora).
+  // Era el caso de las 7 bolsas que no matcheaban el mapeo viejo; hoy sólo falta EBA.
+  // El criterio NO pasa por insCatOf: si el catálogo de categorías no se pudo leer devuelve "" para
+  // todo y el guard no frenaría nada. Con un inyector elegido lo que se entrega son bolsas (v29.28),
+  // así que cualquier ítem que el bundle de GP2 no reconozca frena.
+  if (gp2.modo === "EI") {
+    const sinEq = sel.filter(function (it) { return !_insGp2Mat(gp2, it); });
+    if (sinEq.length) return { ok: false, msg: "No tiene equivalencia en Gestión Productiva: " + sinEq.map(function (it) { return it.cod; }).join(", ") + ".\nCargala en Stock general → Virgilio (código de Cervantes) antes de entregarla." };
+  }
   if (!rows.length) return { ok: true, msg: "" };
   const sinUni = rows.filter(function (r) { return r.bolsas == null || !(r.bolsas > 0); });
   if (sinUni.length) return { ok: false, msg: "GP2 sólo entiende Bolsas o Kg: " + sinUni.map(function (r) { return r.it.cod + " en " + (r.it.unidad || "?"); }).join(", ") };
@@ -27710,7 +28119,9 @@ async function showInsumoModal(mode, legajo, _resume) {
     // force: si el admin cambió una categoría o una unidad, el operario la ve en la
     // próxima apertura de RI/EI sin tener que recargar la app.
     await insLoadMeta(true);
-    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni(), mode === "RI" ? insFetchGp2Ri() : Promise.resolve(null)]);
+    const _provFleje = (mode === "RI") ? String(window._insProvFleje || "") : ""; window._insProvFleje = null;
+    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni(), mode === "RI" ? insFetchGp2Ri() : Promise.resolve(null),
+      _provFleje ? insFetchFlejeProv() : Promise.resolve(null)]);
     const saldos = res[1] || {};
     const xUni = res[2] || {};
     // idea 7382: default de unidad = la unidad real del saldo si el insumo tiene UNA sola
@@ -27761,6 +28172,10 @@ async function showInsumoModal(mode, legajo, _resume) {
     else if (mode === "EI") lista = lista.filter(function (x) { return insCatOf(x) !== "plastico"; });
     window._insEnvioSub = null;
     _ins = { mode: mode, legajo: String(legajo || "").trim(), items: lista, filtro: "", cat: (riCat && insCatDef(riCat)) ? riCat : "", qty: null, nuevo: null };
+    /* v29.82: vino de un proveedor de flejes → se ven SÓLO sus flejes. Si el mapa no se pudo leer,
+       se ven TODOS (con el aviso): esconder flejes por una lectura caída es dejar al operario sin
+       poder cargar lo que ya descargó del camión. */
+    if (_provFleje) { _ins.provFleje = _provFleje; _ins.flejeProv = res[4] || null; _ins.provOtros = false; }
     if (envIny) { _ins.soloBolsas = true; _ins.cat = "plastico"; }
     // v14.95 — bolsas ↔ GP2: si en la ubicación se eligió un inyector / una OC de GP2, queda en la
     // sesión (viaja con el borrador). RI con OC: precarga las bolsas pendientes de cada material.
@@ -27954,9 +28369,12 @@ function insRender() {
         '</button>';
     }).join("") +
       (cnt[""] ? '<button class="ins-catbtn' + (cntQ[""] ? " hasq" : "") + '" onclick="insSetCat(\'?\')"><span class="ins-catem">❓</span><span class="ins-catnm">Sin categoría</span><span class="ins-catn">' + cnt[""] + '</span></button>' : "") +
-      // v29.56 (Luis, 13/10): el operario NO da de alta un insumo al recibir. Sólo recibe
-      // lo que ya está en la lista (o un componente del catálogo de GP2). El "+ Agregar
-      // insumo nuevo" se sacó: un código distinto lo define Stock y Compras, no el operario.
+      // v30.05 (Luis, 13/10): "hay que darles la opción de poder crear códigos nuevos cuando
+      // reciben si no están en la lista (antes tenían un botón abajo que les permitía hacer eso
+      // no, ponéselos)". Vuelve el "+ Agregar insumo", que la v29.56 había sacado: el operario
+      // no se puede quedar sin poder cargar lo que ya tiene en la mano. Antes de crear, el alta
+      // avisa si ya existe algo con esos números (ver insNuevoOk).
+      (isIn ? '<button class="ins-catbtn add" onclick="insNuevoOpen(\'\')"><span class="ins-catem">+</span><span class="ins-catnm">Agregar insumo</span><span class="ins-catn">nuevo</span></button>' : "") +
       '</div>';
     h += '<div class="ins-cbadge" style="margin-top:10px;">' + nOper + ' insumos en uso' + (cnt[""] ? ' · ' + cnt[""] + ' sin clasificar' : "") + '</div>';
   } else {
@@ -27966,8 +28384,31 @@ function insRender() {
     const base = f
       ? (cat ? _ins.items.filter(function (it) { return insCatOf(it) === (cat === "?" ? "" : cat); }) : _ins.items)
       : _ins.items.filter(function (it) { const k = insCatOf(it); return cat === "?" ? k === "" : k === cat; });
-    const shown = (f ? base.filter(function (it) { return stkMatchBusq(f, it.cod || it.gp2Cod || "", (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || ""), true); }) : base)   // v21.43
+    /* v29.87 (Luis, 13/10) — "elegido el proveedor, muestra los flejes y alambres que están
+       asignados a él y, mientras haya algún fleje y/o alambre que aparezca un botón que diga
+       «otros» y que permita seleccionar de los que todavía no están vinculados".
+       Son DOS listas, no una: la del proveedor y la de los que GP2 no le asignó a nadie. «Otros»
+       cambia de una a la otra; nunca se mezclan, y nada queda inalcanzable.
+       Buscando (`f`) no se filtra nada: si el operario escribe el código, lo tiene que encontrar. */
+    let baseP = base, nSinProv = 0;
+    if (!f && cat === "fleje" && _ins.provFleje && _ins.flejeProv) {
+      nSinProv = base.filter(function (it) { return !_insProvDe(it); }).length;
+      baseP = base.filter(function (it) {
+        const pv = _insProvDe(it);
+        return _ins.provOtros ? !pv : (pv && _insK(pv) === _insK(_ins.provFleje));
+      });
+    }
+    const shown = (f ? baseP.filter(function (it) { return stkMatchBusq(f, it.cod || it.gp2Cod || "", (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || ""), true); }) : baseP)   // v21.43
       .slice().sort(_insSortCat(cat));
+    if (!f && cat === "fleje" && _ins.provFleje) {
+      h += '<div class="ins-depw" style="background:#eef2ff;border-color:#a5b4fc;color:#1e293b;">' +
+        (_ins.provOtros ? '🧵 <b>Otros</b> — los que todavía no están asignados a ningún proveedor en GP2'
+                        : '🚛 Flejes y alambres de <b>' + escapeHtml(_ins.provFleje) + '</b>') +
+        (_ins.flejeProv ? '' : ' — <b>no se pudo leer</b> qué flejes son suyos: se muestran todos') + '</div>';
+      // «Otros» sólo si de verdad hay alguno sin vincular
+      if (_ins.flejeProv && nSinProv) h += '<button class="ins-back" style="width:100%;margin-bottom:8px;" onclick="insProvOtros()">' +
+        (_ins.provOtros ? '‹ Volver a los de ' + escapeHtml(_ins.provFleje) : 'Otros (' + nSinProv + ')') + '</button>';
+    }
     if (_ins.soloBolsas) h += '<div class="ins-bar"><span class="ins-bar-t">🧪 Bolsas plásticas</span></div>';
     else h += '<div class="ins-bar"><button class="ins-back" onclick="insBack()">‹ Atrás</button>' +
       '<span class="ins-bar-t">' + escapeHtml(cat ? insCatLbl(cat === "?" ? "" : cat) : "🔎 Buscar") + '</span></div>';
@@ -27987,7 +28428,9 @@ function insRender() {
           (it.qty > 0 ? '<span class="ins-itq' + (it.unidad ? "" : " falta") + '">' + it.qty + " " + escapeHtml(it.unidad || "¿unidad?") + '</span>' : "") +
           '</button>';
       }).join("") +
-        // v29.56 (Luis, 13/10): sin "+ Agregar insumo" dentro de la categoría al recibir.
+        // v30.05: y también dentro de la categoría. Las CERRADAS (bolsas y cajas) siguen sin
+        // alta: su catálogo es conocido y completo (Thomas, v29.25/30).
+        (cat && isIn && INS_CAT_CERRADA.indexOf(cat) < 0 ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
         '</div>';
     }
   }
@@ -28009,11 +28452,20 @@ function insRender() {
    admin desde Stock y Compras → Insumos (idea 5572). */
 function insNuevoOpen(cat) {
   if (!_ins) return;
-  // v29.56 (Luis, 13/10): el operario NO da de alta insumos. Recibe sólo lo que ya está
-  // en la lista; un código distinto lo define Stock y Compras. Guarda dura, por si algún
-  // camino viejo (una sesión guardada, un botón cacheado) todavía llama acá.
-  try { alert("No se puede agregar un insumo nuevo acá.\n\nRecibí lo que ya está en la lista. Si llegó algo que no figura, avisá a Stock y Compras para que lo carguen."); } catch (_e) {}
-  return;
+  // v30.05 (Luis, 13/10): el alta VUELVE — pero SÓLO al RECIBIR ("hay que darles la opción de
+  // poder crear códigos nuevos CUANDO RECIBEN"). Al ENTREGAR nunca hubo botón y la guarda queda:
+  // dar de alta algo al sacarlo sería sacar stock de algo que nunca entró.
+  if (_ins.mode !== "RI") {
+    try { alert("No se puede agregar un insumo nuevo acá.\n\nAl ENTREGAR sale sólo lo que ya está en la lista. Si llegó algo que no figura, cargá la RECEPCIÓN primero."); } catch (_e) {}
+    return;
+  }
+  // y tampoco en una categoría CERRADA (bolsas y cajas): su catálogo es conocido y completo
+  // (Thomas, v29.25/30). El botón ya no se dibuja ahí; esto frena el camino a mano.
+  if (INS_CAT_CERRADA.indexOf(cat) >= 0) {
+    const _c0 = insCatDef(cat);
+    try { alert("No se agregan insumos nuevos en " + (_c0 ? _c0.lbl : "esa categoría") + ".\n\nEstán todas en la lista. Si falta una, avisá a Stock y Compras."); } catch (_e) {}
+    return;
+  }
   _ins.nuevo = { cat: insCatDef(cat) ? cat : "", qty: "", uni: "", det: "" };
   _ins.qty = null;
   insRender();
@@ -28088,6 +28540,29 @@ function insNuevoOk() {
   // Sin código no hay clave natural: se dedupe por el DETALLE (normalizado). Si ya
   // hay uno escrito igual, no creo otro — lo abro para que sume sobre ese.
   const _norm = function (x) { return String(x || "").trim().toLowerCase().replace(/\s+/g, " "); };
+  /* v30.05 — lo que mordió el 13/10: el operario escribió "13.6 x 0.8" y ese fleje YA existía
+     como `N°19` ("13,6 x 0,8 · Fleje N° 19"), así que se creó un TMP y 144 Kg quedaron en un
+     código que no existe para nadie. Antes de crear se buscan los parecidos por los NÚMEROS del
+     detalle — sin importar coma/punto ni el orden — y se ofrecen. NO bloquea: si de verdad es
+     otro, se crea igual; lo que no puede es crearse en silencio teniendo el gemelo en la lista. */
+  const _nums = function (x) { return String(x || "").toLowerCase().replace(/(\d),(\d)/g, "$1.$2").match(/\d+(?:\.\d+)?/g) || []; };
+  const nd = _nums(det);
+  if (nd.length) {
+    const cands = _ins.items.filter(function (it) {
+      if (!it.cod || _insEsTmp(it)) return false;
+      const ni = _nums((it.nombre || "") + " " + it.cod);
+      return nd.every(function (x) { return ni.indexOf(x) >= 0; });
+    }).slice(0, 6);
+    if (cands.length) {
+      let sigue = false;
+      try {
+        sigue = confirm("⚠ Puede que ya exista:\n\n" +
+          cands.map(function (it) { return "  · " + it.cod + (it.nombre ? " — " + it.nombre : ""); }).join("\n") +
+          "\n\nSi es uno de ésos, cancelá y tocalo en la lista (te la dejo filtrada).\n\n¿Crear igual uno NUEVO?");
+      } catch (_e) { sigue = true; }
+      if (!sigue) { _ins.nuevo = null; _ins.filtro = String(nd[0] || ""); insRender(); return; }
+    }
+  }
   const ya = _ins.items.filter(function (it) { return _norm(it.nombre) === _norm(det); })[0];
   if (ya) {
     alert("Ya hay un insumo con ese detalle. Te lo abro para que pongas la cantidad.");
@@ -28245,6 +28720,7 @@ function _insSaleMC(it) {
   return mc ? mc.u : "";
 }
 function insCloseQty() { if (!_ins) return; _ins.qty = null; insRender(); }
+function insProvOtros() { if (!_ins) return; _ins.provOtros = !_ins.provOtros; insRender(); }
 function insBack() { if (!_ins || _ins.soloBolsas) return; _ins.cat = ""; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = null; insRender(); }
 /* Entrar a una categoría (pantalla 2). Volver a tocarla desde adentro = volver. */
 function insSetCat(k) { if (!_ins || _ins.soloBolsas) return; _ins.cat = (_ins.cat === k) ? "" : k; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = null; insRender(); }
@@ -28385,6 +28861,13 @@ function insEmitCierre(legajo, mode, tsInicioIso, total) {
       id: payload.id, status: "queued", ts_inicio_iso: payload.ts_inicio_iso
     });
   } catch (_e) { /* no-op */ }
+  /* v29.90 (Luis, 13/10): el candado del legajo de prueba tambien aca. Esta era la UNICA
+     escritura de un evento de operario que llamaba a `_enqueueReportRaw` DIRECTO, salteandose
+     el gate que `enqueueReport` y `enqueueAutoClose` si tienen. Por eso el 13/10 el monitor
+     mostro al legajo 1 «en jornada» con un cierre de Recepcion de Insumos (12:32→12:33) SIN su
+     apertura: la apertura la descarto el gate y el cierre salio igual. Y un cierre huerfano no
+     se distingue de una tarea abierta: la vista lo lee como jornada viva. */
+  try { if (esLegajoPrueba(payload.legajo)) return; } catch (_e) {}
   try { _enqueueReportRaw(payload); } catch (_e) { /* no-op */ }
   try { updatePendingIndicator(); } catch (_e) {}
 }
@@ -28562,13 +29045,17 @@ async function showMGModal(legajo, _resume) {
     mgRender(); return;
   }
   try {
-    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), ocgFetchCapacidad(), ocgFetchCeldas(),
+    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCapacidad(), ocgFetchCeldas(),
       // v12.14 (idea 4926) — demanda del día y cajas×MC, best-effort: si fallan no bloquean el guardado.
       (async function () { try { return await ocgDemanda(true); } catch (_e) { return {}; } })(),
       (async function () { try { return (await rkbFetchCxM()).cxm || {}; } catch (_e) { return {}; } })(),
       (async function () { try { return await gvFetchLugares(); } catch (_e) { return null; } })()]);
     const saldos = res[0] || {};
-    const capMap = res[2] || {};
+    /* v29.64 (Luis, 13/10, D5) - la capacidad del DUAL es POR EMPRESA: `stockFetchSaldos` emite
+       la clave con sufijo ("437E LK") y `ocgFetchCapacidad` indexa el codigo PELADO, asi que el
+       dual quedaba con cap = 0 (sin maximo, sin maxMC y al final del orden). `_rkbCapDe` resuelve
+       por (cod, empresa) y para un codigo no dual devuelve la misma suma pelada que antes. */
+    const capObj = res[2] || { pelada: {}, porEmp: {} };
     const celdasMap = res[3] || {};   // v10.08 — cod → [celdas de góndola]
     const demMap = res[4] || {};      // v12.14 — demanda (cajas pedidas) del día por código
     const cxmMap = res[5] || {};      // v12.14 — cajas por master caja (planimetría)
@@ -28608,14 +29095,20 @@ async function showMGModal(legajo, _resume) {
     });
     const items = _filas.map(function (a) {
       const kk = _ocgNorm(a.cod);
-      const cap = capMap[kk] || 0;
+      /* v29.64 (D5) - en un DUAL la clave trae el sufijo ("437E LK"): las cajas x MC y las celdas
+         de gondola se indexan por el codigo PELADO (son del ARTICULO, iguales en las dos empresas),
+         asi que se busca con sufijo y se cae al pelado. La DEMANDA no: `ocgDemanda(true)` ya la
+         emite por empresa (`pkCodEmpresa`) y caer al pelado le daria a cada empresa los pedidos
+         de las dos. Las celdas se siguen filtrando por `a.emp` dos lineas mas abajo. */
+      const kb = kk.replace(/\s+(LK|CH)$/, "");
+      const cap = _rkbCapDe(a.cod, capObj);
       const gond = Number(a.terminado) || 0;
       const ped = Number(demMap[kk]) || 0;
-      const cxm = Number(cxmMap[kk]) || 0;
+      const cxm = Number(cxmMap[kk]) || Number(cxmMap[kb]) || 0;
       // v15.40 — si la fila tiene empresa, sólo muestra las celdas DE ESA empresa:
       // un 809E de LK va a J13/J14 y uno de CH a M13/M15; mostrarle las cuatro al
       // operario es justo el error que se quiere evitar.
-      let celdas = celdasMap[kk] || [];   // v10.08 — dónde va en góndola
+      let celdas = celdasMap[kk] || celdasMap[kb] || [];   // v10.08 — dónde va en góndola · v29.64: el dual, por el pelado
       if (a.emp && _gvLugares && _gvLugares.emp) {
         const _f = celdas.filter(function (c) { const e = _gvLugares.emp[gvNormSector(c)]; return !e || e === a.emp; });
         if (_f.length) celdas = _f;
@@ -29232,6 +29725,24 @@ function _modTareaVisible(m) {
   return m.ovs.some(function (id) { var e = document.getElementById(id); return !!e && getComputedStyle(e).display !== "none"; });
 }
 /* La barra (Anular / Terminé) se ve mientras el módulo de una tarea abierta está en pantalla. */
+/* v29.81 (Luis, 13/10: «la barra de abajo con Anular y Terminé tapa opciones y botones … que no tape
+   nada, priorizá la visión de smartphone») — la barra es fixed y se comía el último renglón de la lista
+   (caso: Completar Pedido en el celular). Mientras se ve, los overlays de esos módulos TERMINAN arriba
+   de la barra (`bottom: <alto>`), así su scroll llega hasta el final, y el body lleva el mismo colchón
+   para la botonera de atrás. Al irse la barra se devuelve todo. Al agregar un módulo a MOD_TAREA, sus
+   overlays van en `ovs` — de ahí sale esta lista. */
+var _MODBAR_OVS = (function () { var a = []; Object.keys(MOD_TAREA).forEach(function (c) { a = a.concat(MOD_TAREA[c].ovs || []); }); return a; })();
+function _modTareaColchon(px) {
+  px = Number(px) || 0;
+  try { document.documentElement.style.setProperty("--gv-modbar", px + "px"); } catch (_e) {}
+  var pb = px ? px + "px" : "";
+  try { if (document.body.style.paddingBottom !== pb) document.body.style.paddingBottom = pb; } catch (_e) {}
+  _MODBAR_OVS.forEach(function (id) {
+    var e = document.getElementById(id); if (!e) return;
+    var val = (px && getComputedStyle(e).display !== "none") ? px + "px" : "";
+    if (e.style.bottom !== val) e.style.bottom = val;
+  });
+}
 var _modTareaTimer = null;
 function _modTareaVigilar() {
   var leg = String((typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim();
@@ -29240,6 +29751,7 @@ function _modTareaVigilar() {
   var bar = document.getElementById("modTareaBar");
   if (!cod) {
     if (bar) bar.style.display = "none";
+    _modTareaColchon(0);
     var algun = leg && Object.keys(MOD_TAREA).some(function (c) { return modTareaActiva(leg, c); });
     if (!algun && _modTareaTimer) { clearInterval(_modTareaTimer); _modTareaTimer = null; }
     return;
@@ -29262,6 +29774,7 @@ function _modTareaVigilar() {
       '<button type="button" onclick="modTareaBoton(\'' + cod + '\',false)" style="' + bs + 'background:#16a34a;color:#fff;">🏁 Terminé</button>';
   }
   bar.style.display = "flex";
+  _modTareaColchon(bar.offsetHeight || 56);
 }
 function modTareaBoton(code, anular) {
   var m = MOD_TAREA[code]; if (!m) return;
@@ -29309,9 +29822,12 @@ async function showGuardarOrden(legajo) {
     + '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;"><b style="font-size:17px;">📋 ¿Qué bajar primero?</b><button onclick="closeGuardarOrden()" style="width:auto;background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;">Cerrar</button></div>'
     + '<div id="gordenBody" style="padding:13px 14px;"><div style="text-align:center;color:#64748b;padding:24px;">Calculando prioridades…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
+    const res = await Promise.all([stockFetchSaldos(), rkbFetchCapacidad(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.guardado_cajas_por_hora&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })]);
-    const saldos = res[0] || {}, capMap = res[1] || {}, cxmMap = (res[3] && res[3].cxm) || {}, _facG = res[4] || {}, _noG = res[5] || {};
+    /* v29.64 (Luis, 13/10, D5) - capacidad del dual por EMPRESA (`_rkbCapDe`): con el lookup
+       pelado el dual daba cap = 0, y el `if (cap <= 0) return null` de los URGENTES lo SACABA de
+       la lista (el 437E LK con 225 cajas en racks no aparecia nunca). */
+    const saldos = res[0] || {}, capObj = res[1] || { pelada: {}, porEmp: {} }, cxmMap = (res[3] && res[3].cxm) || {}, _facG = res[4] || {}, _noG = res[5] || {};
     // v8.91 — ratio de guardado (cajas/h) directo de Stock_Config; si no hay, 380. Para la tarjeta de horas.
     var _rateRow = (res[6] && res[6][0]) || null; var _gRateVal = _rateRow ? parseFloat(_rateRow.valor) : 380; if (!(_gRateVal > 0)) _gRateVal = 380;
     const items = Object.keys(saldos).map(function (k) {
@@ -29319,7 +29835,7 @@ async function showGuardarOrden(legajo) {
       if (_noG[_ocgNorm(a.cod)]) return null;   // v24.52 — a liquidar: no se manda a guardar
       const aGuardar = Math.round(Number(a.a_guardar) || 0), exc = Math.round(Number(a.excedente) || 0), racks = Math.round(Number(a.racks) || 0);
       if (aGuardar + exc + racks <= 0) return null;   // nada esperando para bajar
-      const cap = Math.round(capMap[_ocgNorm(a.cod)] || 0), gond = Math.round(Number(a.terminado) || 0);
+      const cap = Math.round(_rkbCapDe(a.cod, capObj)), gond = Math.round(Number(a.terminado) || 0);
       // v8.90: cxm de planimetría; si no hay, fallback a Cajas_x_Master de la tabla de artículos
       var _cxmVal = cxmMap[_cpNorm(a.cod)] || 0;
       if (!_cxmVal) { var _fG = _facG[String(a.cod).toUpperCase()]; if (_fG && _fG.cajasXMaster > 0) _cxmVal = _fG.cajasXMaster; }
@@ -29331,7 +29847,7 @@ async function showGuardarOrden(legajo) {
     var urgentes = Object.keys(saldos).map(function (k) {
       var a = saldos[k];
       if (_noG[_ocgNorm(a.cod)]) return null;   // v24.52
-      var cap = Math.round(capMap[_ocgNorm(a.cod)] || 0); if (cap <= 0) return null;
+      var cap = Math.round(_rkbCapDe(a.cod, capObj)); if (cap <= 0) return null;
       var gond = Math.round(Number(a.terminado) || 0);
       var ratio = gond / cap; if (ratio >= _URG) return null;
       var back = Math.round((Number(a.a_guardar) || 0) + (Number(a.excedente) || 0) + (Number(a.racks) || 0));
@@ -29618,7 +30134,7 @@ function rkbRender() {
       }).join("") + "</div>";
     }
     // v24.68 (Thomas, D23): sin posición no se registra; si el código no tiene posición en el Mapa, se escribe.
-    if (!(it.locs && it.locs.length)) locsHtml += '<div class="rkb-locs"><input class="rkb-pos" placeholder="Posición (ej AD05)" value="' + escapeHtml(it.sec || "") + '" oninput="rkbSetPos(' + i + ',this.value)"></div>';
+    if (!(it.locs && it.locs.length)) locsHtml += '<div class="rkb-locs"><input class="rkb-pos" placeholder="Posición (ej AD05 o AD05-2)" value="' + escapeHtml(it.sec || "") + '" oninput="rkbSetPos(' + i + ',this.value)"></div>';
     else if (!it.sec) locsHtml += '<div class="rkb-sug" style="color:#dc2626">⚠ Tocá de qué posición bajás.</div>';
     const room = rkbRoom(it);
     let gonHtml = "";
@@ -29647,7 +30163,7 @@ function rkbRoom(it) { return it.cap > 0 ? Math.max(0, it.cap - Math.max(0, it.g
    no hay lugar de góndola que medir ni excedente, y el conteo a ciegas es sólo del rack. */
 const RKB_DESTINO = "a_guardar";
 function rkbExc(it) { if (RKB_DESTINO === "a_guardar") return 0; return (it.cap > 0 && it.baja > 0) ? Math.max(0, _rkbInner(it) - rkbRoom(it)) : 0; }
-function rkbSetPos(i, v) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; it.sec = String(v || "").toUpperCase().replace(/\s+/g, ""); rkbRender(); }
+function rkbSetPos(i, v) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; it.sec = String(v || "").toUpperCase().replace(/\s+/g, ""); rkbRender(); }   // v29.78: la parte viaja en el texto (Y25-2)
 function rkbUsarRoom(i) {
   if (!_rkb) return; const it = _rkb.items[i]; if (!it) return;
   const room = rkbRoom(it), usaM = it.cxm > 0 && !it.manual;
@@ -30150,6 +30666,93 @@ async function eaUbicDelete() {
    Evento IR por palet. Contraparte de Mover (mv) y Bajar de racks (rkb). ===== */
 let _ir = null;
 function _irNorm(c) { return String(c == null ? "" : c).toUpperCase().replace(/\s+/g, ""); }
+/* ⚠ v29.67 (Luis, 13/10, D2) — CANDADO del Ingreso a racks: un código que NO EXISTE no entra, y si lo tipeado
+   es una POSICIÓN de rack se lo dice. Caso AB3 (13/10, legajo 104): escribió la posición AB03 en el campo del
+   CÓDIGO y entraron 60 cajas de un código fantasma (eran 956E, que terminaron en AB10); el 09/10 pasó lo mismo
+   con «606» (era 606E). Es el mismo candado de Stocks → Ajustar/Fijar (v25.28) más el aviso de posición.
+   gv_stock_cod_conocido (los 7 maestros) + gv_rack_sector (el Mapa) + gv_codigo_baja_de, las tres anon.
+   ⚠ Solo en modo IMPORTACIÓN, que es donde el código se TIPEA: en Nacional sale de la lista de stock real.
+   ⚠ Bloquea la posición solo si ADEMÁS el código no existe: «A1» es rack de insumos Y código de verdad.
+   ⚠ Si no se puede verificar, pregunta: «no pude leer» no es «existe». */
+const _IR_CHK = {};
+async function _irRpc(fn, body) {
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, { method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(body) });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return await r.json();
+}
+async function _irCodChk(cod) {
+  const k = _irNorm(cod); if (!k) return null;
+  if (_IR_CHK[k]) return _IR_CHK[k];
+  const out = { cod: k, existe: null, baja: null, pos: null };
+  try { out.existe = (await _irRpc("gv_stock_cod_conocido", { p_cod: k })) === true; } catch (_e) {}
+  try { const rep = await _irRpc("gv_codigo_baja_de", { p_cod: k }); if (typeof rep === "string") out.baja = rep || "-"; } catch (_e) {}
+  if (out.existe !== true) { try { const s = await _irRpc("gv_rack_sector", { p: k }); if (s) out.pos = String(s); } catch (_e) {} }
+  if (out.existe !== null || out.baja || out.pos) _IR_CHK[k] = out;   // el "no se pudo leer" no se cachea
+  return out;
+}
+let _irChkT = null;
+function _irCodEfe() { if (!_ir) return ""; return _irNorm(_ir.cod) || _irNorm(_ir.codPick); }
+function _irChkPedir() {
+  if (_irChkT) { clearTimeout(_irChkT); _irChkT = null; }
+  if (!_ir) return;
+  if (_ir.modo === "nacional") { _ir.chk = null; return; }
+  const k = _irCodEfe();   // v29.77: en Importación el código sale de la LISTA; lo tipeado se chequea igual (AB3)
+  if (!k) { _ir.chk = null; return; }
+  if (_IR_CHK[k]) { _ir.chk = _IR_CHK[k]; return; }
+  _ir.chk = null;
+  _irChkT = setTimeout(function () {
+    _irCodChk(k).then(function (res) { if (_ir && _irCodEfe() === k) { _ir.chk = res; irRender(); } }).catch(function () {});
+  }, 450);
+}
+function _irChkMal(chk) { return !!(chk && (chk.baja || (chk.pos && chk.existe === false))); }
+function _irChkWarn(chk) {
+  if (!chk) return "";
+  if (chk.baja) return '<div class="ir-warn">⚠ El código <b>' + escapeHtml(chk.cod) + '</b> no se usa más'
+    + (chk.baja !== "-" ? ': es el <b>' + escapeHtml(chk.baja) + '</b>. Cargalo como ' + escapeHtml(chk.baja) + '.' : '.') + '</div>';
+  /* v29.78 (Luis, 13/10: «No tiene que avisar que es una posicion, simplemente no tiene que dejar») —
+     una posición de rack (AB3) no lleva cartel: no está en la lista, no se puede elegir y «usar igual»
+     no se ofrece (_irChkMal). El aviso que decía «es la POSICIÓN de rack AB03» se retiró. */
+  if (chk.pos && chk.existe === false) return "";
+  if (chk.existe === false) return '<div class="ir-warn" style="background:#fffbeb;border-color:#fcd34d;color:#92400e">⚠ El código <b>' + escapeHtml(chk.cod) + '</b> no existe en el maestro. Revisalo antes de cargar.</div>';
+  return "";
+}
+async function _irCodGuard(codN) {
+  const cajas = Number(_ir && _ir.inner) || 0, sec = String((_ir && _ir.sector) || "").toUpperCase();
+  const chk = await _irCodChk(codN); if (!chk) return false;
+  if (_ir) { _ir.chk = chk; }
+  if (chk.baja) { try { alert("El código " + codN + " no se usa más" + (chk.baja !== "-" ? ": es el " + chk.baja + ". Cargalo como " + chk.baja + "." : ".")); } catch (_e) {} irRender(); return false; }
+  if (chk.existe === true) return true;
+  if (chk.pos) { irRender(); return false; }   // v29.78: una posición de rack no se carga, y no lleva cartel
+  irRender();
+  const q = " " + cajas + " cajas en " + sec + "?";
+  if (chk.existe === false) return confirm("No existe el código " + codN + ".\n\n¿Lo creo y le cargo" + q);
+  return confirm("No pude verificar si el código " + codN + " existe.\n\n¿Cargo igual" + q);
+}
+/* v29.77 (Luis, 13/10: «mas que candado, solo debería dar opciones de poner un codigo ya existente.
+   a medida que se escribe se sugiere el codigo») — el campo Código de Importación SUGIERE códigos que
+   existen, en vez de aceptar texto libre. El universo es el MISMO que decide el candado de la v29.67
+   (`gv_stock_cod_conocido`), listado por `gv_stock_cod_lista()`: así la pantalla no puede sugerir un
+   código que después el candado rechaza. Deja afuera los dados de baja y los insumos puros (A1 es
+   insumo Y posición de rack: justo la confusión que esto viene a cerrar); el insumo importado (323ES)
+   entra porque está en Importados. Devuelve el código como lo escriben los maestros (026, no 26).
+   ⚠ Si la lectura falla, la lista queda vacía y el campo sigue aceptando lo tipeado con el candado de
+   la v29.67 — «no pude leer» no es «ese código no existe». */
+async function irFetchCodigos() {
+  const arr = [];
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_stock_cod_lista", { method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    (Array.isArray(j) ? j : []).forEach(function (x) {
+      const c = String(x.cod || "").trim(); if (!c) return;
+      arr.push({ cod: c, k: _ocgNorm(c), nom: String(x.nombre || "").trim(), imp: x.importado === true });
+    });
+  } catch (_e) {}
+  return arr;
+}
 async function irFetchCxM(plani) {
   const cx = {};
   try {
@@ -30190,7 +30793,17 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
     await loadArtNombres();
     const cxm = await irFetchCxM(plani);
     const saldos = await stockFetchSaldos().catch(function () { return {}; });   // v6.28: para el "nacional" (stock en a_guardar/excedente)
+    const cods = await irFetchCodigos();   // v29.77: los códigos que se pueden sugerir en Importación
     const seen = {}, libres = [], ocupados = {};
+    /* v29.78 (Luis, 13/10) — SUB-POSICIONES: `sector` de Racks_Planimetria ES la DIRECCIÓN (Y25 o Y25-2),
+       así que `ocupados` y `libres` ya vienen por parte. Lo único nuevo son dos mapas: en qué rack está
+       cada dirección y en cuántas partes está ese rack, para poder ofrecer PARTIRLO cuando está ocupado. */
+    const partesDe = {}, rackDe = {};
+    (plani || []).forEach(function (r) {
+      const sec = String(r.sector || "").trim().toUpperCase(); if (!sec) return;
+      const rk = String(r.rack || r.sector || "").trim().toUpperCase();
+      rackDe[sec] = rk; partesDe[rk] = Math.max(1, Number(r.partes) || 1);
+    });
     (plani || []).forEach(function (r) { const sec = String(r.sector || "").trim(); if (sec && String(r.estado) === "ocupado" && r.cod_art) ocupados[sec.toUpperCase()] = String(r.cod_art); });
     (plani || []).forEach(function (r) {
       const sec = String(r.sector || "").trim(); if (!sec) return;
@@ -30199,7 +30812,7 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
       if (!ocupados[secU]) libres.push(sec);
     });
     libres.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
-    _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, libres: libres, ocupados: ocupados, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
+    _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, cods: cods, libres: libres, ocupados: ocupados, partesDe: partesDe, rackDe: rackDe, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", codNuevo: false, masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
     _ir.tsInicio = _irIni || Date.now(); if (!_irIni) { try { gvRacksTramo("IRI", _ir.legajo, _ir.tsInicio); } catch (_e) {} }   // v23.66: el tramo de racks arranca al abrir · v26.83: o sigue el abierto
     irRender();
   } catch (e) { const b = document.getElementById("irBody"); if (b) b.innerHTML = '<div class="ir-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -30212,15 +30825,20 @@ function irRender() {
   const secU = String(_ir.sector || "").trim().toUpperCase(), ocupadoPor = _ir.ocupados[secU] || "";
   const sectorOcupadoOtro = ocupadoPor && _irNorm(ocupadoPor) !== codN;
   const nombre = _ir.cod ? (artNombre(_ir.cod, "") || "") : "";
+  const chk = (_ir.chk && _ir.chk.cod === _irCodEfe()) ? _ir.chk : null;   // v29.67: candado del código (solo importación)
+  const codMal = !nac && _irChkMal(chk);
   const origTxt = _ir.origen === "excedente" ? "excedente" : "a guardar";
   const disp = nac ? _irDisp(_ir.cod, _ir.origen) : 0;
-  // v6.28: toggle Importación (stock nuevo) / Nacional (mover stock existente a racks)
+  /* v6.28: dos modos. v29.100 (Luis, 13/10: «no hay una forma clara para mandar mercadería de A
+     guardar a Racks … Importado y nacional se tiene que renombrar a "Ingreso directo" o "Desde A
+     guardar"»): los botones se llaman por lo que HACEN, no por el origen de la mercadería. Los
+     valores internos (import/nacional) NO cambian: los usan racks_plani_ingreso y _nacional. */
   let h = '<div class="ir-fld"><div class="ir-seg">'
-    + '<button class="ir-segb' + (!nac ? " on" : "") + '" onclick="irSetModo(\'import\')">📦 Importación</button>'
-    + '<button class="ir-segb' + (nac ? " on" : "") + '" onclick="irSetModo(\'nacional\')">🏠 Nacional</button>'
+    + '<button class="ir-segb' + (!nac ? " on" : "") + '" onclick="irSetModo(\'import\')">📦 Ingreso directo</button>'
+    + '<button class="ir-segb' + (nac ? " on" : "") + '" onclick="irSetModo(\'nacional\')">📥 Desde A guardar</button>'
     + '</div></div>';
   if (nac) {
-    h += '<div class="ir-hint">Mové a racks stock que <b>YA tenés</b> (no crea stock nuevo): elegí <b>origen</b>, <b>código</b> con stock, <b>cajas</b> y el <b>sector</b>. Descuenta del origen y ocupa la celda.</div>';
+    h += '<div class="ir-hint"><b>Mercadería que ya está en el depósito</b> y la ponés en un rack. Mové a racks stock que <b>YA tenés</b> (no crea stock nuevo): elegí <b>origen</b>, <b>código</b> con stock, <b>cajas</b> y el <b>sector</b>. Descuenta del origen y ocupa la celda.</div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Origen del stock</div><div class="ir-seg">'
       + '<button class="ir-segb' + (_ir.origen === "a_guardar" ? " on" : "") + '" onclick="irSetOrigen(\'a_guardar\')">A guardar</button>'
       + '<button class="ir-segb' + (_ir.origen === "excedente" ? " on" : "") + '" onclick="irSetOrigen(\'excedente\')">Excedente</button>'
@@ -30231,19 +30849,23 @@ function irRender() {
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas a mover' + (_ir.cod ? ' (máx ' + Math.round(disp) + ')' : '') + '</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div>';
     if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(codCanonSuf(_ir.cod)) + ' en ' + origTxt + '.</div>';
   } else {
-    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
-    h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="ej. 582E" value="' + escapeHtml(codBase(_ir.cod)) + '" oninput="irSetCod(this.value)"></div>';
-    if (_ir.cod) h += '<div class="ir-desc">' + escapeHtml(nombre || "(código nuevo, sin nombre)") + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
+    h += '<div class="ir-hint"><b>Mercadería que entra al depósito ahora</b> (crea stock nuevo). Si las cajas YA están en <b>A guardar</b>, usá «📥 Desde A guardar» o las contás dos veces. Cargá lo que llegó, <b>un palet por vez</b>: elegí el <b>código</b> de la lista (escribí el código o el nombre y te lo sugiero), cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
+    // v29.77: el campo BUSCA entre los códigos que existen; el código se elige de la lista (o se escribe entero)
+    h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="🔎 código o nombre (ej. 956E)" value="' + escapeHtml(_ir.codPick || "") + '" oninput="irSetPick(this.value)"></div>';
+    if (_ir.cod) h += '<div class="ir-desc">Elegido: <b>' + escapeHtml(codBase(_ir.cod)) + '</b> ' + escapeHtml(nombre || (_ir.codNuevo ? "(código nuevo, sin nombre)" : "")) + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
+    if (chk) h += _irChkWarn(chk);
+    h += _irAvisoAGuardar();   // v29.100: si esas cajas YA están en A guardar, no es un ingreso directo
+    h += _irListaImp();
     h += '<div class="ir-row2"><div class="ir-fld"><div class="ir-lbl">Masters</div><div class="ir-stp"><button class="ir-sb" onclick="irChgM(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.masters) || 0) + '" oninput="irSetM(this.value)"><button class="ir-sb" onclick="irChgM(1)">+</button></div></div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas (inner)</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div></div>';
   }
   h += '<div class="ir-fld"><div class="ir-lbl">Sector</div><input id="irSec" class="ir-inp" type="text" autocomplete="off" placeholder="ej. Y30" value="' + escapeHtml(_ir.sector) + '" oninput="irSetSec(this.value)"></div>';
-  if (sectorOcupadoOtro) h += '<div class="ir-warn">⚠ ' + escapeHtml(secU) + ' ya está ocupado por <b>' + escapeHtml(ocupadoPor) + '</b>. Elegí otro (o poné ese mismo código para sumar).</div>';
+  if (sectorOcupadoOtro) h += _irOcupadoHtml(secU, ocupadoPor);
   else if (ocupadoPor) h += '<div class="ir-ok2">➕ ' + escapeHtml(secU) + ' ya tiene ' + escapeHtml(ocupadoPor) + ' — se suma.</div>';
   h += '<div class="ir-libres">' + _ir.libres.slice(0, 14).map(function (s) { return '<button class="ir-chip' + (secU === s.toUpperCase() ? ' on' : '') + '" onclick="irSetSec(\'' + escapeHtml(s) + '\')">' + escapeHtml(s) + '</button>'; }).join("") + (_ir.libres.length > 14 ? '<span class="ir-more">+' + (_ir.libres.length - 14) + ' libres</span>' : (_ir.libres.length ? '' : '<span class="ir-more">sin sectores libres</span>')) + '</div>';
   h += '<div class="ir-fld"><div class="ir-lbl">Empresa</div><div class="ir-seg"><button class="ir-segb' + (_ir.emp === "LK" ? " on" : "") + '" onclick="irSetEmp(\'LK\')">LK · Loeke</button><button class="ir-segb' + (_ir.emp === "CH" ? " on" : "") + '" onclick="irSetEmp(\'CH\')">CH · Chef</button></div></div>';
   const dispOk = !nac || (disp > 0 && Number(_ir.inner) <= disp);
-  const ok = codN && (Number(_ir.inner) > 0) && secU && !sectorOcupadoOtro && dispOk;
+  const ok = codN && (Number(_ir.inner) > 0) && secU && !sectorOcupadoOtro && dispOk && !codMal;
   h += '<button class="ir-fin"' + (ok ? "" : " disabled") + ' onclick="irRevisar()">Revisar carga →' + (secU && Number(_ir.inner) > 0 ? ' (' + (Number(_ir.inner) || 0) + ' cajas a ' + escapeHtml(secU) + ')' : '') + '</button>';
   if (_ir.done.length) {
     h += '<div class="ir-done-h">Cargados en esta sesión (' + _ir.done.length + ')</div>';
@@ -30255,19 +30877,219 @@ function irRender() {
   else h += '<button class="gv-anular" onclick="irAnular()">⛔ Anular ingreso</button>';
   _renderKeepFocus(body, h);
 }
-function irSetCod(v) { if (!_ir) return; _ir.cod = String(v == null ? "" : v).toUpperCase().replace(/\s+/g, ""); const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0 && Number(_ir.masters) > 0) _ir.inner = Number(_ir.masters) * cxm; irRender(); }
+/* v29.77 — irSetCod ya no cuelga de ningún input (en Importación el código se elige de la lista con
+   irPickCod): queda como setter programático. Si el código no está en el universo, se marca como
+   «código nuevo», que es el mismo estado que deja el «usar igual» — así el candado lo pregunta. */
+function irSetCod(v) {
+  if (!_ir) return;
+  _ir.cod = String(v == null ? "" : v).toUpperCase().replace(/\s+/g, "");
+  if (_ir.modo !== "nacional") {
+    _ir.codPick = codBase(_ir.cod);
+    const hit = _irCodBuscar(_ocgNorm(_ir.cod));
+    if (hit) { _ir.cod = hit.cod; _ir.codNuevo = false; } else _ir.codNuevo = !!_ir.cod;
+  }
+  _irCxmAplicar(); _irChkPedir(); irRender();
+}
 function irSetM(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || n < 0) n = 0; _ir.masters = n; const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0) _ir.inner = n * cxm; irRender(); }
 function irChgM(d) { if (!_ir) return; irSetM(Math.max(0, (Number(_ir.masters) || 0) + d)); }
 function irSetI(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || n < 0) n = 0; _ir.inner = n; irRender(); }
 function irChgI(d) { if (!_ir) return; irSetI(Math.max(0, (Number(_ir.inner) || 0) + d)); }
-function irSetSec(v) { if (!_ir) return; _ir.sector = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9]/g, ""); irRender(); }
+/* ═══ v29.78 (Luis, 13/10) — PARTIR UN RACK EN EL MOMENTO ═══════════════════════════
+   «si alguien guarda algo a un rack que ya esta ocupado por otro codigo, promptee para decir
+    de que lado lo dejan … que separe ese rack en Izq y Der (una subdivision de racks)» ·
+   «pongamos la posibilidad de, por ejemplo, Y25-1, Y25-2, Y25-3».
+   Las partes se numeran de IZQUIERDA a DERECHA y la dirección es «Y25-2»: el operario la
+   elige acá, parado frente al rack. Lo escribe gv_rack_partir (queda en GV_Rack_Particion).
+   ⚠ Lo que YA estaba sin parte se muda a la parte que él diga: si quedara sin parte, nadie
+   sabría de qué lado está (y el guard RACKS_FALTA_PARTE frenaría el próximo movimiento). */
+function _irRackDe(secU) { return (_ir && _ir.rackDe && _ir.rackDe[secU]) || String(secU || "").replace(/-\d$/, ""); }
+function _irPartesDe(secU) { const rk = _irRackDe(secU); return Math.max(1, Number((_ir && _ir.partesDe && _ir.partesDe[rk]) || 1)); }
+function _irPartesLibres(rk) {
+  const out = [];
+  Object.keys((_ir && _ir.rackDe) || {}).forEach(function (sec) {
+    if (_ir.rackDe[sec] !== rk) return;
+    if (_ir.ocupados[sec]) return;
+    out.push(sec);
+  });
+  return out.sort(function (a, b) { return a.localeCompare(b, undefined, { numeric: true }); });
+}
+function _irOcupadoHtml(secU, ocupadoPor) {
+  const rk = _irRackDe(secU), n = _irPartesDe(secU);
+  let h = '<div class="ir-warn">⚠ <b>' + escapeHtml(secU) + '</b> ya está ocupado por <b>' + escapeHtml(ocupadoPor) + '</b>.';
+  if (n > 1) {
+    const libres = _irPartesLibres(rk);
+    h += '<br>' + escapeHtml(rk) + ' está dividido en <b>' + n + ' partes</b>: '
+      + (libres.length ? 'elegí una libre → ' + libres.map(function (x) { return '<button class="ir-chip" onclick="irSetSec(\'' + escapeHtml(x) + '\')">' + escapeHtml(x) + '</button>'; }).join("")
+                       : 'no quedan partes libres. Elegí otra posición.');
+    h += '</div>';
+    return h;
+  }
+  h += '<br>Si lo dejás <b>al lado, en el mismo rack</b>, dividí ' + escapeHtml(rk) + ' y decime en qué parte queda cada cosa:'
+    + '<div class="ir-libres" style="margin-top:6px">'
+    + [2, 3, 4].map(function (k) { return '<button class="ir-chip" onclick="irPartir(' + k + ')">✂ en ' + k + ' partes</button>'; }).join("")
+    + '</div><div class="ir-hint" style="margin:4px 0 0">Se numeran de <b>izquierda a derecha</b> (' + escapeHtml(rk) + '-1, ' + escapeHtml(rk) + '-2…). O elegí otra posición.</div></div>';
+  return h;
+}
+async function irRecargarPlani() {
+  const plani = await racksFetchPlani();
+  const seen = {}, libres = [], ocupados = {}, partesDe = {}, rackDe = {};
+  (plani || []).forEach(function (r) {
+    const sec = String(r.sector || "").trim().toUpperCase(); if (!sec) return;
+    const rk = String(r.rack || r.sector || "").trim().toUpperCase();
+    rackDe[sec] = rk; partesDe[rk] = Math.max(1, Number(r.partes) || 1);
+    if (String(r.estado) === "ocupado" && r.cod_art) ocupados[sec] = String(r.cod_art);
+  });
+  (plani || []).forEach(function (r) {
+    const sec = String(r.sector || "").trim(); if (!sec) return;
+    const secU = sec.toUpperCase(); if (seen[secU]) return; seen[secU] = true;
+    if (typeof _racksZonaInsumo === "function" && _racksZonaInsumo(sec)) return;
+    if (!ocupados[secU]) libres.push(sec);
+  });
+  libres.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
+  if (!_ir) return;
+  _ir.libres = libres; _ir.ocupados = ocupados; _ir.partesDe = partesDe; _ir.rackDe = rackDe;
+  _ir.cxm = await irFetchCxM(plani).catch(function () { return _ir.cxm; });
+}
+async function irPartir(n) {
+  if (!_ir) return;
+  const secU = String(_ir.sector || "").trim().toUpperCase(), rk = _irRackDe(secU);
+  const ocup = _ir.ocupados[secU] || "";
+  if (!rk || !ocup) return;
+  const p = prompt("¿En qué parte está el " + ocup + " que YA hay en " + rk + "?\n\n" +
+    "Las partes se cuentan de IZQUIERDA a DERECHA: 1 es la de la izquierda" + (n === 2 ? ", 2 la de la derecha." : ", " + n + " la de la derecha.") +
+    "\n\nEscribí 1 a " + n + ":", "1");
+  if (p == null) return;
+  const k = Math.max(1, Math.min(n, parseInt(p, 10) || 0));
+  if (!k) return;
+  if (!confirm("Divido " + rk + " en " + n + " partes y dejo el " + ocup + " en " + rk + "-" + k + ".\n\n¿Dale?")) return;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_rack_partir", { method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_sector: rk, p_partes: n, p_parte_actual: k,
+        p_motivo: "Guardado a racks: entraba otro código al lado", p_legajo: String(_ir.legajo || "") }) });
+    const txt = await r.text();
+    if (!r.ok) { alert("No se pudo dividir " + rk + ":\n" + txt); return; }
+    await irRecargarPlani();
+    const libres = _irPartesLibres(rk);
+    _ir.sector = libres[0] || (rk + "-" + (k === 1 ? 2 : 1));
+    irRender();
+    alert("✓ " + rk + " quedó en " + n + " partes. El " + ocup + " está en " + rk + "-" + k + " y vos vas a " + _ir.sector + ".");
+  } catch (e) { alert("No se pudo dividir " + rk + ": " + (e.message || e)); }
+}
+function irSetSec(v) { if (!_ir) return; _ir.sector = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9-]/g, ""); irRender(); }   // v29.78: el guión de la parte (Y25-2)
 function irSetEmp(e) { if (!_ir) return; _ir.emp = (e === "CH") ? "CH" : "LK"; irRender(); }
 /* v6.28 — Ingreso a racks NACIONAL: mover stock existente (a_guardar/excedente) a racks. */
+/* v29.100 (Luis, 13/10) — EL ERROR QUE ESTO VIENE A EVITAR: el 13/10 el 934E (1 master, 12 cajas)
+   y el 606E (10) entraron por «Ingreso directo» cuando esas cajas ya estaban en A guardar, así que
+   el stock quedó contado DOS veces (A guardar 12 + racks 12) y nadie se enteró hasta que Luis lo vio
+   en Stocks. El aviso no frena: ofrece el camino correcto con un toque. */
+function _irSaldoAGuardar(cod) {
+  if (!_ir || !_ir.saldos || !cod) return null;
+  const k = _ocgNorm(cod);
+  let ag = 0, ex = 0, hit = false;
+  Object.keys(_ir.saldos).forEach(function (key) {
+    if (_ocgNorm(String(key).replace(/\s+(LK|CH)$/i, "")) !== k) return;
+    const e = _ir.saldos[key] || {};
+    ag += Number(e.a_guardar) || 0; ex += Number(e.excedente) || 0; hit = true;
+  });
+  if (!hit) return null;
+  return { a_guardar: Math.max(0, ag), excedente: Math.max(0, ex) };
+}
+function _irAvisoAGuardar() {
+  if (!_ir || _ir.modo === "nacional" || !_ir.cod) return "";
+  const s = _irSaldoAGuardar(_ir.cod); if (!s) return "";
+  const ag = Math.round(s.a_guardar), ex = Math.round(s.excedente);
+  if (ag < 1 && ex < 1) return "";
+  const org = ag >= 1 ? "a_guardar" : "excedente";
+  const txt = ag >= 1 ? ag + " caja" + (ag === 1 ? "" : "s") + " en <b>A guardar</b>"
+                      : ex + " caja" + (ex === 1 ? "" : "s") + " en <b>Excedente</b>";
+  return '<div class="ir-warn">⚠ Este código ya tiene ' + txt + '.<br>'
+    + 'Si <b>son esas mismas cajas</b>, esto NO es un ingreso directo: se contarían dos veces.'
+    + '<button class="ir-chip on" style="display:block;margin-top:8px" onclick="irDesdeAGuardar()">📥 Moverlas desde ' + (org === "excedente" ? "Excedente" : "A guardar") + '</button></div>';
+}
+function irDesdeAGuardar() {
+  if (!_ir) return;
+  const cod = _ir.cod, s = _irSaldoAGuardar(cod);
+  const org = (s && Math.round(s.a_guardar) >= 1) ? "a_guardar" : "excedente";
+  const sec = _ir.sector;
+  irSetModo("nacional"); _ir.origen = org; _ir.sector = sec;
+  const k = _ocgNorm(cod);
+  const key = Object.keys(_ir.saldos || {}).filter(function (x) {
+    return _ocgNorm(String(x).replace(/\s+(LK|CH)$/i, "")) === k && (Number((_ir.saldos[x] || {})[org]) || 0) > 0;
+  })[0];
+  if (key) { _ir.cod = key; _ir.codPick = key; }
+  irRender();
+}
 function _irDisp(cod, origen) { if (!_ir || !_ir.saldos || !cod) return 0; const e = _ir.saldos[String(cod)]; if (!e) return 0; return Math.max(0, Number(e[origen === "excedente" ? "excedente" : "a_guardar"]) || 0); }
-function irSetModo(m) { if (!_ir) return; _ir.modo = (m === "nacional" ? "nacional" : "import"); _ir.cod = ""; _ir.codPick = ""; _ir.masters = 0; _ir.inner = 0; irRender(); }
+function irSetModo(m) { if (!_ir) return; _ir.modo = (m === "nacional" ? "nacional" : "import"); _ir.cod = ""; _ir.codPick = ""; _ir.codNuevo = false; _ir.masters = 0; _ir.inner = 0; _ir.chk = null; irRender(); }
 function irSetOrigen(o) { if (!_ir) return; _ir.origen = (o === "excedente" ? "excedente" : "a_guardar"); _ir.cod = ""; _ir.inner = 0; irRender(); }
-function irSetPick(v) { if (!_ir) return; _ir.codPick = String(v == null ? "" : v); irRender(); }
-function irPickCod(codEnc) { if (!_ir) return; const cod = decodeURIComponent(codEnc); _ir.cod = cod; const disp = _irDisp(cod, _ir.origen); if (Number(_ir.inner) > disp) _ir.inner = disp; irRender(); }
+function irSetPick(v) {
+  if (!_ir) return;
+  _ir.codPick = String(v == null ? "" : v);
+  /* v29.77 — en Importación lo tipeado es la BÚSQUEDA: el código queda elegido sólo si coincide EXACTO
+     con uno que existe (así tipear el código entero sigue andando sin tocar la lista) o si lo tocan en
+     la lista. El «usar igual» (código nuevo) se mantiene mientras no cambie el texto. */
+  if (_ir.modo !== "nacional") {
+    const k = _ocgNorm(_ir.codPick);
+    if (!(_ir.codNuevo && _ocgNorm(_ir.cod) === k && k)) {
+      const hit = k ? _irCodBuscar(k) : null;
+      _ir.cod = hit ? hit.cod : "";
+      _ir.codNuevo = false;
+    }
+    _irCxmAplicar();
+    _irChkPedir();
+  }
+  irRender();
+}
+function _irCxmAplicar() { if (!_ir) return; const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0 && Number(_ir.masters) > 0) _ir.inner = Number(_ir.masters) * cxm; }
+function _irCodBuscar(k) {
+  if (!_ir || !k) return null;
+  const arr = _ir.cods || [];
+  for (let i = 0; i < arr.length; i++) if (arr[i].k === k) return arr[i];
+  return null;
+}
+function irPickCod(codEnc) {
+  if (!_ir) return;
+  const cod = decodeURIComponent(codEnc);
+  _ir.cod = cod; _ir.codNuevo = false;
+  if (_ir.modo === "nacional") { const disp = _irDisp(cod, _ir.origen); if (Number(_ir.inner) > disp) _ir.inner = disp; }
+  else { _ir.codPick = codBase(cod); _irCxmAplicar(); _irChkPedir(); }
+  irRender();
+}
+/* v29.77 — la salida: un importado que todavía no está en ningún maestro (el alta va por Importación →
+   ➕ Agregar / modificar). No se ofrece si lo tipeado es una POSICIÓN de rack o un código de baja: eso
+   lo frena el candado de la v29.67, que es el caso que originó todo (AB3). */
+function irCodNuevo() {
+  if (!_ir) return;
+  const k = _irNorm(_ir.codPick); if (!k) return;
+  _ir.cod = k; _ir.codNuevo = true; _irCxmAplicar(); _irChkPedir(); irRender();
+}
+function _irListaImp() {
+  if (!_ir) return "";
+  const arr0 = _ir.cods || [];
+  const f = String(_ir.codPick || "").toLowerCase().trim();
+  const chk = (_ir.chk && _ir.chk.cod === _irCodEfe()) ? _ir.chk : null;
+  if (!arr0.length) return '';   // la lectura falló: el campo queda libre con el candado de la v29.67
+  if (!f) return '<div class="ir-desc" style="color:#64748b">Escribí el <b>código</b> o el <b>nombre</b> y te sugiero los que existen (' + arr0.length + ' códigos · 🚢 = importado).</div>';
+  const arr = arr0.filter(function (x) { return (x.cod + " " + x.nom).toLowerCase().indexOf(f) >= 0; });
+  if (!arr.length) {
+    let v = '<div class="ir-warn" style="background:#fffbeb;border-color:#fcd34d;color:#92400e">⚠ No hay ningún código que coincida con "' + escapeHtml(_ir.codPick) + '".</div>';
+    if (!_irChkMal(chk)) v += '<button class="gv-anular" style="border-color:#fcd34d;color:#92400e;margin:-4px 0 11px" onclick="irCodNuevo()">✎ Cargar «' + escapeHtml(_irNorm(_ir.codPick)) + '» igual (código nuevo)</button>';
+    return v;
+  }
+  const kSel = _ocgNorm(_ir.cod);
+  let h = '<div style="max-height:190px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;margin:-2px 0 11px;">';
+  arr.slice(0, 40).forEach(function (x) {
+    const on = kSel && x.k === kSel;
+    h += '<button onclick="irPickCod(\'' + encodeURIComponent(x.cod) + '\')" style="display:flex;width:100%;align-items:baseline;gap:8px;padding:8px 10px;border:none;border-bottom:1px solid #f1f5f9;background:' + (on ? "#0e7490" : "#fff") + ';color:' + (on ? "#fff" : "#0f172a") + ';cursor:pointer;text-align:left;font-size:13.5px;">'
+      + '<span style="font-family:Consolas,Menlo,monospace;font-weight:800;">' + escapeHtml(x.cod) + '</span>'
+      + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:' + (on ? "#e0f2fe" : "#475569") + ';">' + escapeHtml(x.nom || "—") + '</span>'
+      + (x.imp ? '<span style="white-space:nowrap;font-size:12px;">🚢</span>' : '') + '</button>';
+  });
+  if (arr.length > 40) h += '<div class="ir-more" style="padding:7px 10px;">+' + (arr.length - 40) + ' más — afiná la búsqueda</div>';
+  h += '</div>';
+  return h;
+}
 function _irListaNac() {
   if (!_ir) return "";
   const orig = _ir.origen === "excedente" ? "excedente" : "a_guardar";
@@ -30297,13 +31119,16 @@ function _irListaNac() {
 /* Paso de revisión (v5.69): "Revisar carga →" no escribe nada — muestra un resumen
    y recién ahí "✓ Confirmar carga" ejecuta irCargar(). "← Volver" vuelve al formulario
    con los datos intactos para corregir antes de confirmar. */
-function irRevisar() {
+async function irRevisar() {
   if (!_ir) return;
   const codN = _irNorm(_ir.cod), secU = String(_ir.sector || "").trim().toUpperCase();
   const ocupadoPor = _ir.ocupados[secU] || "";
   const sectorOcupadoOtro = ocupadoPor && _irNorm(ocupadoPor) !== codN;
   if (!codN || !(Number(_ir.inner) > 0) || !secU || sectorOcupadoOtro) return;
   if (_ir.modo === "nacional") { const disp = _irDisp(_ir.cod, _ir.origen); if (!(disp > 0) || Number(_ir.inner) > disp) return; }
+  // v29.67: el candado del código (D2) — acá es donde frena, aunque el chequeo de fondo no haya llegado
+  if (_ir.modo !== "nacional" && !(await _irCodGuard(codN))) return;
+  if (!_ir) return;
   _ir.confirming = true; irRender();
 }
 function irVolver() { if (!_ir) return; _ir.confirming = false; irRender(); }
@@ -30360,6 +31185,7 @@ async function irCargar() {
   const cxmv = _ir.cxm[cod] || 0;
   const masters = nac ? (cxmv > 0 ? Math.floor(inner / cxmv) : 0) : (Number(_ir.masters) || 0);
   if (!cod || !sector || inner <= 0) return;
+  if (!nac && _irChkMal(_ir.chk && _ir.chk.cod === cod ? _ir.chk : null)) { try { alert("Revisá el código " + cod + " antes de cargar."); } catch (_e) {} return; }   // v29.67
   const origTxt = _ir.origen === "excedente" ? "excedente" : "a guardar";
   if (nac) { const disp = _irDisp(_ir.cod, _ir.origen); if (inner > disp) { try { alert("No hay tantas: solo hay " + Math.round(disp) + " cajas de " + cod + " en " + origTxt + "."); } catch (_e) {} return; } }
   let res = "";
@@ -30388,7 +31214,7 @@ async function irCargar() {
   // nacional: descontar del saldo local (origen −, racks +) para refrescar el buscador
   if (nac && _ir.saldos && _ir.saldos[_ir.cod]) { const key = _ir.origen === "excedente" ? "excedente" : "a_guardar"; _ir.saldos[_ir.cod][key] = (Number(_ir.saldos[_ir.cod][key]) || 0) - inner; _ir.saldos[_ir.cod].racks = (Number(_ir.saldos[_ir.cod].racks) || 0) + inner; }
   _ir.done.push({ cod: cod, sector: sector, masters: masters, inner: inner, nac: nac ? origTxt : "" });
-  _ir.cod = ""; _ir.codPick = ""; _ir.masters = 0; _ir.inner = 0; _ir.sector = (_ir.libres[0] || ""); _ir.confirming = false;
+  _ir.cod = ""; _ir.codPick = ""; _ir.codNuevo = false; _ir.masters = 0; _ir.inner = 0; _ir.sector = (_ir.libres[0] || ""); _ir.confirming = false; _ir.chk = null;
   irRender();
   try { alert("✓ " + (nac ? "Trasladado" : "Cargado") + ": " + inner + " cajas de " + cod + " → " + sector + (nac ? " (desde " + origTxt + ")" : "") + "."); } catch (_e) {}
 }
@@ -33872,14 +34698,27 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     "?tipo=eq.baja_racks&deposito=in.(racks,racks_ch)" +
     "&ts=gte." + encodeURIComponent(dayStartIso) + "&ts=lte." + encodeURIComponent(dayEndIso) +
     "&order=ts.asc&limit=5000&select=legajo,ts";
-  const [r, rf, rfj, nombres, historic, rkMov] = await Promise.all([
+  /* v29.90 (Luis, 13/10): quiénes ENTRARON a la app ese día (cualquier método de login).
+     Es la MISMA fuente que el CTE `login_dia` de gv_monitor_horas_operario_dia, así que el
+     front y la vista filtran igual. Best-effort: si falla, el Set queda vacío y NO se filtra
+     a nadie (una lectura rota no es "nadie se logueó"). */
+  const logUrl = SUPABASE_URL + "/rest/v1/rpc/gv_monitor_logueados" +
+    "?p_desde=" + encodeURIComponent(dayStartIso) +
+    "&p_hasta=" + encodeURIComponent(new Date(new Date(`${dayKey}T00:00:00-03:00`).getTime() + 24*3600*1000).toISOString());
+  const [r, rf, rfj, nombres, historic, rkMov, logRows] = await Promise.all([
     fetch(evUrl,    { headers }),
     fetch(fichUrl,  { headers }),
     fetch(fjPrevUrl,{ headers }),
     getEmpleadosNombres(),
     getHistoricMap(),
-    fetch(rkUrl, { headers }).then(function (x) { return x.ok ? x.json() : []; }).catch(function () { return []; })
+    fetch(rkUrl, { headers }).then(function (x) { return x.ok ? x.json() : []; }).catch(function () { return []; }),
+    fetch(logUrl, { headers }).then(function (x) { return x.ok ? x.json() : []; }).catch(function () { return []; })
   ]);
+  const _logueados = new Set();
+  (Array.isArray(logRows) ? logRows : []).forEach(function (x) {
+    const l = String((x && (x.legajo != null ? x.legajo : x)) || "").trim();
+    if (l) _logueados.add(l);
+  });
   if (!r.ok)  throw new Error("Eventos HTTP " + r.status);
   if (!rf.ok) throw new Error("Fichadas HTTP " + rf.status);
   // FJ del día anterior por operario (el último de ese día). best-effort:
@@ -34115,7 +34954,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
      picking/armado de ESA tanda. Un evento automatico (PKC, ENT, TAL, GST, MGR, *X...) no corta la cola; un
      tramo que ya estaba abierto al cerrar (ts_inicio antes del TP/TAP) la deja en 0; una bajada de racks sin
      tramo la corta (ese tramo ya cuenta como racks); un segundo TP/TAP de la MISMA tanda no la corta. */
-  const COLA_AUTO = new Set(["PUB","AUB","PKC","ENT","RSP","ROC","RAG","FGU","FSS","IMPT","TAL","GST","MGR","PKM","SSG","PSP","NPD","PKAX"]);
+  const COLA_AUTO = new Set(["PUB","AUB","PKC","ENT","RSP","ROC","RAG","FGU","FSS","IMPT","TAL","GST","MGR","PKM","SSG","PSP","PKG","NPD","PKAX","AUI"]);
   const _colaEvs = new Map(), _colaRk = new Map();
   for (const ev of events) {
     const leg = String(ev.legajo || "").trim();
@@ -34471,6 +35310,11 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     const _frP = p.pickFrTandas || new Set(), _frA = p.armFrTandas || new Set();
     if (p.pickedTandas.size === 0 && p.armedTandas.size === 0 && _frP.size === 0 && _frA.size === 0
         && p.ccTandas.size === 0 && p.movMs === 0 && p.otrosProdMs === 0 && !p.abiertoProdMs) continue;
+    /* v29.90 (Luis, 13/10): en el monitor sólo van los legajos que SE LOGUEARON ese día
+       (trabajador o entrevista). Un evento suelto desde el admin no es un operario en jornada.
+       Mismo criterio que gv_monitor_horas_operario_dia. Fail-open: con el Set vacío (lectura
+       rota, o día sin logins registrados — o sea antes del 30/09) no se filtra a nadie. */
+    if (_logueados.size > 0 && !_logueados.has(String(leg).trim())) continue;
     // v26.67: de una tanda frenada, sólo la parte de ESTE legajo en ESTE día (gvCreditoDe); el resto, entera
     [["picking", p.pickedDetail], ["armado", p.armedDetail]].forEach(function (fd) {
       const visto = new Set();
@@ -46697,14 +47541,15 @@ async function qbpLoadBadge() {
     // v22.39 — además del badge de SOS, la tarjeta de HORAS DE GUARDADO PENDIENTES en el
     // propio botón (mismo cálculo que ¿Qué bajar primero?: cajas que ENTRAN ahora a góndola
     // ÷ cajas/h). Se traen cxm y ratio para que coincida con la pantalla, no una cuenta aparte.
-    var res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
+    var res = await Promise.all([stockFetchSaldos(), rkbFetchCapacidad(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.guardado_cajas_por_hora&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })]);
-    var saldos = res[0] || {}, capMap = res[1] || {}, cxmMap = (res[2] && res[2].cxm) || {}, _facG = res[3] || {}, _noG = res[4] || {}, n = 0, totCajas = 0;
+    // v29.64 (D5) - la misma capacidad por empresa que la pantalla, o el badge y la lista no coinciden.
+    var saldos = res[0] || {}, capObj = res[1] || { pelada: {}, porEmp: {} }, cxmMap = (res[2] && res[2].cxm) || {}, _facG = res[3] || {}, _noG = res[4] || {}, n = 0, totCajas = 0;
     var _rateRow = (res[5] && res[5][0]) || null; var rate = _rateRow ? parseFloat(_rateRow.valor) : 380; if (!(rate > 0)) rate = 380;
     Object.keys(saldos).forEach(function (k) {
       var a = saldos[k];
       if (_noG[_ocgNorm(a.cod)]) return;   // v24.52 — a liquidar: ni SOS ni horas de guardado
-      var cap = Math.round(capMap[_ocgNorm(a.cod)] || 0); if (cap <= 0) return;
+      var cap = Math.round(_rkbCapDe(a.cod, capObj)); if (cap <= 0) return;
       var back = Math.round((Number(a.a_guardar) || 0) + (Number(a.excedente) || 0) + (Number(a.racks) || 0));
       if (back > 0 && (Math.round(Number(a.terminado) || 0)) / cap < 0.20) n++;   // SOS: góndola < 20% con stock atrás
       if (back <= 0) return;
@@ -47940,6 +48785,7 @@ function pmapBuscar(v) {
   const inp = document.getElementById("pmapSearch");
   if (inp && inp.value !== v && v != null) inp.value = v;
   if (_pmapModo === "rack") { prkSaltar(); pmapRender(); return; }
+  if (_pmapModo === "scp") { pscpSaltar(); pmapRender(); return; }
   if (_pmapQ) {
     const hayAca = (_pmap || []).some(function (r) {
       return String(r.gondola || "").toUpperCase() === _pmapG && pmapMatch(r, _pmapQ);
@@ -47958,6 +48804,11 @@ function pmapRender() {
   const vj = document.getElementById("pmapVieja");
   pmapAlertaRender();
   if (_pmapModo === "rack") { if (vj) vj.style.display = "none"; prkRender(); prkDesfaseRender(); return; }
+  if (_pmapModo === "scp") {
+    if (vj) vj.style.display = "none";
+    const dz0 = document.getElementById("prkDesfase"); if (dz0) dz0.hidden = true;
+    pscpRender(); return;
+  }
   if (vj) vj.style.display = "";
   const dz = document.getElementById("prkDesfase"); if (dz) dz.hidden = true;
   if (!_pmap) { box.innerHTML = '<div class="planim-empty">Cargando…</div>'; return; }
@@ -48113,25 +48964,36 @@ function pmapCellHtml(g, n, porCelda) {
    Una posición de Racks_Planimetria que no existe como rack en GV_Lugar sale igual, en
    amarillo ("sin_lugar"), para que no quede escondida. */
 function pmapModo(m) {
-  _pmapModo = (m === "rack") ? "rack" : "gondola";
-  const g = document.getElementById("pmapModoG"), r = document.getElementById("pmapModoR");
+  /* v29.98 (Luis, 13/10) — TRES clases de lugar: góndola · rack · SC y SP (la grilla IN-A1…IN-L6,
+     que son las piezas de Cervantes y NO racks). Cada una tiene su modo y su vista. */
+  _pmapModo = (m === "rack") ? "rack" : (m === "scp" ? "scp" : "gondola");
+  const g = document.getElementById("pmapModoG"), r = document.getElementById("pmapModoR"),
+        sc = document.getElementById("pmapModoS");
   if (g) g.classList.toggle("pmap-modo-on", _pmapModo === "gondola");
   if (r) r.classList.toggle("pmap-modo-on", _pmapModo === "rack");
+  if (sc) sc.classList.toggle("pmap-modo-on", _pmapModo === "scp");
   const inp = document.getElementById("pmapSearch");
   if (inp) inp.placeholder = _pmapModo === "rack"
     ? "🔍 Código (438E, 505…), posición (X05) o descripción"
-    : "🔍 Código (438E, 505…), celda (F13) o descripción";
+    : (_pmapModo === "scp"
+        ? "🔍 Código de pieza (A4, DISC1…), celda (IN-A1 o A1) o descripción"
+        : "🔍 Código (438E, 505…), celda (F13) o descripción");
   if (_pmapModo === "rack" && !_prk) {
     pmapSetStatus("Cargando los racks…", true);
     prkFetch().then(function () { prkSaltar(); pmapRender(); });
   }
   if (_pmapModo === "rack") prkSaltar();
+  if (_pmapModo === "scp") {
+    if (!_pscp) { pmapSetStatus("Cargando SC y SP…", true); pscpFetch().then(function () { pscpSaltar(); pmapRender(); }); }
+    else pscpSaltar();
+  }
   pmapRender();
 }
 async function prkFetch() {
   // v22.77: Racks_Planimetria es una VISTA — la cantidad sale del libro de stock (ubicacion = sector).
   const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_rack_celda",
-    "select=sector,rack,orden,empresa,uso,cod,descripcion,master_cajas,innercajas,estado,fuente,motivo,revisar_id&order=rack.asc,sector.asc");
+    // v29.78: pos_rack/parte/partes — `sector` ES la DIRECCIÓN (Y25 o Y25-2)
+    "select=sector,rack,orden,empresa,uso,cod,descripcion,master_cajas,innercajas,estado,fuente,motivo,revisar_id,pos_rack,parte,partes&order=rack.asc,sector.asc");
   if ((filas && filas.length) || !_prk) _prk = filas || [];
   try {
     const rev = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Rack_Revisar",
@@ -48145,10 +49007,15 @@ async function prkFetch() {
 }
 function prkNum(sec) { const m = String(sec || "").match(/(\d+)/); return m ? Number(m[1]) : 0; }
 function prkRacks() {
+  /* v29.98: las celdas de SC y SP (IN-A1…) tienen su propio modo; acá no son un rack. */
   const seen = {}, out = [];
-  (_prk || []).forEach(function (r) { const k = String(r.rack || "").toUpperCase(); if (k && !seen[k]) { seen[k] = 1; out.push(k); } });
+  (_prk || []).forEach(function (r) {
+    if (_scpEsCelda(r.sector)) return;
+    const k = String(r.rack || "").toUpperCase(); if (k && !seen[k]) { seen[k] = 1; out.push(k); }
+  });
   return out.sort(function (a, b) { return a.localeCompare(b, "es"); });
 }
+function _scpEsCelda(sec) { return /^IN[-\s]/i.test(String(sec || "")); }
 function prkMatch(r, q) {
   if (!q) return false;
   if (r._ins && r._ins.some(function (x) { return prkMatch(x, q); })) return true;
@@ -48313,6 +49180,8 @@ function prkAbrir(sector) {
     '<div class="prk-btns">' +
       '<button class="planim-btn-save" onclick="prkGuardar(' + secJ + ',false)">💾 Guardar</button>' +
       (libre ? "" : '<button class="prk-vaciar" onclick="prkGuardar(' + secJ + ',true)">🗑 Vaciar posición</button>') +
+      '<button class="prk-vaciar" style="background:#e0f2fe;border-color:#7dd3fc;color:#075985" onclick="prkPartir(' + secJ + ')">' +
+        (Number(r.partes) > 1 ? '✂ Partes (' + Number(r.partes) + ')' : '✂ Partir') + '</button>' +
     '</div>' +
     '<div class="prk-nota">Guardar deja en el stock de racks lo que hay en ESTA posición (ajusta por la diferencia) y cierra lo que tenía «a contar».</div>' +
     prkInsHtml(sector, ins);
@@ -48385,6 +49254,199 @@ async function prkInsUbicarGuardar(cod, refId) {
   const body = { p_cod: cod, p_cantidad: q ? Number(q.value || 0) : 0 };
   if (refId != null) body.p_reemplaza_id = refId;
   await prkInsEscribir(sec, body, "✓ " + cod + " quedó en " + sec + ".");
+}
+/* ===== v29.98 (Luis, 13/10) — SC y SP: la TERCERA clase de lugar del depósito =====
+   Luis: "en el deposito tenes diferentes cosas: Gondolas / Racks / Sector SC y SP. Sector SC y SP
+   usa un nomenclador similar al de gondolas y racks y puede que la confusion surja de ahi" ·
+   "hagamos que sea su propio sector, lugar. IN-A1 por ejemplo".
+
+   SC = Sector Crudo · SP = Sector Procesado: la mesa de trabajo de Cervantes (GP2) adentro del
+   depósito. Su grilla es de UN DÍGITO (A1…L6) y por eso se pisaba con la góndola A01, con el rack
+   AD05 y —lo peor— con el CÓDIGO de la pieza (D4 es una celda Y un código; N7 también).
+   Desde la v29.98 la celda se llama IN-A1 y vive en GV_Lugar con tipo 'scp': gv_rack_sector YA NO
+   la resuelve (así Ingreso a racks no la ofrece nunca) y la resuelve gv_scp_sector.
+   NO guarda cajas de artículo: lo que hay en cada celda son piezas del módulo de Insumos
+   (categorías partes_crudo / parte_procesado), y se escribe por la MISMA RPC que las de racks
+   (gv_insumo_posicion_guardar → Insumos_Ubicaciones), que es lo que lee el módulo de Insumos. */
+let _pscp = null, _pscpC = "";
+async function pscpFetch() {
+  const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_scp_celda",
+    "select=sector,col,fila,cod,descripcion,categoria,sec_gp2,cantidad,stock,unidad,estado&order=col.asc,fila.asc");
+  if ((filas && filas.length) || !_pscp) _pscp = filas || [];
+  return _pscp;
+}
+function pscpCols() {
+  const seen = {}, out = [];
+  (_pscp || []).forEach(function (r) { const k = String(r.col || "").toUpperCase(); if (k && !seen[k]) { seen[k] = 1; out.push(k); } });
+  return out.sort(function (a, b) { return a.length - b.length || a.localeCompare(b, "es"); });
+}
+function pscpMatch(r, q) {
+  if (!q) return false;
+  return String(r.cod || "").toUpperCase().indexOf(q) >= 0 ||
+         String(r.sector || "").toUpperCase().indexOf(q) >= 0 ||
+         String(r.descripcion || "").toUpperCase().indexOf(q) >= 0;
+}
+function pscpSaltar() {
+  if (!_pmapQ || !_pscp) return;
+  const aca = _pscp.some(function (r) { return String(r.col || "").toUpperCase() === _pscpC && pscpMatch(r, _pmapQ); });
+  if (aca) return;
+  const otra = _pscp.filter(function (r) { return pscpMatch(r, _pmapQ); })[0];
+  if (otra) _pscpC = String(otra.col || "").toUpperCase();
+}
+function pscpGo(c) { _pscpC = String(c || "").toUpperCase(); pmapRender(); }
+/* Junta las filas de una misma celda: una celda puede tener más de una pieza anotada. */
+function pscpGrupos(filas) {
+  const por = {}, orden = [];
+  (filas || []).forEach(function (r) {
+    const k = String(r.sector || "").toUpperCase();
+    if (!por[k]) { por[k] = []; orden.push(k); }
+    por[k].push(r);
+  });
+  return orden.map(function (k) {
+    const fs = por[k];
+    return Object.assign({}, fs[0], { _mas: fs.slice(1) });
+  });
+}
+function pscpCellHtml(r) {
+  const sec = String(r.sector || ""), libre = r.estado === "libre";
+  const hit = _pmapQ && (pscpMatch(r, _pmapQ) || (r._mas || []).some(function (x) { return pscpMatch(x, _pmapQ); }));
+  const cls = libre ? "pmap-libre" : "";
+  let cuerpo, tip = sec;
+  if (libre) { cuerpo = '<span class="pmap-cod">libre</span>'; tip += " · celda libre"; }
+  else {
+    /* v30.04 (Luis: "no importa SP o SC, ese sector tiene de los dos … no te compliques mas que
+       eso"): la celda NO se rotula por sector. Es IN-<letra><número> y punto. */
+    const st = Number(r.stock);
+    cuerpo = '<span class="pmap-cod">' + escapeHtml(String(r.cod || "—")) + '</span>' +
+             (isNaN(st) ? "" : '<span class="prk-mc">' + pmapNum(st) + (r.unidad ? " " + escapeHtml(r.unidad) : "") + '</span>');
+    tip += " · " + String(r.cod || "") + (r.descripcion ? " — " + r.descripcion : " (no está en Insumos)") +
+           (isNaN(st) ? "" : " · " + st + " " + (r.unidad || "") + " en stock");
+  }
+  if (r._mas && r._mas.length) {
+    cuerpo += '<span class="prk-mc">+' + r._mas.length + ': ' +
+      escapeHtml(r._mas.map(function (x) { return String(x.cod || ""); }).join(", ")) + '</span>';
+    tip += " · también: " + r._mas.map(function (x) { return String(x.cod || ""); }).join(", ");
+  }
+  return '<div class="pmap-cell ' + cls + (hit ? " pmap-hit" : "") + '" title="' + escapeHtml(tip) + '"' +
+         ' onclick="pscpAbrir(' + JSON.stringify(sec).replace(/"/g, "&quot;") + ')">' +
+         '<span class="pmap-sec">' + escapeHtml(sec.replace(/^IN-/, "")) + '</span>' + cuerpo + '</div>';
+}
+function pscpRender() {
+  const tabs = document.getElementById("pmapTabs"), box = document.getElementById("pmapGrid"),
+        leg = document.getElementById("pmapLeg");
+  if (!box) return;
+  if (!_pscp) { box.innerHTML = '<div class="planim-empty">Cargando…</div>'; if (tabs) tabs.innerHTML = ""; if (leg) leg.innerHTML = ""; return; }
+  const cs = pscpCols();
+  if (!cs.length) {
+    if (tabs) tabs.innerHTML = ""; if (leg) leg.innerHTML = "";
+    box.innerHTML = '<div class="planim-empty">No pude leer SC y SP (sin conexión, o falta la vista <b>gv_scp_celda</b> — sql/gv_sector_scp_v2998.sql).</div>';
+    pmapSetStatus(""); return;
+  }
+  if (!_pscpC || cs.indexOf(_pscpC) < 0) _pscpC = cs[0];
+  const hits = {};
+  if (_pmapQ) _pscp.forEach(function (r) { if (pscpMatch(r, _pmapQ)) { const k = String(r.col || "").toUpperCase(); hits[k] = (hits[k] || 0) + 1; } });
+  if (tabs) tabs.innerHTML = cs.map(function (k) {
+    const n = hits[k] || 0;
+    return '<button class="lug-tab' + (k === _pscpC ? " lug-tab-on" : "") + (n ? " pmap-tab-hit" : "") + '"' +
+           ' onclick="pscpGo(' + JSON.stringify(k).replace(/"/g, "&quot;") + ')">' +
+           escapeHtml(k) + (n ? ' <b>' + n + '</b>' : "") + '</button>';
+  }).join("");
+  const rows = pscpGrupos(_pscp.filter(function (r) { return String(r.col || "").toUpperCase() === _pscpC; }))
+    .sort(function (a, b) { return (Number(a.fila) || 0) - (Number(b.fila) || 0); });
+  const lib = rows.filter(function (r) { return r.estado === "libre"; }).length;
+  let h = '<div class="pmap-head">Columna <b>' + escapeHtml(_pscpC) + '</b> · ' + rows.length + ' celdas' +
+          (lib ? ' · ' + lib + ' libres' : "") + '</div>';
+  h += '<div class="pmap-wrap"><div class="pmap-cols">' + rows.map(pscpCellHtml).join("") + '</div></div>';
+  box.innerHTML = h;
+  if (leg) {
+    const it = function (cls, txt, c) { return '<span><i class="pmap-sw ' + cls + '"></i>' + txt + ' <b>' + c + '</b></span>'; };
+    leg.innerHTML = it("", "piezas anotadas", _pscp.filter(function (r) { return r.cod; }).length) +
+                    it("pmap-libre", "celda libre", _pscp.filter(function (r) { return r.estado === "libre"; }).length) +
+                    '<span>el stock de cada pieza lo lleva <b>GP2</b> (Cervantes): acá se dice DÓNDE está</span>';
+  }
+  pmapSetStatus(cs.length + " columnas · " + _pscp.length + " piezas anotadas en " +
+    Object.keys(_pscp.reduce(function (a, r) { a[r.sector] = 1; return a; }, {})).length + " celdas" +
+    (_pmapQ ? (function () {
+      const q = Object.keys(hits).reduce(function (a, k) { return a + hits[k]; }, 0);
+      return " · " + q + (q === 1 ? " celda" : " celdas") + ' con "' + _pmapQ + '"';
+    })() : ""));
+}
+/* Tocar una celda abre su editor. Se escribe por gv_insumo_posicion_guardar — la MISMA RPC que las
+   posiciones de racks de insumo— así que el módulo de Insumos lo ve al toque. */
+function pscpAbrir(sector) {
+  const m = document.getElementById("pmapCeldaModal"), tit = document.getElementById("pmapCeldaTit"),
+        box = document.getElementById("pmapCeldaBody");
+  if (!m || !tit || !box) return;
+  const fs = (_pscp || []).filter(function (x) { return String(x.sector) === String(sector) && x.cod; });
+  _pmapCelda = sector; pmapCeldaStatus("");
+  tit.textContent = "Celda " + sector;
+  const S = JSON.stringify(String(sector)).replace(/"/g, "&quot;");
+  let h = '<div class="prk-det"><b>' + escapeHtml(String(sector)) + '</b> — acá NO van cajas de artículo: ' +
+    'son piezas de Cervantes. El saldo de cada una lo lleva GP2; esto dice dónde está.</div>' +
+    '<div class="prk-ins"><b>Piezas en esta celda</b>';
+  if (!fs.length) h += '<div class="prk-nota" style="margin-top:4px">Ninguna.</div>';
+  fs.forEach(function (x, k) {
+    const C = JSON.stringify(String(x.cod || "")).replace(/"/g, "&quot;");
+    h += '<div class="prk-ins-row"><span><b>' + escapeHtml(String(x.cod || "")) + '</b>' +
+      (x.descripcion ? ' — ' + escapeHtml(x.descripcion) : ' <span style="color:#b45309">(no está en Insumos)</span>') + '</span>' +
+      '<button class="prk-vaciar" onclick="pscpQuitar(' + S + ',' + C + ')">🗑 Quitar</button></div>';
+  });
+  h += '<div class="prk-ins-row"><input class="planim-inp" id="pscpNuevo" type="text" placeholder="Código de pieza (A4, DISC1…)" style="width:170px" oninput="this.value=this.value.toUpperCase()">' +
+    '<button class="planim-btn-save" onclick="pscpAgregar(' + S + ')">﹢ Agregar</button></div>' +
+    '<div class="prk-nota">Se guarda en Insumos_Ubicaciones por gv_insumo_posicion_guardar: es lo que ve el módulo de Insumos.</div></div>';
+  box.innerHTML = h;
+  m.classList.add("show");
+}
+async function pscpEscribir(sector, body, okMsg) {
+  pmapCeldaStatus("Guardando…", true);
+  const r = await pmapRpc("gv_insumo_posicion_guardar", Object.assign({ p_sector: sector }, body));
+  if (!r.ok) { pmapCeldaStatus("No se guardó: " + r.err, false); return false; }
+  await pscpFetch(); pmapRender();
+  pscpAbrir((r.data && r.data.sector) || sector);
+  pmapCeldaStatus(okMsg, true);
+  return true;
+}
+async function pscpAgregar(sector) {
+  const c = document.getElementById("pscpNuevo");
+  const cod = c ? String(c.value || "").trim() : "";
+  if (!cod) { pmapCeldaStatus("Escribí el código de la pieza.", false); return; }
+  await pscpEscribir(sector, { p_cod: cod, p_cantidad: 0 }, "✓ " + cod + " quedó en " + sector + ".");
+}
+async function pscpQuitar(sector, cod) {
+  if (!confirm("¿Sacar " + cod + " de " + sector + "?")) return;
+  await pscpEscribir(sector, { p_cod: cod, p_cantidad: 0, p_quitar: true }, "✓ " + cod + " salió de " + sector + ".");
+}
+/* v29.78 (Luis, 13/10) — PARTIR / UNIR un rack desde el Mapa. Las partes se numeran de
+   IZQUIERDA a DERECHA y la dirección de cada una es «Y25-2». Lo escribe gv_rack_partir, que
+   además muda lo que había sin parte a la parte que se indique (si quedara sin parte, nadie
+   sabría de qué lado está) y deja la fila en GV_Rack_Particion. */
+async function prkPartir(sector) {
+  const f = (_prk || []).filter(function (x) { return String(x.sector) === String(sector); })[0] || {};
+  const rack = String(f.pos_rack || sector).toUpperCase(), hoy = Math.max(1, Number(f.partes) || 1);
+  const txt = prompt("¿En cuántas partes está dividido " + rack + "?\n\n" +
+    "1 = un solo lugar (entero)\n2, 3… = partes numeradas de IZQUIERDA a DERECHA (" + rack + "-1, " + rack + "-2…)\n\n" +
+    "Ahora: " + hoy + (hoy === 1 ? " (entero)" : " partes"), String(hoy));
+  if (txt == null) return;
+  const n = Math.max(1, Math.min(9, parseInt(txt, 10) || 0));
+  if (!n || n === hoy) return;
+  let parte = null;
+  if (n > 1 && hoy <= 1) {
+    const ocup = (_prk || []).filter(function (x) { return String(x.pos_rack || x.sector).toUpperCase() === rack && x.cod && x.fuente !== "insumo"; })[0];
+    if (ocup) {
+      const p = prompt("¿En qué parte (1 a " + n + ") está el " + String(ocup.cod) + " que ya hay en " + rack + "?\n\n1 es la de la izquierda.", "1");
+      if (p == null) return;
+      parte = Math.max(1, Math.min(n, parseInt(p, 10) || 0));
+      if (!parte) return;
+    }
+  }
+  const mot = prompt("¿Por qué? (queda anotado en la bitácora)", n > 1 ? ("Dividido en " + n + " partes") : "Vuelve a ser un solo lugar");
+  if (!mot) return;
+  pmapCeldaStatus("Guardando…", true);
+  const r = await pmapRpc("gv_rack_partir", { p_sector: rack, p_partes: n, p_parte_actual: parte, p_motivo: mot });
+  if (!r.ok) { pmapCeldaStatus("No se pudo: " + r.err, false); return; }
+  await prkFetch(); pmapRender();
+  prkAbrir(n > 1 ? (rack + "-" + (parte || 1)) : rack);
+  pmapCeldaStatus("✓ " + rack + (n > 1 ? " quedó en " + n + " partes (" + rack + "-1 … " + rack + "-" + n + ")." : " volvió a ser un solo lugar."), true);
 }
 let _prkGuardando = false;
 async function prkGuardar(sector, vaciar) {
@@ -57535,6 +58597,11 @@ function pkHojaArmar(tanda, tp, pkc, lug, nps, otras, nombre, base){
     cajas: lineas.reduce(function (s, x){ return s + x.esp; }, 0), falt: lineas.reduce(function (s, x){ return s + (x.real == null ? 0 : Math.max(0, x.esp - x.real)); }, 0) };
 }
 function pkHojaHtml(d){
+  // ⚠ v29.65 (Luis, 13/10) — la diagonal del parcial y el tachado de la fila sin pickear NO van
+  // con linear-gradient + calc(): html2canvas (el PDF que arma el helper de impresión) no parsea el
+  // calc() de los color stops y pinta el gradiente SOLIDO — la nota salió con un CUADRADO NEGRO
+  // encima del total de cajas y la fila sin pickear toda gris, ilegible. Van con una barra de fondo
+  // sólido (::after, sin calc), que el navegador y html2canvas dibujan igual. tests/pk-hoja-picking.cjs.
   var css = '<style>.pkh{font-family:Arial,Helvetica,sans-serif;color:#111;}' +
     '.pkh-top{display:flex;justify-content:space-between;align-items:flex-start;gap:1em;border-bottom:.12em solid #111;padding-bottom:.35em;margin-bottom:.4em;}' +
     '.pkh-t{font-size:1.55em;font-weight:800;line-height:1.15;}.pkh-s{font-size:1.25em;}.pkh-r{font-size:1.1em;text-align:right;line-height:1.35;}' +
@@ -57545,9 +58612,9 @@ function pkHojaHtml(d){
     '.pkh-tot{font-size:1.15em;font-weight:800;margin-top:.35em;text-align:center;}.pkh-m3h{font-size:1.3em;font-weight:800;margin-top:.25em;text-align:center;}' +
     '.pkh-ok{font-weight:800;font-size:1.15em;}' +
     '.pkh-diag{position:relative;display:inline-block;padding:0 .18em;}' +
-    '.pkh-diag::after{content:"";position:absolute;left:0;right:0;top:0;bottom:0;background:linear-gradient(to top right,transparent calc(50% - .55px),#111 calc(50% - .55px),#111 calc(50% + .55px),transparent calc(50% + .55px));-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.pkh-diag::after{content:"";position:absolute;left:-.02em;right:-.02em;top:50%;height:.09em;margin-top:-.045em;background:#111;transform:rotate(-20deg);-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
     '.pkh-got{font-weight:800;margin-left:.35em;}' +
-    '.pkh-no td{color:#777;background:linear-gradient(to bottom,transparent calc(50% - .6px),#777 calc(50% - .6px),#777 calc(50% + .6px),transparent calc(50% + .6px));-webkit-print-color-adjust:exact;print-color-adjust:exact;}.pkh-no .pkh-cod{color:#777;}</style>';
+    '.pkh-no td{color:#777;position:relative;}.pkh-no td::after{content:"";position:absolute;left:0;right:0;top:50%;height:.075em;margin-top:-.037em;background:#777;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.pkh-no .pkh-cod{color:#777;}</style>';
   var mitad = Math.ceil(d.lineas.length / 2);
   // v25.71 (Luis): la columna «Pickeo» desaparece; el resultado va en «Total cajas».
   //  · se pickeó todo → el número + ✓   · a medias → total tachado (diagonal fina) + lo pickeado al lado
@@ -58054,6 +59121,78 @@ function gvHelperRender(ping){
   const ov = document.getElementById("gvHelperOv"); if (!ov || !ov.classList.contains("show")) return;
   ov.innerHTML = gvHelperHtml();
   if (ping && gvHelperActivo() && Date.now() - _gvHelper.pingTs > 3000) helperVivo().then(function (){ gvHelperRender(false); });
+}
+/* ============================================================
+   📺 VINCULAR TV (v29.78, Elías, 13/10/2026)
+   ============================================================
+   La TV de pared (monitor/tv.html) ya no pide el código de ingreso con la clave pública: guarda un secreto
+   propio y, la primera vez, muestra un código de 6 dígitos. Acá un supervisor lo aprueba (gv_tv_vincular_aprobar)
+   y desde ese momento esa TV muestra el código. También se ven las TV vinculadas y se desvinculan
+   (gv_tv_pantallas / gv_tv_revocar). Todo con la sesión del supervisor (gvWriteHdr). */
+/* GV-UI (v29.83): el pop-up usa los tokens y clases de gv-ui.css; acá sólo va el layout. */
+const GV_VTV_CSS = "#gvVtvOv{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:9999}" +
+  "#gvVtvOv.show{display:flex}#gvVtvOv .vtv{width:min(560px,94vw);max-height:90vh;overflow:auto;display:flex;flex-direction:column;gap:var(--gv-sp-4)}" +
+  "#gvVtvOv .vtv-cab{display:flex;justify-content:space-between;align-items:center;gap:var(--gv-sp-3)}" +
+  "#gvVtvOv .vtv-cab b{font-size:var(--gv-fs-lg)}#gvVtvOv .vtv-form{display:flex;gap:var(--gv-sp-3);flex-wrap:wrap;align-items:center}" +
+  "#gvVtvOv #gvVtvCod{width:9ch;font-size:var(--gv-fs-xl);letter-spacing:.1em;text-align:center}#gvVtvOv #gvVtvNom{flex:1;min-width:160px}" +
+  "#gvVtvOv button{min-height:var(--gv-tap)}";
+let _gvVtvMsg = "";
+async function openVincularTv() {
+  if (!requireSupervisor()) return;
+  if (!document.getElementById("gvVtvCss")) { const st = document.createElement("style"); st.id = "gvVtvCss"; st.textContent = GV_VTV_CSS; document.head.appendChild(st); }
+  let ov = document.getElementById("gvVtvOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "gvVtvOv";
+    ov.addEventListener("click", function (e) { if (e.target === ov) closeVincularTv(); });
+    document.body.appendChild(ov);
+  }
+  _gvVtvMsg = "";
+  ov.classList.add("show");
+  await gvVtvRender();
+}
+function closeVincularTv() { const ov = document.getElementById("gvVtvOv"); if (ov) ov.classList.remove("show"); }
+async function _gvVtvRpc(fn, body) {
+  const h = await facAuthWriteHeaders();
+  if (!h) throw new Error("Iniciá sesión con Google como supervisor.");
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, { method: "POST", cache: "no-store", headers: h, body: JSON.stringify(body || {}) });
+  const t = await r.text();
+  let j = null; try { j = t ? JSON.parse(t) : null; } catch (_e) {}
+  if (!r.ok) throw new Error((j && j.message) || ("HTTP " + r.status));
+  return j;
+}
+async function gvVtvRender() {
+  const ov = document.getElementById("gvVtvOv"); if (!ov) return;
+  let filas = null, err = "";
+  try { filas = await _gvVtvRpc("gv_tv_pantallas", {}); } catch (e) { err = String(e.message || e); }
+  const fmt = function (x) { if (!x) return "—"; try { return new Date(x).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (_e) { return "—"; } };
+  const activas = (filas || []).filter(function (f) { return f.estado === "activa"; }).length;
+  const estado = err ? '<div class="gv-err">No pude leer las TV vinculadas: ' + escapeHtml(err) + '</div>'
+    : '<div class="gv-state ' + (activas ? "ok" : "media") + '"><span class="v">' + (activas ? activas + (activas === 1 ? " TV vinculada" : " TV vinculadas") : "Ninguna TV vinculada") + '</span></div>';
+  const tabla = (err || !filas || !filas.length) ? ""
+    : '<div class="gv-tblwrap"><table class="gv-tbl compact"><tr><th>TV</th><th>Estado</th><th>Aprobada</th><th>Último uso</th><th></th></tr>' + filas.map(function (f) {
+        return '<tr><td class="t">' + escapeHtml(f.nombre || ("TV " + f.id)) + '</td><td><span class="gv-badge ' + (f.estado === "activa" ? "ok" : "err") + '">' + escapeHtml(f.estado) + '</span></td><td>' + fmt(f.aprobado_en) +
+          "</td><td>" + fmt(f.ultimo_uso) + "</td><td>" + (f.estado === "activa" ? '<button onclick="gvVtvRevocar(' + Number(f.id) + ')">Desvincular</button>' : "") + "</td></tr>";
+      }).join("") + "</table></div>";
+  ov.innerHTML = '<div class="vtv gv gv-card"><div class="vtv-cab"><b>Vincular TV</b><button onclick="closeVincularTv()" aria-label="Cerrar">✕</button></div>' + estado +
+    '<div class="vtv-form"><input id="gvVtvCod" inputmode="numeric" maxlength="6" placeholder="código" aria-label="Código de 6 dígitos de la TV">' +
+    '<input id="gvVtvNom" placeholder="Nombre (TV depósito)" aria-label="Nombre de la TV"><button onclick="gvVtvAprobar()">Vincular</button></div>' +
+    (_gvVtvMsg ? '<div class="gv-sub" id="gvVtvMsg">' + escapeHtml(_gvVtvMsg) + '</div>' : "") + tabla + '</div>';
+}
+async function gvVtvAprobar() {
+  const cod = String((document.getElementById("gvVtvCod") || {}).value || "").replace(/\D/g, "");
+  const nom = String((document.getElementById("gvVtvNom") || {}).value || "").trim();
+  if (cod.length !== 6) { _gvVtvMsg = "Poné los 6 números que muestra la TV."; await gvVtvRender(); return; }
+  try {
+    const j = await _gvVtvRpc("gv_tv_vincular_aprobar", { p_codigo: cod, p_nombre: nom });
+    _gvVtvMsg = (j && j.ok) ? "TV vinculada: en menos de un minuto muestra el código de ingreso." : ("No se pudo vincular: " + ((j && j.error) || "probá de nuevo."));
+  } catch (e) { _gvVtvMsg = "No se pudo vincular: " + String(e.message || e); }
+  await gvVtvRender();
+}
+async function gvVtvRevocar(id) {
+  if (!confirm("¿Desvincular esta TV? Deja de mostrar el código de ingreso hasta que se la vuelva a vincular.")) return;
+  try { const j = await _gvVtvRpc("gv_tv_revocar", { p_id: id }); _gvVtvMsg = (j && j.ok) ? "TV desvinculada." : "No se pudo desvincular."; }
+  catch (e) { _gvVtvMsg = "No se pudo desvincular: " + String(e.message || e); }
+  await gvVtvRender();
 }
 function openHelperImpresion(){
   if (!requireSupervisor()) return;
@@ -62254,7 +63393,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.61"></script>
+<script src="importacion.js?v=30.08"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62518,6 +63657,74 @@ async function cgResolver(i, ajustar) {
 }
 window.cgLoad = cgLoad; window.cgResolver = cgResolver;   // los onclick del cuadro viven en el global
 
+/* v29.69 (Luis, 13/10): GÓNDOLAS QUE INFORMÓ EL OPERARIO EN EL PICKING.
+   Si el picking le muestra un código que no tiene celda en el Mapa y el operario lo levanta igual,
+   la app le pregunta de dónde lo sacó (evento PKG). Acá el supervisor la da de alta, igual que
+   ajusta el stock con los conteos: ✓ = gv_lugar_item_guardar(sector, cod) · ✕ = se descarta.
+   Una lectura ROTA se dice, no se dibuja como «no hay nada». */
+let _gsRows = [];
+async function gsLoad() {
+  const box = document.getElementById("gsAside"); if (!box) return;
+  const sbx = window.sb;
+  if (!sbx || typeof sbx.rpc !== "function") { if (!gsLoad._re) { gsLoad._re = 1; setTimeout(gsLoad, 2500); } return; }
+  let r;
+  try { r = await sbx.rpc("gv_gondola_sugerida_pendientes"); } catch (e) { r = { error: e }; }
+  if (r && r.error) {
+    box.style.display = "";
+    box.innerHTML = '<div class="gs-h">Góndolas informadas</div><div class="gs-l3">No se pudieron leer.</div>';
+    return;
+  }
+  _gsRows = (r && r.data) || [];
+  gsRender();
+}
+function gsRender() {
+  const box = document.getElementById("gsAside"); if (!box) return;
+  if (!_gsRows.length) { box.style.display = "none"; box.innerHTML = ""; return; }
+  box.style.display = "";
+  box.innerHTML = '<div class="gs-h">Góndolas sin cargar en el Mapa (' + _gsRows.length + ')</div>' +
+    _gsRows.map(function (x, i) {
+      const f = x.ts ? new Date(x.ts) : null;
+      const cuando = f ? (String(f.getDate()).padStart(2, "0") + "/" + String(f.getMonth() + 1).padStart(2, "0") + " " + String(f.getHours()).padStart(2, "0") + ":" + String(f.getMinutes()).padStart(2, "0")) : "";
+      const sec = x.sector_ok ? escapeHtml(x.sector) : ('<span style="color:#b91c1c">' + escapeHtml(x.sector_dicho || "?") + ' ✕</span>');
+      return '<div class="gs-it">' +
+        '<div class="gs-l1">' + escapeHtml(_padCod(x.cod_base || x.cod || "")) + ' → ' + sec + '</div>' +
+        '<div class="gs-l2">' + escapeHtml(x.descripcion || "") + '</div>' +
+        '<div class="gs-l3">' + escapeHtml(x.nombre || ("leg. " + (x.legajo || "?"))) + ' · ' + cuando + (x.tanda ? " · " + escapeHtml(x.tanda) : "") +
+          (Number(x.cajas) ? " · levantó " + Math.round(Number(x.cajas)) + " cj" : "") + '</div>' +
+        (x.ocupada_por ? '<div class="gs-l3" style="color:#b45309">⚠ esa celda hoy tiene ' + escapeHtml(x.ocupada_por) + '</div>' : '') +
+        (x.tiene_gondola ? '<div class="gs-l3" style="color:#b45309">⚠ el código ya tiene celda en el Mapa</div>' : '') +
+        '<div class="gs-btns"><button class="gs-ok" title="Dar de alta esa celda para el código" onclick="gsResolver(' + i + ',true)">✓</button>' +
+        '<button class="gs-no" title="Descartar (no toca el Mapa)" onclick="gsResolver(' + i + ',false)">✕</button></div>' +
+        '</div>';
+    }).join("");
+}
+async function gsResolver(i, aceptar) {
+  const x = _gsRows[i]; if (!x) return;
+  let sector = x.sector || "", cajas = null;
+  if (aceptar) {
+    sector = (prompt("¿En qué celda va el " + (x.cod_base || x.cod) + "?\n(el operario anotó «" + (x.sector_dicho || "") + "»)", x.sector || x.sector_dicho || "") || "").trim();
+    if (!sector) return;
+    const c = prompt("¿Cuántas cajas entran en " + sector.toUpperCase() + "? (vacío = sin capacidad cargada)", "");
+    if (c === null) return;
+    cajas = String(c).trim() === "" ? null : Number(String(c).replace(",", "."));
+    if (cajas != null && !(cajas >= 0)) { alert("La capacidad tiene que ser un número."); return; }
+  } else if (!confirm("Descartar la góndola que informó el operario para " + (x.cod_base || x.cod) + "? El Mapa no se toca.")) return;
+  let r;
+  try {
+    r = await window.sb.rpc("gv_gondola_sugerida_resolver",
+      { p_cid: x.client_id, p_aceptar: !!aceptar, p_sector: aceptar ? sector : null, p_cajas_max: cajas });
+  } catch (e) { r = { error: e }; }
+  if (r && r.error) { alert("No se pudo: " + (r.error.message || r.error) + "\nNo se tocó nada, probá de nuevo."); return; }
+  if (r && r.data && r.data.ok === false && r.data.motivo !== "ya_resuelto") {
+    alert(r.data.motivo === "sector_no_existe"
+      ? "Esa celda no existe en el Mapa. Dala de alta primero en Stock → Mapa de góndolas."
+      : "No se pudo: " + r.data.motivo);
+    return;
+  }
+  gsLoad();
+}
+window.gsLoad = gsLoad; window.gsResolver = gsResolver;
+
 function showSupervisor(email) {
   window.__isSupervisor = true;
   $("authBlock").classList.add("hidden");
@@ -62545,10 +63752,219 @@ function showSupervisor(email) {
   try { ppLoadBadge(); } catch (_e) {}   // v10.48: badge Pasaje de Papeles (pendientes de enviar)
   try { if (typeof adsLoadBadge === "function") adsLoadBadge(); } catch (_e) {}   // v27.20: badge violeta ADS (talleristas debajo del umbral)
   try { cgLoad(); } catch (_e) {}   // v28.58: conteos de góndola del picking que difieren
+  try { gsLoad(); } catch (_e) {}   // v29.69: góndolas que informó el operario en el picking
+  try { if (typeof anLoadBadge === "function") anLoadBadge(); } catch (_e) {}   // v29.72: tandas con avisos sin revisar
   try { if (typeof impIrLoadBadge === "function") impIrLoadBadge(); } catch (_e) {}   // v29.11: badge 📥 Recibido por operarios (Importación)
   try { colaImpLoadBadge(); } catch (_e) {}   // v11.60: badge Cola de impresión NP (armadas sin imprimir; rojo si +24h)
   try { expIsisLoadBadge(); } catch (_e) {}   // badge Agregar Expreso ISIS (expresos que eligió el cliente en la página)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
+  try { rolPanelInit(); } catch (_e) {}   // v29.85: panel por rol (quién sos + checklist)
+}
+
+/* ============ PANEL POR ROL (v29.85, Thomas 13/10) ============
+   El panel admin entra con un mail compartido, así que no dice quién es la
+   persona: al entrar se elige QUIÉN sos y, según el ÁREA, aparece un checklist
+   de lo que hay para mirar/hacer con contadores en vivo (gv_rol_panel) y un
+   botón que abre el módulo. NO ejecuta nada: el de atrasados abre el pop-up de
+   reprogramar a confirmar. La elección se guarda por dispositivo; "cambiar"
+   re-pregunta (el admin es compartido entre Luis y Thomas). */
+const GV_SUP_ROLES = {
+  luis:      { nombre: "Luis",           area: "admin" },
+  thomas:    { nombre: "Thomas",         area: "admin" },
+  marianela: { nombre: "Marianela",      area: "ventas" },
+  tomas:     { nombre: "Tomás González", area: "ventas" },
+  viviana:   { nombre: "Viviana",        area: "impo" },
+  /* v30.05 (13/10): Juan está en la PC de la impresora. Su área es UNA cosa: que la nota de
+     picking y la de armado salgan solas. No ve nada de la PPP ni de compras. */
+  juan:      { nombre: "Juan",           area: "impresion" }
+};
+const GV_AREA_NOMBRE = { admin: "Administración general", ventas: "Ventas", impo: "Importaciones · Comex · Cobranzas", impresion: "Impresión de notas" };
+const GV_ROL_ITEMS = [
+  { id: "sin_zona",  areas: ["admin", "ventas"], label: "Pedidos sin zona",                          cnt: function (d) { return d.sin_zona_ped; },                       open: function () { openPPP(); },                hint: "Asignales zona en «A Programar»" },
+  { id: "atrasados", areas: ["admin", "ventas"], label: "Pedidos atrasados · reprogramar",           cnt: function (d) { return d.atrasados; },                          open: function () { openPPP(); },                hint: "Abrí «Pasar de día» y confirmá" },
+  { id: "cuar_prog", areas: ["admin", "ventas"], label: "Programados con cuarentena",            cnt: function (d) { return d.cuar_prog; },                          open: function () { openPPP(); },                hint: "Sacalos o aprobalos en «A Programar»" },
+  { id: "cuar_arm",  areas: ["admin", "ventas"], label: "Armados en cuarentena sin día",             cnt: function (d) { return d.cuar_armado; },                        open: function () { openPPP(); },                hint: "Asignales día a mano" },
+  { id: "imp_ir",    areas: ["admin", "impo"],   label: "Ingresos a racks sin revisar",          cnt: function (d) { return d.imp_ir; },                           open: function () { openPedidosImportacion(); }, hint: "Importación → Recibido" },
+  { id: "ads",       areas: ["admin", "impo"],   label: "Quiebres de stock a 10 días",               cnt: function (d) { return (d.ads_stock && d.ads_stock.q10) || 0; }, open: function () { openAds(); },               hint: "ADS → Stock", tall: function (d) { return d.ads_tall; } },
+  { id: "expreso",   areas: ["admin", "impo"],   label: "Expresos por cargar en ISIS",               cnt: function (d) { return d.expreso; },                            open: function () { openExpresoIsis(); },        hint: "No frena ningún pedido" },
+  { id: "conc",      areas: ["admin", "impo"],   label: "Movimientos por resolver",             cnt: function (d) { return d.conc; },                               open: function () { openCobranzas(); },          hint: "Cobranzas → Conciliación" },
+
+  /* v30.05 — ÁREA «impresion» (Juan). Estos dos NO salen de `gv_rol_panel`: se miden ACÁ
+     (`local`), porque el estado de la impresión automática es de ESTA PC, no de la base.
+     ⚠⚠ EL PANEL NO TOCA EL HELPER: no llama a `gvHelperConectar`, `gvHelperGuardar` ni
+     `psSetAuto` — sólo MIRA y abre el pop-up de siempre. Y **no le pega a 127.0.0.1 si el
+     helper no está conectado en esta PC**: desconectado, el navegador nunca sale al
+     loopback (en un celular Chrome pediría permiso de red local para nada, regla v26.24). */
+  { id: "imp_auto", areas: ["impresion"], label: "Impresión automática", open: function () { openHelperImpresion(); },
+    local: async function () {
+      try {
+        if (typeof _facIsMobile === "function" && _facIsMobile())
+          return { n: 1, hint: "Esto va en la PC de la impresora, no en el celular" };
+        if (!gvHelperActivo())
+          return { n: 1, hint: "No está conectada en esta PC · Configuración → Helper de impresión" };
+        var vivo = false; try { vivo = await helperVivo(); } catch (_e) { vivo = false; }
+        if (!vivo)
+          return { n: 1, hint: "Conectada pero no contesta: abrí el helper en esta PC" };
+        if (!psIsAuto())
+          return { n: 1, hint: "El helper anda pero esta PC no imprime sola" };
+        var arranco = !!(typeof _ps !== "undefined" && _ps && _ps.timer);
+        return { n: 0, hint: arranco ? "Sale sola: picking al TP y armado al terminar cada NP"
+                                     : "Prendida · arranca sola en menos de un minuto" };
+      } catch (_e) { return { n: null, hint: "No se pudo mirar el estado de la impresión" }; }
+    } },
+  { id: "imp_cola", areas: ["impresion"], label: "Hojas sin imprimir", open: function () { openColaImpHistorial(); },
+    local: async function () {
+      var rows = null;
+      try { rows = await colaImpFetch(_colaImpDia(-21), _colaImpDia(14)); } catch (_e) { rows = null; }
+      /* una lectura ROTA no es un CERO: va «—», no «✓ al día» */
+      if (!rows) return { n: null, hint: "No se pudieron leer las hojas pendientes" };
+      var pend = _colaImpPendientes(rows).filter(function (x) { return x.tipo !== "fac"; });
+      var lim = Date.now() - 24 * 3600000;
+      var venc = pend.filter(function (x) { return x.ts && new Date(x.ts).getTime() < lim; }).length;
+      return { n: pend.length, hint: venc ? (venc + " hace +24 h \u00B7 tocá para imprimirlas")
+                                          : "Picking y armado · tocá para imprimirlas" };
+    } }
+];
+
+function _rolGet() { try { return localStorage.getItem("gv_sup_quien") || ""; } catch (_e) { return ""; } }
+function _rolSet(k) { try { localStorage.setItem("gv_sup_quien", k); } catch (_e) {} }
+
+function rolPanelInit() {
+  var cont = document.getElementById("rolPanel"); if (!cont) return;
+  var k = _rolGet();
+  if (!k || !GV_SUP_ROLES[k]) { rolPickerAbrir(); return; }
+  rolPanelRender(k);
+}
+
+function rolPickerAbrir(ev) {
+  /* v29.97: «cambiar» vive DENTRO de la barra que despliega: sin cortar la propagación,
+     tocarlo abriría el cuadro y de paso plegaría el panel. */
+  try { if (ev && ev.stopPropagation) ev.stopPropagation(); } catch (_e) {}
+  var ov = document.getElementById("rolPickerOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "rolPickerOv";
+    ov.style.cssText = "position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:18px;";
+    document.body.appendChild(ov);
+  }
+  var btns = Object.keys(GV_SUP_ROLES).map(function (k) {
+    var r = GV_SUP_ROLES[k];
+    return '<button onclick="rolElegir(\'' + k + '\')" style="display:block;width:100%;margin:8px 0;padding:14px;border:none;border-radius:12px;background:#2563eb;color:#fff;font-size:17px;font-weight:800;cursor:pointer;text-align:left;">' + r.nombre + ' <span style="font-weight:600;font-size:var(--gv-fs-sm);">· ' + GV_AREA_NOMBRE[r.area] + '</span></button>';
+  }).join("");
+  ov.innerHTML = '<div style="background:var(--gv-surface);border-radius:var(--gv-r);padding:var(--gv-sp-6);max-width:380px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.3);"><div style="font-size:var(--gv-fs-2xl);font-weight:800;color:var(--gv-ink);">¿Quién sos?</div><div style="font-size:var(--gv-fs-md);color:var(--gv-ink-2);margin:4px 0 12px;">Según tu área te muestro qué hay para mirar.</div>' + btns + '</div>';
+  ov.style.display = "flex";
+  /* v30.04 (pase GV-UI): el cuadro TIENE SALIDA, pero sólo si ya hay alguien elegido. En el
+     primer ingreso obliga a elegir (si no, el panel no sabe de quién es); abierto desde
+     «cambiar», sin salida dejaba atrapado al supervisor que lo tocó por error. */
+  ov.onclick = function (e) { if (e.target === ov && _rolGet()) ov.style.display = "none"; };
+  if (!ov.__escPuesto) {
+    ov.__escPuesto = true;
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && ov.style.display !== "none" && _rolGet()) ov.style.display = "none";
+    });
+  }
+}
+function rolElegir(k) { _rolSet(k); var ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none"; rolPanelRender(k); }
+/* v29.95 (Luis, 13/10: *"aprieto luis y no entra"*): ⚠ TODO ESTO VIVE ADENTRO DE LA IIFE
+   `initAuth`, así que un `onclick="rolElegir('luis')"` del HTML NO lo encuentra — un handler
+   inline se resuelve contra WINDOW, no contra el scope del script. Es el mismo pozo de
+   `window.sb` (v23.98). Al agregar un botón con onclick a este bloque, exponer su función acá. */
+window.rolElegir = rolElegir;
+window.rolPickerAbrir = rolPickerAbrir;
+window.GV_ROL_ITEMS = GV_ROL_ITEMS;
+window.rolPanelToggle = rolPanelToggle;
+
+function rolPanelRender(k) {
+  var cont = document.getElementById("rolPanel"); if (!cont) return;
+  var r = GV_SUP_ROLES[k]; if (!r) { rolPickerAbrir(); return; }
+  window.__gvRol = r.area;
+  cont.style.display = "block";
+  cont.className = _rolAbierto() ? "abierto" : "";
+  /* v30.04 (pase GV-UI): «cambiar» es HERMANO de la barra, no un <span onclick> adentro de
+     un <button> — ahí medía 22 px (la mitad del blanco de toque de 44), no se alcanzaba por
+     teclado (tabIndex -1) y un lector leía la barra entera como un solo control. */
+  cont.innerHTML =
+    '<div class="rolp-head">' +
+      '<button class="rolp-bar" type="button" aria-expanded="' + (_rolAbierto() ? 'true' : 'false') + '" onclick="rolPanelToggle()">' +
+        '<span class="rolp-car">\u25B6</span>' +
+        '<span class="rolp-quien">' + r.nombre + ' <span class="rolp-area">\u00B7 ' + GV_AREA_NOMBRE[r.area] + '</span></span>' +
+        '<span class="rolp-badge rolp-b-gris" id="rolpBadge">\u2026</span>' +
+      '</button>' +
+      '<button class="rolp-cambiar" type="button" onclick="rolPickerAbrir(event)">cambiar</button>' +
+    '</div>' +
+    '<div class="rolp-body"><div class="rolp-list" id="rolpList"></div></div>';
+  rolPanelCargar();
+}
+
+/* v29.97: abierto/cerrado por dispositivo. Arranca CERRADO: el dato es el badge. */
+function _rolAbierto() { try { return localStorage.getItem("gv_rol_abierto") === "1"; } catch (_e) { return false; } }
+function rolPanelToggle() {
+  var cont = document.getElementById("rolPanel"); if (!cont) return;
+  var ab = !cont.classList.contains("abierto");
+  cont.className = ab ? "abierto" : "";
+  var bar = cont.querySelector(".rolp-bar"); if (bar) bar.setAttribute("aria-expanded", ab ? "true" : "false");
+  try { localStorage.setItem("gv_rol_abierto", ab ? "1" : "0"); } catch (_e) {}
+}
+
+function rolPanelCargar() {
+  var area = window.__gvRol || "admin";
+  var items = GV_ROL_ITEMS.filter(function (it) { return it.areas.indexOf(area) >= 0; });
+  var listEl = document.getElementById("rolpList"); var bgEl = document.getElementById("rolpBadge");
+  /* v30.05 — dos clases de ítem: los REMOTOS (un contador de `gv_rol_panel`) y los LOCALES
+     (`it.local`, que se miden en esta PC: la impresión automática de Juan). Un área puede no
+     tener ninguno remoto; ahí ni se llama a la RPC. */
+  var remotos = items.filter(function (it) { return typeof it.cnt === "function"; });
+  var _loc = {};                      // id -> { n, hint } ya resuelto de los LOCALES
+  var _data = remotos.length ? null : {};   // sin remotos no hay nada que esperar
+  function paint(data) {
+    if (data !== undefined) _data = data;
+    if (!listEl) return;
+    var alerts = 0, falta = false;
+    listEl.innerHTML = items.map(function (it) {
+      var idx = GV_ROL_ITEMS.indexOf(it);
+      var n, hint = it.hint || "";
+      if (it.local) {
+        var r = _loc[it.id];
+        n = r ? r.n : null;
+        if (r && r.hint) hint = r.hint;
+        if (!r) falta = true;
+      } else {
+        n = _data ? (it.cnt(_data) || 0) : null;
+        if (!_data) falta = true;
+      }
+      if (n > 0) alerts++;
+      /* v30.04 (pase GV-UI): el PUNTO puede ser `--gv-muted` (es un ícono), el NÚMERO no:
+         el \u2014 de «no pude leer» salía en #94a3b8 = 2,45 y el \u2713 en #16a34a = 3,15,
+         los dos abajo de AA 4,5. Son dos colores distintos, no uno. */
+      var dot = (n === null) ? "var(--gv-muted)" : (n > 0 ? "var(--gv-error)" : "var(--gv-ok)");
+      var numc = (n === null) ? "var(--gv-ink-2)" : (n > 0 ? "var(--gv-error)" : "var(--gv-ok)");
+      var num = (n === null) ? "\u2014" : (n > 0 ? String(n) : "\u2713");
+      var tall = (it.tall && _data) ? it.tall(_data) : 0;
+      var extra = (it.id === "ads" && tall > 0) ? ' \u00B7 <span class="rolp-sub">' + tall + ' talleristas flojos</span>' : '';
+      return '<button class="rolp-row" onclick="GV_ROL_ITEMS[' + idx + '].open()">' +
+        '<span class="rolp-dot" style="background:' + dot + '"></span>' +
+        '<span class="rolp-lbl">' + it.label + extra + '<span class="rolp-hint">' + hint + '</span></span>' +
+        '<span class="rolp-num" style="color:' + numc + '">' + num + '</span></button>';
+    }).join("");
+    /* el BADGE es el dato de la barra: el color NUNCA va solo (GV-UI 5), lleva palabra. */
+    if (bgEl) {
+      if (falta && !alerts) { bgEl.className = "rolp-badge rolp-b-gris"; bgEl.textContent = "sin contadores"; bgEl.title = "No se pudieron leer todos los contadores \u00B7 tocá un ítem igual"; }
+      else if (alerts === 0) { bgEl.className = "rolp-badge rolp-b-verde"; bgEl.textContent = "\u2713 al día"; bgEl.title = "Nada pendiente en tu área"; }
+      else { bgEl.className = "rolp-badge rolp-b-rojo"; bgEl.textContent = alerts + " para mirar"; bgEl.title = "Tocá para ver el detalle"; }
+    }
+  }
+  paint(undefined);
+  /* cada LOCAL se mide por su cuenta y repinta al resolver: uno lento no traba a los otros */
+  items.filter(function (it) { return it.local; }).forEach(function (it) {
+    Promise.resolve().then(function () { return it.local(); })
+      .then(function (r) { _loc[it.id] = (r && typeof r === "object") ? r : { n: null, hint: it.hint || "" }; })
+      .catch(function () { _loc[it.id] = { n: null, hint: "No se pudo mirar" }; })
+      .then(function () { paint(undefined); });
+  });
+  if (!remotos.length) return;
+  fetch(SUPABASE_URL + "/rest/v1/rpc/gv_rol_panel", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { paint(d && typeof d === "object" ? d : null); })
+    .catch(function () { paint(null); });
 }
 
 function showOperario(emp) {
@@ -62959,6 +64375,23 @@ function _tvClaveVigente() { return __tvClaveOkAt && (Date.now() - __tvClaveOkAt
 function _tvPaso(cual) {
   ["tvClaveStep", "tvNombreStep", "tvLegNumStep", "tvLegajoStep", "tvCervStep"].forEach(function (id) { const e = $(id); if (e) e.classList.toggle("hidden", id !== cual); });
 }
+/* v29.84 (Elías): el servidor frena un intento fallido 2 s por equipo/IP, y desde la 6.ª falla en 10 min
+   pide el equipo (gv_dispositivo + huella + navegador; la MAC no la da el navegador) y avisa por Telegram.
+   ≡ gv_clave_chequear (sql/gv_tv_seguridad_v2974.sql). */
+function _gvHuella() {
+  try {
+    const s = [screen.width, screen.height, screen.colorDepth, new Date().getTimezoneOffset(),
+      navigator.language, navigator.platform, navigator.hardwareConcurrency || 0, navigator.maxTouchPoints || 0].join("|");
+    let h = 0; for (let i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
+    return (h >>> 0).toString(16);
+  } catch (_e) { return null; }
+}
+function _tvClaveError(e) {
+  if (e === "espera") return "Esperá 2 segundos y probá de nuevo.";
+  if (e === "bloqueo") return "Demasiados intentos fallidos desde este celular. Esperá 10 minutos o pedile ayuda a un supervisor.";
+  if (e === "dispositivo") return "Demasiados intentos: actualizá la app y probá de nuevo.";
+  return "Clave incorrecta. Mirá la TV (cambia cada minuto).";
+}
 window.loginConClaveTv = async function () {
   const errEl = $("legajoLoginError"); if (errEl) errEl.textContent = "";
   const clave = String(($("tvClaveInput") || {}).value || "").replace(/\D/g, "");
@@ -62967,11 +64400,12 @@ window.loginConClaveTv = async function () {
   try {
     const r = await fetch(SB_URL + "/rest/v1/rpc/gv_tv_clave_validar", { method: "POST",
       headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_clave: clave }) });
+      body: JSON.stringify({ p_clave: clave, p_dispositivo: gvDispositivoId(), p_huella: _gvHuella(),
+        p_navegador: String(navigator.userAgent || "").slice(0, 200) }) });
     j = r.ok ? await r.json() : null;
   } catch (_e) { j = null; }
   if (!j) { if (errEl) errEl.textContent = "Sin conexión: probá de nuevo."; return; }
-  if (!j.ok) { if (errEl) errEl.textContent = "Clave incorrecta. Mirá la TV (cambia cada minuto)."; return; }
+  if (!j.ok) { if (errEl) errEl.textContent = _tvClaveError(j.error); return; }
   __tvClaveOkAt = Date.now();
   const lista = $("tvNombreLista");
   if (lista) {
@@ -65184,13 +66618,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.61"></script>
-<script src="hotsale.js?v=29.61"></script>
-<script src="estadisticas.js?v=29.61"></script>
-<script src="ads.js?v=29.61"></script>
-<script src="plantel.js?v=29.61"></script>
+<script src="cobranzas.js?v=30.08"></script>
+<script src="hotsale.js?v=30.08"></script>
+<script src="estadisticas.js?v=30.08"></script>
+<script src="ads.js?v=30.08"></script>
+<script src="plantel.js?v=30.08"></script>
+<!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
+<script src="analisis.js?v=30.08"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.61"></script>
+<script src="ayuda.js?v=30.08"></script>
 
 </body>
 </html>

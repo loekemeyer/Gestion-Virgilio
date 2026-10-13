@@ -26,6 +26,14 @@
 // identidad es el JWT de Virgilio validado contra su propio PostgREST
 // (RPC bridge_jwt_email) — valida firma+expiración sin depender de la sesión.
 //
+// ⚠⚠ 2026-10-13 (Elías, auditoría de seguridad): LÍMITE DE INTENTOS. Antes "verify"
+// aceptaba códigos sin límite y "send" dejaba hasta 5 códigos vivos a la vez: se podía
+// adivinar el código a fuerza bruta (~26 % cada 10 min a 100 req/s) y entrar como admin.
+// Ahora (pedido de Elías: sin bloqueo): (1) un "send" anula los códigos anteriores (un solo
+// código vivo); (2) 1 intento cada 5 segundos por cuenta; (3) cada código equivocado se anota
+// en public.login_otp_fallos con IP, navegador y origen; (4) a los 10 fallos en 1 hora sale
+// un aviso por mail. El "bridge" NO pasa por el límite (no usa código).
+//
 // Deploy (una vez): verify_jwt=false y depende de los secrets RESEND_API_KEY /
 // RESEND_FROM (opcional; fallback a onboarding@resend.dev, dominio verificado
 // por Resend). Ya usados por la Edge Function admin-otp.
@@ -77,6 +85,59 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
   });
+}
+
+// ── Ritmo de intentos y aviso (2026-10-13, Elías) ──────────────────────────────
+// SIN bloqueo: cada cuenta tiene 1 intento cada 5 segundos (login_otp_turno, atómico en
+// la base) y a los 10 fallos en 1 hora sale un aviso por mail (máx. 1 por hora y cuenta,
+// login_otp_fallo). Cada fallo queda en public.login_otp_fallos con IP, navegador y
+// origen. Si la base no responde, se deja pasar (se loguea): nunca deja afuera a nadie.
+function ipDe(req: Request): string | null {
+  const xf = req.headers.get("x-forwarded-for") ?? "";
+  const ip = xf.split(",")[0].trim() || (req.headers.get("cf-connecting-ip") ?? "").trim();
+  return ip || null;
+}
+async function turno(sb: ReturnType<typeof createClient>, ambito: string, clave: string): Promise<boolean> {
+  const r = await sb.rpc("login_otp_turno", { p_ambito: ambito, p_clave: clave });
+  if (r.error) { console.error("login_otp_turno:", r.error.message); return true; }
+  return r.data === true;
+}
+async function anotarFallo(sb: ReturnType<typeof createClient>, req: Request, ambito: string, clave: string, detalle: string): Promise<void> {
+  const r = await sb.rpc("login_otp_fallo", {
+    p_ambito: ambito, p_clave: clave, p_ip: ipDe(req),
+    p_ua: req.headers.get("user-agent") ?? "",
+    p_origen: req.headers.get("origin") || req.headers.get("referer") || null,
+    p_detalle: detalle,
+  });
+  if (r.error) { console.error("login_otp_fallo:", r.error.message); return; }
+  if (r.data) await mandarAviso(sb, r.data as Record<string, unknown>);
+}
+function escHtml(s: unknown): string {
+  return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" } as Record<string, string>)[c]);
+}
+async function mandarAviso(sb: ReturnType<typeof createClient>, a: Record<string, unknown>): Promise<void> {
+  try {
+    const key = await getSecret(sb, "RESEND_API_KEY", "RESEND_API_KEY");
+    if (!key) { console.error("aviso: sin RESEND_API_KEY"); return; }
+    const from = (await getSecret(sb, "RESEND_FROM", "RESEND_FROM")) || "onboarding@resend.dev";
+    const lista = (v: unknown) => (Array.isArray(v) ? v : []).map((x) => "<li>" + escHtml(x ?? "—") + "</li>").join("");
+    const html = `<div style="font-family:system-ui,Arial,sans-serif;color:#222"><h2 style="color:#b00020">⚠ Intentos fallidos de login</h2>` +
+      `<p><b>${escHtml(a.fallos_1h)}</b> códigos/claves equivocados en la última hora.</p>` +
+      `<p>Login: <b>${escHtml(a.ambito)}</b> · cuenta: <b>${escHtml(a.clave)}</b></p>` +
+      `<p>IPs:</p><ul>${lista(a.ips)}</ul><p>Navegadores:</p><ul>${lista(a.navegadores)}</ul><p>Desde:</p><ul>${lista(a.origenes)}</ul>` +
+      `<p style="color:#666;font-size:12px">Detalle completo: tabla public.login_otp_fallos (Supabase LK). Máximo un aviso por hora.</p></div>`;
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: [RECIPIENT_EMAIL], subject: `⚠ ${escHtml(a.fallos_1h)} intentos fallidos de login (${escHtml(a.ambito)})`, html }),
+    });
+    if (!res.ok) console.error("aviso: Resend", res.status, await res.text());
+  } catch (e) { console.error("aviso:", e); }
+}
+
+async function anularCodigos(sb: ReturnType<typeof createClient>, userId: string): Promise<void> {
+  const r = await sb.from("admin_otp_codes").update({ used: true }).eq("user_id", userId).eq("used", false);
+  if (r.error) console.error("anular codigos:", r.error.message);
 }
 
 async function sha256Hex(text: string): Promise<string> {
@@ -245,6 +306,9 @@ Deno.serve(async (req: Request) => {
         .gte("created_at", sinceIso);
       if ((countRes.count ?? 0) >= 5) return jsonResponse({ error: "rate_limited" }, 429);
 
+      // Un solo código vivo: el nuevo anula los anteriores.
+      await anularCodigos(admin, userId);
+
       const code = generate6DigitCode();
       const codeHash = await sha256Hex(code);
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -273,6 +337,10 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "verify") {
+      if (!(await turno(admin, "admin_login_otp", userId))) {
+        return jsonResponse({ error: "esperar", detail: "Esperá 5 segundos entre intentos." }, 429);
+      }
+
       const inputCode = String(body.code ?? "").replace(/\s+/g, "");
       if (!/^\d{6}$/.test(inputCode)) return jsonResponse({ error: "invalid_format" }, 400);
       const codeHash = await sha256Hex(inputCode);
@@ -287,7 +355,10 @@ Deno.serve(async (req: Request) => {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (found.error || !found.data) return jsonResponse({ error: "invalid_code" }, 401);
+      if (found.error || !found.data) {
+        await anotarFallo(admin, req, "admin_login_otp", userId, "codigo equivocado");
+        return jsonResponse({ error: "invalid_code" }, 401);
+      }
 
       const upd = await admin.from("admin_otp_codes").update({ used: true }).eq("id", found.data.id);
       if (upd.error) return jsonResponse({ error: "db_error", detail: upd.error.message }, 500);

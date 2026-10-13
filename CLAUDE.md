@@ -270,6 +270,101 @@ explica (📦/📅 de «no es demora»), un estado que se lee de un vistazo, el 
 el operario ya tiene memorizado. La prueba es: si el emoji se saca y no se pierde información, se
 saca.
 
+## 🟥🟥🟥 REGLA RECTORA DE DISEÑO «GV-UI» (Luis, 2026-10-13, v29.83): UNA PANTALLA SE LEE DE UN VISTAZO
+
+**Luis, textual:** *"quiero que agarremos una filosofía de diseño visual / front / usabilidad
+moderna y que cortemos con la basura. Buscamos que sea rápidamente procesable visualmente
+cualquier pantalla de esta aplicación. Sin texto excesivo, claridad visual, directo al grano con
+la información más importante primero y bien simple."* · *"Deberíamos hacer un agente o .md o algo
+para que cuando se genere un módulo nuevo, haga un pase para dejar establecidas las normas de
+estética y diseño unificadas para el programa."*
+
+**Vale para TODOS los repos y TODA pantalla nueva o que se toque** (copiar este bloque al
+`CLAUDE.md` del repo nuevo). No reemplaza la regla de espacio del 28/09 ni la de «MENOS EMOJIS»:
+las tres son la misma idea — **densidad alta, ruido cero** —. Ésta agrega la **jerarquía**.
+
+> ## **La pregunta de cada pantalla es: «¿qué tiene que saber el que la abre, en 2 segundos?».**
+> Eso va primero, grande y solo. Todo lo demás baja un nivel o se pliega.
+
+| pieza | qué es |
+|---|---|
+| **`gv-ui.css`** | la FUENTE: tokens (`--gv-*`) y clases (`.gv-state`, `.gv-item`, `.gv-tbl`, `.gv-hero`…). Se carga en `index.html` con el `?v=` de la app |
+| **`docs/GV-UI.md`** | de dónde sale cada número, con el contraste MEDIDO de cada color. Se lee antes de tocar el CSS |
+| **`.claude/agents/disenador-gvui`** | **el PASE**: audita un módulo contra el sistema y devuelve `archivo:línea — [severidad] → fix` |
+| **`tests/gv-ui-sistema.cjs`** | el candado del sistema (paleta, escala, tokens muertos, la pantalla de referencia) |
+| **`analisis.js`** | la **pantalla de referencia**: es el molde |
+
+### Los 8 puntos
+
+1. **UN dato principal por pantalla, y es el texto más grande que se ve.** Si hay dos cosas del
+   mismo tamaño, no hay jerarquía: el ojo no sabe dónde parar. El título y el código de la cosa
+   (la tanda, el cliente, la OC) **no** son el dato principal: son el rótulo.
+2. **Tres niveles de tamaño y nada más.** La escala es **11 · 12 · 14 · 16 · 20 · 30 px** (+ 46
+   para el dato principal), y sale de los tokens: **un módulo no escribe un `font-size` propio**.
+   **14 px es el PISO de un dato**; 11 y 12 son sólo rótulo o metadato.
+   ⚠ **Para densificar se achica el AIRE, nunca la letra** (es la regla explícita de SAP Fiori:
+   entre su modo cómodo y su modo compacto el `font-size` no cambia).
+3. **El veredicto antes que los números.** Arriba va UNA línea (≤ 60 caracteres) que dice qué pasa
+   y qué hacer («2 hallazgos fuertes: mirar de cerca»), no un párrafo que repite lo de abajo.
+4. **Lo explicativo se pliega.** Glosarios, metodología, desgloses y la letra chica van en un
+   `<details>` cerrado. **Ningún bloque de texto largo se dibuja abierto.**
+5. **El color significa, y NUNCA va solo** (WCAG 1.4.1: un lector de pantalla no anuncia el color
+   y un daltónico no lo distingue). Estado = **color + forma + palabra**. Se testea en 10 segundos
+   con `filter: grayscale(100%)`: si en gris no se distingue, falla.
+6. **Un rótulo son 1 o 2 palabras, sin la explicación al lado.** `rendimiento`, no
+   `rendimiento (esperado ÷ real)`. La explicación vive en el `<details>` del punto 4.
+7. **Una línea por ítem**, con un punto de color para la severidad, y «y N más» pasando de 8.
+8. **Sin emojis decorativos** (regla del 06/10) y **sin unidad repetida**: va en el rótulo.
+
+### ⚠⚠ EL PASE: una pantalla nueva no está terminada hasta que lo pasa
+
+**Al crear un módulo o rehacer una pantalla, antes de darla por terminada se corre el agente
+`disenador-gvui`.** Mide 10 puntos sobre la pantalla CORRIENDO (no leyendo el código: el
+`font-size` que vale es el computado, y el que manda puede venir del CSS global del index): usa el
+sistema · escala · contraste calculado · jerarquía · veredicto · nada largo sin plegar · tabla ·
+color que va solo · blanco de toque de 44 px a 430 px de ancho · emojis y rótulos.
+
+Y al test del módulo se le copia el **bloque `(g)` de `tests/analisis-productivo.cjs`**, que mide
+la regla sola: *un hallazgo sin candado vuelve en la próxima pantalla*.
+
+### Lo que esto cierra, medido el 13/10 antes de empezar
+
+`index.html` tenía **302 colores y 38 tamaños de letra distintos**; `importacion.js` 72 y 19;
+`cobranzas.js` 44 y 16. Cada módulo escribía su propio `<style>` con su propia escala: **no había
+una app, había nueve.** Tras el pase, `analisis.js` quedó en **0 tamaños propios y 0 hex propios**.
+
+**Tres colores que estaban mal y ahora son tokens** (contraste calculado con la fórmula WCAG 2.x,
+contra el fondo real de la app, no contra blanco):
+
+| estaba | medía | va |
+|---|---:|---|
+| ámbar `#d97706` de «para mirar» | **2,97** ✗ | `--gv-warn` `#92400e` (**6,61**) |
+| amarillo `#f1c21b` como texto | **1,57** ✗ | sólo de FONDO con texto negro (**10,75**) |
+| gris `#94a3b8` en rótulos | **2,39** ✗ | `--gv-ink-2` `#475569` (**7,07**) · el `#94a3b8` queda sólo para líneas |
+
+### Lo que está DECIDIDO y no se vuelve a discutir
+
+- **Los números de tabla van CENTRADOS. Cerrado por Luis el 13/10/2026** (*"dejalo centrado,
+  decisión estilística para todo GV"*), sabiendo que Polaris y el resto de la industria piden
+  alinearlos a la derecha. **Es una decisión de estilo de la casa, no un descuido: no se vuelve a
+  proponer la alineación a la derecha, ni como mejora ni como hallazgo de un pase.** Lo que **sí**
+  entró, porque no choca con nada, son las **cifras tabulares** (`font-variant-numeric:
+  tabular-nums`): arreglan que la columna baile sin mover la alineación.
+- **Los `<th>` van en sentence case** («Desde el anterior», no «DESDE EL ANTERIOR»): Carbon lo
+  cambió en su v10 y la lectura en mayúscula es ~10 % más lenta. **Ya es así en `.gv-tbl`**, o sea
+  en la pantalla de referencia; las tablas viejas que todavía tienen `text-transform: uppercase`
+  se arreglan cuando se las toca, no antes. **La mayúscula sí se deja en una etiqueta de 3-4
+  letras** (`PICK`, `ARM`, `PICKING`): ahí no hay palabra que reconocer.
+- **La migración es forward-facing**: `gv-ui.css` lo usa el módulo nuevo y el que se toca. **Nadie
+  reescribe `importacion.js` por esto.** Los 302 colores del index se mueren solos.
+- **`monitor/tv.html` queda AFUERA** del sistema a propósito: es una pantalla a 4 metros, con
+  fondo oscuro y su propia escala en `--u` (`min(1vh, 0,5625vw)`). Tiene su sistema y funciona.
+
+**Chequeo:** `node tests/gv-ui-sistema.cjs` (el sistema: la paleta se mide, la escala está
+completa, no hay token muerto y la pantalla de referencia no tiene un px ni un hex propio) ·
+`node tests/analisis-productivo.cjs` (el bloque **(g)**: la regla sobre la pantalla corriendo;
+verificado que falla al achicar el dato principal). Los números, las fuentes (Carbon, Fiori,
+Fluent, Material 3, Polaris, Ant, NN/g, WCAG) y las decisiones abiertas: **`docs/GV-UI.md`**.
 ## 📌 LEER PRIMERO: `docs/ESTADO-Y-PENDIENTES.md`
 
 **Foto del estado al 2026-09-13.** Qué falta de verdad está en la base
@@ -958,6 +1053,19 @@ código, comentarios ni mensajes de commit).
 
 - **`desactiva caveman`** = responder solo el **próximo mensaje** normal/completo, y después **volver solo** a caveman.
 - **`caveman desactivacion total`** = apagar caveman por completo (queda desactivado hasta que se reactive).
+
+⚠⚠ **Los dos hooks de caveman son TEXTO SUGERIDO, no un candado** (medido el 13/10): el `additionalContext` de
+`PreToolUse`/`PostToolUse` llega al modelo en cada llamada a herramienta y compite con el resto del contexto —
+incluidas las reglas de ESTE archivo que piden lo contrario (el SQL exacto antes de escribir, las decisiones Dn
+del cierre, «medir antes de opinar»). Cuando chocan, gana el archivo y la respuesta se pasa de tres líneas.
+
+⚠⚠ **NO se arma un hook `Stop` que mida la respuesta y la BLOQUEE** (Luis, 13/10: *"¿de qué sirve el stop si la
+generación ya se hizo y los tokens se gastaron? no hagas eso"*). Un bloqueo llega **después** de generar: paga el
+texto largo y la reescritura, o sea gasta el doble de lo que caveman intenta ahorrar. **No volver a proponerlo.**
+
+⚠ Y lo que de verdad pesa en este repo es el INPUT, no el output: `CLAUDE.md` son **9.076 líneas / ~204 mil
+tokens** y entra dos veces por sesión, contra los ~50 tokens que ahorra cada respuesta recortada. Toda discusión
+de ahorro que empiece por el estilo de la respuesta está mirando el lado chico.
 
 ## ⚠ REGLA de TONO (Luis, 2026-09-19): sin dramatismo
 
@@ -1709,13 +1817,160 @@ Y ese día se dieron de alta **O02** y **O05** (racks LK que no existían) y **Z
 del 363E era falsa: la góndola del 363E es J04). Problema 646. Al contar en una posición que el Mapa no conoce,
 se da de alta en `GV_Lugar`, no se carga en otra.
 
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.97): EN EL DEPÓSITO HAY **TRES** CLASES DE LUGAR — Góndolas · Racks · **Sector SC y SP**
+
+**Luis, textual:** *"Vamos a entender algo. en el deposito tenes diferentes cosas: Gondolas / Racks / Sector SC
+y SP. Sector SC y SP usa un nomenclador similar al de gondolas y racks y puede que la confusion surja de ahi."*
+
+> ## **SC = Sector Crudo · SP = Sector Procesado.** Son la mesa de trabajo de **Cervantes (GP2)** dentro del
+> ## depósito, NO racks de Virgilio. Su nomenclador es la **grilla de UN DÍGITO** (`A1`…`L6`), y por eso se
+> ## confunde con la góndola `A01` y con el rack `AD05`.
+
+| clase | nomenclador | qué guarda | dónde vive el saldo |
+|---|---|---|---|
+| **Góndola** | letra + **2 dígitos**: `A01`…`Ñ60`, `P`, `Y`, `Z` | cajas de artículo para pickear | `Movimientos_Stock` dep. `terminado` |
+| **Rack** | letra(s) + **2 dígitos**, con `AD`/`AT` en los de insumo: `AD05`, `X22`, `R01AD`, `V09AT`, `AF13` | master cajas de artículo · fleje · plástico · importados | `Movimientos_Stock` dep. `racks` / `racks_ch` / `insumos` |
+| **SC y SP** | letra(s) + **UN dígito**: `A1`…`L6` (52 celdas) + `MEDIO` | **piezas de Cervantes**: `partes_crudo` (SC) y `parte_procesado` (SP) | **`GP2.inventario`** (ubicación «Sector Crudo» / «Sector Procesado»), NO Virgilio |
+
+### ⚠⚠ v30.03 (Luis, 13/10): SC y SP es SU PROPIO LUGAR — la celda se llama **`IN-A1`** y su tipo es **`scp`**
+
+**Luis:** *"hagamos que sea su propio sector, lugar. IN-A1 por ejemplo? queda bien asi?"* · *"claro,
+agrega al mapa este sector"* · *"una vez hecho fijate que vincule bien con insumos y con todo lo que
+tenga que vincular bien … y una vez tengamos la base bien armada, limpiamos todo"*.
+
+> ## **ES UN SOLO SECTOR Y NO SE PARTE: `IN-<letra><número>`, y nada más que eso.**
+> **Luis, 13/10:** *"no importa SP o SC, ese sector tiene de los dos. todo ese sector es
+> IN-\*Letra\*\*Numero\*, no te compliques mas que eso"*. La grilla está **INTERCALADA** —`G1`-`G4`
+> tiene piezas de SC y `G5`-`G6` de SP; `L1`-`L4` SP y `L5`-`L6` SC; `H1` SP y `H2`-`H7` SC—, así
+> que **un prefijo `SC-` / `SP-` habría que renombrarlo cada vez que una pieza cambia de celda**.
+> SC y SP son **de qué es la PIEZA** (su categoría de Insumos), no de qué es la CELDA: el Mapa
+> **no rotula la celda por sector** y el encabezado no los cuenta aparte.
+
+| pieza | qué es |
+|---|---|
+| `GV_Lugar` | las 55 celdas con **`tipo = 'scp'`**, empresa `IN`, nombre `IN-A1`…`IN-L6`. Se dieron de alta **IN-K4, IN-K5 e IN-K6**, que tenían piezas cargadas y no existían |
+| **`gv_scp_sector(txt)`** | el resolvedor de la grilla: `IN-A1`, `IN A1`, `in-a1` y el **`A1` pelado** (es lo que se tipea hoy) |
+| **`gv_insumo_sector(txt)`** | el **cuello ÚNICO de una posición de INSUMO** = `coalesce(gv_rack_sector, gv_scp_sector)`: rack de insumo (`R01AD`, `AF13`, `X20`) **o** celda de SC/SP. Lo usan `gv_insumo_ubicacion` y las **dos** RPC que escriben una posición (`gv_insumo_ubicaciones_guardar`, `gv_insumo_posicion_guardar`) |
+| **`gv_scp_celda`** | la vista de la solapa nueva: una fila por celda, con la pieza, su sector (SC/SP) y su saldo |
+| Mapa | tercer modo **📐 SC y SP** (`pmapModo('scp')`), una solapa por columna; tocar una celda abre su editor y escribe por **la misma RPC** que las posiciones de racks |
+| `Insumos_Ubicaciones.sector` | las 63 filas de la grilla pasaron a `IN-xx` |
+
+> ## ⚠⚠ **Lo que esto CIERRA: `gv_rack_sector('A1')` ahora devuelve NULL.**
+> `gv_rack_sector` filtra `tipo = 'rack'`, así que **Ingreso a racks no puede ofrecer una celda de
+> SC/SP ni guardar una caja ahí**. Antes devolvía `A1`. Es el mismo pozo de la v29.67 (el operario
+> escribió `AB3` en el campo del código) visto del otro lado.
+
+- **Al agregar una celda a SC/SP va con el prefijo**: `insert into "GV_Lugar"(sector,tipo,empresa) values ('IN-C3','scp','IN');`
+  Los dos CHECK se ampliaron (`tipo` acepta `scp`; el nombre acepta `IN-xx`).
+- **El saldo de una pieza de SC/SP lo lleva GP2**, no Virgilio: acá se dice **DÓNDE** está. En
+  `GP2.ubicacion` no hay celdas (SC y SP son **una** ubicación cada uno), así que la celda física
+  existe sólo en `Insumos_Ubicaciones.sector`. El espejo `gv_gp2_espejo_sync` copia todo `GV_Lugar`
+  sin filtrar tipo, así que GP2 ve las 55 celdas solo (medido: `GP2.virgilio_lugar` tipo `scp` = 55).
+- **Y de paso se arreglaron 3 insumos** que estaban en rojo: `gv_insumo_ubicacion` pasó de **145 a
+  148** posiciones resueltas. Quedan **2** sin lugar, y son las dos de **`medio`**.
+- ⚠⚠ **`medio` NO ES UN LUGAR y no se le inventa uno** (Luis, 13/10: *"medio no se que es ni que
+  debería ser, no va para mi, es como que algo no tenga lugar"*). Sus dos filas salieron, y las piezas
+  **`A1`** (Mgo Plano 501 Pint., 7 cajones) y **`H1`** (Manija Redonda p/cromar, 10 cajones) pasaron
+  a la alerta **«insumo con stock y sin posición»** del Mapa, que es donde se ven y donde se las
+  ubica con un click. **Si vuelve a aparecer un `medio`, es eso: algo sin lugar.**
+- ⚠ **`gv_rack_celda` ya no ve la grilla** (Luis, 13/10: *"d1 dale"*). Su rama de insumos traía
+  `gv_insumo_ubicacion` **sin mirar el tipo del lugar**, así que las 63 filas de SC/SP salían como
+  `sin_lugar` en la solapa Racks — la vista no sabía que esas celdas habían dejado de ser racks. El
+  parche le agrega `exists (… GV_Lugar lr where lr.sector = u.sector and lr.tipo = 'rack')`. La
+  **regla protegida** que toca (*"una celda por DIRECCIÓN: un rack partido se ve como sus N partes"*)
+  **sigue en pie**: no cambia nada de las partes. Medido: de 306 filas a 243 y el **md5 de esas 243
+  es el mismo antes y después**; `prkRacks` del front saltea `^IN[-\s]` como segunda red.
+- ⚠⚠ **Y se LIMPIÓ `Insumos_Ubicaciones`** (Luis: *"d3 limpia"*): **150 → 110 filas**, las 110
+  resuelven, **0 con código fantasma** y **0 fuera del nombre canónico**. Salieron las **38** que no
+  matcheaban ningún código de `Insumos` y tenían su gemelo válido en la misma celda (29 el fleje sin
+  el `N°`, 4 con su código ISIS, 8 la pieza con un punto de más, 5 basura `-` `--` `---` `----`
+  `N|24`; las 38 en cantidad 0) y las **2 de `medio`**; **30** pasaron al nombre canónico
+  (`N7` → `N07`, `R1AD` → `R01AD`, `V9 AT` → `V09AT`, `AF1` → `AF01`, `Z2` → `Z02`).
+  Backup: `zz_backups."GV_Backup_InsUbic_20261013"` · `select jsonb_pretty(public.gv_scp_limpiar(true));`
+  dice qué haría, fila por fila.
+
+**Chequeo:** `select public.gv_scp_sector('A1'), public.gv_rack_sector('A1'), public.gv_insumo_sector('R1Ad');`
+→ `IN-A1`, **NULL**, `R01AD` · `select count(*) from public.gv_scp_celda;` (63 en 55 celdas) ·
+`select * from public.gv_reglas_perdidas;` · `select count(*) from public."Insumos_Ubicaciones";` (110,
+todas resueltas y con el nombre canónico) · `node tests/pmap-scp.cjs`.
+`sql/gv_sector_scp_v2998.sql` (rollback: `select public.gv_scp_revertir();`), 5 centinelas.
+⚠ Los objetos de la base, los 5 centinelas, el `.sql` y los comentarios del código dicen **v29.98**
+(la versión con que se aplicaron): es la llave de idempotencia, **no cambiarla**; la app salió en la
+v30.03 porque otras sesiones se adelantaron.
+
+### El mislabel que esto RETIRA
+
+⚠⚠ **El bullet de la v22.80 dice que la grilla `A1…L6` son «racks de insumos». ES FALSO y queda RETIRADO.**
+Se dieron de alta así el 25/09 —tipo `rack`, empresa `IN`— y de ahí salió la confusión; **la v30.03 las
+pasó a `tipo = 'scp'` y a nombre `IN-A1`** (bloque de arriba). Medido el 13/10, antes de tocar nada:
+
+- las **52 celdas de un dígito** de `GV_Lugar` son **exactamente** donde viven `parte_procesado` (SP: `A1`-`A6`,
+  `B1`-`B6`, `C1`, `C2`, `C5`, `C6`, `D1`, `D3`-`D6`, `E1`, `E2`, `E5`, `E6`, `F1`, `F2`, `F6`, `G5`, `G6`, `H1`,
+  `L1`-`L4`) y `partes_crudo` (SC: `G1`-`G4`, `H2`-`H7`, `I4`, `J1`-`J4`, `J6`, `L5`, `L6`);
+- **0 cajas de artículo** pasaron por ellas en toda la historia (`deposito in (racks, racks_ch)` con ubicación de
+  un dígito → vacío). No son racks: no guardan cajas.
+- `K4`, `K5` y `K6` tienen piezas de SC cargadas y **no existen en `GV_Lugar`**: el alta del 25/09 los salteó.
+
+⚠ **`gv_rack_sector('A1')` devolvía `A1`** (y `('A01')` NULL, porque A01 es góndola): el resolvedor de racks
+**aceptaba una celda de SC/SP** y **Ingreso a racks la ofrecía**. No hizo daño porque nadie guardó una caja ahí.
+**Cerrado en la v30.03**: con `tipo = 'scp'` ese `coalesce` no la encuentra más y devuelve NULL.
+
+### Y en GP2 no hay celdas: SC y SP son UNA ubicación cada uno
+
+`GP2.ubicacion` tiene **12 `sector`** (`Sector Crudo`, `Sector Procesado`, `Sector Fleje`, `Sector Caja`…) y
+**ninguna celda adentro**: el saldo de una pieza es por (componente, sector), sin posición. **La celda física
+`A1`…`L6` existe SÓLO en `Insumos_Ubicaciones.sector` de Virgilio**, para que el operario sepa dónde mirar. Son
+dos niveles de detalle distintos y no se reconcilian.
+
+⚠⚠ **Y el CÓDIGO de una pieza de SC/SP también se pisa con el de una caja.** `CONOCIMIENTO_GP2.md` lo tiene
+medido del 03/09: **`A1`, `A4`, `A8` y `A9` existen DOS veces en `GP2.componente`** —una pieza de Sector
+Procesado y una Caja— y la regla de allá es *"unir por `componente.id`, y si hay que resolver desde un código,
+desambiguar por sector"*. O sea: la colisión de nomencladores **no es sólo de lugares, es también de códigos**.
+
+> **Antes de decir que una posición «no existe» o que un código «está mal cargado»: mirar si no es SC/SP.**
+> El criterio es el dígito: **un dígito = SC/SP · dos dígitos = góndola o rack.**
+
+**Chequeo:**
+
+```sql
+-- las 52 celdas de SC/SP, con qué categoría de insumo vive en cada una
+select u.sector, i.categoria, count(*)
+  from public."Insumos_Ubicaciones" u
+  join public."Insumos" i on upper(btrim(i.cod)) = upper(btrim(u.cod))
+ where upper(btrim(u.sector)) ~ '^[A-Z]{1,2}[0-9]$'
+ group by 1,2 order by 1;
+-- y que ninguna tenga cajas de artículo (tiene que dar vacío)
+select m.ubicacion, m.cod_art, sum(m.delta) from public."Movimientos_Stock" m
+ where m.deposito in ('racks','racks_ch') and upper(btrim(coalesce(m.ubicacion,''))) ~ '^[A-Z]{1,2}[0-9]$'
+ group by 1,2 having sum(m.delta) <> 0;
+```
+
+### ⚠ Lo que esto explica: las posiciones «con dos códigos» NO son racks compartidos
+
+Barrido del 13/10 sobre `Insumos_Ubicaciones`: **38 filas** no matchean ningún código de `Insumos`, **las 38 en
+cantidad 0** y **las 38 con su gemelo válido en LA MISMA celda**. No es un lugar con dos cosas: es **la misma
+cosa escrita dos veces**.
+
+| cuántas | qué son | ejemplo |
+|---:|---|---|
+| 29 | el fleje **sin el `N°`** | `63` junto a `N°63` en R11AD |
+| 4 | el fleje **con su código ISIS** | `1645` = `N°35` · `2565` = `N°36` · `2615` = `N°18` · `2745` = `N°37` |
+| 8 | la pieza de SP **con un punto de más** | `DISC.1` junto a `DISC1` · `DISC. 4` junto a `DISC4` |
+| 5 | basura de verdad | `-`, `--`, `---`, `----`, `N|24` |
+
+⚠⚠ **Queda RETIRADO lo que reporté antes** (*"basura de carga, no racks compartidos — eso se limpia en
+`Insumos_Ubicaciones`"*): de las 38, **sólo 5 son basura**; las otras 33 son el mismo insumo con una segunda
+grafía, y 4 de ellas son **su código ISIS**, que es un dato bueno escrito en el campo equivocado — el ISIS vive
+en `Insumos.isis` y en `GP2.insumo_equivalencia.isis` (regla v29.79), no en el código de una ubicación.
+
 ### ⚠ INSUMOS: dónde está cada uno sale del Mapa (Luis, 25/09, v22.80)
 
 **Luis:** *"es un mismo depósito físico … son racks de insumos. Dejalos con el nomenclador que ya existe, no inventes
 uno nuevo · AD adelante AT atrás · sí, ponelo en el mapa"*.
 
 - Los racks de insumos son `GV_Lugar` tipo `rack`, **empresa `IN`** (R01AD, K04, X20…). Se sumaron 69 que faltaban:
-  la grilla **A1…L6 con ese nombre** (A1 ≠ A01: A01 es góndola; por eso `gv_lugar_sector_fmt` acepta un dígito) y
+  ⚠⚠ **la grilla A1…L6 NO son racks de insumos: es SC/SP — ver la regla de arriba, v29.97** (A1 ≠ A01: A01 es
+  góndola; por eso `gv_lugar_sector_fmt` acepta un dígito) y
   R07AD, R10AD/AT, R12AT, R16AD, V01AD, V02AT, V05AT, V11AT, V12AT, V13AD, AF02/04/07/16/18, AE04.
 - **`gv_rack_sector(texto)`** resuelve cualquier grafía: primero el nombre exacto (A1), después con cero y AD/AT
   (`R1Ad` → R01AD, `V9 At` → V09AT, `W1` → W01). Es la misma para racks de artículos y de insumos.
@@ -1725,6 +1980,15 @@ uno nuevo · AD adelante AT atrás · sí, ponelo en el mapa"*.
   (celdas de góndola) quedan en rojo ⚠ en la pestaña Insumos.
 - El Mapa de racks muestra los insumos (🧰, con la cantidad declarada en el módulo, en su unidad).
 - `Insumos_Ubicaciones_Unificadas` está muerta desde el 11/08: nadie la lee ni la escribe.
+- ⚠⚠ **`Insumos_Ubicaciones.cantidad` es DECORATIVA: no se carga a mano y no se corrige** (medido el 13/10, con
+  el conteo de 505C). **142 de 149 filas están en 0 o null** (112 códigos de 116), **ninguna función la lee** para
+  calcular algo —sólo las dos RPC que la escriben, `gv_insumo_ubicaciones_guardar` y `gv_insumo_posicion_guardar`—
+  y el front **omite el número cuando es 0** (`_stkInsUbicStr` en Stocks y el `🧰 insumo` del Mapa): nadie ve un
+  «0» en pantalla. El saldo real de un insumo sale SIEMPRE de `Movimientos_Stock` (deposito `insumos`, convertido
+  con `Insumos_Factores`), que es lo que leen el módulo, las compras y el espejo a GP2.
+  ⚠ **Cargarle el número a un código suelto es peor que dejarlo vacío**: lo vuelve el 5.º con dato entre 112 sin
+  dato, sin que nada lo reconcilie después — es el pozo de la copia que nadie poda (regla v23.00). Si algún día
+  esa columna tiene que valer, se llena sola desde el saldo, no a mano.
 - `sql/gv_insumos_ubicacion_v2279.sql` (rollback en la cabecera), `tests/ins-aceptar-ubic.cjs`.
 
 ### ⚠⚠ EL MAPA ES EL PUNTO PRINCIPAL — y avisa el stock sin lugar (Luis, 25/09, v22.82)
@@ -1768,6 +2032,65 @@ cuenta (Stock → Capacidad «Importar» y «Borrar todo», y Despiece «Guardar
 **Rollback** y el bloque que se corrió: `sql/gv_capacidad_sector_vista_v2275.sql`. Las definiciones de
 los 12 dependientes quedaron en `zz_backups."GV_Backup_CapSector_defs_20260925"`. Lo sostiene
 `tests/cap-sector-vista.cjs`.
+
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.78): UN RACK SE PUEDE PARTIR — `Y25-1`, `Y25-2`, `Y25-3`…
+
+**Luis:** *"algunos racks tienen mucho espacio que estamos desaprovechando … si alguien guarda algo a un
+rack que ya esta ocupado por otro codigo, promptee para decir de que lado lo dejan … que separe ese rack
+en Izq y Der (basicamente, una subdivision de racks)"* · *"pongamos la posibilidad de, por ejemplo,
+Y25-1, Y25-2, Y25-3"*.
+
+> ## Un rack puede estar **DIVIDIDO en N partes** (1 a 9, numeradas de **izquierda a derecha**) y la
+> ## **DIRECCIÓN** de una parte es **`Y25-2`**. Sin partir (N = 1) la dirección sigue siendo `Y25`.
+
+**Antes de esto el sistema PROHIBÍA el segundo código** (`gv_rack_pos_chequear` devolvía `ocupado:<cod>` y
+frenaba el ingreso) y el conteo del Mapa **borraba** lo que hubiera en la posición que no fuera el código
+que se estaba guardando. Medido al 13/10: 258 racks activos, 89 posiciones con stock, **0 con dos códigos**.
+
+| la pregunta | la función | para qué |
+|---|---|---|
+| ¿cuál es EL RACK? | **`gv_rack_sector(txt)`** — pela la parte (`Y25-2` → `Y25`) | AGRUPAR y validar: es el **cuello único** por donde 18 funciones y 12 vistas siguen contando por rack **sin tocarlas** |
+| ¿cuál es la DIRECCIÓN? | **`gv_rack_pos(txt)`** | lo que se **ESCRIBE** en `Movimientos_Stock.ubicacion` |
+| ¿qué parte pide el texto? | `gv_rack_lado(txt)` → 1..9 (null si el rack no está partido) | |
+| ¿en cuántas partes está? | `gv_rack_subs(txt)` ← **`GV_Lugar.gv_sub`** | la subdivisión es **del RACK**, no del movimiento |
+| ¿falta decir la parte? | `gv_rack_falta_parte(txt)` · `gv_rack_dir(txt)` (todo junto, para el front) | |
+
+- **La parte viaja DENTRO del texto de la dirección**, así que **ninguna función cambió de firma**: entra por
+  el mismo argumento de siempre. Acepta `Y25-2`, `Y25 2`, `Y25/2`, `Y25 izq` (= 1) y `Y25 der` (= 2); se
+  muestra siempre el número.
+- **Partir / unir: `gv_rack_partir(sector, partes, parte_actual, motivo, legajo)`** — la llama **el operario**
+  desde Ingreso a racks cuando se topa con un rack ocupado (es lo que pidió Luis: que lo decida en el
+  momento, parado frente al rack), y el supervisor desde el Mapa (**✂ Partir**). Lo que ya estaba **sin
+  parte se muda a la parte que él indique**; unir frena si más de una parte tiene mercadería. Queda en
+  **`GV_Rack_Particion`**.
+- ⚠ **EL PUNTO QUE EVITA PERDER UNA CAJA:** en un rack partido **todo movimiento lleva la parte**
+  (trigger `aa_gv_racks_ajuste_sin_posicion` → **`RACKS_FALTA_PARTE`**). Sin eso las cajas quedan «en el
+  rack, sin parte»: el Mapa muestra una parte fantasma y Bajar de racks no sabe de dónde sacarlas.
+- ⚠ **`gv_rack_posicion_guardar` vacía SÓLO su parte** (`gv_rack_pos(m.ubicacion) = v_sec`). Con el criterio
+  por rack, contar la izquierda **borraba el stock de la derecha**: es el único lugar que podía destruir
+  stock ajeno.
+- ⚠ **`Racks_Planimetria.sector` pasa a ser la DIRECCIÓN** (+ columnas `rack`, `parte`, `partes`), y lo
+  mismo `gv_rack_celda` (+ `pos_rack`, `parte`, `partes`). Por eso el front casi no cambió: los chips de
+  Bajar de racks, las posiciones de Stocks → Ajustar y las celdas del Mapa ya tratan la posición como un
+  **string opaco**. Lo que necesita el RACK usa la columna `rack`. ⚠ El `id` de la vista es un hash que
+  **incluye la parte**, o dos partes del mismo código tendrían el mismo id y PostgREST devolvería una sola.
+- **Front**: Ingreso a racks ofrece **✂ en 2 / 3 / 4 partes** y pregunta en qué parte está lo que ya había
+  (`_irOcupadoHtml` / `irPartir`); si el rack ya está partido ofrece las partes libres. Bajar de racks y
+  Stocks → Ajustar / Fijar / Stock inicial piden la parte (`gv_rack_dir`); 📥 Recibir de Importación ofrece
+  una opción por parte. El Mapa dibuja **una celda por parte** y tiene ✂ Partir / unir.
+- ⚠ **Medido antes de aplicar nada: con 0 racks partidos todo se comporta EXACTAMENTE como antes** — la
+  huella de `gv_rack_sector` sobre los 2.645 textos de ubicación reales no cambió
+  (`c82ba953f63ab26f7de76c42abc2f05f`) y las dos vistas devolvieron las mismas filas y el mismo md5
+  (259 y 304). Es forward-facing por construcción: no hay nada que migrar.
+- Los insumos **no se parten** (siguen con su nomenclador `AD`/`AT`, que son filas propias de `GV_Lugar`).
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` (16 centinelas) ·
+`select sector, rack, parte, partes, cod_art, innercajas, estado from public."Racks_Planimetria" where partes > 1;` ·
+`select * from public."GV_Rack_Particion" order by id desc;` · `node tests/rack-subposicion.cjs`.
+`sql/gv_rack_subposicion_v2978.sql` (rollback en la cabecera y al final). ⚠ Los objetos de la base, los
+16 centinelas y los marcadores internos dicen **v29.78** (la versión con que se aplicaron): es la llave de
+idempotencia, **no cambiarla**; la app salió en la v29.94 porque otras sesiones se adelantaron.
 
 ## ⚠ REGLA: el CÓDIGO DE CLIENTE es por EMPRESA — nunca cruzar por código solo
 
@@ -3980,6 +4303,14 @@ privado `loekemeyer/Impo-Comex`**; acá va sólo el build web (`client/dist-web`
 - **v29.23: PARIDAD con el viejo, flujo por flujo** (subir, verificar, editar, corregir, guardar, descargar): `tests/impo-comex-paridad-{lakout,multidoc,marks,cajas,inal}.cjs`
   comparan pedidos a la puerta, pantalla y descargas contra lo que hizo el viejo (`impo-comex/`), grabado en el test o en
   `tests/tools/`. Mientras exista `impo-comex/` se regraban desde el viejo (ver la cabecera de cada test). **Al borrar el viejo, los tests siguen andando.**
+- ⚠ **v30.06 (Elías, 13/10): el botón del IMPO COMEX VIEJO se ocultó** — en Pedidos Importación queda un solo
+  **🛃 IMPO COMEX** que abre el nuevo (`openImpoComex2`). `openImpoComex()` y la carpeta `impo-comex/` siguen (los
+  tests de paridad graban desde ahí) hasta que se borren.
+- ⚠ **r81 (Elías, 13/10) — Cajas marca la OTRA MARCA del frente**: la IA lee TODAS las marcas del frente del cartón
+  (`marcas_frente`) y la empresa de referencia es el **prefijo del código de barras** (779558700 LK / 779800543 CH) o,
+  sin barras, el **CUIT del comercializador**. Una marca de la otra empresa → fila `marca_frente` **diferencia GRAVE**.
+  Vive en `Impo-Comex/supabase/functions/_shared/cajas.ts` (deploy `Impo_Comex_verify-cajas`, v26) y lo comparten el
+  viejo y el nuevo; acá sólo cambiaron el rótulo y el formato del campo (`ic-cajas.js`, `logica/cajasEtiquetas.js`).
 
 ## ⚠ REGLA (Luis, 2026-09-28, v23.45): la importación se RECIBE desde el panel — 📥 RECIBIR
 
@@ -4483,6 +4814,24 @@ no cambie al cambiar el criterio y que el u$s/m³ guarde sólo su clave).
   Si no alcanza, se marcan «✗ no» los ÚLTIMOS camiones del orden hasta que el resto entre. **Desde las 15:00** sale el
   cartel rojo de CORTE con los camiones a pasar de día en la PPP. Es aviso: no mueve nada.
 - `sql/gv_monitor_tanda_camion_orden_v2386.sql`, `tests/tv-meta-camion.cjs`, `tests/tandas-orden-camion.cjs`.
+
+## ⚠⚠ REGLA (Elías, 2026-10-13, v29.84): el CÓDIGO DE LA TV no se entrega a la clave pública — y se prueba de a uno cada 2 s
+
+**Elías:** *"1 hay que cambiar"* · *"no es anon, tiene que ser al enviar con el token que se obtiene de la pantalla"* ·
+*"limitar a cada 2 seg. y hacer que sólo sea aceptable el código anterior durante 5 segundos después que desaparece de la
+TV … y se le puede hacer que envíen su mac a los 6 intentos"* (Virgilio y Cervantes).
+
+| pieza | qué hace |
+|---|---|
+| **`gv_clave_chequear`** (no la llama nadie de afuera) | el limitador ÚNICO de los 4 validadores (Gestión, 3.0 Virgilio, 3.0 Cervantes, tablet GP2): un intento fallido frena esa IP/equipo **2 s** (`espera`; serializado con `pg_advisory_xact_lock`, sin eso dos intentos simultáneos no se veían) · el código del minuto anterior vale sólo los **5 s** siguientes (65 s de código activo) · desde la **6.ª falla en 10 min** pide el equipo (`gv_dispositivo` + huella + navegador; la MAC no la da el navegador) y avisa por Telegram · **10 por equipo / 40 por IP** → `bloqueo`. Log `GV_Clave_Intento` |
+| **TV de pared** | guarda un SECRETO propio (`localStorage gv_tv_secreto`) y pide el código con él (`gv_tv_clave_actual_tv`). La 1.ª vez muestra a la izquierda un código de 6 dígitos que un supervisor aprueba en **⚙️ Configuración → 📺 Vincular TV** (ahí también se desvincula) |
+| **Mon. Admin / Vista TV / header del monitor** | piden el código con la sesión del supervisor |
+| un solo helper | `monitor/tv-clave.js` (lo cargan tv.html, admin.html e index.html) |
+
+- `GP2.monitor_clave_validar` ya no se puede llamar con la clave pública.
+- ⚠ **PARTE B pendiente** (sacarle `gv_tv_clave_actual` a la clave pública): se aplica cuando Elías confirma que la TV ya
+  muestra el código vinculada. Hasta entonces el helper cae a la clave pública si la TV no está vinculada.
+- `sql/gv_tv_seguridad_v2974.sql` (parte A aplicada el 13/10, parte B comentada), `tests/tv-clave-segura.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-29, v23.87): el operario NO vuelve a la pantalla del legajo
 
@@ -5105,6 +5454,247 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   esperando un «sí» que nadie contesta, no Postgres (ni `lock_timeout` ni `statement_timeout` saltan porque la sentencia
   nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
+
+## ⚠ REGLA (v29.99): `dead-handlers` mira TODOS los módulos que carga el index, no sólo dos
+
+Un `onclick="fn(...)"` llama a `window.fn`: una función que queda **dentro de una closure** deja el
+botón **muerto** y la página no tira ningún error. `tests/dead-handlers.cjs` cubría `index.html` +
+`importacion.js`; hoy cubre también cobranzas, hotsale, estadisticas, ads, plantel, analisis, ayuda,
+recepcion, planimetria y los dos de talleristas (**1.104 handlers**). **Al sacar un módulo nuevo del
+index, agregarlo a `ARCHIVOS`** — si el archivo no existe, el test falla y lo dice.
+
+Lo que destapó: la v29.92 puso `rolPickerAbrir` y `rolElegir` adentro de la closure donde ya viven
+`gsLoad` / `gsResolver` (que se exponen a mano con `window.x = x`), así que los dos botones del panel
+por rol no hacían nada. **Ese bloque de `index.html` (~63000) NO es top-level**: toda función que se
+llame desde un `onclick` va expuesta.
+
+**Barrido del 13/10, 0 muertos fuera de esos dos:** `monitor/tv.html`, `monitor/admin.html`, el
+selector y Cervantes no usan `onclick="..."` de texto (asignan la función o usan `addEventListener`,
+que no se puede romper por nombre); `admin/` (el espejo de LK) tiene 88 handlers y los 88 resuelven;
+`impocomex/` tiene 49 y los 4 que un escaneo estático marca (`onBlur`, `onBorrar`, `onInput`,
+`repinta`) son **métodos de objeto y callbacks de `IC.on(...)`**, no globales: falsos positivos.
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.96): EN EL MONITOR SÓLO VAN LOS LEGAJOS QUE SE LOGUEARON
+
+**Luis, textual:** *"se habrá hecho como una prueba para ver visuales desde el admin, no deberían
+aparecer esas cosas en el monitor. solo legajos que se hayan logueado (trabajadores o entrevistas)"*.
+
+> **Un evento suelto no hace a un operario.** Para figurar en el monitor hay que haber ENTRADO a la
+> app ese día (`GV_Dispositivo_Login`, `tipo = 'operario'`), **con cualquier método**.
+
+| pieza | qué hace |
+|---|---|
+| `gv_monitor_horas_operario_dia` (CTE **`login_dia`**) | la fuente: TV, 📺 Vista TV y Mon. Admin lo heredan por `gv_monitor_horas_operario` |
+| **`gv_monitor_logueados(desde, hasta)`** | la misma pregunta para el front (lectura, anon, ventana ≤ 8 días) |
+| `index.html` `fetchMonitorDayStats` | la lee y filtra igual, así el monitor del index y la vista siguen ≡ |
+
+- **CUALQUIER método de login, no el de llegada.** `gv_monitor_ingresos` (v27.68) corta por
+  `clave_tv` / `nombre` porque contesta *"¿a qué hora llegó?"*; acá la pregunta es *"¿entró?"*.
+  Medido: con el criterio de llegada se caían **7 días-operario reales** que entraron con
+  `sesion_guardada` (30/09 leg 104/8/94 · 02/10 leg 277 · 06/10 leg 191/237 · 08/10 leg 277).
+- **FAIL-OPEN, y por eso no hay fecha de corte**: si ese día no hay NINGÚN login registrado, no se
+  filtra a nadie. `GV_Dispositivo_Login` empezó el **30/09**, así que sin esa cláusula todos los
+  días anteriores quedaban vacíos (y el fixture del 15/09 roto). Sirve igual el día que la
+  registración de ingresos se caiga: se ve de más, nunca de menos.
+- **El filtro es la salida de un legajo de prueba, no su anulación.** El caso que lo originó: el
+  legajo **1** apareció «en jornada» el 13/10 por **un** `RI` suelto hecho desde el admin. Se anuló
+  (`RI` → `RIX`, backup `zz_backups."GV_Backup_RegLeg1_20261013"`) **y el monitor lo seguía
+  mostrando**: el CTE `base` de la vista filtra `''`, `'0'` y `sup:*`, pero **NO saca las opciones
+  terminadas en `X`**. Lo que lo saca es esta regla.
+- ⚠ **El legajo 1 sigue contando en el monitor** cuando SÍ se loguea (v27.63, Thomas D13): esto no
+  lo excluye, le pide haber entrado.
+- ⚠ **El patrón del centinela es `login_dia`, no el marcador `v29.90-login`**: ése vive en un
+  comentario y el centinela los saca antes de buscar (regla v21.82) — probado, daba «LA REGLA SE
+  PERDIÓ» con la regla puesta. `GV_Dispositivo_Login` tampoco sirve: aparece 2 veces y la otra es
+  la regla v27.54. Centinela 422, huella re-congelada.
+- ⚠ **Los marcadores de la base, el centinela y los comentarios del front dicen `v29.90`**: es la
+  versión con la que se aplicó, antes de que otra sesión se llevara ese número. **Es la llave, no
+  se cambia.**
+
+**Chequeo:** `select * from public.gv_monitor_horas_operario;` · `select * from public.gv_reglas_perdidas;` ·
+`select * from public.gv_huellas_cambiadas;` · `node tests/mon-solo-logueados.cjs` (corre la pantalla:
+el que no se logueó no sale, el que sí sale, y el fail-open; verificado que falla contra la v29.92) ·
+`node tests/mon-vs-vista.cjs`. `sql/gv_monitor_solo_logueados_v2996.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.90): en el MONITOR, el día dice CUÁNDO DEBIÓ ARMARSE
+
+**Luis, textual:** *"quiero que en el monitor, en el día figure así: «Mié 14/10 (debió armarse Vie 9)»
+o «Vie 16/10 (debe armarse Mié 14/10)»"*.
+
+> **El dato es el VERBO.** «debió» = esa fecha de armado YA PASÓ, o sea que ese día de reparto
+> viene atrasado. «debe» = todavía hay tiempo.
+
+| pieza | qué hace |
+|---|---|
+| **`restarHabiles(key, n)`** (`monitor/tv.html`) | el espejo de `sumarHabiles`: mismo criterio de día hábil (finde + `GV_Feriados`, con la lista de respaldo si el fetch falla) |
+| **`diaArmado(key)`** | armado = **salida − 2 hábiles** (norma de Thomas del 23/09, v21.56: se arma el día 1, se factura el 2 y sale el 3 — es la misma cuenta que ya hacía `calcularMeta` con `sumarHabiles(hoy, 2)`). Devuelve `{fecha, txt, vencido}` |
+| cuadro **«NPs por Día»** | el texto va en el `<small>` de la celda del día (que `.rd td small` ya dibuja en bloque): **no ensancha la columna** — regla de espacio del 28/09 |
+| rojo (`.rd-arm.tarde`) | sólo si la fecha de armado **ya pasó Y** ese día todavía tiene NP sin armar (pendiente + proceso neto). Una fecha vieja de un día que ya salió entero no es un atraso. **El color no va solo**: el verbo lo dice igual |
+
+⚠ **Es la TV y lo hereda Mon. Admin** (`monitor/build-admin.cjs` se arma de `tv.html`). El monitor
+de `index.html` no tiene este cuadro. `monitor/tv.html` queda **afuera del sistema GV-UI** a
+propósito (regla v29.83): acá manda su escala en `--u`.
+
+⚠ **El caso difícil es el feriado, y es justo el ejemplo de Luis:** dos hábiles antes del
+**miércoles 14/10** son el **viernes 9**, no el lunes 12, porque el 12/10 es feriado. Contar días
+corridos da el número equivocado tres veces por mes.
+
+**Chequeo:** `node tests/mon-dia-armado.cjs` — corre la TV con el reloj fijo en el martes 13/10 y
+mide los dos ejemplos textuales de Luis, el caso «debe armarse hoy» y que la columna no se
+ensanche. Verificado que falla al sacar la etiqueta, al ignorar los feriados y al correr el límite
+del verbo.
+
+### ⚠⚠ Y el LEGAJO DE PRUEBA entraba al monitor por el cierre de insumos
+
+Lo que destapó el pedido: el 13/10 el monitor mostraba al **legajo 1 «en jornada»** con un cierre
+de Recepción de Insumos (12:32→12:33) **sin su apertura**. `insEmitCierre` era la **única**
+escritura de un evento de operario que llamaba a **`_enqueueReportRaw` DIRECTO**, salteándose el
+gate que `enqueueReport` (`esOperadorPrueba`) y `enqueueAutoClose` (`esLegajoPrueba`) sí tienen:
+la apertura la descartó el gate y el cierre salió igual.
+
+> **Un cierre huérfano no se distingue de una tarea abierta**, así que
+> `gv_monitor_horas_operario_dia` lo lee como jornada viva — y el legajo 1 cuenta en el monitor
+> desde la v27.63 (Thomas, D13), así que queda ahí con el tiempo muerto corriendo.
+
+**Al escribir un evento de operario se llama a `enqueueReport`.** `_enqueueReportRaw` es la lógica
+interna y **no tiene candado**: quien la use directo se lo pone él. Hoy son tres llamadores y los
+tres filtran el legajo de prueba. Lo sostiene el bloque **(d)** de `tests/legajo1-confirma.cjs`,
+que lo mide sobre la cola de verdad (verificado que falla sin el guard).
+
+## ⚠ REGLA (Luis, 2026-10-13, v30.02): el UMBRAL DEL INTRADÍA no frena lo que tiene DÍA FORZADO
+
+**Luis:** *"lk 1670, por que no se programo solo?"*. Era un **Retira con día pactado** (16/10) que
+entró 13:31 y seguía sin tanda.
+
+> El intradía (cron 73, cada 5 min) llama al armador **sólo** si lo pendiente de las **zonas
+> automáticas** (1, 2 y 3) llega al umbral, o si hay algo de zona manual con camión a su zona.
+> **Retira, Súper y el resto no suman ahí** (`pendienteAutomatico` de la Edge Function lo dice
+> textual, y el conteo manual exige zona `^Zona N`), así que un pendiente que un pase programa
+> **sí o sí hoy** no llegaba NUNCA al armador: la corrida salía por `intradia_sin_umbral` sin
+> llamarlo y el pedido esperaba el job de las 00:01 — hasta **11 h** parado.
+
+Mismo agujero que la regla v19.52 ya marca para `'^\s*Zona\s*[0-9]+'`: **al tocar el armado,
+preguntarse si ahí no falta Retira.**
+
+| pieza | qué hace |
+|---|---|
+| **`gv_ppp_web_forzado_sin_tanda()`** | los pedidos SIN TANDA que un pase programa hoy sí o sí: **(a4)** Retira con día elegido (`gv_web_retiro_pactado`) · **(b2)** diferido con su piso cumplido · **(a0e)** cliente nuevo aprobado. Lee `lk_pedidos_match` (el FDW ya está en la base): no necesita el feed |
+| cron **156 `gv-ppp-web-forzado`** | minutos 7,17,37,47, anti-solape: si esa función devuelve algo, llama a la Edge Function en modo **diario** (el de las 00:01, que no mira el umbral) y el armador corre. Si no, no hace nada |
+
+- **No hizo falta redeploy** de `gv-ppp-web-tandas-diarias`. Queda además
+  **`gv_ppp_web_pendiente_forzado(text,jsonb)`** —el mismo criterio recibiendo los pendientes por
+  jsonb— **sin llamador**: es la mitad del fix para el día que esa función se re-deploye y el
+  umbral se arregle adentro (sumar su conteo a `npManual`).
+- Sobrar una fila no cuesta nada (decide el armador); faltar una deja el pedido sin programar.
+- Probado: con LK 1670 pendiente la función devolvía 1 fila y la corrida lo programó como
+  **LK 0414, tanda F89A, Retira, 16/10**.
+- Los objetos y el centinela de la base dicen **v29.82** (la versión con que se aplicaron): es la
+  llave, no cambiarla. `sql/gv_ppp_web_forzado_sin_tanda_v3002.sql` (rollback en la cabecera).
+
+**Chequeo:** `select * from public.gv_ppp_web_forzado_sin_tanda();` — lo que el armador tiene que
+tomar sí o sí · `select * from public.gv_reglas_perdidas;`.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.69): el código SIN GÓNDOLA en el Mapa se lo PREGUNTA AL OPERARIO
+
+**Luis:** *"si el modulo de pickeo los promptea a pickear un codigo para el que no tiene registro de
+lugar (en que gondola esta) y el que pickea lo agarra, debería preguntarle de que gondola lo agarro
+y debería aparecerle la sugerencia al admin para ajustar gondolas de la misma forma que le aparece
+para ajustar stock."*
+
+Mismo circuito que el conteo de góndola del picking (CG, v28.58):
+
+| paso | qué pasa |
+|---|---|
+| picking | el paso de un código sin celda en `GV_Lugar_Item` sale con el aviso **📍 no tiene góndola en el Mapa**; al confirmar («✓ Puse» o «Faltan» con 1+ caja) pregunta **«¿De qué góndola lo sacaste?»** |
+| evento | **PKG** = `COD|lo que escribió|TANDA`, sin `ts_inicio` (no abre tarea). Dedup `pkg_<legajo>_<tanda>_<cod>` |
+| landing del admin | cuadro **«Góndolas sin cargar en el Mapa»** (`#gsAside`, a la derecha; el de conteos queda a la izquierda) con el código, la celda, quién y cuándo, si esa celda ya tiene otro código y si el código ya tiene celda |
+| ✓ | `gv_gondola_sugerida_resolver` → **`gv_lugar_item_guardar`**: da de alta la celda (pide capacidad; vacío = sin capacidad). **✕** descarta y el Mapa no se toca |
+
+⚠ **La pregunta va DESPUÉS de registrar el pick**: el PKC se manda igual, así que si el celular muere
+en la pregunta lo pickeado no se pierde. Y se puede saltear («No sé»): **no frena el picking**, y no
+vuelve a preguntar por ese código en esa tanda (se guarda en el avance, sobrevive a reabrirlo).
+
+⚠ **Lo que el operario escribe NO se inventa**: `gv_gondola_sector` devuelve sólo una celda que
+existe en `GV_Lugar` (`f9` → **F09**, `m 13` → **M13**); lo que no matchea queda como «dicho» y el
+cuadro lo muestra en rojo para que el supervisor lo corrija a mano.
+
+**Cuánto es**, medido el 13/10 sobre 60 días: **25 códigos sin celda y 131 líneas de picking**
+(231/232/233, 567, 565, 998E…), unas 2 por día. No es ruido.
+
+⚠ **Al agregar un evento de detalle como PKG hay que sumarlo a `COLA_AUTO` y a los `isUpsert` de
+`index.html`**, o la cola lo trata como una tarea del operario.
+
+### D3 (Luis): en el Análisis Productivo se MARCAN los anómalos — y sólo en pantalla
+
+*"solo en pantalla, hace que sea mas claro el detalle, descripcion, analisis y que haya algo para
+marcar los anomalos"*. **Nada de Telegram.**
+
+- Arriba del detalle va una **conclusión en una frase** (`_anConclusion`, armada con lo que ya trajo
+  la base): *"El picking lo hizo X en 1:04, un 61 % MÁS de lo esperado para una tanda de dificultad
+  alta… Hay 2 cosas para mirar de cerca"*. Los avisos van bajo el rótulo **«Qué se encontró»**.
+- Barra con **🚩 Anómala · ✓ Revisada · ✕ Sacar marca** (con nota). Vive en `GV_Analisis_Marca`
+  (`gv_analisis_marcar` / `gv_analisis_marcas`), una fila por tanda, y la puede poner el supervisor
+  o un legajo habilitado.
+- En la lista: chip 🚩/✓ y los filtros **Todas · Con avisos · 🚩 Marcadas**.
+- **D4 (Luis): el botón lleva badge** — `gv_analisis_badge(14)`: tandas de los últimos 14 días con un
+  aviso DURO y **sin marcar** (ni anómala ni revisada). Se apaga marcándolas. Va en el botón del panel
+  (`#anBadge`) y en el de la botonera de Juan (`#anBadgeOp`). ⚠ Una lectura rota **no lo apaga**: lo deja
+  como estaba — un 0 que no es un 0 real es peor que no mostrar nada. Al 13/10: 11 pendientes.
+- ⚠ Las marcas se leen **aparte** de la lista: si esa lectura falla, la pantalla se ve igual (sin los
+  banderines), y no hubo que tocar `gv_analisis_tanda`, que tiene centinela.
+
+**Chequeo:** `select * from public.gv_gondola_sugerida_pendientes();` ·
+`select public.gv_gondola_sector('f9');` → `F09` · `node tests/pk-gondola-sugerida.cjs` ·
+`node tests/analisis-productivo.cjs`. `sql/gv_gondola_sugerida_v2969.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.68): ANÁLISIS PRODUCTIVO por tanda — y el s/caja del PKC NO es un detector
+
+Botón **📈 Análisis Productivo** en el panel del supervisor y en la botonera del operario (ahí **sólo** para
+los legajos de `GV_Analisis_Acceso`; hoy **Juan, legajo 8**). El monitor ya evalúa por OPERARIO y por DÍA
+(Monitor → Ritmo, v29.47-48): esto es la misma cuenta abierta **por TANDA**, con el detalle código por código.
+
+| pieza | qué hace |
+|---|---|
+| `gv_analisis_lista(dias, legajo, buscar)` | las tandas del período con el rendimiento de picking y de armado, su dificultad y **cuántos avisos DUROS** tiene cada una (se calculan para todo el período de una, 1,4 s a 60 días) |
+| `gv_analisis_tanda(tanda, legajo)` | el detalle: esperado por dificultad vs real, composición del tiempo (bruto · pausas · huecos · cola), m³/h, cajas/h, el promedio de ese operario y el del depósito en esa dificultad, la tabla línea por línea y los avisos (260 ms) |
+| `gv_analisis_cod_base(dias)` | cuánto tarda **normalmente** una línea de cada código: mediana de 120 días, y la misma mediana descontando el término por caja del D17 (3,74 s). 194 de 289 códigos tienen 8+ líneas medidas y cubren el 96 % |
+| `GV_Analisis_Acceso` | quién lo ve desde el celular. Agregar a alguien es un `insert`, no un deploy |
+
+> ## **El `ts` del PKC dice cuándo se TOCÓ OK, no cuándo se levantó la caja.**
+> Medido el 13/10 sobre 120 días: marcar «menos de 1 s por caja con 5+ cajas» salta en **148 de 560 tandas
+> (26 %)**, y agrupando las ráfagas en **283 de 588 (48 %)**. Eso no es fraude: es que se confirma en bloque.
+> Por eso el s/caja del PKC va como **dato** en la tabla, con lo normal del código al lado, y **no dispara
+> una alarma por sí solo**. No volver a proponerlo como detector.
+
+**Los tres avisos que SÍ tienen señal, y por qué:**
+
+1. **El picking dio completo y el armado declaró faltante** de ese código. No depende del reloj.
+   Medido: **14 casos en 13 de 486 tandas (2,7 %), 44 cajas**.
+2. **Paso confirmado sin tiempo frente a la góndola**: del registro por paso (`GV_Picking_Paso_Evento`,
+   v26.25, **desde el 05/10**), de que la pantalla MOSTRÓ el código a que se confirmó. Mediana **29 s**,
+   p10 7,1 s; **36 de 1.081 pasos (3,3 %)** bajan de 2 s. Con el filtro de 3+ cajas quedan **6 pasos en 6
+   tandas**, más 10 con menos de 1 s por caja en 5+ cajas. Una tanda anterior al 05/10 no tiene este dato y
+   la pantalla lo dice: **no se inventa el aviso**.
+3. **El conteo cíclico de góndola de ese picking** (CG, v28.58) que no coincide con el sistema.
+
+El resto (línea lenta, huecos de +5 min, celular bloqueado, reconfirmaciones, sin stock en góndola,
+ritmo alto o bajo contra su dificultad) va como **media/baja**: son para mirar, no para acusar.
+
+⚠ **El tiempo «frente a la góndola» es desde el ÚLTIMO `mostrado` anterior a la confirmación**, no desde el
+primero: `gv_picking_paso.primera_vez` es el primero y da negativos cuando la cola manda el `mostrado`
+después del `ok`. Con el primero el aviso saltaba en el 46 % de las tandas; con el último, en el 13 %.
+
+⚠ **No es un candado**: el legajo lo manda el celular y no se puede verificar (el operario entra con el
+código de la TV, no con una sesión). Frena a quien lo lee, como el semáforo de repos. El supervisor entra
+por su sesión de Google.
+
+⚠ El marcador de la regla va en **código** (`v_regla constant text := 'v29.64-acceso'`), no en un comentario
+de línea: el centinela saca los comentarios antes de buscar (regla v21.82) y el patrón quedaba en rojo.
+
+**Chequeo:** `select public.gv_analisis_lista(14, '8');` · `select public.gv_analisis_tanda('<TANDA>', '8');` ·
+`select * from public.gv_reglas_perdidas;` · `node tests/analisis-productivo.cjs`.
+`sql/gv_analisis_productivo_v2964.sql`, `analisis.js`. ⚠ Los objetos de la base y los centinelas dicen
+**v29.64** (la versión con que se aplicaron): es la llave, no cambiarla.
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.50): los INSTRUCTIVOS de pared se GENERAN, no se dibujan
 
@@ -7675,9 +8265,9 @@ negativo para usos prácticos de importación"*.
   (Distribución)», Bolsas Plásticas «en Virgilio»): eso ya está en Virgilio y no se suma. `gv_gp2_inventario.parte`
   = cervantes / terceros / virgilio; `gv_gp2_stock_componente` saca `virgilio` (terceros sigue contando). Impacto al
   02/10: 0. `sql/gv_gp2_stock_solo_cervantes_v2605.sql`.
-- ⚠ **Hay DOS tablas de vínculo y NO son lo mismo:** `GV_Importados_Equiv_GP2` (GV, para SUMAR stock: varios
-  componentes y factor) y `GP2.importado_virgilio_componente` (GP2, para el AVISO de recepción: un componente por
-  código). Al 02/10 difieren en códigos (599E/599ES→GRJ32, 522E→GRJ33, 590ES→PINCEL590 sólo en la de GP2; 94xP vs
+- ⚠ **`GV_Importados_Equiv_GP2` NO es una equivalencia de códigos** (v29.74): dice qué piezas de Cervantes
+  **aportan** stock a un importado, 1→N con factor (942E ← Z47 + Z47-M505 + 942E). La equivalencia de códigos
+  vive en **`GP2.insumo_equivalencia`** y es otra pregunta: no se fusionan. Al 02/10 difieren en códigos (599E/599ES→GRJ32, 522E→GRJ33, 590ES→PINCEL590 sólo en la de GP2; 94xP vs
   94xE). Unificarlas queda para después (Luis, 02/10).
 - `gv_importados_ordenes` suma dos columnas AL FINAL: **`stock_gp2`** y **`stock_total_neto`** (sin el `greatest(…,0)`
   + GP2). `stock_total` / `stock_actual` / `stock_cajas` **no se tocaron** (los leen otros). El módulo de importación
@@ -7751,8 +8341,9 @@ chinos y para avisar en la página que no tenemos stock"*.
   decía «Plásticos» por «Bolsas plásticas», «Flejes» por «Flejes y alambres», y no conocía «Sector Crudo» ni
   «Sector Procesado». Al agregar una categoría en `Insumos_Categorias`, GP2 la ve sola en ≤ 10 min.
   `sql/gv_gp2_espejo_categorias_v2960.sql` · GP2 `db/migracion_virgilio_categorias_20261013.sql`, CONOCIMIENTO 4kn.
-- **v25.17 (Luis, 30/09, D5): GP2 ve el stock de insumos y el Mapa de Virgilio**, en tres tablas de **solo lectura** del
-  schema GP2 (así no rompe su Regla 0): `virgilio_insumo_stock`, `virgilio_insumo_ubicacion` y `virgilio_lugar`. Las
+- **v25.17 (Luis, 30/09, D5): GP2 ve el stock de insumos y el Mapa de Virgilio**, en tres objetos de **solo lectura** del
+  schema GP2 (así no rompe su Regla 0): `virgilio_insumo_stock` (desde la v29.89 una **vista en vivo**, no una copia),
+  `virgilio_insumo_ubicacion` y `virgilio_lugar`. Las
   llena `gv_gp2_espejo_sync()` (cron `gv-gp2-espejo-sync`, c/10 min, reescribe sólo si cambió el md5). Luis: *"que los
   dos tengan acceso a los datos y que puedan hablar"*; el vínculo de códigos (D3) va después. `sql/gv_gp2_espejo_v2517.sql`.
 
@@ -7764,8 +8355,8 @@ el mismo molde (el mismo bloque está en el `CLAUDE.md` de `loekemeyer/Gestion-P
 
 | pieza | cómo |
 |---|---|
-| frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.aceptado_virgilio`, y los espejos de solo lectura `GP2.virgilio_insumo_stock` / `_ubicacion` / `virgilio_lugar` / `virgilio_insumo_categoria` |
-| códigos | GV habla en código de ARTÍCULO (323ES), GP2 en COMPONENTE (GRJ31). El vínculo vive en **`GP2.importado_virgilio_componente`** y **nunca se adivina** |
+| frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.aceptado_virgilio`, y los espejos de solo lectura `virgilio_insumo_stock` (desde la v29.89 una **vista en vivo**) / `_ubicacion` / `virgilio_lugar` / `virgilio_insumo_categoria` |
+| códigos | GV habla en código de ARTÍCULO (323ES), GP2 en COMPONENTE (GRJ31). El vínculo vive en **`GP2.insumo_equivalencia`** y **nunca se adivina** |
 | confirmar | el que recibe dice **Sí / No** donde trabaja, en la tarjeta del componente. ⚠ **Hoy avisa sólo lo que RECIBE CERVANTES** (Luis, 02/10: *"lo que recibe Cervantes avisa"*): lo que GP2 manda a Virgilio (`enviar_a_virgilio`, tablet y botón «→ Virgilio») no pide Sí/No en GV |
 | Sí | el MISMO camino que la carga manual (en GP2: `crear_recepcion_insumo` + control en kg pendiente) |
 | No | cada lado toca SÓLO su fila; la reacción la hace un trigger del otro lado y se ve **donde se cargó** |
@@ -7794,7 +8385,7 @@ de insumos de Virgilio en GP2 se rearma **desde cero y en blanco** cuando Luis l
   pierde: cruza cuando se da de alta el artículo en GP2.
 - **Alta de un importado en GP2 con su receta**: se va haciendo **a medida que haga falta, por SQL en el back, no desde el
   front** (Luis, 05/10). Pendientes al 05/10 (sin fila): 323E, 838E, 438E, 439E, 584E, 727E, 865E, 55289. Hecho: 599E.
-- **Mapeo componente ↔ artículo**: tabla **`GP2.importado_virgilio_componente`** (`cod_virgilio → componente_id`), un
+- **Mapeo componente ↔ artículo**: tabla **`GP2.insumo_equivalencia`** (`cod_virgilio → componente_id`), un
   insert por código. Es el vínculo del flujo de recepción de insumos importados; el espejo de entregas cruza por
   `GP2.articulo` directo.
 - **Chequeo:** `select count(*), min(fecha), max(fecha) from "GP2".virgilio_espejo_pend;` — lo que todavía no cruzó, con
@@ -8581,6 +9172,28 @@ front las llama con `gvWriteHdr()` (la sesión), nunca con la clave pública. El
 - Primer toque SELECCIONA, «Enviar» EMPIEZA la tarea (evento **MDI**, `texto` = MOV/INS/CP/RC) y abre el módulo; abierta, el botón queda rojo y tocarlo RE-ABRE el mismo módulo (retomar, mismo tramo). Abajo, barra con **⛔ Anular** (MDT `ANULADO` → no productivas) y **🏁 Terminé** (MDT con `ts_inicio`). IR sigue con IRI/IRT y también va por «Enviar».
 - `MOD_TAREA` en index.html; tope 12 h (`_gvModVivo`). Vista `gv_monitor_horas_operario_dia` y `gv_horas_operario_detalle_v2` (marcador `v28.93-mdt`): MDT suma a Hs MOV ≡ `fetchMonitorDayStats`; TV / Mon. Admin «En este momento». `sql/gv_modulo_tarea_mdi_mdt_v2893.sql`, `tests/modulo-tarea-enviar.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-13, v29.81): una BARRA FIJA abajo NO TAPA NADA — se le hace lugar
+
+**Luis, con la captura del celular:** *"la barra de abajo con «Anular» y «Terminé» tapa opciones y botones
+(aparece arriba de algo que esté al fondo de la lista). Ajustalo en todos los módulos para que no tape
+nada (prioriza visión de smartphone)"*.
+
+> **Una barra `position:fixed` abajo se descuenta del alto de lo que hay detrás; no se dibuja encima.**
+
+- `#modTareaBar` (⛔ Anular · 🏁 Terminé de Mover racks, Completar Pedido, Pasar a urgente e Insumos) mide
+  su alto y **`_modTareaColchon(px)`** le hace lugar: cada overlay de `MOD_TAREA[*].ovs` que está en
+  pantalla pasa a `bottom: <alto>` (termina arriba de la barra, así su scroll llega hasta el final) y el
+  `body` lleva el mismo `padding-bottom` para la botonera de atrás. Al irse la barra, todo vuelve.
+- **La lista de overlays sale de `ovs`**, que ya existía: al agregar un módulo a `MOD_TAREA`, sus overlays
+  van ahí y el colchón lo hereda solo.
+- ⚠ Un overlay **sin scroll** (los de Insumos, con la tarjeta centrada) no se arregla con el colchón: su
+  tarjeta tiene que ENTRAR arriba de la barra. Hoy entra en un 390 x 740; si alguna crece, el test se pone
+  rojo y ahí hay que darle scroll (`overflow:auto` + la tarjeta con `margin:auto`, nunca
+  `align-items:center` con overflow: eso deja el borde de arriba inalcanzable).
+- `tests/modbar-no-tapa.cjs` mide **en 390 x 740** con la pantalla corriendo: la barra pegada abajo, el
+  overlay terminando justo en ella, el último renglón de una lista larga por encima, el colchón del body y
+  que al cerrar vuelva todo (verificado: 12 chequeos en rojo contra la v29.78).
+
 ## ⚠ REGLA (Luis, 2026-10-09, v29.05): un AJUSTE de RACKS lleva la POSICIÓN — Stock → Ajustar / Fijar / Stock inicial
 
 Caso 606 (09/10): un ingreso a racks X22 se cargó como **606** siendo **606E** (pedido PI B260601), y la corrección desde
@@ -8604,6 +9217,103 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
   desde A guardar. Retira la pestaña Racks de la v29.12 (caso 958E del 09/10: JM mandó 1 MC desde AD10 con la MC mal cargada en 13).
 - Lo sostiene la base: trigger `aa_gv_salida_cervantes_no_racks` → `SC_DESDE_RACKS` (centinela v29.13).
   `sql/gv_salida_cervantes_no_racks_v2913.sql`, `tests/sc-racks-unidad.cjs`.
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v30.01): los modos de INGRESO A RACKS son «Ingreso directo» y «Desde A guardar»
+
+**Luis:** *"el problema es que no hay una forma clara para mandar mercadería de A guardar a Racks"* ·
+*"Importado y nacional se tiene que renombrar a «Ingreso directo» o «Desde A guardar»"*.
+
+> ## **El modo se llama por lo que HACE, no por el origen de la mercadería.**
+> **📦 Ingreso directo** = entra al depósito ahora, **crea stock nuevo**. · **📥 Desde A guardar** =
+> ya está en el depósito, **lo mueve** (descuenta de A guardar o de Excedente).
+
+| | antes | ahora |
+|---|---|---|
+| botones | 📦 Importación · 🏠 Nacional | **📦 Ingreso directo · 📥 Desde A guardar** |
+| valor interno | `import` / `nacional` | **igual** (lo usan `racks_plani_ingreso` y `racks_plani_ingreso_nacional`): no se toca |
+
+- **Y avisa**: en «Ingreso directo», un código que YA tiene cajas en A guardar (o en Excedente) saca
+  *«⚠ Este código ya tiene N cajas en A guardar. Si son esas mismas cajas, esto NO es un ingreso
+  directo: se contarían dos veces»* con el botón **📥 Moverlas desde A guardar**, que pasa al otro
+  modo con el código y el origen puestos. **No frena**: lo decide el operario (`_irAvisoAGuardar`,
+  `irDesdeAGuardar`; el saldo sale de `_ir.saldos`, que ya se carga al abrir el módulo).
+
+**Lo que costó, el 13/10:** el **934E** (1 master, 12 cajas, Y07, 14:40) y el **606E** (10 cajas,
+X22, 10:00) se cargaron por Importación cuando esas cajas ya estaban en A guardar: racks sumó y
+A guardar quedó igual, o sea **el stock contado dos veces**, y nada avisó — lo vio Luis en Stocks.
+Corregido con un ajuste (`CORR IR 146592538`, A guardar 934E −12 → 0; racks queda en 180, que es lo
+que hay). El movimiento de racks NO se toca: la mercadería está en Y07.
+
+**Cómo se encuentra otro igual** — un IR que no descontó nada y dejó saldo vivo en A guardar:
+
+```sql
+select m.id, m.creado, m.cod_art, m.delta, m.ref, m.legajo
+  from public."Movimientos_Stock" m
+ where m.deposito = 'racks' and m.tipo = 'ingreso' and m.ref like 'ingreso a racks %'
+   and m.creado >= now() - interval '30 days'
+   and exists (select 1 from public."Movimientos_Stock" x
+                where x.deposito = 'a_guardar' and upper(btrim(x.cod_art)) = upper(btrim(m.cod_art))
+                group by 1 having sum(x.delta) > 0)
+ order by m.creado desc;
+```
+
+**Chequeo:** `node tests/ir-codigo-candado.cjs` (bloque **H**: el aviso, que no frena, que el botón
+cambia de modo con el código puesto, y los dos rótulos nuevos; verificado que falla contra la v30.00).
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.67 + v29.77 + v29.78, D2): en INGRESO A RACKS el CÓDIGO SE ELIGE — se sugiere mientras se escribe
+
+**Luis:** *"956E · va a terminar en AB10 · el operario lo puso mal · ponele candado"* y, después del candado:
+*"mas que candado, solo debería dar opciones de poner un codigo ya existente. a medida que se escribe se sugiere
+el codigo"*. El 13/10 09:34 el legajo 104 escribió la **posición** `AB3` en el campo del **código** y entraron
+**60 cajas de un código fantasma** en AB03 (eran **956E** y las volvió a cargar bien en **AB10** a las 09:37). El
+09/10 había pasado lo mismo con «606», que era 606E.
+
+> ## **El campo Código del modo Importación BUSCA: el código sale de la LISTA, no del teclado.**
+
+| lo que escribe el operario | qué hace el módulo (v29.77) |
+|---|---|
+| parte del código o del **nombre** (`956`, `cuchara`) | **sugiere** los códigos que existen (🚢 = importado); hay que **tocar** el que corresponde — una coincidencia parcial no elige sola |
+| el código entero, exacto (`956E`, y `26` = `026`) | se elige solo: tipear el código completo sigue andando sin tocar la lista |
+| `606` (el caso del 09/10) | la lista le sugiere el **606E**, que es el que existe |
+| nada que coincida | ⚠ *«No hay ningún código que coincida»* + **«✎ Cargar «XXX» igual (código nuevo)»**, y ahí el candado PREGUNTA antes de crearlo |
+
+- La lista sale de **`gv_stock_cod_lista()`** (lectura, anon, 689 códigos / 155 importados / 321 ms al 13/10):
+  el **MISMO universo** que ya decide el candado `gv_stock_cod_conocido`, así la pantalla **no puede sugerir un
+  código que después el candado rechaza**. Deja afuera los dados de baja (`GV_Codigo_Baja`) y los **insumos puros**
+  —`A1` es insumo **y** posición de rack, justo la confusión que esto cierra—; el insumo importado (**323ES**) entra
+  porque está en `Importados`. Devuelve el código **como lo escriben los maestros** (`026`, no `26`), que es como se
+  escribe en `Movimientos_Stock` / `GV_Lugar_Item` / `Importados` / `OC_Maximos`.
+- ⚠ **Si esa lectura falla, el campo queda libre con el candado de la v29.67** y nada más: *«no pude leer»* no es
+  *«ese código no existe»*.
+- `irSetCod` **ya no cuelga de ningún input** (queda como setter programático): un código que no está en el universo
+  queda marcado como **código nuevo**, el mismo estado que deja el «usar igual», así el candado lo pregunta.
+
+### El candado de la v29.67 sigue abajo de todo (y es lo único que frena a AB3)
+
+| lo tipeado | qué hace el módulo |
+|---|---|
+| código que existe (`gv_stock_cod_conocido`, los 7 maestros) | sigue como siempre |
+| **POSICIÓN de rack** que no es un código (`gv_rack_sector`: AB3 → AB03, W1 → W01) | **no se carga, y SIN CARTEL** (Luis, v29.78: *«No tiene que avisar que es una posicion, simplemente no tiene que dejar»*): no está en la lista, no se ofrece «usar igual» y «Revisar carga» queda deshabilitado |
+| código **dado de baja** (`gv_codigo_baja_de`: 865ED → 865E) | bloquea y dice cuál va |
+| no existe y no es posición | **pregunta** (no bloquea): *«No existe el código X. ¿Lo creo y le cargo N cajas en SEC?»* |
+| no se pudo verificar | pregunta: *«no pude leer» no es «existe»* |
+
+- Es el mismo candado de **Stocks → Ajustar / Fijar** (v25.28) con el aviso de posición que este caso pide
+  (`_irCodChk` / `_irCodGuard`, cache por código, chequeo con debounce al tipear + candado en `irRevisar`).
+- ⚠ **Solo en modo IMPORTACIÓN**, que es donde el código se TIPEA: en **Nacional** sale de la lista de stock real
+  (y su clave trae el sufijo de empresa, `438E LK`, que `gv_stock_cod_conocido` no conoce: daría falso rojo).
+- ⚠ **La posición bloquea sólo si ADEMÁS el código no existe**: `A1` es rack de insumos **y** código de verdad
+  (medido 13/10: `gv_rack_sector('A1')` = A1 y `gv_stock_cod_conocido('A1')` = true).
+- ✅ **El dato de AB3 se corrigió el 13/10** (D3): ajuste inverso `-60` en AB03 (mov **146068820**, `ref 'CORR IR 145833325'`,
+  backup `zz_backups."GV_Backup_MovStock_AB3_20261013"`). AB3 queda en **0** y **AB03 libre** en el Mapa; las 60 reales siguen en
+  **AB10** (132). El movimiento original NO se borra. Problema **758** de la auditoría, cerrado con este commit.
+- ⚠ **Con la lista puesta, `AB3` ya no puede quedar elegido tipeando** (no está en el universo): lo único que se
+  ve es el *«No hay ningún código que coincida»* **sin** el botón de «usar igual» (`_irChkMal` sigue usando
+  `gv_rack_sector` para decidirlo, pero ya no lo dice). El candado sólo se alcanza forzando el código
+  (`irSetCod`) y ahí frena sin cartel. **Se prueban las dos capas.**
+- Centinelas 403 y 404 · `sql/gv_stock_cod_lista_v2977.sql` (rollback: `drop function public.gv_stock_cod_lista();`) ·
+  `tests/ir-codigo-candado.cjs` (corre la pantalla; verificado que falla con **14 chequeos en rojo** contra la v29.73
+  y con 10 contra la v29.66).
 
 ## ⚠ REGLA (Luis, 2026-10-09, v29.17): ❓ AYUDA — el asistente del operario SÓLO sabe el manual
 
@@ -8641,6 +9351,172 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
   (ABS, AI, EBA, NY c/Carga 25%, NY Recup, NY Virgen, PE Polie, PP 2630, PS PE). Una bolsa nueva aparece cuando se le da ubicación.
 - `tests/ins-ri-cat-bolsas.cjs`.
 
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.89): el ORIGEN de una recepción de insumos es una LISTA CERRADA por categoría — y hay UN SOLO «Enviar»
+
+(el `.sql`, los centinelas 416-418 y los comentarios del código dicen **v29.82**: es la versión con la que se aplicaron, la llave — no cambiarla.)
+
+**Luis:** *"quiero que el menu sea reducido dependiendo de que es lo que estan recibiendo"* · *"tienen que
+apretar «enviar» dos veces … ¿hace falta que sea asi?"*.
+
+> ## **No se escribe de dónde vino: se ELIGE de los que pueden traer eso.** Y la lista **NO vive en el front**:
+> sale de **`gv_insumo_origenes(categoria)`**, que la arma con GP2 menos **`GV_Insumo_Origen_Excluido`**.
+
+| categoría | de dónde salen los botones | al 13/10 |
+|---|---|---|
+| 🧪 **Bolsas plásticas** | `proveedor_insumo` rubro *Sector Bolsas Plásticas* **que entrega en Virgilio** (`entrega_en is null`) | Indarnyl · Beta Plásticos · Santa Rosa Plásticos |
+| 📦 **Cajas** | `proveedor_insumo` rubro *Sector Caja* | Corrugadora del Plata · Recicor |
+| 🧩 **Partes plásticas** | los **inyectores** (`ubicacion` tipo `inyector`) **+ Cervantes** | Cervantes · Kollplast · Pat Bet Plast · Pettofrezza Rafael |
+| 🧵 **Flejes** | `componente.proveedor` del sector Fleje **+ Cervantes** | Cervantes + 8 (Altrak, Aperam, Basconia, Brawin, Hermac, JL Metales, Resortes Charcas, Szapiro) |
+| **SC y SP** | **no se pregunta**: siempre **Cervantes**, siempre **remito** | — |
+
+- **SC y SP se saltean las DOS preguntas** (Luis: *"no entregan con factura nunca, solo remito, siempre es
+  Cervantes, que ni pregunte"*): el origen queda fijo y la documentación **arranca en el N° de remito**, sin el
+  paso Remito / Factura / los dos. El «‹ Atrás» de ahí vuelve a las **categorías**, no a un paso que no existe.
+- **Flejes**: con **Cervantes** se ven **todos**; con un **proveedor**, sólo los que GP2 le tiene asignados
+  (`gv_insumo_fleje_proveedor`, por el código de Virgilio o por el componente de GP2 que la lista ya muestra).
+  Y **mientras quede alguno sin vincular**, el botón **«Otros (N)»** cambia a la lista de **los que todavía
+  no están asignados a ningún proveedor** (Luis, v29.87: *"que aparezca un botón que diga «otros» y que
+  permita seleccionar de los que todavía no están vinculados"*). Son **dos listas, no una**: nunca se
+  mezclan, y se vuelve con «‹ Volver a los de \<proveedor\>».
+- **Las bolsas sólo se ENVÍAN a los inyectores habilitados** (ámbito `inyector`): el mismo filtro se le aplica a
+  `material_virgilio_bundle` en «📤 Envío a inyectores».
+
+### ⚠ Lo que GP2 tiene y acá NO va: queda ANOTADO, no se adivina
+
+`GV_Insumo_Origen_Excluido` (ámbito, nombre, motivo). Al 13/10, **dos filas, las dos con la diferencia contra
+GP2 escrita** — y las dos **para revisar allá**, porque o GP2 está mal o la lista de Luis está incompleta:
+
+| ámbito | nombre | por qué |
+|---|---|---|
+| `plastico` | **Simco** | GP2 lo tiene activo en *Sector Bolsas Plásticas* (sin cód. de proveedor) y Luis nombró 3 |
+| `partes_plasticas` · `inyector` | **JL Matriceria** | GP2 lo tiene como inyector y Luis nombró 3 |
+
+⚠ **Arcolor y Julio Garcia e Hijos NO hacen falta excluirlos**: GP2 dice que entregan en **Cervantes 2868**, así
+que el filtro `entrega_en is null` ya los deja afuera de una recepción **de Virgilio**. Si algún día entregan acá,
+se les borra ese campo en GP2 y aparecen solos.
+
+**Los tres los confirmó Luis el 13/10** y no se vuelven a preguntar: *"pone una excepcion en los inyectores para
+que solo aparezcan los 3 que te dije, bolsas plasticas son los que ya estan configurados en GV, lo de arcolor y
+julio tal cual, solo cervantes no virgilio"*.
+
+### ⚠ Y lo que quedaba SÓLO EN EL FRONT pasó a una tabla (Luis, v29.87)
+
+**Luis:** *"crea tabla si sólo está en el front el dato"*. Tres datos del negocio que vivían escritos en
+`index.html`:
+
+| dato | ahora vive en | lo lee |
+|---|---|---|
+| el apodo del origen («Manolo» = Pat Bet Plast) | **`GV_Insumo_Origen_Apodo`** | `gv_insumo_apodos()` |
+| cuántas cajas trae un paquete (25) | **`GV_Insumo_Config`** `caja_x_paquete` | `gv_insumo_config()` |
+| las marcas que se eligen al recibir (Loeke · Chef · Mixto; en cajas sin Mixto) | **`GV_Insumo_Config`** `marcas` / `marcas_cajas` | `gv_insumo_config()` |
+
+Los hidrata **`insFetchConfig`** desde `insLoadMeta`; `INS_CAJA_X_PAQ`, `INS_MARCAS`, `INS_CAJA_MARCAS` e
+`INS_INY_APODO` pasaron de `const` a `let` y **quedan de FALLBACK**: si la base no contesta, el operario carga
+igual que antes. **Al agregar un dato del módulo de insumos, va a la tabla y se hidrata acá: no se escribe un
+número más en `index.html`.**
+
+⚠ `gv_insumo_origenes` **no** devuelve el apodo: agregarle una columna pide `DROP` + `CREATE` y el connector se
+cuelga con la palabra de borrado (regla del 07/10). Por eso va en su propia RPC, no en la que ya existía.
+
+### ⚠⚠ La lista cerrada NO puede dejar al operario sin poder cargar
+
+- **«✏ Otro origen»** siempre está: el camión que nadie previó se escribe a mano, como antes.
+- **Si la base no contesta, queda el texto libre de siempre** — *"no pude leer"* no es *"no hay de dónde recibir"*.
+- En flejes, los que **GP2 no le asignó a nadie** (al 13/10: **29 de los 48** de Virgilio) **no se esconden**:
+  van contados atrás de **«➕ Ver los N flejes sin proveedor asignado en GP2»**. Y **buscando se ve TODO**: si el
+  operario escribe el código, lo tiene que encontrar (regla v20.95).
+  ⚠ Los 19 vinculados cubren **4** de los 8 proveedores (Basconia 12, Aperam 6, Altrak 1, Hermac 1); los otros 4
+  (Brawin, JL Metales, Szapiro, Resortes Charcas) se ven igual, porque la lista de recepción ya trae **sus
+  componentes de GP2** (v29.35) y el alta en Virgilio la hace `gv_insumo_desde_gp2` al elegirlos.
+
+### UN SOLO «Enviar» (y no, no hacía falta el segundo)
+
+El primer «Enviar» de la botonera ya arranca el tiempo (la tarea **Insumos**, `MDI` de `MOD_TAREA`, v28.93). El
+segundo sólo servía para que `send()` abriera el toggle RI/EI. Hoy, terminada la documentación, lo abre
+**`_insArrancarToggle(mode)`**: el mismo `send()` de siempre (evento, historial, cola offline) con
+`{sinAviso:true}` — se saca el cartel *"Reporte enviado correctamente"*, que ahí no aporta nada: lo que confirma
+que arrancó es la lista en pantalla. **El aviso de FALLA se mantiene.** Vale para Recibir **y** Entregar.
+
+⚠ **Si el toggle RI/EI quedó ABIERTO** (la app se reinició con la recepción a medias), `_insArrancarToggle`
+**RETOMA** —con el borrador si hay— en vez de llamar a `send()`, que lo **cerraría**. Perder la sesión del
+operario por volver a entrar sería peor que el segundo Enviar que esto saca.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` (vacía) · `select nombre, fuente from
+public.gv_insumo_origenes('plastico');` · `select * from public.gv_insumo_config();` ·
+`node tests/ins-ri-origen-menu.cjs` (verificado que falla contra la v29.85) · `node tests/ins-envio-tipo.cjs`
+(el que quedó viejo: exigía JL Matriceria entre los inyectores, y de paso le pegaba a la base de verdad).
+`sql/gv_insumo_origenes_v2982.sql`, centinelas 416-418.
+
+## ⚠ REGLA (Luis, 2026-10-13, v30.00): el SEPARADOR DECIMAL no decide una búsqueda — y un TMP no se da de alta sobre un código que ya existe
+
+**Luis, con los 144 Kg del `TMP-0037`:** *"¿cómo es que se aceptó sin lugar? ¿se permite eso? ¿cómo es que se
+guardó sin código?"*.
+
+> ## **`stkMatchBusq` normaliza el decimal de los DOS lados: buscar `13.6` encuentra `13,6`.**
+> En los flejes la MEDIDA es el nombre, y **39 de 48 tienen decimal** (27 con coma, 12 con punto).
+
+Lo que costó no normalizarlo: el 13/10 09:09 el legajo 104 recibió 144 Kg de un fleje `13.6 x 0.8`, no lo encontró
+en la lista — se llama **`N°19`**, *«13,6 x 0,8 · Fleje N° 19»*, con **coma** — y lo dio de alta como insumo nuevo.
+El servidor lo numeró `TMP-0037` y los 144 Kg quedaron en un código que no existe para nadie. El arreglo sólo
+**agrega** matches (`(\d),(\d)` → `$1.$2`), no saca ninguno, y vale para TODO buscador que use esa función.
+
+**Tres cosas del circuito que la pregunta destapó, y conviene tener a mano:**
+
+1. **La recepción de un insumo NUNCA pregunta el lugar.** Pide categoría → origen → documentación (remito /
+   factura) → el insumo de la lista → cantidad + unidad + **marca** (v29.57). El lugar de un insumo vive en el
+   **Mapa** y lo pone un supervisor; la red es la alarma **`gv_mapa_stock_sin_lugar`** (*"hay N en stock y el insumo
+   no está en ninguna posición del Mapa"*). ⚠ **Al 13/10 esa alarma tiene 19 insumos**, 7 de ellos cajas: existe,
+   pero nadie la mira.
+2. **«Aceptar» es del ADMIN, no de la recepción** (Stock y Compras → Insumos): es el paso que le pone el código real,
+   el nombre y la ubicación inicial. `TMP-0037` **nunca se aceptó**: quedó pendiente desde las 09:09. Y no se podía
+   — `insumo_identificar` **frena** un TMP contra un código en uso (*"una sugerencia del operario no se puede
+   fusionar contra un insumo en uso"*), que es correcto: fusionar dos stocks lo decide una persona, no un botón.
+3. **El alta se cerró a las 09:35 y Luis la REABRIÓ el mismo día** (v30.05, abajo): la v29.56 había tapado
+   `insNuevoOpen` con un `alert`, y `TMP-0037` fue el último que entró por ahí. Hoy el botón está de vuelta **con
+   el aviso de parecidos** adelante. **Y lo que sigue abierto no es el código: es el LUGAR** — un código del
+   catálogo de GP2 (`gv_insumo_desde_gp2`) también se recibe sin posición, y queda en esa alarma.
+
+Los 144 Kg se fusionaron en `N°19` con el mecanismo de la casa (se renombra el `cod_art` del movimiento, el TMP
+sale del catálogo y queda en `Insumos_Historial`), **sin tocar la ubicación** (Luis: *"hay que ver dónde está"*).
+⚠ Ojo con el efecto: `N°19` ya tenía R06AT, así que **el Mapa ahora dice R06AT y la alarma se apagó** — si no
+están ahí, lo corrige el conteo, no un aviso. Detalle, verificación y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
+§3.v3000. Lo sostiene `tests/stk-busca-decimal.cjs`.
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v30.05): el operario SÍ PUEDE crear un código nuevo al RECIBIR — con el aviso de parecidos
+
+**Luis, textual:** *"hay que darles la opción de poder crear códigos nuevos cuando reciben si no están en la lista
+(antes tenían un botón abajo que les permitía hacer eso no, ponéselos)"*.
+
+> **Se RETIRA la v29.56** (*"en Recepción de insumos el operario ya NO da de alta un código nuevo"*, de esta
+> misma mañana). El **«+ Agregar insumo»** vuelve a estar en la grilla de categorías y dentro de cada categoría.
+
+| dónde | alta |
+|---|---|
+| **RI (recibir)**, categoría común | **SÍ** — el botón en los dos lugares |
+| **RI**, categoría **CERRADA** (bolsas, cajas) | **NO**: su catálogo es conocido y completo (Thomas, v29.25/30). El botón no se dibuja y `insNuevoOpen` se planta si lo llaman a mano |
+| **EI (entregar)** | **NO**, como siempre: dar de alta algo al sacarlo sería sacar stock de algo que nunca entró |
+
+**Y el alta AVISA antes de crear.** Es la lección del `TMP-0037` (arriba): el operario escribió `13.6 x 0.8`
+teniendo el fleje en la lista como `N°19` (*13,6 x 0,8*) y se creó un código que no existía para nadie. Ahora
+`insNuevoOk` busca los parecidos **por los NÚMEROS del detalle** — sin importar coma ni punto ni el orden — y los
+muestra: *«⚠ Puede que ya exista: · N°19 — 13,6 x 0,8 · Fleje N° 19»*. Cancelando **no crea nada y deja la lista
+filtrada por ese número**; «crear igual» crea. **No bloquea**: lo que no puede es crearse en silencio teniendo el
+gemelo a la vista.
+
+⚠ **La identidad la sigue poniendo el servidor** (`nuevo_insumo_tmp` → `TMP-00NN`) y el código de verdad se lo
+pone un admin en Stock y Compras → Insumos. **Un TMP no se fusiona desde el front contra un código en uso**
+(`insumo_identificar` lo frena, y está bien): si de verdad son el mismo, lo resuelve una persona.
+
+⚠⚠ **El REMITO que la recepción pide NO se guarda en Virgilio.** `_insDocState` (n° de remito / factura y sus
+fechas) se usa para GP2 — bolsas contra su OC — y después se tira (`insDocCancel` lo pone en `null`): el
+movimiento no lo lleva en ninguna columna. Lo cargado a mano desde una sesión lo pone en `ref` (`Remito 38880`)
+y en la descripción, pero **lo que carga el operario desde el celular queda sin el remito**. Cerrarlo es un
+cambio aparte (una columna, o el `ref`), y **no está hecho**.
+
+**Chequeo:** `node tests/ins-alta-duplicado.cjs` (corre el alta de verdad: avisa con el candidato, cancelar no
+crea y deja el filtro, «crear igual» crea, y una medida que de verdad no está entra derecho) ·
+`node tests/ins-categorias.cjs` · `node tests/ins-ri-cat-bolsas.cjs` · `node tests/ins-admin.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.57): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
 
 (los comentarios del código, el `.sql` y la vista dicen **v29.56**: otra sesión se llevó ese número mientras se escribía esto.)
@@ -8663,16 +9539,20 @@ nada (mismo insumo físicamente, mismo lugar físico) pero debería quedar regis
 
 ### ⚠ Y los saldos de insumos en unidad VIEJA (MC) son de antes de la v24.69
 
-`gv_insumo_unidad_base` convierte a la unidad base, pero es **BEFORE INSERT solamente**: las 18 líneas cargadas en
-MC antes de esa versión (546P 10 · H201Part 5 · 439E 1 · 505C 1 · 590E 1; la última del **25/08**) quedaron así, y
+`gv_insumo_unidad_base` convierte a la unidad base, pero es **BEFORE INSERT solamente**: las líneas cargadas en MC
+antes de esa versión quedaron así, y
 `vista_saldos_insumos_x_unidad` **agrupa por unidad** → esos códigos muestran dos saldos (Uni positivo + MC negativo).
 **No es un bug vivo**: `gv_importados_stock_insumos` los convierte con el factor y da el número correcto (505C
-**98.000** · 439E **312** · 590E **0**, `sin_factor` en 0). Los 5 saldos negativos de insumos son exactamente esas
-unidades viejas, todos de categoría `importados`: **cero negativos en las categorías del operario**.
+**98.000** · 439E **312** · 590E **0**, `sin_factor` en 0). Los saldos negativos de insumos son exactamente esas
+unidades viejas, todos de categoría `importados`: **cero negativos en las categorías del operario**. Al 13/10, tras
+el conteo del 546P, son **3**: 439E −5 · 590E −4 · 505C −3, los tres en MC (eran 5 con los dos grupos del 546P).
 
-⚠⚠ **NO se normalizan: quedan así** (Luis, 13/10, D9: *"dejalo"*). El UPDATE que las reexpresaría está escrito en
+⚠⚠ **NO se normalizan: quedan así** (Luis, 13/10, D9: *"dejalo"*). **Hoy son 10 filas en 5 códigos**, medido el
+13/10 después del conteo del 546P: `H201Part` 5 (saldo 0) · **`N°7` 2 (saldo 0, que la lista vieja de «18» se
+olvidaba)** · `439E` 1 (−5) · `505C` 1 (−3) · `590E` 1 (−4), la última del **25/08**. Las 10 de `546P` salieron de
+acá con su conteo (arriba). Las que molestan —el código que muestra dos saldos— son **3**, las de saldo ≠ 0. El UPDATE que las reexpresaría está escrito en
 `sql/gv_insumo_marca_empresa_v2956.sql` y **no se aplicó**: es cosmético (que cada código muestre un solo número) y
-no cambia ninguna cuenta, así que no vale pisar 18 filas de `Movimientos_Stock`. **No volver a proponerlo.** Y si
+no cambia ninguna cuenta, así que no vale pisar esas filas de `Movimientos_Stock`. **No volver a proponerlo.** Y si
 alguien lo intenta: un INSERT compensatorio NO sirve — la línea nueva con unidad `MC` la convierte el trigger y el
 saldo MC sigue ahí; el único camino es el UPDATE de las filas viejas, que no dispara ese trigger.
 
@@ -8682,9 +9562,12 @@ marca**; lo único que queda es **a quién se le dio** (`ref`: Cervantes 42 · R
 destino del 30/06 al 07/08, de antes de que el campo fuera obligatorio). O sea el circuito es **asimétrico a
 propósito**: la entrada dice de qué empresa vino y la salida no dice para cuál se usó. **No proponer pedir la marca
 al entregar ni «cerrar el círculo» por empresa.**
-⚠ **Las 45 «Cajas» de 546P no se tocan** (Luis, 13/10, D8: *"dejalo"*): esa unidad no tiene factor en
-`Insumos_Factores` y no se inventa. Y 546P no está mapeado a ningún importado, así que su stock hoy no lo lee
-ninguna pantalla de compra.
+⚠⚠ **RETIRADA la D8 («las 45 Cajas de 546P no se tocan»): el 546P SE CONTÓ EN EL DEPÓSITO y se unificó**
+(Luis, 13/10, mismo día y después de la D8: *"fui yo. está ok, se hizo el conteo en el depo"*). A las 13:59 pasó a
+**una sola unidad, `Uni`** —sus grupos «Cajas» (−45) y «MC» (−60) se reexpresaron, refs `unificación: pasa 222 MC a
+Uni (bruto 1:1)` y `fix_recatalog_bastidor`— más el ajuste del conteo (`CONTEO 546P X13`, −8.640): **30.528 → 6.768
+Uni**. **No se perdió ningún movimiento**: las líneas se reexpresaron, no se borraron. Hoy el 546P tiene **0 filas en
+«Cajas» y 0 en «MC»**. Lo que vale es esto, no la D8.
 
 ## ⚠ REGLA (v29.24, 09/10): el REPLAY de Terminar Día no re-manda los items SÓLO de Historial (`h_*`)
 
@@ -8706,13 +9589,180 @@ ninguna pantalla de compra.
 - Corre por el disparador `zz_gv_gp2_espejo_insumos` (cada movimiento de insumos; nunca frena la carga: el error va al log)
   y por el cron `gv-gp2-espejo-insumos` (:19 y :49). Alcance: cajas, fleje, parte_procesado, partes_crudo, plastico — los
   importados NO.
-- **Qué código va con qué componente lo dice `GP2.importado_virgilio_componente`** (54 cargadas el 09/10; el resto lo asigna
+- **Qué código va con qué componente lo dice `GP2.insumo_equivalencia`** (54 cargadas el 09/10; el resto lo asigna
   Thomas en GP2 → Stock General → Virgilio, D30). Un código sin equivalencia no se copia.
 - **D16 (Thomas): el celular del operario de Virgilio NO escribe en GP2.** Lo que pasa en GP2 (envío de bolsas a un inyector,
   consumo) lo carga el admin dentro de GP2. `gv_insumo_envio_inyector` queda sin grant y sin llamador.
 - Lectura: `select * from public.gv_gp2_espejo_insumos(null, true);` (qué haría) · `select * from public."GV_GP2_Espejo_Log" order by id desc;`
 - Rollback: `select cron.unschedule('gv-gp2-espejo-insumos');` + `alter table public."Movimientos_Stock" disable trigger zz_gv_gp2_espejo_insumos;`
+- ⚠⚠ **v29.66 (Luis, 13/10): el depósito «<sector> en Virgilio» SE CREA SOLO si falta.** Sin eso la fila salía «sin depósito
+  en Virgilio» y ese stock **no se reflejaba nunca, sin que nadie se enterara**: pasó el 13/10 al vincular C9 y D14
+  (Resortes, Sector Bombilla, 24.552 u mudas). Hoy la función lo crea (sólo ejecutando, no al simular) y sigue con el ajuste.
+  El insert va con `not exists`, **no** con `on conflict (tipo, ref_id)`: el índice es PARCIAL (`where ref_id is not null`) y
+  da 42P10; y el guard hace falta porque dos componentes del mismo sector entran en el mismo loop (el 2.º chocaba con la
+  ubicación que creó el 1.º). Marcadores `v29.61-ubic` / `v29.61-ubic3` (llave, no cambiarlos), centinela 398 con patrón de
+  CÓDIGO (el `-- v29.61-ubic3` es comentario y `gv_reglas_perdidas` limpia los comentarios antes de buscar: con ese patrón
+  el centinela daba «perdida» con la regla puesta). `sql/gv_gp2_espejo_insumos_ubic_v2966.sql`.
+- ⚠ **NO se duplica nada, medido el 13/10.** La verdad es Virgilio; GP2 tiene la copia en depósitos SEPARADOS: los 5 (hoy 6)
+  `virgilio_sector` **no entran en `v_nivel_stock`**, así que no inflan máximos ni OC de Cervantes, y el **único** escritor de
+  esos depósitos es el espejo (0 movimientos de otra fuente). Las bolsas viven sólo en la ubicación 57 (`tipo='sector'`, la
+  única que SÍ entra en `v_nivel_stock`, y está bien: el sector se mudó a Virgilio y no hay otro depósito de bolsas). Probado
+  en transacción abortada: +1 cajón de G11 en Virgilio → GP2 15.380 → 16.149 **en el acto**. Y 59 de 59 filas en `ok`.
+- ⚠ **590E (Pincel Silicona) NO se espeja**: es categoría `importados` en Virgilio y los importados están fuera del alcance a
+  propósito (tienen su propio circuito, `Importados_Stock_Parte` / `gv_importados_stock_insumos`).
 - `sql/gv_gp2_espejo_insumos_v2932.sql`.
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.74): LA TABLA DE EQUIVALENCIAS DE INSUMOS ES UNA — `GP2.insumo_equivalencia`
+
+**Luis:** *"tiene que haber una tabla de insumos que muestre la equivalencia entre un insumo de virgilio, de
+cervantes y el codigo ISIS que tienen. Punto."* · *"¿cómo catzo terminamos teniendo dos?"*
+
+> **Toda equivalencia de códigos de insumos vive en `GP2.insumo_equivalencia`** (`cod_virgilio` ·
+> `componente_id` → cod de Cervantes · `isis`). Legible: **`GP2.v_insumo_equivalencia`**. Se edita en
+> GP2 → Stock general → pestaña Virgilio. **No se crea otra, ni una columna que haga lo mismo.**
+
+Había dos, y la vieja **no era una tabla: era una COLUMNA** (`GP2.componente.codigo_virgilio`, 8 filas, sólo
+bolsas, de la v14.95). Por eso nadie la encontró el 30/09 cuando hizo falta un mapeo, y se creó la tabla al
+lado. Mismo pozo que el módulo de Matricería duplicado.
+
+⚠ **Y la columna nació mal, no se desalineó:** estaba cargada con abreviaturas del lado de Cervantes (`NV`,
+`NR`, `N25`, `PP`, `PS`, `PE`) que **nunca existieron en Virgilio** — los códigos de Virgilio son `NY Virgen`,
+`PP 2630`, `NY Recup`… desde el 02/07. Coincidían sólo `ABS` y `AI`.
+
+**Lo que costó, medido el 13/10:** `GP2.movimiento` tipo `envio_inyector` tenía **0 filas en toda su
+historia**, mientras en Virgilio salieron **86 bolsas (2.150 kg)** a inyectores entre el 25/08 y el 08/10
+(Rafael 57, Manolo 29). 7 de las 9 bolsas no matcheaban, así que `enviar_material_virgilio` **no se llamaba
+nunca y encima en silencio** (`_insGp2Mat` devolvía null y la fila salía del lote sin avisar). El espejo bajaba
+la 57 igual: los kg se evaporaban.
+
+⚠ **No hay desfase de stock que ajustar** (medido): el espejo del 09/10 fijó la 57 al saldo real de Virgilio
+(la **subió de 0 a 5.525 kg**: GP2 nunca había tenido stock de bolsas), y esas salidas ya estaban netas ahí.
+Lo que no existe es el **circuito del inyector: ni las salidas ni las devoluciones** (0 movimientos con las
+ubicaciones 58-61 en toda la historia). Cargar sólo las salidas dejaría a Rafael debiendo kg que ya devolvió
+inyectado: arrancarlo pide **un conteo de lo que cada inyector tiene hoy**, no un backfill.
+
+| pieza | qué cambió |
+|---|---|
+| `GP2.componente.codigo_virgilio` | **borrada** (backup `zz_backups."GV_Backup_CodigoVirgilio_20261013"`) |
+| `enviar_material_virgilio` · `recibir_oc_virgilio` | resuelven el componente por `insumo_equivalencia`; sin fila, **fallan ruidoso** |
+| `material_virgilio_bundle` · `oc_pendientes_virgilio` | devuelven el **código REAL** de Virgilio (el front de GV matchea con `_insK()`, upper+trim: no hubo que tocarlo) |
+| `recalcular_maximo_material` | «está en Virgilio» = tiene fila en la equivalencia |
+| `public.gv_gp2_inventario` | `codigo_virgilio` sale de la equivalencia — ⚠ con `CREATE OR REPLACE`, nunca `DROP CASCADE` (cuelgan `gv_gp2_stock_componente` y `gv_importados_ordenes`: ese cascade ya dejó Importados en 404 en la v16.20 y la v16.33) |
+| front (`index.html`) | **una bolsa sin equivalencia NO pasa en silencio**: con un inyector elegido, cualquier ítem que el bundle no reconozca frena con el confirm («¿registrar igual sólo en Virgilio?»). El criterio **no usa `insCatOf`**: si el catálogo de categorías no se leyó devuelve `""` para todo y el guard no frenaría nada |
+| `isis` | cargado desde `Insumos.isis`: **29 de 79**. Las bolsas tienen el ISIS igual al código de Cervantes (2455 = ABS); ⚠ **AI no**: componente 2465, ISIS 1135 — mirar si no es un error de carga en `Insumos` |
+
+⚠ **`EBA` queda CERRADO** (Luis, 13/10: *"se definirá después; el admin que está creando la página tiene que
+setear el código de Cervantes"*): sus 20 bolsas (celda Q34) no cruzan al espejo porque no tiene componente en
+Cervantes. **No se da de alta desde acá y no se vuelve a sugerir.**
+⚠ **`CAJA Nº 1` y `CAJA Nº 22` tienen el mismo ISIS (`0127`)** en `Insumos`: uno de los dos está mal.
+⚠ Los centinelas de las 3 funciones de **GP2** no entran en `GV_Reglas_Centinela` (sólo alcanza `public`):
+del lado de GP2 lo sostienen sus tests. En GV quedan los ids 388 y 406.
+
+`sql/gv_insumo_equivalencia_unica_v2974.sql` (rollback en la cabecera), `tests/ins-bolsa-sin-equivalencia.cjs`.
+
+### ⚠ v29.79 (Luis, 13/10): GP2 es el CANÓNICO del código ISIS — se replica a `Insumos`
+
+**Luis:** *"si hay diferencias actualmente, asumi que el de GP2 es el canonico y remplazacelo a Virgilio"* ·
+*"que haya boton para confirmar que se guarda/vincula el codigo ISIS con el de Virgilio y/o con el de Cervantes
+o en cualquier permutacion de esas combinaciones"*.
+
+> El dueño del ISIS de un insumo es **`GP2.insumo_equivalencia.isis`**. Lo que se guarda ahí se escribe en
+> **`public."Insumos".isis`**, **incluido vaciarlo**. **Nunca al revés.**
+
+- Lo hace el trigger **`public.gv_insumo_isis_sync`** (de GV, sobre la tabla de GP2 — mismo patrón que
+  `gv_ingreso_virgilio_denegado`, v25.37). **No hay ciclo**: `gv_gp2_espejo_sync` copia `Insumos.isis` a
+  `GP2.virgilio_insumo_stock`, que es **otra** tabla, y el bundle del editor ya leía la equivalencia primero.
+- Pasa el bloqueo `aaa_gv_anon_bloqueo` porque es SECURITY DEFINER (`current_user` = postgres, regla v29.16).
+- Del lado de GP2 (Stock general v3.7.0): el botón **«🔗 Vincular»** tiene columna propia y guarda en
+  **cualquier permutación** (sólo Cervantes · sólo ISIS · los dos); un ISIS vacío **limpia** el dato en los
+  dos lados. El vínculo con Cervantes no se borra desde ahí, a propósito.
+- ⚠ **Para corregir el ISIS de un insumo de Virgilio se edita en GP2**, no en `Insumos`: si se toca sólo del
+  lado de Virgilio, el próximo guardado desde GP2 lo pisa.
+- Rollback: `drop trigger zz_gv_insumo_isis_sync on "GP2".insumo_equivalencia;`
+  Adenda en `gestion-productiva-2.0/db/migracion_insumo_equivalencia_unica_20261013.sql`.
+- **El Cód. Cervantes del editor sólo acepta códigos que EXISTEN** (Luis, 13/10, Stock general v3.8.0): es un
+  `datalist` con todos los componentes de GP2; uno inventado no habilita el botón y no llega a la base.
+
+#### ⚠ Medido el 13/10 (Luis: *"hacé la prueba de que funcione bien. que no joda ningún stock real"*)
+
+> **VINCULAR NO MUEVE UN GRAMO DE STOCK.** Lo único que escribe es la fila de la equivalencia y el `isis`
+> de `Insumos`. Medido en transacción abortada: `Movimientos_Stock` 82.475 → 82.475 · `GP2.movimiento`
+> 45 → 45 · `GP2.inventario` 148.107,85 → 148.107,85 · el espejo 380.391,3 → 380.391,3.
+
+| qué se probó | resultado |
+|---|---|
+| los dos (Cervantes + ISIS) | GP2 `9991` → GV `9991` |
+| sólo ISIS (Cervantes vacío) | el componente **se conserva** (`coalesce`) y GV toma el ISIS nuevo |
+| ISIS vacío | limpia en los dos lados, como pidió Luis |
+| minúscula (`z23a`) | guarda la grafía real `Z23A` |
+| código de Cervantes inventado | frena con `COMPONENTE_INEXISTENTE` |
+| las 8 bolsas de material | cruzan a su componente (sólo falta **EBA**, cerrado); un envío de 2 bolsas de NY Virgen mueve 50 kg del sector 57 al inyector y **no toca `Movimientos_Stock`** |
+
+⚠ **El riesgo de que un ISIS vacío borre un dato bueno es HOY CERO, y así se mide**: la pantalla pre-carga
+el ISIS del espejo, y el espejo coincide con `Insumos` en **135 de 135** filas (0 casos de «espejo vacío y
+GV tiene»). Si alguna vez el espejo quedara atrás, vincular con el campo vacío **sí** borraría el ISIS de
+Virgilio: la consulta que lo mide es el `case` de `virgilio_insumo_stock` contra `Insumos` por `upper(cod)`.
+
+⚠ **Lo que sí mueve stock es el ESPEJO**: al vincular un código con saldo, le fija ese saldo en el depósito
+«<sector> en Virgilio». **No infla nada de Cervantes**: los 6 depósitos `virgilio_sector` tienen **0 filas en
+`v_nivel_stock`**. Centinelas al cierre: `gv_reglas_perdidas`, `gv_endpoints_rotos` y `gv_huellas_cambiadas`
+en **0**.
+
+#### ⚠ v29.87 (Luis, 13/10): el espejo NO espera al cron — vincular lo dispara en el acto
+
+**Luis, textual:** *"¿por qué tarda 10 min? debería ser lectura de una tabla en conjunto, instantáneo, no?"*.
+Tenía razón, y lo que se mide es el tamaño del desperdicio:
+
+| cuánto cuesta de verdad | medido 13/10 |
+|---|---|
+| calcular el stock de insumos **en vivo** (el bloque 1 de `gv_gp2_espejo_sync`) | **20 ms** · 163 filas |
+| `gv_gp2_espejo_insumos(null, true)`, los 5 rubros | **28 ms** |
+| leer el espejo ya copiado | 0,5 ms |
+| el cron 112 entero (4 bloques con sus md5) | 123 ms, **cada 10 min** |
+| el cron 152 del inventario | **cada 30 min** (`:19,:49`) |
+
+> **~40 ms de trabajo esperaban en una cola de 10 y 30 minutos.** El motivo nunca fue el costo: el espejo
+> se armó como **copia** por la Regla 0 de GP2 (GP2 no lee `public`).
+
+- **El hueco concreto**: el stock ya se adelanta solo en cada movimiento de insumos (trigger
+  `zz_gv_gp2_espejo_insumos` de `Movimientos_Stock`), pero **vincular no es un movimiento**, así que un
+  código recién vinculado no mostraba su stock en GP2 hasta el cron. Hoy lo dispara el vínculo:
+  **`public.gv_insumo_equiv_espejo`** (trigger `zz_gv_insumo_equiv_espejo` AFTER INSERT OR UPDATE OF
+  `componente_id` sobre `GP2.insumo_equivalencia`, mismo patrón que el del ISIS).
+- Medido: vincular N°56 tarda **57 ms** y sus **873 kg aparecen en el acto** en «Sector Fleje en Virgilio».
+  Un vínculo que cambia **sólo el ISIS no dispara** el espejo (4,8 ms, 0 filas de log).
+- ⚠ **Nunca frena el vínculo**: el error va a `GV_GP2_Espejo_Log` con `resultado = 'error'` y lo rehace el
+  cron. Rollback: `alter table "GP2".insumo_equivalencia disable trigger zz_gv_insumo_equiv_espejo;`
+- Centinela 420. `sql/gv_insumo_equiv_espejo_v2987.sql`.
+
+#### ⚠⚠ v29.89 (Luis, 13/10: *"si, pasala a vista"*): `GP2.virgilio_insumo_stock` ES UNA VISTA EN VIVO
+
+> **GP2 ya no lee una copia de hasta 10 minutos atrás: lee el saldo del momento, en 19,5 ms.**
+> La tabla que el bloque 1 de `gv_gp2_espejo_sync` rehacía cada 10 min **se borró**; en su lugar hay una
+> **vista** con las mismas 8 columnas (`actualizado_en = now()`), `security_invoker = true`.
+
+- **Es una excepción APROBADA a la Regla 0 de GP2** (GP2 no lee `public`). La pidió Luis; el precedente
+  que aprobó Thomas es **`GP2.v_produccion_todas`**, que lee `reg_prod_3_0`. **El resto del espejo sigue
+  siendo copia**: los bloques 2, 3 y 4 (ubicaciones, Mapa, categorías) y el cron 112 no se tocaron, y
+  tampoco `gv_gp2_espejo_insumos` / cron 152 / los dos triggers, que escriben el **inventario** de GP2 y
+  son otra cosa.
+- **Medido antes de aplicar** (transacción abortada): la vista devuelve las **mismas 163 filas y el mismo
+  md5** que la copia, y **`anon` 163 · `authenticated` 163** — nadie pierde filas. Ese chequeo no es
+  opcional: una vista con `security_invoker` sobre una tabla con RLS **no da error, devuelve MENOS filas**
+  (la trampa de la v20.45), y `Movimientos_Stock` tiene RLS prendida. Medido aparte: `anon` ve las 163
+  filas del depósito insumos y las 129 de `vista_insumos`.
+- **Quién la lee** (medido, no supuesto): `GP2.virgilio_insumos_sin_match_bundle` (el editor de
+  equivalencias) y `public.gv_insumo_isis_sync` (sólo la nombra en un comentario). **Ninguna vista**, y
+  nadie le escribía salvo el bloque 1 que se sacó.
+- ⚠ Los marcadores de la base dicen **v29.88** (otra sesión se llevó ese número mientras se escribía
+  esto): son la **llave**, no se cambian.
+- ⚠ **El marcador de la regla va en CÓDIGO** (`v_regla constant text := 'v29.88-vista'`), no en el
+  comentario que la explica: `gv_reglas_perdidas` limpia los comentarios antes de buscar (regla v21.82),
+  así que un marcador comentado vigila el rótulo y no la regla. Centinela **421**: si otra sesión repone
+  el bloque 1 desde una copia vieja, avisa.
+- Respaldo `zz_backups."GV_Backup_VirgilioInsumoStock_20261013"` (con RLS y sin escrituras).
+  **Rollback completo** —vuelve la tabla, su PK, su policy y el bloque 1— en la cabecera de
+  `sql/gv_insumo_stock_vista_v2988.sql`.
 
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
 
@@ -8838,10 +9888,330 @@ objetivo es que ninguna celda se quede sin mercadería para el picking, y el ped
 celda. **No volver a proponer el orden por hueco en cajas** (`min(cap − góndola − A guardar + pedido, racks)`),
 que es la otra lectura y quedó descartada.
 
-⚠⚠ **El MISMO cruce pelado sigue en Guardado a Góndola y en «¿Qué bajar primero?»** (`showMGModal` y
-`showGuardarOrden`, las dos con `capMap[_ocgNorm(a.cod)]`). Ahí el dual queda con `cap = 0`, y en «¿Qué bajar
-primero?» el filtro `x.it.cap > 0` **lo saca de la lista**. No se tocó: en MG la empresa viaja en la fila
-(`a.emp`), así que el arreglo es de una línea pero cambia qué filas se ven. Queda a decisión de Luis.
+⚠⚠ **v29.64 (D5, Luis 13/10: *"que no lo saque, que pueda evaluar individualmente a cada uno"*): el mismo
+`_rkbCapDe` en GUARDADO A GÓNDOLA, en «¿QUÉ BAJAR PRIMERO?» y en su BADGE.** Los tres cruzaban la capacidad
+con `capMap[_ocgNorm(a.cod)]`, o sea el código **pelado** contra una clave de saldo que para los duales trae
+el sufijo: el dual quedaba con `cap = 0` y, en «¿Qué bajar primero?», el `if (cap <= 0) return null` de los
+urgentes **lo borraba de la pantalla y del badge** (el 437E LK con 225 cajas en racks y la góndola de LK a 72
+no aparecía nunca). Hoy los tres llaman a `rkbFetchCapacidad()` + `_rkbCapDe(a.cod, capObj)`, así que **cada
+empresa del dual se evalúa por separado** y para un código no dual el número es idéntico al de antes.
+En MG, además, las **cajas × MC y las celdas de góndola** se buscan con sufijo y se caen al pelado (son del
+ARTÍCULO, iguales en las dos empresas): sin eso el dual no mostraba el hint de MC ni sus celdas. **La DEMANDA
+no cae al pelado**: `ocgDemanda(true)` ya la emite por empresa (`pkCodEmpresa`) y el fallback le daría a cada
+empresa los pedidos de las dos.
 
-**Chequeo:** `node tests/rkb-orden-urgencia.cjs` — corre la pantalla y mide el orden y que el 437E LK tome **120**
-(el de LK), no los 168 de las dos empresas sumadas. Verificado que falla contra el index anterior.
+⚠ **Capacidad en más de una empresa son SÓLO 5 códigos** (medido 13/10): los 4 duales y el **606E** (LK + IN),
+que por eso sigue midiéndose con la suma pelada (218) — `porEmp` guarda únicamente LK y CH.
+
+⚠ **D6 (Luis, 13/10): el 505I queda al final y la capacidad la carga Luis a mano** (*"cerralo así después se
+la asigno manualmente"*). Tiene **1.475 cajas en racks** con la góndola en 0 porque su celda del Mapa no tiene
+`cajas_max`. No cargarla desde una sesión.
+
+**Chequeo:** `node tests/rkb-orden-urgencia.cjs` · `node tests/mg-prioridad.cjs` · `node tests/qbp-liquidar.cjs`
+— los tres corren la pantalla y miden que el 437E LK tome **120** (el de LK), no los 168 de las dos empresas
+sumadas, y que no se caiga de la lista. Verificado que los tres fallan contra el index anterior.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.64, D11): el GUARDADO A GÓNDOLA puede entrar A MEDIAS — y queda así
+
+**Luis, textual:** *"d11 no, dejalo así"*. Medido en la auditoría del módulo de operarios: un guardado (MG)
+son **dos filas sueltas** (`a_guardar −N` / `terminado +N`, cada una con su `client_id`, el mismo `creado`) y la
+cola del celular las manda **fila por fila** (v25.20). El guard `trg_guardado_no_negativo` rechaza con
+`raise exception` (23514) **sólo la pata de `a_guardar`** cuando el saldo quedaría negativo; la cola la descarta
+como «400 de datos» y **la pata de góndola entra igual**, así que la góndola queda inflada y nada avisa.
+
+**Riesgo asumido:** puede volver a pasar y el saldo del código queda por encima de lo físico hasta el próximo
+conteo. **Cuánto pasó en toda la historia: 1 vez, 1 caja** — 599E, 30/09/2026 15:51:29, legajo 104, movimiento
+id 104074491, `terminado +1` sin su `a_guardar −1` (góndola 599E = 40, físico 39). El guard está bien: lo que
+falla es que las dos patas viajan por separado. **No volver a proponer el arreglo sin que Luis lo pida.**
+
+✅ **La caja del 599E se corrigió el 13/10** (D12, Luis: *"d12 si, corregila"*): ajuste `terminado −1` con
+`ref = 'CORR MG 104074491'` (mov 145964321). Góndola 599E 40 → **39**, igual al caché `stocks_carga_rapida`. El
+movimiento original NO se borra: la corrección va como ajuste aparte.
+
+Cómo se ve si vuelve a pasar: un `guardado` de `terminado` sin su par de `a_guardar` con el mismo `creado`, sin
+su ajuste de corrección:
+
+```sql
+select m.cod_art, m.creado, m.legajo, m.delta
+  from public."Movimientos_Stock" m
+ where m.tipo = 'guardado' and m.delta > 0
+   and not exists (select 1 from public."Movimientos_Stock" x
+                    where x.tipo = 'guardado' and x.deposito = 'a_guardar'
+                      and x.cod_art = m.cod_art and x.creado = m.creado and x.legajo = m.legajo)
+   and not exists (select 1 from public."Movimientos_Stock" c
+                    where c.ref = 'CORR MG ' || m.id::text)
+ order by m.creado desc;
+```
+
+Al 13/10 queda **1 fila y es de antes del módulo actual**: 542, 22/07/2026, `legajo` y `client_id` en NULL (una
+carga de panel, no del celular).
+
+⚠⚠ **El 542 del 22/07 NO SE TOCA Y NO SE PREGUNTA MÁS** (Luis, 13/10: *"542 olvidate, fue hace un montón así que
+seguramente ya se ajustó. Que vos y que cualquier otra sesión dejen de preguntarlo"*). Es de hace tres meses y el
+conteo ya lo ajustó. **Ninguna sesión lo vuelve a reportar ni a ofrecer corregirlo**: al correr la consulta de arriba,
+esa fila se ignora.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.69): una BAJA DE RACKS que no se guarda queda colgada — y el reconteo del rack la DUPLICA
+
+Caso **606E**: el 09/10 15:55 el legajo 104 bajó **10 cajas de X22** a «A guardar» y nunca las guardó (entre esa fecha
+y el 13/10 no hay un solo MG del 606E). El 13/10 10:00 se recontó X22 (**130 cajas**, +10 de ingreso) y se bajaron las
+130, que se guardaron enteras a las 10:36. Resultado: A guardar quedó con **10 cajas que ya estaban contadas adentro de
+las 130**. Luis, 13/10: *"las 130 eran lo único que había, no hay 10 cajas sueltas en ningún lado (a guardar, góndolas,
+racks, nada)"*.
+
+> **Una baja de racks (BR) sin su guardado (MG) deja saldo vivo en «A guardar». Si después se recuenta ese rack, ese
+> saldo pasa a contar dos veces.** El conteo del rack no sabe que esas cajas ya habían salido en la base.
+
+✅ Corregido el 13/10 (Luis: *"corregilas"*): ajuste **`a_guardar −10`** con `ref = 'CORR BR 132730592'` (mov
+146068819). No va a `terminado`: las cajas no existen aparte, estaban dentro de las 130 ya guardadas. A guardar del
+606E = **0** en movimientos y en el caché; `gv_stock_negativos` sin el 606E. El `baja_racks` original NO se borra.
+
+**Cómo encontrar otro caso igual** — código con saldo vivo en «A guardar» cuyo último movimiento es un `baja_racks`
+(no un guardado), sin su ajuste de corrección:
+
+```sql
+select m.cod_art, m.empresa, sum(m.delta) a_guardar,
+       (array_agg(m.tipo order by m.creado desc))[1] ultimo_tipo,
+       max(m.creado)::date desde
+  from public."Movimientos_Stock" m
+ where m.deposito = 'a_guardar'
+ group by 1,2 having sum(m.delta) > 0
+ order by 3 desc;
+```
+
+⚠ **Un saldo en «A guardar» no es un error por sí mismo**: es mercadería bajada o recibida esperando guardarse. Lo que
+hay que mirar es si ese rack se recontó después de la baja. **La corrección va con el «sí» del dueño**, porque la
+pregunta («¿esas cajas están físicamente?») sólo la puede contestar el depósito.
+
+⚠⚠ **NO se avisa cuando una baja queda sin guardar: Luis dijo que NO** (13/10, D16: *"no lo armes"*). Se le ofreció un
+aviso (Telegram o cartel) para el BR que al día siguiente sigue sin su MG, y lo bajó. **No volver a proponerlo.** El
+caso se encuentra con la consulta de arriba, a mano.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.74): el MONITOR dice DÓNDE QUEDÓ FÍSICAMENTE una tanda pickeada
+
+**Luis:** *"cuando muestra una tanda en la pantalla que está pickeada, que muestre dónde quedó físicamente
+(último dato entre lo que indicó quien la pickeó sobre dónde la dejó o la mesa de armado en la que la están
+armando)"*.
+
+El dato **ya se registraba en tres lugares y no lo mostraba ninguna pantalla**:
+
+| cuándo | dónde vive | qué dice |
+|---|---|---|
+| al TERMINAR el picking (TP) | evento **`PUB`** (`texto` = tanda, `descripcion` = lugar) | Mesa 1 · Mesa 2 · Carro · AA9… |
+| al FRENAR el picking | **`GV_Tanda_Freno.ubicacion`** (v26.61) | dónde quedó el carro |
+| al TERMINAR el armado (TAP) | evento **`AUB`** | AA1..AD8, el sector de armado |
+
+- Lo resuelve **`gv_tanda_ubicacion(text[])`** (lectura, anon, ~17 ms para 57 tandas): UNA fila por tanda con
+  la ubicación del **`ts` más reciente** entre las tres fuentes, más `fuente`, `legajo` y **`otras`** (lo que esa
+  misma fuente dejó en otro lado, p. ej. NP repartidas en dos sectores).
+- Se ve en **la TV de pared, la 📺 Vista TV y el Mon. Admin** (`monitor/tv.html` → `admin.html` por el build):
+  chip **📍 Mesa 2** dentro de la celda del código, en la tabla de tandas y en «🚚 Pendientes de salir hoy».
+  **Va abajo del código y no en una columna propia**: en la pared lo escaso es el ANCHO, y el que busca el
+  pallet lee primero la tanda. El `title` dice de dónde salió el dato, quién lo cargó y a qué hora.
+- **Es SECURITY DEFINER a propósito**: cruza `PPP_Web_Programacion`, que `anon` no ve por RLS, y una función
+  INVOKER devolvería MENOS filas sin dar error (la trampa de la v20.45). Verificado con `set local role anon`:
+  55 de 57 tandas (las 2 que faltan no tienen ninguna ubicación registrada).
+- **Una lectura rota no borra el chip**: si la RPC falla, la tanda se dibuja como antes.
+
+⚠ **RETIRADA la nota de que la mesa no se registra mientras arman** (decía que el AUB se emite al TERMINAR y
+que preguntarla al dar AP lo decidía Luis): desde la **v29.90 SÍ se registra** — el AP la pregunta y emite un
+**`AUI`** (regla al final de este archivo). Lo que sigue valiendo es que el **AUB** sale al TERMINAR (TAP), así
+que entre el AP y el TAP el dato vivo es el del AUI.
+
+⚠ **El AUB hoy viene por TANDA, no por NP.** Medido el 13/10: 130 filas por tanda (la última, de hoy) contra 408
+por NP cuya última es del 30/09 — o sea que `_stkFetchNpsByTanda` no le trae las NP a la tanda web y
+`askArmadoUbicaciones` cae a su fallback de «una ubicación para toda la tanda». La RPC cubre **las dos formas**,
+así que no cambia nada mostrar una u otra; el fallback en sí es otro tema.
+
+⚠ **No se agregó al monitor viejo de `index.html`** (el que abre el supervisor desde la app): la pared y el Mon.
+Admin son los que se miran, y acá no hay riesgo de «dos verdades» porque es un dato que se muestra, no un número
+que se calcula. Si se quiere ahí también, se agrega.
+
+**Chequeo:** `select tanda, ubicacion, fuente from public.gv_tanda_ubicacion(array['F58B','F86A']);` ·
+`select * from public.gv_reglas_perdidas;` · `node tests/mon-tv.cjs` (4 chequeos nuevos, verificado que fallan
+contra el tv.html anterior) · `node tests/mon-admin.cjs`. `sql/gv_tanda_ubicacion_v2974.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.90): al EMPEZAR EL ARMADO se pregunta la MESA — evento `AUI`
+
+⚠ **En la base los 4 centinelas y la huella dicen `v29.86`** (la versión con la que se aplicó, antes de que otras sesiones se llevaran la 29.86 a la 29.89): es la etiqueta de cuándo entró, **no se cambia**.
+
+**Luis:** *"d1 si, que pregunte la mesa al empezar armado. fijate que no rompa nada. todo esto
+fowardfacing"*.
+
+Cierra el agujero que la v29.74 dejó anotado: el **PUB** dice dónde dejó la tanda el picking y el
+**AUB** dónde quedó al TERMINAR el armado, pero **mientras arman no había nada**.
+
+| cuándo | evento | qué dice |
+|---|---|---|
+| al terminar el picking (TP) | `PUB` | dónde dejó la tanda |
+| al frenar el picking | `GV_Tanda_Freno.ubicacion` | dónde quedó el carro |
+| **al EMPEZAR el armado (AP)** | **`AUI`** (v29.90) | **la mesa en la que la están armando** |
+| al terminar el armado (TAP) | `AUB` | el sector donde quedó el pedido |
+
+- El cuadro (`askArmadoMesa`) ofrece **Mesa 1**, **Mesa 2** y **✏️ Otro lugar…** para escribirlo. Lo emite
+  `emitArmadoMesa` con el molde de `emitPickUbic` (encola + manda, id único: si vuelve a tocar AP con otra
+  mesa, manda la más reciente). `texto` = tanda, `descripcion` = mesa.
+- ⚠⚠ **LA MESA ES OBLIGATORIA: NO hay «Después» ni ningún escape** (Luis, 13/10: *"como que «Despues»? no es
+  una opcion eso ni debería serlo"*). El primer intento tenía ese botón y quedó **retirado**: o una mesa, o
+  «✏️ Otro lugar…». **No volver a ponerlo.**
+- **`ts_inicio` NULL a propósito**: NO abre tarea (el `abre` de las horas es una **lista blanca**:
+  EP/AP/MGI/RKI/IRI/MDI/toggles) y no cierra ninguna. Es un evento de **DETALLE**, como PUB / AUB / PKG.
+- ⚠⚠ **Obligatoria para el operario, pero NO frena el código, y el cómo importa**: la pregunta va **al final**
+  del bloque del AP, **después** de `showCompletarWizard` y **SIN `await`** (`askArmadoMesa(texto).then(…)`),
+  así que el cuadro sale **encima** del asistente — que ya está abierto — y `send()` no espera a nadie. En la
+  pantalla es obligatoria igual (el overlay tapa todo y no tiene salida), pero si el cuadro **no se dibuja**
+  el operario tiene el asistente abierto abajo en vez de quedar trabado. **Con `await` delante del asistente
+  quedaba todo colgado de un toque**: tres tests que manejan un AP de verdad (`ap-resume`, `dos-en-curso`,
+  `tanda-sin-articulos`) se quedaron esperando el cuadro para siempre, y en el celular un cuadro que no
+  resuelve dejaba al operario sin el asistente de Completar. Retomar una tanda frenada emite un AP nuevo →
+  vuelve a preguntar (puede ser otra mesa); **reabrir** el asistente («▶ Seguir armado») no pregunta nada.
+  ⚠ Al escribir un test que mande un AP por `send()`, stubear `window.askArmadoMesa` (devolver `null`) para
+  que el cuadro no quede abierto encima de la pantalla.
+- **Forward-facing**: no hay un solo `AUI` en la historia y **no se backfillea**. El 15/09 de
+  `tests/tools/vista-15.json` da idéntico (verificado, md5 `f5c7560f…`): sólo se movió la **huella**.
+
+> ⚠⚠ **Un evento de detalle nuevo tiene que entrar en las 5 listas de «automáticos» de la COLA** (v26.43), o
+> cortaría la cola de un TP/TAP y bajaría las horas de picking y de armado sin que nada avise:
+> `gv_monitor_horas_operario_dia` · `gv_horas_operario_detalle_v2` (x2) · `gv_picking_tanda_calc` ·
+> `gv_armado_tanda_calc`, más `COLA_AUTO` de `index.html` y el `AUTO` de `monitor/build-admin.cjs`. Son las
+> mismas 5 que ya nombran a PKG / NPD / PKAX.
+
+- `gv_tanda_ubicacion` suma AUI como cuarta fuente, con **`fuente = 'armado_mesa'`**; sigue ganando el `ts`
+  **más reciente**, así que la secuencia PUB → AUI → AUB se ordena sola. En la TV y en el Mon. Admin el chip
+  dice **📍 Mesa 1** y el `title` **«la están armando acá»**.
+- Probado como `anon` en transacción abortada (AP + AUI 2 s después): los dos **entran**, el trigger
+  `gv_evento_duplicado` descarta **0** (su R1 exige `ts_inicio` en las dos filas) y la ubicación de F86A pasó
+  de **AB7 (armado)** a **Mesa 2 (armado_mesa)**.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` y `select * from public.gv_huellas_cambiadas;` (las dos
+vacías) · `node tests/arm-mesa-inicio.cjs` (corre la pantalla: el AP con mesa encola AP+AUI, sin contestar no se
+encola AUI, el cuadro que explota **no** traba el asistente) · `node tests/mon-tv.cjs`.
+`sql/gv_armado_mesa_aui_v2990.sql` (rollback al pie).
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.95): un `onclick` del HTML SE RESUELVE CONTRA `window` — no contra el scope del script
+
+**Luis, con la captura del cuadro «¿Quién sos?»:** *"aprieto luis y no entra"*.
+
+El panel por ROL (v29.92) dibujaba sus botones con handlers **inline**
+(`onclick="rolElegir('luis')"`), y todo ese bloque vive **adentro de la IIFE `initAuth`**
+del segundo `<script>` de `index.html` (líneas ~62957-66056). Un handler inline **no ve el
+scope del script: se resuelve contra `window`**, así que el click tiraba *"rolElegir is not
+defined"* y **no pasaba nada** — ni un cartel, ni un error a la vista.
+
+> **Si una función se usa en un `onclick` / `onchange` del HTML y se declaró dentro de esa
+> IIFE, hay que exponerla: `window.laFuncion = laFuncion;`** Es el mismo pozo de `window.sb`
+> (v23.98), y el archivo ya lo resuelve así en decenas de lugares (`window.pkFrenar`,
+> `window.cobrosRenderTab`, `window.histReintentar`…).
+
+| dónde vive la función | ¿hace falta exponerla? |
+|---|---|
+| el primer `<script>` (líneas 7081-62940), que **no** es IIFE | no: ya es global |
+| un `.js` propio cargado como script clásico (`ads.js`, `cobranzas.js`…) | no, salvo que esté en su propia IIFE |
+| **la IIFE `initAuth`** (segundo `<script>`) | **sí**, siempre |
+
+Expuestas para el panel por rol: `rolElegir`, `rolPickerAbrir`, `GV_ROL_ITEMS` (las filas del
+checklist llaman `GV_ROL_ITEMS[i].open()`).
+
+⚠⚠ **UN CANDADO ESTÁTICO NO VE ESTE BUG**: el `onclick` está y la función está. La única forma
+de medirlo es **clickear con la pantalla corriendo**. Lo sostiene
+`tests/rol-panel-click.cjs`, que aprieta «Luis» de verdad y además barre **todo** `onclick` del
+cuadro y del panel exigiendo que resuelva contra `window` (así un botón nuevo del bloque no
+vuelve a nacer muerto). ⚠ Ese barrido lleva un guard de *"¿encontré al menos uno?"*: sin él daba
+**verde con el bug puesto**, porque con el cuadro sin dibujar hay 0 onclicks y 0 faltantes.
+
+**Barrido del 13/10 sobre toda la IIFE** (funciones declaradas ahí y usadas en un handler
+inline sin exponer): **0 casos más**. El panel por rol era el único.
+
+### ⚠ v30.03 (Luis, 13/10): el panel por rol es UNA LÍNEA con BADGE — el checklist se despliega
+
+**Luis, con la captura:** *"esa visual es horrible … ajusta eso en un menu colapsable con un
+badge. que el arreglo sea general y no solo para luis"*.
+
+El panel se dibujaba abierto: ~560 px de alto empujando el panel de administración entero, con
+«Hola, Luis» partido en dos renglones, el veredicto en prosa y un «cambiar» de una pantalla de
+ancho. Es la regla de espacio del 28/09 y el punto 4 de GV-UI (*lo explicativo se pliega; ningún
+bloque largo se dibuja abierto*).
+
+| | |
+|---|---|
+| plegado (lo que se ve al entrar) | **44 px**: `▶ Luis · Administración general` + badge + `cambiar` |
+| badge | **`3 para mirar`** (rojo) · **`✓ al día`** (verde) · **`sin contadores`** (gris). El color NUNCA va solo: lleva palabra (GV-UI 5) |
+| desplegado | el checklist de siempre, 474 px |
+| abierto/cerrado | `localStorage gv_rol_abierto`, por dispositivo. **Arranca plegado**: el dato es el badge |
+
+⚠ **Vale para los CINCO roles y las tres áreas**, que es lo que pidió Luis: es el mismo render
+(`rolPanelRender`), no hay nada propio de Luis. Lo mide el test sobre los 5.
+
+⚠ **El `button{width:100%;padding:16px;font-size:22px}` global de la línea 26 también muerde acá**
+(mismo pozo que el pop-up de Importados, v23.93): sin `#rolPanel button{width:auto}` el «cambiar»
+sale de una pantalla de ancho. Y el reset se lleva puesto el ancho de la BARRA y de las FILAS, así
+que las dos vuelven con `#rolPanel .rolp-bar, #rolPanel .rolp-row{width:100%}`.
+
+⚠ **«cambiar» vive DENTRO de la barra que despliega**: se le pasa el evento
+(`rolPickerAbrir(event)`, que corta la propagación). **No se escribe `event.stopPropagation()` en
+el `onclick`**: ahí el identificador que se llama es un método, y el barrido genérico del test
+—que exige que todo `onclick` resuelva contra `window`— lo marcaría como función faltante.
+
+**Chequeo:** `node tests/rol-panel-click.cjs` — mide, con la pantalla corriendo y para los 5
+roles, que arranque plegado en una línea, que el badge lleve palabra, que «cambiar» sea angosto y
+que tocar la barra despliegue el checklist.
+
+### ⚠ v30.04 (13/10): EL PASE `disenador-gvui` sobre el panel por rol
+
+Se corrió el agente sobre la pantalla CORRIENDO (no leyendo el CSS) a 1280 y a 390 px, en los
+tres estados del contador. Devolvió **5 ALTA · 6 MEDIA · 4 BAJA**; se aplicó todo:
+
+| qué estaba mal, medido | cómo quedó |
+|---|---|
+| el ✓ verde `#16a34a` daba **3,15:1** y el `—` de «no pude leer» `#94a3b8` **2,45** (AA pide 4,5) | el PUNTO sigue en `--gv-muted` (es un ícono) y el NÚMERO va aparte: `--gv-ok` **4,68** · `--gv-error` **6,04** · `--gv-ink-2` **7,07** |
+| el **DATO** del plegado (el badge) medía **12,5 px** contra el nombre —que es el RÓTULO— a 14 | badge **16 px** (`--gv-fs-lg`), nombre **12** (`--gv-fs-sm`): la jerarquía deja de estar al revés |
+| «cambiar» era un `<span onclick>` **adentro del `<button>` de la barra**: **22 px** de alto, `tabIndex -1` y un lector leía la barra entera como un solo control | `<button>` hermano dentro de `.rolp-head`, **44 px**, alcanzable por teclado, y la barra con `aria-expanded` |
+| **6 tamaños y 11 hex propios** con `gv-ui.css` ya cargado en `index.html:14` | 0 propios: todo sale de los tokens |
+| el cuadro «¿Quién sos?» **no tenía salida** (ni ✕, ni backdrop, ni Escape) | cierra con Escape o tocando el fondo **sólo si ya hay alguien elegido**: en el primer ingreso sigue obligando a elegir |
+| rótulos de hasta **7 palabras** que repetían el hint, y un 📥 en 1 de 8 | «Movimientos por resolver», «Ingresos a racks sin revisar», «Programados con cuarentena»; sin emoji |
+
+⚠ **Y apareció uno que el pase no vio**, midiendo a 390 px: sin **`min-width:0`** en la barra y en
+`.rolp-quien`, el contenido les pone un min-width implícito, no encogen, y **«cambiar» se salía
+12 px del panel**, pegado al borde de la pantalla. Es el pozo clásico de un hijo de flex con texto.
+
+⚠⚠ **Dos candados nuevos, y el segundo es el que importa:** el bloque **(g)** de
+`tests/rol-panel-click.cjs` mide sobre la pantalla corriendo el **contraste calculado** de los tres
+estados, la escala, la jerarquía badge > nombre, los 44 px y el desborde, **a 1280 y a 390**.
+Verificado que falla contra el index anterior reproduciendo los números del pase (2,45 · 3,15 ·
+13 px · 22 px · `tabIndex -1`).
+
+> ⚠ **El helper de contraste va como FUNCIÓN, no como string en un template literal.** Ahí el `\d`
+> del regex pierde la barra —en un template una escapada desconocida deja sólo la letra—, el match
+> no devuelve nada y **TODO contraste sale 1:1**: el test queda verde con los colores mal puestos.
+> Pasó en el primer intento y lo cazó que los 18 chequeos dieran exactamente «1:1».
+
+### ⚠ v30.05 (Luis, 13/10): el rol de JUAN es la IMPRESIÓN, y el panel NO TOCA EL HELPER
+
+**Luis:** *"agregale un usuario tambien a Juan. Necesita que la impresion automatica de notas de
+picking/armado salga y nada más. fijate que esto no joda con el helper"*.
+
+Área nueva **`impresion`** («Impresión de notas»), con **dos** ítems y nada más — Juan no ve la PPP,
+ni compras, ni cobranzas:
+
+| ítem | qué dice | abre |
+|---|---|---|
+| **Impresión automática** | si en ESTA PC el helper está conectado, contesta y la estación está prendida | ⚙️ Helper de impresión |
+| **Hojas sin imprimir** | picking y armado pendientes de `colaImpFetch` (el facturado no es de Juan) | 📅 Cola por día |
+
+> ## **El panel MIRA el helper; no lo prende, no lo apaga y no le pega a 127.0.0.1 de más.**
+
+- No llama a `gvHelperConectar`, `gvHelperGuardar` ni `psSetAuto`: eso sigue siendo del pop-up de
+  ⚙️ Configuración, donde conectar = esta PC imprime sola (v26.30).
+- ⚠⚠ **Y sólo pinguea el loopback si el helper está CONECTADO en esa PC.** Desconectado, el
+  navegador no sale a `127.0.0.1` — en un celular Chrome pediría permiso de red local para nada
+  (regla v26.24). Es lo único que podía «joder con el helper» y es lo que mide el candado.
+- Los ítems de Juan son **LOCALES** (`it.local`, se miden en el navegador) y no en `gv_rol_panel`.
+  Por eso `rolPanelCargar` tiene ahora dos clases de ítem; **un área sin ítems remotos ni llama a la
+  RPC**. Cada local resuelve por su cuenta y repinta: uno lento no traba a los otros, y una lectura
+  rota deja «—», nunca «✓ al día».
+
+**Chequeo:** `node tests/rol-panel-click.cjs`, bloque **(h)** — con el helper desconectado mide que
+**no salga un solo request a 127.0.0.1**, que Juan vea sus 2 ítems y que `gv_helper_imp_v1` y
+`ps_auto_virgilio` queden **sin tocar**; con el helper conectado y contestando, que sí lo pinguee y
+marque ✓ sin apagarle nada. Verificado que falla sacando el guard: *«el panel le pegó a 127.0.0.1
+con el helper DESCONECTADO»*.

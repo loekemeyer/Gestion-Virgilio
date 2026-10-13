@@ -4,7 +4,10 @@
    urgente. Además muestra por código el máximo de MCs que entran sin rebalsar
    (piso((cap − góndola) / cajas×MC)) — informativo, no limita el input. Sin capacidad → va al
    final y sin cxm no hay hint. Best-effort: si demanda/cxm fallan, el modal abre igual.
-   Sale 1 si falla. */
+   v29.64 (Luis, 13/10, D5) - la capacidad del DUAL es POR EMPRESA: la clave del saldo viene con
+   sufijo ("437E LK") y la capacidad se indexaba PELADA, asi que el dual quedaba con cap = 0 (sin
+   maximo, sin hint de MC y al final). Se mockean las DOS lecturas: contra el codigo viejo
+   (ocgFetchCapacidad) el resto del test pasa y SOLO falla el dual. Sale 1 si falla. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -20,18 +23,26 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.stockFetchSaldos = async function () { return {
       "500": { cod: "500", desc: "", a_guardar: 10, terminado: 90 },
       "600": { cod: "600", desc: "", a_guardar: 5, terminado: 80 },
-      "700": { cod: "700", desc: "", a_guardar: 3, terminado: 1 }
+      "700": { cod: "700", desc: "", a_guardar: 3, terminado: 1 },
+      // v29.64 - DUAL: su cap es la de LK (120), no los 168 de las dos empresas pegadas.
+      // (72 - 0) / 120 = 0,60 -> entre el 600 (0,20) y el 500 (0,90).
+      "437E LK": { cod: "437E LK", desc: "", a_guardar: 8, terminado: 72 }
     }; };
     window.loadArtNombres = async function () { return {}; };
-    window.ocgFetchCapacidad = async function () { return { "500": 100, "600": 100 }; };
+    window.ocgFetchCapacidad = async function () { return { "500": 100, "600": 100, "437E": 168 }; };
+    window.rkbFetchCapacidad = async function () { return {
+      pelada: { "500": 100, "600": 100, "437E": 168 }, porEmp: { "437E LK": 120, "437E CH": 48 } }; };
     window.ocgFetchCeldas = async function () { return {}; };
     window.ocgDemanda = async function () { return { "600": 60 }; };
-    window.rkbFetchCxM = async function () { return { cxm: { "500": 12, "600": 10 } }; };
+    window.rkbFetchCxM = async function () { return { cxm: { "500": 12, "600": 10, "437E": 6 } }; };
 
     await showMGModal("104", null);
     out.orden = (_mg.items || []).map(function (it) { return it.cod; }).join(",");
     // 600: (80−60)/100 = 0.2 · 500: 90/100 = 0.9 · 700: sin cap → último
-    out.ordenOk = out.orden === "600,500,700";
+    out.ordenOk = out.orden === "600,437E LK,500,700";
+    const _d = (_mg.items || []).filter(function (it) { return it.cod === "437E LK"; })[0] || {};
+    out.capDual = _d.cap;                       // 120 (la de LK), no 168
+    out.maxMCDual = _d._maxMC;                  // floor((120 - 72) / 6) = 8 MC
     const html = document.getElementById("mgBody").innerHTML;
     // hint de 600: floor((100−80)/10) = 2 MC (20 cajas)
     out.hint600 = html.indexOf("2 MC") >= 0 && html.indexOf("(20 cajas)") >= 0;
@@ -45,13 +56,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.ocgDemanda = async function () { throw new Error("x"); };
     window.rkbFetchCxM = async function () { throw new Error("x"); };
     await showMGModal("104", null);
-    out.bestEffort_orden = (_mg.items || []).map(function (it) { return it.cod; }).join(",") === "600,500,700" ||
-                           (_mg.items || []).map(function (it) { return it.cod; }).join(",") === "500,600,700";
+    const _be = (_mg.items || []).map(function (it) { return it.cod; }).join(",");
+    out.bestEffort_orden = _be === "600,437E LK,500,700" || _be === "437E LK,500,600,700";
     out.bestEffort_abre = !!document.getElementById("mgBody");
     return out;
   });
-  const pass = r.ordenOk && r.hint600 && r.hint500cero && r.sin700hint &&
-    r.bestEffort_orden && r.bestEffort_abre && errs.length === 0;
+  const pass = r.ordenOk && r.hint600 && r.hint500cero && r.sin700hint && r.capDual === 120 &&
+    r.maxMCDual === 8 && r.bestEffort_orden && r.bestEffort_abre && errs.length === 0;
   console.log("mg-prioridad:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();

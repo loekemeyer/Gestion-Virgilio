@@ -31834,7 +31834,8 @@ Objetos nuevos: `gv_picking_estimar(text[])` (anon, 1,45 s para las 37 pendiente
 - Rollback: `cron.alter_job(155, command := <el viejo, en la cabecera del sql>)`, poner `caja_extra` en 0 (y restar
   0,0061 × (cajas − cajas30) del caché), recrear `gv_ppp_plantel` desde `sql/gv_ritmo_picking_v2947.sql`.
 
-## §3.v2962 — el excedente cargado por un conteo no se reparte hacia atrás (Giuliana, 13/10/2026, problema 766)
+<<<<<<< HEAD
+## §3.v3008 — el excedente cargado por un conteo no se reparte hacia atrás (Giuliana, 13/10/2026, problema 766; el marcador de la base y el .sql dicen v29.62: otra sesión se llevó los números hasta la v30.07)
 
 El conteo de la estantería P (13/10) cargó excedente en 26 códigos (ajustes `ref = 'CONTEO P 13/10'`) y la corrida
 15:11 del cron 68 le devolvió a góndola el de **14** (501, 315, 222, 220, 862, 221, 355, 207, 560, 654, 234, 026, 902,
@@ -31855,3 +31856,99 @@ cambian exactamente esos 28 saldos (14 excedente +N, 14 góndola −N). Aplicado
 y dejaba 4 góndolas en negativo. Centinela: `least\(f\.picked, greatest\(f\.tomado, 0\)\)`.
 Backup de la definición anterior: `zz_backups."GV_Backup_Etapa1_def_20261013"` (md5 prosrc 7d6a3bb2…).
 `sql/reconciliar_pipeline_stock_etapa1_v2962.sql`.
+=======
+### §3.v2982 — Recepción de insumos: el ORIGEN es una lista cerrada por categoría (Luis, 13/10/2026)
+
+- **Nuevo, nada existente tocado**: tabla `GV_Insumo_Origen_Excluido` (RLS on, sin escritura para anon/authenticated),
+  `gv_insumo_origenes(text)` y `gv_insumo_fleje_proveedor()` — las dos SECURITY DEFINER **porque leen el schema `GP2`**
+  (`proveedor_insumo`, `ubicacion`, `componente`, `insumo_equivalencia`), que `anon` no ve; INVOKER devolvería MENOS
+  filas sin dar error (trampa v20.45). Verificado con `set local role anon`: las 7 categorías contestan y
+  `gv_insumo_fleje_proveedor()` da 53.
+- **Centinelas 416-418** (`gv_reglas_perdidas` vacía). ⚠ Los patrones van del CÓDIGO, no del comentario, y `objeto`
+  es el **nombre pelado** de la función: la vista cruza por `pg_proc.proname`. Con la firma (`public.f(text)`) y con
+  un marcador en un `--` el centinela decía «regla perdida» con la regla puesta.
+- **Lo que devuelve al 13/10**: plástico → Indarnyl · Beta Plásticos · Santa Rosa Plásticos (los que entregan en
+  Virgilio) · cajas → Corrugadora del Plata · Recicor · partes plásticas → Cervantes + los 3 inyectores · flejes →
+  Cervantes + 8 proveedores · SC/SP → Cervantes · `inyector` (para el envío de bolsas) → los 3.
+- **Impacto en otras pantallas: 0** (sólo lectura; no se tocó ninguna función ni vista existente). El filtro de
+  inyectores de «📤 Envío a inyectores» se aplica **en el front**, sobre lo que devuelve `material_virgilio_bundle`.
+- **Rollback**: `drop function public.gv_insumo_origenes(text); drop function public.gv_insumo_fleje_proveedor();`
+  `drop table public."GV_Insumo_Origen_Excluido";` + borrar los centinelas 416-418. El front cae solo al texto libre
+  y a ver todos los flejes (fail-open). `sql/gv_insumo_origenes_v2982.sql`.
+
+### §3.v2987 — Los datos del módulo de insumos que vivían en el front (Luis, 13/10/2026)
+
+- **Nuevo**: `GV_Insumo_Origen_Apodo` (apodo del origen) y `GV_Insumo_Config` (`caja_x_paquete` 25,
+  `marcas` Loeke,Chef,Mixto, `marcas_cajas` Loeke,Chef), las dos con RLS y sin escritura para
+  anon/authenticated; `gv_insumo_config()` y `gv_insumo_apodos()` (SECURITY DEFINER, anon). Verificado como anon.
+- **Impacto: 0** — el front los usa para pisar sus defaults (`INS_CAJA_X_PAQ`, `INS_MARCAS`, `INS_CAJA_MARCAS`,
+  `INS_INY_APODO`, que pasaron de `const` a `let`); si la lectura falla queda exactamente lo de antes.
+- ⚠ **No se le agregó la columna `apodo` a `gv_insumo_origenes`**: cambiar las columnas de salida pide
+  `DROP` + `CREATE` y el connector se cuelga 60 s con la palabra de borrado (regla del 07/10, medido otra vez
+  hoy: la llamada no llega a Postgres y nada se aplica). Por eso el apodo va en su propia RPC.
+- **Rollback**: `drop function public.gv_insumo_config(); drop function public.gv_insumo_apodos();`
+  `drop table public."GV_Insumo_Config", public."GV_Insumo_Origen_Apodo";` — el front vuelve a sus defaults solo.
+
+### §3.v3000 — TMP-0037 fusionado en N°19, y los 3 flejes vinculados (Luis, 13/10/2026)
+
+**El caso.** El 13/10 09:09:47 el legajo 104 recibió **144 Kg** de un fleje `13.6 x 0.8` dándolo de alta como
+insumo nuevo: el servidor lo numeró **`TMP-0037`** (`nuevo_insumo_tmp`) y la recepción entró con ese `cod_art`.
+Ese fleje **ya existía** como **`N°19`** («13,6 x 0,8 · Fleje N° 19», posición **R06AT**, saldo 0 desde el 16/09)
+y está vinculado a **IF11** de GP2. O sea: 144 Kg al código equivocado.
+
+**Por qué no lo encontró en la lista** (la causa raíz, medida): el buscador (`stkMatchBusq`) comparaba el texto
+**tal cual**, y el nombre de `N°19` lleva **coma** decimal. Buscar `13.6` NO encuentra `13,6`. En los flejes la
+medida **es** el nombre: **39 de 48 tienen decimal** (27 con coma, 12 con punto), así que el pozo estaba abierto
+para más de la mitad. Arreglado en la v30.00: los dos lados se normalizan (`(\d),(\d)` → `$1.$2`) — sólo **agrega**
+matches, no saca ninguno (suite completa en verde).
+
+**La puerta ya estaba cerrada 26 minutos después**: la **v29.56** (13/10 09:35) sacó el alta de un insumo nuevo
+por el operario. `TMP-0037` es el último que entró por ahí, y el único TMP que quedaba vivo (los otros 17 están
+en 0 y fuera del catálogo: se ceronearon y borraron el 10/10).
+
+**Qué se hizo** (mecanismo de la rama de FUSIÓN de `insumo_identificar`; el front no lo deja hacer porque un TMP
+no se fusiona contra un insumo en uso: `v_existe and v_es_tmp` → exception):
+`update "Movimientos_Stock" set cod_art='N°19', descripcion='… (era TMP-0037)' where cod_art='TMP-0037'`
+(**1 movimiento**) + se saca `TMP-0037` del catálogo + `insumo_hist_log('fusionar', …)`.
+Backup: `zz_backups."GV_Backup_TMP0037_20261013"` (con RLS).
+
+**Verificado**: `N°19` 0 → **144 Kg** · `TMP-0037` fuera del catálogo y en 0 · la alarma del Mapa
+(`gv_mapa_stock_sin_lugar`) deja de marcarlo · el espejo corrió con el UPDATE y GP2 ya tiene los 144 Kg en
+**IF11 / «Sector Fleje en Virgilio»** (`gv_gp2_espejo_insumos('N°19')` → `antes = 144`, `delta = 0`).
+
+⚠ **La UBICACIÓN no se tocó** (Luis: *"no los pongas en el mismo lugar, hay que ver donde esta"*). `N°19` tiene
+R06AT en `Insumos_Ubicaciones` desde antes, así que **el Mapa ahora dice R06AT** — y el aviso de «stock sin lugar»
+se apagó. Si los 144 Kg no están ahí, lo corrige el conteo; nadie lo va a ir a buscar por una alarma.
+
+**Y los 3 flejes limpios vinculados** (Luis: *"los 3 limpios metelos"*), en `GP2.insumo_equivalencia` por
+`componente_id`: `10` → IF2 (Fleje N° 10, **40 Kg**) · `1060500` → IB3 (Fleje N° 6, **540 Kg**) ·
+`FLEJE·91 X 1,75` → IA5 (Fleje N° 29, 0). Los tres de **Basconia**. El espejo corrió en el acto (log 61 y 62,
+`ajustado`) y los kg están en la ubicación **75** («Sector Fleje en Virgilio»), que tiene **0 filas en
+`v_nivel_stock`**: no infla el máximo ni la OC de Cervantes. Ningún ISIS pisado (los tres estaban en null).
+Flejes vinculados: **19 → 22 de 48**.
+
+### §3.v3005 — Recepción del remito 38880 cargada a mano, y dos códigos de fleje nuevos (Luis, 13/10/2026)
+
+**Por qué a mano**: *"recién se recibieron insumos pero hubo problemas por cambios que hicimos hoy. De momento,
+voy a hacer una recepción por acá"* (Luis). Los dos insumos **no existían** en Virgilio ni en GP2 (se buscó por
+nombre, por medida y por número: `ALAMBRE LARGO·11` y `N°46B` son otros alambres; las varillas de GP2 son piezas
+procesadas o las `IVBCM`/`IVBLM` de Brawin, otras medidas), así que se crearon:
+
+| cod | nombre | categoría | recibido |
+|---|---|---|---|
+| `ALAMBRE·6 X 2,75` | 6 x 2,75 | fleje | **122,1 Kg** (2 rollos) |
+| `VARILLA·205 X 400` | 205 x 400 | fleje | **128,4 Kg** (5 cajones) |
+
+- **La grafía del código sigue la convención de los flejes sin `N°`**: prefijo + `·` + medida, como
+  `ALAMBRE LARGO·11`, `FLEJE·91 X 1,75` o `FLEJE PROLIPROPILENO·SUNCHOS 12 MM`. **No se les puso `N°97` / `N°98`**
+  a propósito: los `N°xx` de Virgilio espejan el *Fleje N°* de Cervantes y estos dos **no tienen componente en
+  GP2** (el último allá es el 96) — inventar el número crearía otra desalineación.
+- Los movimientos: `recepcion_insumo`, **Kg**, `ref = 'Remito 38880'`, `legajo = 'admin'`, `client_id`
+  `rcp-38880-…` (ids 146691976 y 146691977). La **empresa** la forzó `gv_insumo_unidad_base` a **Mixto**, como
+  todo movimiento de insumos (regla v24.89). **Sin marca**: Luis no dijo de qué empresa viene (el front la exige,
+  una carga por SQL no).
+- **Los dos quedan SIN posición**, así que salen en la alarma del Mapa (`gv_mapa_stock_sin_lugar`, que pasa de 19
+  a 21 insumos): hay que darles celda desde el Mapa. Y **sin equivalencia en GP2**, así que no se espejan.
+- **Verificado**: saldo 122,1 y 128,4 Kg, unidad Kg, empresa Mixto, 0 posiciones, los dos en la alarma.
+- **Rollback**: borrar los dos movimientos por su `client_id` y las dos filas de `Insumos`.
+>>>>>>> origin/main

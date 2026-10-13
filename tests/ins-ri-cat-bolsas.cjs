@@ -8,7 +8,8 @@
    (h) v29.30/31: cajas sin TMP, en cajas o paquetes (×25), guardadas en cajas; al recibir, marca Loeke/Chef obligatoria;
    (g) v29.29: la bolsa sólo en Bolsas, con su equivalente en kg (también en el movimiento);
    (e) v29.25: en RECIBIR y en «Envío a otros», de plásticos sólo las bolsas reales (sin TMP- ni
-       códigos viejos), sin «+ Agregar insumo» en plásticos ni la categoría en el alta. Sale 1 si falla. */
+       códigos viejos). En plásticos NO hay «+ Agregar insumo» (categoría cerrada); el alta
+       generica si abre al recibir (v30.05). Sale 1 si falla. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -36,8 +37,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.stockFetchSaldos = async function () { return {}; };
     window.insFetchSaldosXUni = async function () { return {}; };
     const out = {};
+    /* 13/10: se espera la CONDICION, no el reloj. insRecibirCat() es async (dibuja
+       "Cargando..." y recien despues los botones) y insChooserGo no devuelve su promesa:
+       con un sleep fijo de 50 ms, en un runner lento (CI) el chequeo (a) corria con el
+       cartel de carga puesto y la suite quedaba roja 1 de 485 sin que nada estuviera mal. */
+    const _hasta = async function (fn) {
+      for (let i = 0; i < 200; i++) { if (fn()) return true; await new Promise(function (r) { setTimeout(r, 20); }); }
+      return !!fn();
+    };
     insChooserGo("RI");
-    await new Promise(function (res) { setTimeout(res, 50); });
+    await _hasta(function () { return document.querySelectorAll("#insChooserModal .ins-ri-cat").length > 0; });
     const btns = Array.from(document.querySelectorAll("#insChooserModal .ins-ri-cat")).map(function (x) { return x.textContent; });
     out.a = btns.length === 6 && !btns.some(function (t) { return /Importados/.test(t); });
     insRecibirCatGo("fleje");
@@ -60,16 +69,20 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await showInsumoModal("RI", "104");
     const plaRI = _ins.items.filter(function (x) { return x.cat === "plastico"; }).map(function (x) { return x.cod; }).sort();
     const htmlRI = document.getElementById("insBody").innerHTML;
-    // v29.56 (Luis, 13/10): el operario NO da de alta un insumo al recibir — insNuevoOpen se planta
-    insNuevoOpen("");
+    // v30.05 (Luis, 13/10): el alta VUELVE al recibir, pero NO en bolsas (categoria cerrada):
+    // el boton no se dibuja y el camino a mano se planta igual.
+    insNuevoOpen("plastico");
     const altaBloqueada = _ins.nuevo === null;
+    insNuevoOpen("");            // la generica si abre
+    const altaAbre = !!_ins.nuevo;
+    insNuevoCancel();
     window._insGp2 = null;
     await showInsumoModal("EI", "104");
     const plaEI = _ins.items.filter(function (x) { return x.cat === "plastico"; }).map(function (x) { return x.cod; }).sort();
     const otrasEI = _ins.items.some(function (x) { return x.cod === "F10"; });
     // v29.28 (D9): «Envío a otros» NO ofrece bolsas plásticas
     out.e = JSON.stringify(plaRI) === JSON.stringify(["ABS", "PP 2630"]) && plaEI.length === 0 &&
-      otrasEI && !/ins-itbtn add/.test(htmlRI) && altaBloqueada;
+      otrasEI && !/ins-itbtn add/.test(htmlRI) && altaBloqueada && altaAbre;
     out.plaRI = plaRI; out.plaEI = plaEI;
     // (f) v29.28 (D9): eligió «Envío a inyectores» (aunque GP2 no devuelva la lista) → sólo bolsas
     insEnvioTipoGo("iny"); insUbicCancel(); window._insGp2 = null;

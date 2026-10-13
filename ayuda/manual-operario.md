@@ -65,7 +65,11 @@ Un botón con **borde rojo** es una tarea abierta.
 4. Si el artículo tiene excedente, aparece **«📦 Tiene Excedente — anotar ubicación»**.
 5. A veces te pide **contar** lo que quedó en una celda después de pickear: contá lo que ves y
    cargalo, sin adivinar.
-6. Al terminar tocás **«✓ Terminé el picking»**: queda registrado el **TP**.
+6. Si un código **no tiene góndola cargada en el Mapa**, el paso te lo avisa y, cuando lo
+   confirmás, te pregunta **«¿De qué góndola lo sacaste?»**. Escribí la celda (por ejemplo
+   **F9**) y **«✓ Anotar»**: el supervisor la da de alta. Si no sabés, **«No sé / seguir sin
+   anotar»** — no frena nada y lo que pickeaste ya quedó registrado.
+7. Al terminar tocás **«✓ Terminé el picking»**: queda registrado el **TP**.
 
 Si la tanda la está pickeando otro, sale **«⛔ La tanda X ya la está pickeando…»** y no se abre.
 
@@ -80,11 +84,14 @@ empezó…».
 
 ## Armado de pedidos (AP · TAP)
 
-1. Tocá **AP**, elegí la tanda pickeada y **Enviar**. Se abre el asistente de armado.
-2. Primero hay que clasificar **cada pedido** en **🎁 Lío / 🏷 Etiqueta / 🚶 Nada**.
-3. **Paso 1 · Separar**: separás la mesa por pedido.
-4. **Paso 2 · Líos**: armás los líos; cada uno se cierra con **«✓ Cerrar lío»**.
-5. Al final tocás **«Terminar»**: queda registrado el **TAP** y salen los papeles de cada pedido.
+1. Tocá **AP**, elegí la tanda pickeada y **Enviar**.
+2. Te pregunta **en qué mesa vas a armar**: **Mesa 1**, **Mesa 2** o **✏️ Otro lugar…** para
+   escribirlo. **Hay que elegir una** — sirve para que el monitor diga dónde está la tanda
+   mientras la armás.
+3. Primero hay que clasificar **cada pedido** en **🎁 Lío / 🏷 Etiqueta / 🚶 Nada**.
+4. **Paso 1 · Separar**: separás la mesa por pedido.
+5. **Paso 2 · Líos**: armás los líos; cada uno se cierra con **«✓ Cerrar lío»**.
+6. Al final tocás **«Terminar»**: queda registrado el **TAP** y salen los papeles de cada pedido.
 
 Los faltantes se reparten solos: no hay que cargarlos a mano.
 
@@ -167,8 +174,15 @@ cantidad ya viene cargada), o cerralo con Terminar Día.
 
 Para subir mercadería a los racks.
 1. Tocá **IR** y **Enviar**. Elegí el modo:
-   - **«📦 Importación»**: un contenedor que llega. Cargás **masters**, **cajas por master**, la
-     **posición** de rack (te sugiere libres) y la empresa **LK · Loeke** o **CH · Chef**.
+   - **«📦 Importación»**: un contenedor que llega. En **Código** escribís el código o el nombre y la
+     app te **sugiere los códigos que existen** (🚢 = importado): tocá el que corresponde. Después
+     cargás **masters**, **cajas por master**, la **posición** de rack (te sugiere libres) y la
+     empresa **LK · Loeke** o **CH · Chef**.
+     ⚠ Acá va el **código** del artículo; la posición de rack va abajo, en **Sector** (si escribís una
+     posición no te la va a dejar cargar). Si el código no aparece en la lista, fijate que no te falte
+     una letra (606 es **606E**); si de verdad es nuevo, está el botón
+     **✎ Cargar «956E» igual (código nuevo)** (con el código que escribiste) y te pregunta antes de
+     crearlo.
    - **«🏠 Nacional»**: subir a racks algo que ya está en **A guardar** o en **Excedente**.
 2. **«Revisar carga →»** → **«✓ Confirmar carga»** (o «← Volver» para corregir). Repetí por cada
    palet.
@@ -191,12 +205,21 @@ Para pasar mercadería de una posición de rack a otra (no cambia el stock, sól
 Tocá **📦** y **Enviar**. Hay **3 opciones**:
 
 - **📥 Recibir insumos**: entra stock de insumos. Primero **«¿Qué recibís?»**: elegís la categoría
-  (plásticos, flejes, cajas, partes…; los importados no se reciben acá). Después **de dónde recibís** y
-  la **documentación** (Remito, Factura o los dos) y tocás **Enviar**. Adentro aparecen **todos los
+  (plásticos, flejes, cajas, partes…; los importados no se reciben acá). Después **de dónde recibís**:
+  salen **sólo los que te pueden traer eso** (las bolsas, sus 3 proveedores; las cajas, los suyos; las
+  partes plásticas, los inyectores y Cervantes; los flejes, sus proveedores y Cervantes). Si llegó de
+  otro lado está **«✏ Otro origen»** para escribirlo. **Sector Crudo y Sector Procesado no preguntan
+  nada**: siempre vienen de **Cervantes** y siempre con **remito**, así que vas directo al N° de
+  remito. Después la **documentación** (Remito, Factura o los dos) y **la lista se abre sola**: no hay
+  que volver a tocar Enviar. En **flejes**, si elegís un proveedor ves **sólo los flejes de él**; con
+  **Cervantes** ves todos. Si lo que te trajeron no está en su lista, el botón **«Otros»** te muestra los
+  flejes y alambres que todavía no están asignados a ningún proveedor. Adentro aparecen **todos los
   insumos del rubro con el nombre de GP2**, también los que nunca se recibieron en Virgilio: buscá el
-  tuyo por nombre o código, cargá la cantidad y **«✓ Registrar entrada»**. **Sólo recibís lo que ya
-  está en la lista**: no se puede agregar un insumo nuevo. Si llegó algo que no figura, avisá a Stock
-  y Compras para que lo carguen. En **plásticos**, al entregar aparecen sólo las bolsas que
+  tuyo por nombre o código, cargá la cantidad y **«✓ Registrar entrada»**. Si llegó algo que **no
+  figura en ninguna lista**, está **«+ Agregar insumo»** (en la grilla de categorías y dentro de cada
+  categoría, menos bolsas y cajas): describilo en tus palabras, poné categoría, cantidad y unidad, y
+  listo — el código de verdad se lo pone Stock y Compras después. Si lo que escribís se parece a algo
+  que ya existe, te lo muestra antes de crearlo: fijate bien, casi siempre es ése. En **plásticos**, al entregar aparecen sólo las bolsas que
   se usan (con lugar en el Mapa); al recibir aparecen además las bolsas de GP2.
   Las bolsas se cargan sólo en **Bolsas** (abajo se ve cuántos kg son). En **cajas** aparecen las 11
   cajas (Caja Nº 1 … Nº 29); se cargan en **Cajas** o en **Paquetes** (cada paquete = 25 cajas).
@@ -206,16 +229,18 @@ Tocá **📦** y **Enviar**. Hay **3 opciones**:
 - **📤 Entregar insumos**: sale stock de insumos. Primero **«¿Qué envío es?»**: **🏭 Envío a
   inyectores** (elegís el inyector y aparecen sólo las bolsas plásticas; es la única forma de sacar
   bolsas) o **📦 Envío a otros** (todo lo demás, sin bolsas plásticas);
-  después el destino, **Enviar**, las cantidades y
-  **«✓ Registrar salida»**. Un insumo que viene en caja master (MC) **sale siempre en MC
+  después el destino y **la lista se abre sola** (no hay que volver a tocar Enviar): las cantidades y
+  **«✓ Registrar salida»**. Las bolsas plásticas van a **Kollplast**, **Pat Bet Plast** o
+  **Pettofrezza**, y a nadie más. Un insumo que viene en caja master (MC) **sale siempre en MC
   enteras**.
 - **🚚 Salida a Cervantes**: mandar mercadería a Cervantes. Tiene dos pestañas, **Góndola** y
   **A guardar** → **«✓ Mandar N caja(s) a Cervantes»**. **Nunca se manda desde racks**: si querés
   mandar una master que está en un rack, primero la bajás con **BR** (va a «a guardar») y después
   la mandás desde la pestaña A guardar. Al terminar, cerrá con **«🏁 Terminé»** (o **«⛔ Anular»**).
 
-Recibir y Entregar insumos quedan **abiertos** mientras trabajás (como RT): se cierran tocando
-📦 → la misma opción → **Enviar**, o con Terminar Día. Para salir sin registrar:
+Recibir y Entregar insumos quedan **abiertos** mientras trabajás (como RT): se cierran al registrar
+o al cerrar el cuadro, o con Terminar Día. Si la app se reinició a mitad de camino, volvés a entrar
+por 📦 → la misma opción y **retomás** lo que tenías cargado. Para salir sin registrar:
 **«✕ Anular recepción de insumos»** / **«✕ Anular entrega de insumos»**.
 
 ## Carga de camión (CC)

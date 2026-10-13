@@ -12,12 +12,19 @@ const cuerpo = (n) => { const a = src.indexOf("\nasync function " + n + "("); re
 const aj = cuerpo("stockAjustar"), fj = cuerpo("stockFijar"), ini = cuerpo("stockGuardarInicial");
 ok(/_stkEsRacks\(dep\)[\s\S]*_stkRackPosElegir\(cod, "stkAjPos", cant\)[\s\S]*row\.ubicacion = rp\.ubic/.test(aj) && aj.indexOf("_stkRackPosElegir") < aj.indexOf("stkInsertMov"), "Ajustar: en racks pide la posición antes de grabar y la manda en ubicacion");
 ok(/_stkRackPosElegir\(cod, "stkAjPos2", null\)[\s\S]*actual = rp\.saldo[\s\S]*_fRow\.ubicacion = rackUbic/.test(fj), "Fijar: en racks fija la posición (saldo de esa posición) y manda ubicacion");
-ok(/_stkEsRacks\(dep\)[\s\S]*Sin posición[\s\S]*_stkRackSectorDe\(r\._pos\)[\s\S]*r\.ubicacion = s/.test(ini), "Stock inicial: en racks cada línea lleva posición validada");
+ok(/_stkEsRacks\(dep\)[\s\S]*Sin posición[\s\S]*_stkRackDirDe\(r\._pos\)[\s\S]*r\.ubicacion = String\(d\.pos\)/.test(ini), "Stock inicial: en racks cada línea lleva posición validada");
+ok(/d\.falta[\s\S]*DIVIDIDOS y falta decir en qué parte/.test(ini), "Stock inicial: un rack dividido sin parte no se graba (v29.78)");
 ok(/id="stkAjPos"/.test(src) && /id="stkAjPos2"/.test(src), "inputs de posición en la pantalla");
 (async () => {
   const st = { pos: [], sector: "X22", prompt: null, confirm: true, alerts: [], confirms: [], sectorFalla: false };
   const fetchMock = async (url) => {
-    if (/gv_rack_sector/.test(url)) { if (st.sectorFalla) throw new Error("red"); return { ok: true, json: async () => st.sector }; }
+    // v29.78: la dirección la resuelve gv_rack_dir ({rack, pos, parte, partes, falta})
+    if (/gv_rack_dir/.test(url)) {
+      if (st.sectorFalla) throw new Error("red");
+      const n = st.partes || 1, parte = st.parte == null ? null : st.parte;
+      return { ok: true, json: async () => (st.sector == null ? { rack: null, pos: null, parte: null, partes: null, falta: false }
+        : { rack: st.sector, pos: (n > 1 && parte ? st.sector + "-" + parte : st.sector), parte: parte, partes: n, falta: n > 1 && !parte }) };
+    }
     if (/Racks_Planimetria/.test(url)) return { ok: true, json: async () => st.pos };
     throw new Error("url " + url);
   };
@@ -43,6 +50,14 @@ ok(/id="stkAjPos"/.test(src) && /id="stkAjPos2"/.test(src), "inputs de posición
   st.sector = "X22"; st.inp = "X22"; st.prompt = "NO DEBE PREGUNTAR";
   r = await f("606", "stkAjPos", 4);
   ok(r && r.ubic === "X22", "con la posición tipeada en la pantalla no pregunta");
+  // v29.78 — rack DIVIDIDO: sin la parte no se graba; con la parte, la dirección lleva el «-k»
+  st.sector = "AB05"; st.partes = 2; st.parte = null; st.inp = "AB05"; st.prompt = null;
+  r = await f("606", "stkAjPos", 4);
+  ok(r === null && /dividido en 2 partes/.test(st.alerts.pop()), "rack dividido sin parte: no graba y dice qué escribir");
+  st.parte = 2; st.inp = "AB05-2"; st.pos = [{ sector: "AB05-2", innercajas: 7, emp: "LK", fuente: "stock" }];
+  r = await f("606", "stkAjPos", 4);
+  ok(r && r.ubic === "AB05-2" && r.saldo === 7, "con la parte: graba en AB05-2 con el saldo de ESA parte");
+  st.sector = "X22"; st.partes = 1; st.parte = null; st.pos = [{ sector: "X22", innercajas: 10, emp: "LK", fuente: "stock" }]; st.inp = "X22";
   st.sectorFalla = true; r = await f("606", "stkAjPos", 4);
   ok(r === null && /No pude verificar/.test(st.alerts.pop()), "sin respuesta del Mapa: no graba");
   console.log(fails ? "\n" + fails + " falla(s)" : "\nOK");

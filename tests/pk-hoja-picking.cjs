@@ -16,7 +16,14 @@ const d = A("E70F", tp, pkc, lug, nps, otras, "Juan Farias");
 ok(d.lineas.map(x => x.cod).join() === "066,501,505,809E", "orden del recorrido y el código pelado (809E, no «809E LK»; su góndola J13, no M13)");
 ok(d.lineas[3].lug.sector === "J13", "dual con su empresa");
 ok(d.lineas[2].lug.sector === "D01" && d.lineas[0].lug.sector === "A05", "sector = el primero del código (D01, no D18) y el 066 encuentra su celda «66»");
-ok(!/Orden/.test(H(d)) && !/background:\s*#/i.test(H(d)), "sin columna Orden, sin fondos de color");
+/* La hoja se IMPRIME: ni columna Orden ni fondos de COLOR. El tachado de la v29.65 (la diagonal
+   y la línea del «no se pickeó») va en negro y gris, que es tinta, no color: se deja pasar. */
+const _fondos = (H(d).match(/background:\s*#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/gi) || []).filter((x) => {
+  var v = x.replace(/.*#/, "").toLowerCase();
+  if (v.length === 3) v = v[0] + v[0] + v[1] + v[1] + v[2] + v[2];
+  return !(v.slice(0, 2) === v.slice(2, 4) && v.slice(2, 4) === v.slice(4, 6)); // R=G=B → gris
+});
+ok(!/Orden/.test(H(d)) && !_fondos.length, "sin columna Orden, sin fondos de color: " + JSON.stringify(_fondos));
 ok(d.minOtras === 30 && d.minNeto === 120, "muestra otras tareas (30 min, sin contar dos veces lo que se pisa) y NO las descuenta");
 ok(Math.abs(d.m3h - 0.5) < 1e-9, "m³/hora = m³ ÷ horas del picking (sin descontar)");
 const h = H(d);

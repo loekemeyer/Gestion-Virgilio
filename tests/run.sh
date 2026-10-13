@@ -126,9 +126,11 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== mon-tv (monitor liviano de TV: solo lectura, mismas fuentes que el monitor grande) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-tv.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-dia-armado.cjs
 node tests/monitor-viejo-sin-puerta.cjs
 node tests/fc-parseada-x-de-y.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-sup-no-operario.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-solo-logueados.cjs
 echo "== mon-admin (Mon. Admin: generado desde tv.html, tablero interactivo con pop-ups) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-admin.cjs
 # v26.70 (Luis, D28/D29): una lectura rota de lo facturado o lo cargado no es un cero (cartel falso) y la tanda no se pisa con el m³
@@ -139,6 +141,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tandas-orden-camion.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/operario-queda-botonera.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tv-clave-login.cjs
+node tests/tv-clave-segura.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cervantes-legajo.cjs
 node tests/operario-alta-validar.cjs
 echo "== mon-header-codigo (v23.93: sin QR, dos pestanas con subpestanas y el codigo con su rueda) =="
@@ -229,6 +232,10 @@ echo "== ins-ri-gp2-catalogo (v29.35: Recibir insumos muestra el catálogo de GP
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-ri-gp2-catalogo.cjs
 echo "== ins-marca-empresa (v29.56: al recibir insumos se marca de qué empresa vienen, en toda categoría) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-marca-empresa.cjs
+echo "== ins-ri-origen-menu (v29.82: origen cerrado por categoría, SC/SP sin preguntas, un solo Enviar, flejes por proveedor) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-ri-origen-menu.cjs
+echo "== ins-bolsa-sin-equivalencia (v29.74: una bolsa sin fila en GP2.insumo_equivalencia no sale en silencio) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-bolsa-sin-equivalencia.cjs
 echo "== historial-no-replay (v29.24: el replay de Terminar Día no re-manda los items h_* del Historial) =="
 node tests/historial-no-replay.cjs
 
@@ -271,7 +278,13 @@ echo "== mg-tarea-vencida (v26.56: guardado abierto de otro día no cuenta tiemp
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-tarea-vencida.cjs
 echo "== modulo-minimizar-anular (v26.83: Cerrar minimiza BR/MG/IR sin cortar el tramo; Anular sale con ANULADO) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/modulo-minimizar-anular.cjs
+
+echo "== ir-codigo-candado (v29.67: Ingreso a racks no acepta un codigo que no existe; si es una POSICION lo dice) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ir-codigo-candado.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/modulo-tarea-enviar.cjs
+
+echo "== modbar-no-tapa (v29.81: la barra Anular/Termine no tapa el fondo de la lista — 390x740) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/modbar-no-tapa.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/sc-racks-unidad.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ayuda-chat.cjs
 node tests/ayuda-manual-al-dia.cjs
@@ -302,6 +315,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ins-categorias (idea 7917 / v7.31: navegación + alta por categorías en RI/EI) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-categorias.cjs
+echo "== ins-alta-duplicado (v30.05: el alta avisa si la medida ya existe) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-alta-duplicado.cjs
 
 echo "== ssg-carrera-cron (v7.06: SSG no avisa si el cron ya descontó el picking de la tanda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ssg-carrera-cron.cjs
@@ -708,6 +723,8 @@ echo "== remito-np-web (v15.46: el remito impreso trae cliente y fecha también 
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/remito-np-web.cjs
 echo "== pk-hoja-picking (v25.51: hoja de picking por tanda al terminar el picking) =="
 node tests/pk-hoja-picking.cjs
+echo "== pk-hoja-pdf (v29.65: la hoja como sale por el helper — sin bloques negros en Total cajas) =="
+node tests/pk-hoja-pdf.cjs
 
 echo "== proy-entregadas (v15.52: popup Proyección — cajas ENTREGADAS por el proveedor entre el mes y la barra; s/d si ese mes no había registro) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/proy-entregadas.cjs
@@ -827,6 +844,8 @@ echo "== pmap-gondolas (v17.23: 🗺️ Mapa de góndolas — celdas de a 5, la 
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-gondolas.cjs
 echo "== pmap-racks (v22.67: 📦 pestaña Racks del Mapa — solo lectura, vista gv_rack_celda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-racks.cjs
+echo "== pmap-scp (v29.98: 📐 SC y SP — la tercera clase de lugar, grilla IN-A1…) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-scp.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-punto-unico.cjs
 echo "== imp-escritura-login (v22.81: el maestro de importados se escribe sólo con la sesión de supervisor) =="
 node tests/imp-escritura-login.cjs
@@ -892,6 +911,11 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== resumen-pkc-agrupado (v19.09: el detalle del picking, una linea por tanda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/resumen-pkc-agrupado.cjs
 
+echo "== arm-mesa-inicio (v29.90: al empezar el armado se pregunta la MESA, evento AUI, sin frenar nada) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/arm-mesa-inicio.cjs
+
+echo "== rol-panel-click (v29.95: apretar un nombre en «¿Quién sos?» tiene que ENTRAR) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rol-panel-click.cjs
 echo "== cierre-cancelado-avisa (v19.22: cancelar el «donde dejas la tanda» avisa, no aborta en silencio) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cierre-cancelado-avisa.cjs
 
@@ -954,6 +978,9 @@ echo "== stk-codigo-inexistente (v21.76: un codigo que NO existe no se dibuja en
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-codigo-inexistente.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-ajuste-cod-inexistente.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-ajuste-racks-posicion.cjs
+
+echo "== rack-subposicion (v29.78: un rack se parte en Y25-1, Y25-2... y el ingreso promptea la parte) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rack-subposicion.cjs
 
 echo "== rv-cuadro-entero (v21.29: el Reporte diario entra entero, arranca en hoy y mide lapsos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rv-cuadro-entero.cjs
@@ -1128,6 +1155,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== stk-buscar-cero (Regresion v20) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-buscar-cero.cjs
+echo "== stk-busca-decimal (v30.00: buscar 13.6 encuentra 13,6) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-busca-decimal.cjs
 echo "== stk-pedidas-neto (Regresion v24.04) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-pedidas-neto.cjs
 echo "== stk-refrescar-ya (v25.18) =="
@@ -1216,6 +1245,14 @@ echo "== est-madre-unica (v25.78: la Est. Madre es UN cuadro — est-madre.js, m
 node tests/est-madre-unica.cjs
 echo "== ads-alertas (v27.21: ADS — Alertas Damián Stock, talleristas + quiebres; ads.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ads-alertas.cjs
+
+echo "== gv-ui-sistema (v29.83: el sistema de diseño GV-UI — tokens, paleta medida, escala) =="
+node tests/gv-ui-sistema.cjs
+echo "== analisis-productivo (v29.64: Análisis Productivo por tanda; analisis.js) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/analisis-productivo.cjs
+
+echo "== pk-gondola-sugerida (v29.69: el código sin góndola → se le pregunta al operario) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-gondola-sugerida.cjs
 echo "== ppp-plantel (v29.46: PPP → Plantel de la semana, horas de picking/armado/fijas → personas; plantel.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-plantel.cjs
 echo "== monitor-ritmo (v29.47: Monitor → Ritmo de picking, estimado por dificultad vs real; plantel.js) =="
