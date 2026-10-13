@@ -1849,6 +1849,63 @@ cuenta (Stock → Capacidad «Importar» y «Borrar todo», y Despiece «Guardar
 los 12 dependientes quedaron en `zz_backups."GV_Backup_CapSector_defs_20260925"`. Lo sostiene
 `tests/cap-sector-vista.cjs`.
 
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.78): UN RACK SE PUEDE PARTIR — `Y25-1`, `Y25-2`, `Y25-3`…
+
+**Luis:** *"algunos racks tienen mucho espacio que estamos desaprovechando … si alguien guarda algo a un
+rack que ya esta ocupado por otro codigo, promptee para decir de que lado lo dejan … que separe ese rack
+en Izq y Der (basicamente, una subdivision de racks)"* · *"pongamos la posibilidad de, por ejemplo,
+Y25-1, Y25-2, Y25-3"*.
+
+> ## Un rack puede estar **DIVIDIDO en N partes** (1 a 9, numeradas de **izquierda a derecha**) y la
+> ## **DIRECCIÓN** de una parte es **`Y25-2`**. Sin partir (N = 1) la dirección sigue siendo `Y25`.
+
+**Antes de esto el sistema PROHIBÍA el segundo código** (`gv_rack_pos_chequear` devolvía `ocupado:<cod>` y
+frenaba el ingreso) y el conteo del Mapa **borraba** lo que hubiera en la posición que no fuera el código
+que se estaba guardando. Medido al 13/10: 258 racks activos, 89 posiciones con stock, **0 con dos códigos**.
+
+| la pregunta | la función | para qué |
+|---|---|---|
+| ¿cuál es EL RACK? | **`gv_rack_sector(txt)`** — pela la parte (`Y25-2` → `Y25`) | AGRUPAR y validar: es el **cuello único** por donde 18 funciones y 12 vistas siguen contando por rack **sin tocarlas** |
+| ¿cuál es la DIRECCIÓN? | **`gv_rack_pos(txt)`** | lo que se **ESCRIBE** en `Movimientos_Stock.ubicacion` |
+| ¿qué parte pide el texto? | `gv_rack_lado(txt)` → 1..9 (null si el rack no está partido) | |
+| ¿en cuántas partes está? | `gv_rack_subs(txt)` ← **`GV_Lugar.gv_sub`** | la subdivisión es **del RACK**, no del movimiento |
+| ¿falta decir la parte? | `gv_rack_falta_parte(txt)` · `gv_rack_dir(txt)` (todo junto, para el front) | |
+
+- **La parte viaja DENTRO del texto de la dirección**, así que **ninguna función cambió de firma**: entra por
+  el mismo argumento de siempre. Acepta `Y25-2`, `Y25 2`, `Y25/2`, `Y25 izq` (= 1) y `Y25 der` (= 2); se
+  muestra siempre el número.
+- **Partir / unir: `gv_rack_partir(sector, partes, parte_actual, motivo, legajo)`** — la llama **el operario**
+  desde Ingreso a racks cuando se topa con un rack ocupado (es lo que pidió Luis: que lo decida en el
+  momento, parado frente al rack), y el supervisor desde el Mapa (**✂ Partir**). Lo que ya estaba **sin
+  parte se muda a la parte que él indique**; unir frena si más de una parte tiene mercadería. Queda en
+  **`GV_Rack_Particion`**.
+- ⚠ **EL PUNTO QUE EVITA PERDER UNA CAJA:** en un rack partido **todo movimiento lleva la parte**
+  (trigger `aa_gv_racks_ajuste_sin_posicion` → **`RACKS_FALTA_PARTE`**). Sin eso las cajas quedan «en el
+  rack, sin parte»: el Mapa muestra una parte fantasma y Bajar de racks no sabe de dónde sacarlas.
+- ⚠ **`gv_rack_posicion_guardar` vacía SÓLO su parte** (`gv_rack_pos(m.ubicacion) = v_sec`). Con el criterio
+  por rack, contar la izquierda **borraba el stock de la derecha**: es el único lugar que podía destruir
+  stock ajeno.
+- ⚠ **`Racks_Planimetria.sector` pasa a ser la DIRECCIÓN** (+ columnas `rack`, `parte`, `partes`), y lo
+  mismo `gv_rack_celda` (+ `pos_rack`, `parte`, `partes`). Por eso el front casi no cambió: los chips de
+  Bajar de racks, las posiciones de Stocks → Ajustar y las celdas del Mapa ya tratan la posición como un
+  **string opaco**. Lo que necesita el RACK usa la columna `rack`. ⚠ El `id` de la vista es un hash que
+  **incluye la parte**, o dos partes del mismo código tendrían el mismo id y PostgREST devolvería una sola.
+- **Front**: Ingreso a racks ofrece **✂ en 2 / 3 / 4 partes** y pregunta en qué parte está lo que ya había
+  (`_irOcupadoHtml` / `irPartir`); si el rack ya está partido ofrece las partes libres. Bajar de racks y
+  Stocks → Ajustar / Fijar / Stock inicial piden la parte (`gv_rack_dir`); 📥 Recibir de Importación ofrece
+  una opción por parte. El Mapa dibuja **una celda por parte** y tiene ✂ Partir / unir.
+- ⚠ **Medido antes de aplicar nada: con 0 racks partidos todo se comporta EXACTAMENTE como antes** — la
+  huella de `gv_rack_sector` sobre los 2.645 textos de ubicación reales no cambió
+  (`c82ba953f63ab26f7de76c42abc2f05f`) y las dos vistas devolvieron las mismas filas y el mismo md5
+  (259 y 304). Es forward-facing por construcción: no hay nada que migrar.
+- Los insumos **no se parten** (siguen con su nomenclador `AD`/`AT`, que son filas propias de `GV_Lugar`).
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` (16 centinelas) ·
+`select sector, rack, parte, partes, cod_art, innercajas, estado from public."Racks_Planimetria" where partes > 1;` ·
+`select * from public."GV_Rack_Particion" order by id desc;` · `node tests/rack-subposicion.cjs`.
+`sql/gv_rack_subposicion_v2978.sql` (rollback en la cabecera y al final).
+
 ## ⚠ REGLA: el CÓDIGO DE CLIENTE es por EMPRESA — nunca cruzar por código solo
 
 **Thomas, 2026-09-16:** *"¿contemplaste que los códigos de clientes de LK y CH son diferentes?
