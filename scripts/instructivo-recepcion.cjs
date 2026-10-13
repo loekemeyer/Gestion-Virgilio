@@ -20,37 +20,37 @@ const OUT  = path.join(ROOT, "docs/instructivos");
 const img = (f) => "data:image/png;base64," + fs.readFileSync(path.join(CAPS, f)).toString("base64");
 
 const PASOS = [
-  { n: 1,  img: "00b-botonera-rt.png", t: "Tocá RT y después Enviar",
-    d: "El primer toque <b>selecciona</b>. Recién con <b>Enviar</b> arranca la recepción. El botón queda con borde rojo: la tarea está abierta." },
+  { n: 1,  img: "00b-botonera-rt.png", t: "Tocá RT y Enviar",
+    d: "El primer toque <b>selecciona</b>. <b>Enviar</b> arranca. Queda con borde rojo: la tarea está abierta." },
   { n: 2,  img: "01-tipo.png",         t: "¿Qué vas a cargar?",
-    d: "<b>Talleristas</b> si lo trae un tallerista. <b>Prov. Art. Terminado</b> si es un proveedor de artículo terminado." },
+    d: "<b>Talleristas</b> o <b>Prov. Art. Terminado</b>." },
   { n: 3,  img: "02-lista.png",        t: "Elegí quién entrega",
-    d: "Buscá por nombre. Es <b>el que trae la mercadería</b>, no el que figura en el papel si no coincide." },
+    d: "Buscá por nombre. Es <b>el que trae la mercadería</b>." },
   { n: 4,  img: "03-linea.png",        t: "Fecha y línea",
-    d: "La fecha es la del día que recibís. <b>LK = Loeke · CH = Chef.</b> El botón gris es porque ese tallerista no trabaja para esa empresa." },
+    d: "La fecha es la de hoy. <b>LK = Loeke · CH = Chef.</b> Gris = ese tallerista no trabaja para esa empresa." },
   { n: 5,  img: "04-doc.png",          t: "¿Qué documentación recibís?",
     d: "Lo que te deja en la mano: <b>Remito</b>, <b>Factura</b> o los dos." },
   { n: 6,  img: "05-remito.png",       t: "Número y fecha del papel",
-    d: "Copiá el número <b>tal cual</b>. Hasta que no estén el número y la fecha, <b>Continuar</b> no se prende." },
-  { n: 7,  img: "06-codigos.png",      t: "Los códigos de ese proveedor",
-    d: "<b>OC 120</b> = lo que falta que entregue de la orden de compra. Si trae un código que no está en la lista: <b>Introducir código diferente</b>." },
-  { n: 8,  img: "07-cajas.png",        t: "Cuántas cajas de ese código",
-    d: "Contá las cajas y tipeá el número. <b>Siguiente</b>. Si te equivocaste, volvés a tocar el código y <b>Quitar</b>." },
+    d: "Copiá el número <b>tal cual</b>. Sin eso, <b>Continuar</b> no se prende." },
+  { n: 7,  img: "06-codigos.png",      t: "Los códigos del proveedor",
+    d: "<b>OC 120</b> = lo que falta que entregue. ¿El código no está? <b>Introducir código diferente</b>." },
+  { n: 8,  img: "07-cajas.png",        t: "Cuántas cajas",
+    d: "Contá y tipeá. <b>Siguiente</b>. Para corregir: tocá el código otra vez y <b>Quitar</b>." },
   { n: 9,  img: "08-cargados.png",     t: "Lo cargado queda en verde",
-    d: "Repetí con cada código que trajo. Abajo, <b>Enviar</b> dice cuántos códigos llevás cargados." },
+    d: "Repetí con cada código. <b>Enviar</b> dice cuántos llevás." },
   { n: 10, img: "09-resumen.png",      t: "Revisá y sacá la foto",
-    d: "Mirá que los números sean los que contaste. La <b>foto de la mercadería es obligatoria</b>: sin foto no se puede enviar." },
+    d: "Mirá que los números sean los que contaste. <b>Sin foto no se puede enviar.</b>" },
   { n: 11, img: "10-resumen-foto.png", t: "Confirmar y enviar",
-    d: "Con la foto puesta se habilita <b>Confirmar y enviar</b>. Las cajas entran a <b>A guardar</b>; a la góndola van después, con <b>MG</b>." },
-  { n: 12, img: "11-exceso.png",       t: "Si entró más de lo que pedía la OC",
-    d: "Antes de enviar <b>tenés que avisar</b>: tocá <b>Enviar WhatsApp a Thomas</b>. Recién ahí se habilita Confirmar. No te traba la recepción." }
+    d: "Las cajas entran a <b>A guardar</b>. A la góndola van después, con <b>MG</b>." },
+  { n: 12, img: "11-exceso.png",       t: "Si entró más que la OC",
+    d: "Antes de enviar: <b>Enviar WhatsApp a Thomas</b>. Recién ahí se habilita Confirmar." }
 ];
 
 const OJO = [
-  ["RT queda ABIERTO mientras recibís", "Para cerrarlo tocá <b>RT</b> otra vez y <b>Enviar</b>. Con RT abierto <b>no podés empezar picking ni armado</b>."],
-  ["¿Entraste por error?", "Botón rojo de abajo: <b>✕ Anular recepción</b>. Descarta lo cargado y cierra la sesión."],
-  ["Te fuiste por la mitad", "No se pierde: en la botonera sale <b>▶ Seguir recepción</b> y volvés al mismo paso."],
-  ["Lo recibido NO está en góndola", "Queda en <b>A guardar</b>. Se guarda después con <b>MG · Guardado a Góndola</b>."]
+  ["RT queda ABIERTO", "Para cerrarlo: <b>RT</b> otra vez y <b>Enviar</b>. Abierto no deja empezar picking ni armado."],
+  ["¿Entraste por error?", "Botón rojo de abajo: <b>✕ Anular recepción</b>."],
+  ["Te fuiste por la mitad", "En la botonera sale <b>▶ Seguir recepción</b>. Volvés al mismo paso."],
+  ["No está en góndola", "Queda en <b>A guardar</b>. Se guarda con <b>MG</b>."]
 ];
 
 const tarjeta = (p) => `
@@ -79,19 +79,19 @@ const htmlCon = (COLS, anchos) => `<!doctype html>
            line-height: 1.35; }
   .marca b { display: block; font-size: 6.2mm; color: #0f172a; }
   .grilla { display: grid; grid-template-columns: var(--cols, repeat(5, 1fr)); gap: 4.5mm; flex: 1; align-items: stretch; }
-  .col { display: flex; flex-direction: column; gap: 5.2mm; }
+  .col { display: flex; flex-direction: column; gap: 6.2mm; }
   .paso { break-inside: avoid; }
   .cab { display: flex; align-items: center; gap: 2.2mm; margin-bottom: 1.6mm; }
-  .num { flex: none; width: 9.6mm; height: 9.6mm; border-radius: 50%; background: #0f172a; color: #fff;
-         font-size: 6.1mm; font-weight: 900; display: flex; align-items: center; justify-content: center; }
-  .tit { font-size: 6.4mm; font-weight: 900; line-height: 1.08; }
+  .num { flex: none; width: 10.4mm; height: 10.4mm; border-radius: 50%; background: #0f172a; color: #fff;
+         font-size: 6.6mm; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+  .tit { font-size: 7mm; font-weight: 900; line-height: 1.08; }
   .paso img { display: block; width: 100%; border: .45mm solid #cbd5e1; border-radius: 2mm; }
-  .dsc { font-size: 5.3mm; line-height: 1.26; color: #334155; margin-top: 1.4mm; }
+  .dsc { font-size: 5.85mm; line-height: 1.26; color: #334155; margin-top: 1.4mm; }
   .dsc b { color: #0f172a; }
   footer { margin-top: 4mm; border-top: 1.2mm solid #0f172a; padding-top: 3mm;
            display: grid; grid-template-columns: repeat(4, 1fr); gap: 5mm; }
-  .ojo b.h { display: block; font-size: 5.3mm; font-weight: 900; margin-bottom: 1mm; }
-  .ojo { font-size: 4.6mm; line-height: 1.3; color: #334155; border-left: 1.2mm solid #dc2626; padding-left: 2.6mm; }
+  .ojo b.h { display: block; font-size: 5.8mm; font-weight: 900; margin-bottom: 1mm; }
+  .ojo { font-size: 5.1mm; line-height: 1.3; color: #334155; border-left: 1.2mm solid #dc2626; padding-left: 2.6mm; }
   .pie { margin-top: 2.5mm; font-size: 3.6mm; color: #64748b; text-align: right; }
 </style></head>
 <body style="${anchos ? "--cols:" + anchos.map(a => a.toFixed(3) + "fr").join(" ") : ""}">
