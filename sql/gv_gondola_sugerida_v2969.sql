@@ -28,6 +28,7 @@
 --   drop function if exists public.gv_gondola_sector(text);
 --   drop function if exists public.gv_gondola_sugerida_instalar();
 --   drop table if exists public."GV_Gondola_Sugerida_Resol";
+--   drop function if exists public.gv_analisis_badge(int, text);
 --   drop function if exists public.gv_analisis_marcas(int, text);
 --   drop function if exists public.gv_analisis_marcar(text, text, text, text);
 --   drop function if exists public.gv_analisis_marca_instalar();
@@ -218,6 +219,76 @@ begin
 end $$;
 revoke all on function public.gv_analisis_marcas(int, text) from public;
 grant execute on function public.gv_analisis_marcas(int, text) to anon, authenticated;
+
+-- ─────────────────── 5 bis. D4: el badge del boton (tandas con avisos SIN REVISAR) ───────────────────
+-- pendientes = tandas de los ultimos N dias con un aviso DURO (el picking dio completo un codigo que
+-- el armado declaro faltante, o un paso confirmado sin tiempo frente a la gondola) y sin marca.
+-- Se apaga marcandolas 🚩 anomala o ✓ revisada. 1 s a 14 dias.
+create or replace function public.gv_analisis_badge(p_dias int default 14, p_legajo text default null)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare
+  v_hoy date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
+  v_desde date := v_hoy - greatest(least(coalesce(p_dias, 14), 90), 1) + 1;
+  v_pend int; v_av int; v_anom int;
+begin
+  if not public.gv_analisis_acceso_ok(p_legajo) then
+    raise exception 'ACCESO: el Analisis Productivo es para el supervisor y los legajos habilitados';
+  end if;
+  with u as (
+    select t.tanda from public."GV_Picking_Tanda" t
+     where (t.tp at time zone 'America/Argentina/Buenos_Aires')::date between v_desde and v_hoy
+       and not public.es_legajo_test(t.legajo)
+    union
+    select t.tanda from public."GV_Armado_Tanda" t
+     where (t.tp at time zone 'America/Argentina/Buenos_Aires')::date between v_desde and v_hoy
+       and not public.es_legajo_test(t.legajo)
+  ), pkc as (
+    select upper(btrim(split_part(r.texto, '|', 1))) tanda,
+           regexp_replace(regexp_replace(regexp_replace(upper(btrim(split_part(r.texto, '|', 2))),
+             '\s+(LK|CH)$', ''), '([0-9E])L$', '\1'), '^0+(?=.)', '') ck,
+           max(case when split_part(r.texto, '|', 3) ~ '^[0-9.]+$' then split_part(r.texto, '|', 3)::numeric else 0 end) esp,
+           max(case when split_part(r.texto, '|', 4) ~ '^[0-9.]+$' then split_part(r.texto, '|', 4)::numeric else 0 end) re
+      from public."Registros_Produccion_Virgilio" r
+     where r.opcion = 'PKC' and r.ts_cliente > (v_desde - 2)::timestamptz and not public.es_legajo_test(r.legajo)
+       and upper(btrim(split_part(r.texto, '|', 1))) in (select u.tanda from u)
+     group by 1, 2
+  ), falto as (
+    select distinct e.t tanda from (
+      select upper(btrim(x.tanda)) t,
+             regexp_replace(regexp_replace(regexp_replace(upper(btrim(x.cod_art)),
+               '\s+(LK|CH)$', ''), '([0-9E])L$', '\1'), '^0+(?=.)', '') ck,
+             sum(coalesce(x.cajas_falto, 0)) f
+        from public."Entregas_Virgilio" x
+       where upper(btrim(x.tanda)) in (select u.tanda from u) group by 1, 2) e
+      join pkc on pkc.tanda = e.t and pkc.ck = e.ck
+     where e.f > 0 and pkc.re >= pkc.esp and pkc.esp > 0
+  ), paso as (
+    select distinct s.tanda from public.gv_picking_paso s
+     where s.tanda in (select u.tanda from u)
+       and (select extract(epoch from s.primera_conf - coalesce((select max(m.ts_cliente)
+              from public."GV_Picking_Paso_Evento" m
+             where m.evento = 'mostrado' and upper(btrim(m.tanda)) = s.tanda and m.paso = s.paso
+               and m.legajo = s.legajo and m.ts_cliente <= s.primera_conf), s.primera_vez))) >= 0
+       and ((coalesce(s.real_final, 0) >= 3 and (select extract(epoch from s.primera_conf - coalesce((select max(m.ts_cliente)
+              from public."GV_Picking_Paso_Evento" m
+             where m.evento = 'mostrado' and upper(btrim(m.tanda)) = s.tanda and m.paso = s.paso
+               and m.legajo = s.legajo and m.ts_cliente <= s.primera_conf), s.primera_vez))) < 2)
+         or (coalesce(s.real_final, 0) >= 5 and (select extract(epoch from s.primera_conf - coalesce((select max(m.ts_cliente)
+              from public."GV_Picking_Paso_Evento" m
+             where m.evento = 'mostrado' and upper(btrim(m.tanda)) = s.tanda and m.paso = s.paso
+               and m.legajo = s.legajo and m.ts_cliente <= s.primera_conf), s.primera_vez))) / nullif(s.real_final, 0) < 1))
+  ), av as (select tanda from falto union select tanda from paso)
+  select count(*)::int,
+         count(*) filter (where not exists (select 1 from public."GV_Analisis_Marca" k
+                                             where k.tanda = av.tanda and k.estado <> 'sin'))::int,
+         (select count(*)::int from public."GV_Analisis_Marca" k2
+           where k2.estado = 'anomala' and k2.tanda in (select u2.tanda from u u2))
+    into v_av, v_pend, v_anom from av;
+  return jsonb_build_object('pendientes', coalesce(v_pend, 0), 'con_aviso', coalesce(v_av, 0),
+                            'anomalas', coalesce(v_anom, 0), 'dias', p_dias);
+end $$;
+revoke all on function public.gv_analisis_badge(int, text) from public;
+grant execute on function public.gv_analisis_badge(int, text) to anon, authenticated;
 
 -- ─────────────────── 6. centinela ───────────────────
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)

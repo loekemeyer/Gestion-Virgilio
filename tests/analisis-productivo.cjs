@@ -65,7 +65,7 @@ const DET = {
     for (let i = 0; i < 60 && typeof window.openAnalisisProductivo !== "function"; i++) await espera(100);
     const out = { pedidos: [] };
     if (typeof window.openAnalisisProductivo !== "function") { out.sinModulo = true; return out; }
-    let modo = "ok", acceso = true;
+    let modo = "ok", acceso = true, badgeRoto = false;
     window.sb = { rpc: async (n, a) => {
       out.pedidos.push(n + ":" + JSON.stringify(a || {}));
       if (n === "gv_analisis_acceso_ok") return { data: acceso, error: null };
@@ -73,9 +73,20 @@ const DET = {
       if (n === "gv_analisis_lista") return { data: LISTA, error: null };
       if (n === "gv_analisis_tanda") return { data: DET, error: null };
       if (n === "gv_analisis_marcas") return { data: {}, error: null };
+      if (n === "gv_analisis_badge") return badgeRoto ? { data: null, error: { message: "timeout" } }
+                                                     : { data: { pendientes: 3, con_aviso: 5, anomalas: 1 }, error: null };
       if (n === "gv_analisis_marcar") return { data: { ok: true }, error: null };
       return { data: null, error: { message: "?" } };
     } };
+
+    // (i) el badge del botón: cuenta las tandas con avisos sin revisar
+    await window.anLoadBadge("8"); await espera(60);
+    const bd = document.getElementById("anBadge");
+    out.badge = bd && bd.style.display !== "none" ? bd.textContent : "";
+    out.badgeTitle = bd ? bd.title : "";
+    badgeRoto = true; await window.anLoadBadge("8"); await espera(60);
+    out.badgeTrasRoto = bd && bd.style.display !== "none" ? bd.textContent : "";
+    badgeRoto = false;
 
     // (a) botón del panel
     const btn = [...document.querySelectorAll(".sup-action-btn")].find((x) => /openAnalisisProductivo/.test(x.getAttribute("onclick") || ""));
@@ -147,6 +158,9 @@ const DET = {
   const fallos = [];
   const ok = (c, m) => { if (!c) fallos.push(m); };
   if (r.sinModulo) { console.error("ANÁLISIS PRODUCTIVO — FALLA:\n  analisis.js no se cargó: openAnalisisProductivo no existe."); process.exit(1); }
+  ok(r.badge === "3", "(i) el badge dice «" + r.badge + "» (esperaba 3)");
+  ok(/sin revisar/.test(r.badgeTitle), "(i) el badge no explica qué cuenta: " + r.badgeTitle);
+  ok(r.badgeTrasRoto === "3", "(i) una lectura rota APAGÓ el badge (quedó «" + r.badgeTrasRoto + "»)");
   ok(r.botonPanel, "(a) falta el botón «Análisis Productivo» en el panel del supervisor");
   ok(r.abierto === "flex", "(a) la pantalla no se abrió");
   ok(r.tarjetas === 2, "(b) tarjetas: " + r.tarjetas + " (esperaba 2)");

@@ -138,7 +138,7 @@ function openAnalisisProductivo(legajo) {
   _an.tanda = null; _an.det = null; _an.detErr = "";
   _anRender(); _anCargar();
 }
-function anCerrar() { var ov = document.getElementById("anOv"); if (ov) ov.style.display = "none"; }
+function anCerrar() { var ov = document.getElementById("anOv"); if (ov) ov.style.display = "none"; try { anLoadBadge(); } catch (_e) {} }
 function anDias(n) { _an.dias = n; _anCargar(); }
 function anBuscar(v) { _an.q = String(v || "").toUpperCase().trim(); _anRender(); }
 function anVolver() { _an.tanda = null; _an.det = null; _an.detErr = ""; _anRender(); }
@@ -177,6 +177,7 @@ function anMarcar(estado) {
       if (estado === "sin") delete _an.marcas[_an.tanda];
       else _an.marcas[_an.tanda] = { estado: estado, nota: nota, por: _an.legajo || "", at: new Date().toISOString() };
       _anRender();
+      try { anLoadBadge(); } catch (_e) {}
     });
 }
 
@@ -362,6 +363,24 @@ function _anDetalleHtml() {
   return h;
 }
 
+/* v29.72 (Luis, D4): el badge = tandas con avisos DUROS que nadie marcó todavía (ni anómala ni
+   revisada), de los últimos 14 días. Se apaga marcándolas. Una lectura rota NO lo apaga: lo deja
+   como estaba (un 0 que no es un 0 real es peor que no mostrar nada). */
+function anLoadBadge(legajo) {
+  var leg = legajo || _an.legajo ||
+            (typeof window.gvLegajoActual === "function" ? window.gvLegajoActual() : null) || null;
+  return _anRpc("gv_analisis_badge", { p_dias: 14, p_legajo: leg }).then(function (r) {
+    if (!r || r.error || !r.data) return;
+    var n = Number(r.data.pendientes) || 0, av = Number(r.data.con_aviso) || 0;
+    [document.getElementById("anBadge"), document.getElementById("anBadgeOp")].forEach(function (b) {
+      if (!b) return;
+      if (!(n > 0)) { b.style.display = "none"; return; }
+      b.style.display = ""; b.textContent = n;
+      b.title = n + " tanda(s) de los últimos 14 días con avisos y sin revisar (de " + av + " con avisos)";
+    });
+  });
+}
+
 /* El botón en la botonera del operario: sólo para los legajos habilitados. */
 function anMostrarBotonOperario(legajo) {
   var b = document.getElementById("btnAnalisisOp");
@@ -369,6 +388,9 @@ function anMostrarBotonOperario(legajo) {
   b.style.display = "none";
   if (!legajo) return;
   _anRpc("gv_analisis_acceso_ok", { p_legajo: String(legajo) }).then(function (r) {
-    if (r && !r.error && r.data === true) { b.style.display = ""; b.setAttribute("data-legajo", String(legajo)); }
+    if (r && !r.error && r.data === true) {
+      b.style.display = ""; b.setAttribute("data-legajo", String(legajo));
+      try { anLoadBadge(String(legajo)); } catch (_e) {}
+    }
   });
 }

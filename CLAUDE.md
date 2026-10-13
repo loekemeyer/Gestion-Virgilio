@@ -5148,6 +5148,10 @@ marcar los anomalos"*. **Nada de Telegram.**
   (`gv_analisis_marcar` / `gv_analisis_marcas`), una fila por tanda, y la puede poner el supervisor
   o un legajo habilitado.
 - En la lista: chip 🚩/✓ y los filtros **Todas · Con avisos · 🚩 Marcadas**.
+- **D4 (Luis): el botón lleva badge** — `gv_analisis_badge(14)`: tandas de los últimos 14 días con un
+  aviso DURO y **sin marcar** (ni anómala ni revisada). Se apaga marcándolas. Va en el botón del panel
+  (`#anBadge`) y en el de la botonera de Juan (`#anBadgeOp`). ⚠ Una lectura rota **no lo apaga**: lo deja
+  como estaba — un 0 que no es un 0 real es peor que no mostrar nada. Al 13/10: 11 pendientes.
 - ⚠ Las marcas se leen **aparte** de la lista: si esa lectura falla, la pantalla se ve igual (sin los
   banderines), y no hubo que tocar `gv_analisis_tanda`, que tiene centinela.
 

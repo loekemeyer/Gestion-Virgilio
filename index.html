@@ -6557,7 +6557,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openCobranzas()"><span class="sup-ico">💳</span><span>Cobranzas</span></button>
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
-      <button class="sup-action-btn" onclick="openAnalisisProductivo()" title="Por tanda: ritmo, dificultad, rendimiento contra lo esperado y qué pasó código por código"><span class="sup-ico">📈</span><span>Análisis Productivo</span></button>
+      <button class="sup-action-btn" onclick="openAnalisisProductivo()" style="position:relative;" title="Por tanda: ritmo, dificultad, rendimiento contra lo esperado y qué pasó código por código"><span class="sup-ico">📈</span><span>Análisis Productivo</span><span id="anBadge" class="dp-badge" style="display:none;" title="Tandas con avisos sin revisar"></span></button>
       <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpHoras" style="display:none;font-size:12px;font-weight:800;background:rgba(255,255,255,.18);padding:2px 9px;border-radius:8px;line-height:1.15;white-space:nowrap;" title="Horas de guardado pendientes (lo que entra ahora a góndola ÷ cajas/h)"></span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
       <button class="sup-action-btn" onclick="openAds()" style="position:relative;" title="Alertas Damián Stock: talleristas que no entregan lo pedido y quiebres de stock a 10, 20 y 30 días"><span class="sup-ico">🚨</span><span>ADS — Alertas Damián Stock</span><span id="adsBadge" class="dp-badge" style="display:none;background:#7c3aed;left:2px;right:auto;"></span><span id="adsSemaf" style="display:none;position:absolute;top:2px;right:2px;flex-direction:column;gap:2px;align-items:flex-end;" title="Quiebres de stock previstos: rojo a 10 días · naranja a 20 · amarillo a 30"></span></button>
       <!-- v28.59 (Luis, 08/10): «Corregir códigos de NPs» salió: lo hace solo gv_web_np_sec_auto (cron 119) y lo que no
@@ -7006,7 +7006,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <button id="btnHistTareas" type="button" class="tm-hist-btn" onclick="histTareasAbrir()">📋 Historial<br>de tareas</button>
     <!-- v29.64 (Luis, 13/10): el Análisis Productivo en el módulo de operarios. El botón sólo se muestra
          para los legajos de GV_Analisis_Acceso (hoy Juan, 8): lo resuelve anMostrarBotonOperario. -->
-    <button id="btnAnalisisOp" type="button" class="tm-hist-btn" style="display:none" onclick="openAnalisisProductivo(this.getAttribute('data-legajo'))">📈 Análisis<br>productivo</button>
+    <button id="btnAnalisisOp" type="button" class="tm-hist-btn" style="display:none;position:relative;" onclick="openAnalisisProductivo(this.getAttribute('data-legajo'))">📈 Análisis<br>productivo<span id="anBadgeOp" style="display:none;position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;line-height:20px;padding:0 5px;border-radius:10px;background:#dc2626;color:#fff;font-size:12px;font-weight:800;text-align:center;"></span></button>
   </div>
   <!-- Deshacer último mensaje — visible 60s después de enviar -->
   <div id="undoBanner" class="hidden">
@@ -62803,6 +62803,7 @@ function showSupervisor(email) {
   try { if (typeof adsLoadBadge === "function") adsLoadBadge(); } catch (_e) {}   // v27.20: badge violeta ADS (talleristas debajo del umbral)
   try { cgLoad(); } catch (_e) {}   // v28.58: conteos de góndola del picking que difieren
   try { gsLoad(); } catch (_e) {}   // v29.69: góndolas que informó el operario en el picking
+  try { if (typeof anLoadBadge === "function") anLoadBadge(); } catch (_e) {}   // v29.72: tandas con avisos sin revisar
   try { if (typeof impIrLoadBadge === "function") impIrLoadBadge(); } catch (_e) {}   // v29.11: badge 📥 Recibido por operarios (Importación)
   try { colaImpLoadBadge(); } catch (_e) {}   // v11.60: badge Cola de impresión NP (armadas sin imprimir; rojo si +24h)
   try { expIsisLoadBadge(); } catch (_e) {}   // badge Agregar Expreso ISIS (expresos que eligió el cliente en la página)
