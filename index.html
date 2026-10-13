@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.22">
+<link rel="stylesheet" href="gv-ui.css?v=30.23">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.22"></script>
+<script type="module" src="recepcion.js?v=30.23"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10798,7 +10798,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.22";
+const APP_VERSION = "v30.23";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -23181,26 +23181,34 @@ async function stkOpenCajasPedidasArt(codEnc) {
     const prog = await fetch(SUPABASE_URL + "/rest/v1/gv_np_prog_info?np=in.(" + nps.map(encodeURIComponent).join(",") + ")&select=np,tanda,razon_social,fecha_entrega&limit=8000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
     prog.forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !npInfo[np]) npInfo[np] = { tanda: String(x.tanda || "").trim().toUpperCase(), rs: String(x.razon_social || "").trim(), fecha: _stkFmtFechaNP(x.fecha_entrega), fechaIso: String(x.fecha_entrega || "").slice(0, 10) }; });
   } catch (_e) {}
+  /* v30.21 (13/10, Dorinka F77A) — el ✓ de 📦Pick / 🧾Arm SE LEE EN VIVO, no de _stk.movs.
+     _stk.movs es una FOTO que se carga al abrir Stock y NO se refresca por realtime (sólo los
+     saldos de stocks_carga_rapida se refrescan). Si la tanda se pickea/arma con la pantalla
+     abierta, el PPP ya la mostraba armada pero este modal seguía en "—" hasta recargar todo
+     Stock. Se trae de Movimientos_Stock junto con las siglas (mismo Promise.all). */
   const pickTandas = {}, sepTandas = {};
-  _stk.movs.forEach(function (mv) {
-    if (!_stkMovMatch(mv, codN, _empFiltro) || !_stkWin(mv, true)) return;
-    const ref = String(mv.ref || "").toUpperCase();
-    if (mv.deposito === "separar_pedidos" && mv.tipo === "picking" && Number(mv.delta) > 0) pickTandas[ref] = true;
-    if (mv.deposito === "a_facturar" && mv.tipo === "separado" && Number(mv.delta) > 0) sepTandas[ref] = true;
-  });
   // v6.32 — siglas del que pickeó (TP) y del que separó/armó (TAP) por tanda, como el monitor.
   const tSet = {}; Object.keys(npInfo).forEach(function (np) { const t = npInfo[np].tanda; if (t) tSet[t] = true; });
   const tList = Object.keys(tSet), pickerByTanda = {}, sepByTanda = {};
   if (tList.length) {
     const tIn = tList.map(encodeURIComponent).join(",");
+    const _codNset = _cands0.map(function (c) { return _stkNormCod(c); });
     try {
       const res = await Promise.all([
         fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TP&texto=in.(" + tIn + ")&select=texto,legajo&order=ts_cliente.desc&limit=3000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
         fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAP&texto=in.(" + tIn + ")&select=texto,legajo&order=ts_cliente.desc&limit=3000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
-        (typeof getEmpleadosNombres === "function" ? getEmpleadosNombres().catch(function () { return null; }) : Promise.resolve(null))
+        (typeof getEmpleadosNombres === "function" ? getEmpleadosNombres().catch(function () { return null; }) : Promise.resolve(null)),
+        fetch(SUPABASE_STOCK_ENDPOINT + "?ref=in.(" + tIn + ")&deposito=in.(separar_pedidos,a_facturar)&select=cod_art,deposito,tipo,delta,ref,empresa&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
       ]);
       (res[0] || []).forEach(function (x) { const t = String(x.texto || "").trim().toUpperCase(); if (t && !pickerByTanda[t]) pickerByTanda[t] = String(x.legajo || ""); });
       (res[1] || []).forEach(function (x) { const t = String(x.texto || "").trim().toUpperCase(); if (t && !sepByTanda[t]) sepByTanda[t] = String(x.legajo || ""); });
+      (res[3] || []).forEach(function (mv) {
+        if (_codNset.indexOf(_stkNormCod(codBase(mv.cod_art))) < 0) return;
+        if (_empFiltro && mv.empresa != null && String(mv.empresa).trim() && String(mv.empresa).toUpperCase() !== _empFiltro) return;
+        const ref = String(mv.ref || "").toUpperCase();
+        if (mv.deposito === "separar_pedidos" && mv.tipo === "picking" && Number(mv.delta) > 0) pickTandas[ref] = true;
+        if (mv.deposito === "a_facturar" && mv.tipo === "separado" && Number(mv.delta) > 0) sepTandas[ref] = true;
+      });
     } catch (_e) {}
   }
   const stkSigla = function (leg) { if (!leg) return ""; const nm = (typeof _empleadosNombres !== "undefined" && _empleadosNombres) ? _empleadosNombres.get(String(leg)) : ""; return (typeof initialsFromName === "function") ? initialsFromName(nm || "", leg) : (nm || ("L" + leg)); };
@@ -63563,7 +63571,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.22"></script>
+<script src="importacion.js?v=30.23"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -66869,15 +66877,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.22"></script>
-<script src="hotsale.js?v=30.22"></script>
-<script src="estadisticas.js?v=30.22"></script>
-<script src="ads.js?v=30.22"></script>
-<script src="plantel.js?v=30.22"></script>
+<script src="cobranzas.js?v=30.23"></script>
+<script src="hotsale.js?v=30.23"></script>
+<script src="estadisticas.js?v=30.23"></script>
+<script src="ads.js?v=30.23"></script>
+<script src="plantel.js?v=30.23"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.22"></script>
+<script src="analisis.js?v=30.23"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.22"></script>
+<script src="ayuda.js?v=30.23"></script>
 
 </body>
 </html>
