@@ -6401,7 +6401,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.57"></script>
+<script type="module" src="recepcion.js?v=29.58"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10705,7 +10705,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.57";
+const APP_VERSION = "v29.58";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -29497,6 +29497,34 @@ async function rkbFetchCxM() {
     return { cxm: map, locs: locs };
   } catch (_e) { return { cxm: {}, locs: {} }; }
 }
+/* v29.58 (Luis, 13/10) — capacidad de góndola POR EMPRESA, para que el orden de urgencia de
+   Bajar de racks no mande los DUALES al final. `vista_saldos_stock` emite la clave CON sufijo
+   ("437E LK") y `ocgFetchCapacidad` indexa el código PELADO ("437E"), así que el dual nunca
+   encontraba su capacidad: prio = Infinity y último de la lista, con 225 cajas en racks y la
+   góndola a medio llenar (medido el 13/10: 437E LK 225 · 438E LK 78 · 809E CH 336). La capacidad
+   por empresa YA estaba en Capacidad_Sector (437E: LK 120 / CH 48): faltaba cruzar (cod, empresa).
+   Devuelve las DOS claves y NUNCA las pega — regla de la «438E LK»: son dos datos. */
+async function rkbFetchCapacidad() {
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=cod,empresa,cajas_max");
+    const pelada = {}, porEmp = {};
+    rows.forEach(function (x) {
+      const k = _ocgNorm(x.cod); if (!k || k === "LIBRE") return;
+      const n = Number(x.cajas_max) || 0, e = String(x.empresa || "").trim().toUpperCase();
+      pelada[k] = (pelada[k] || 0) + n;
+      if (e === "LK" || e === "CH") porEmp[k + " " + e] = (porEmp[k + " " + e] || 0) + n;
+    });
+    return { pelada: pelada, porEmp: porEmp };
+  } catch (_e) { return { pelada: {}, porEmp: {} }; }
+}
+/* La capacidad de una clave de saldo: con sufijo de empresa ("437E LK") va por (cod, empresa);
+   pelada, la suma de todas sus celdas (identico a ocgFetchCapacidad para los no duales). */
+function _rkbCapDe(cod, capObj) {
+  if (!capObj) return 0;
+  const k = _ocgNorm(cod), mm = /^(.*?)\s+(LK|CH)$/.exec(k);
+  if (mm) return Number((capObj.porEmp || {})[_ocgNorm(mm[1]) + " " + mm[2]]) || 0;
+  return Number((capObj.pelada || {})[k]) || 0;
+}
 async function showRacksBajarModal(legajo, _resume) {
   if (!document.getElementById("rkbCss")) {
     const s = document.createElement("style"); s.id = "rkbCss";
@@ -29515,11 +29543,13 @@ async function showRacksBajarModal(legajo, _resume) {
   const _rkIni = _gvTramoVivo(legajo, "racks");
   if (_resume) { _rkb = _resume; _rkb._cerrado = false; _rkb.tsInicio = _rkIni || Date.now(); if (!_rkIni) { try { gvRacksTramo("RKI", _rkb.legajo, _rkb.tsInicio); } catch (_e) {} } rkbRender(); return; }   // v23.66: tramo nuevo · v26.83: o el que sigue abierto
   try {
-    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), ocgFetchCapacidad().catch(function () { return {}; }),
-      (async function () { try { return await ocgDemanda(true); } catch (_e) { return {}; } })()]);   // v25.89: demanda, para la prioridad
+    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), rkbFetchCapacidad(),
+      (async function () { try { return await ocgDemanda(true); } catch (_e) { return {}; } })(),
+      (async function () { try { return await ocgFetchProyeccion(); } catch (_e) { return {}; } })()]);   // v25.89: demanda · v29.58: Est. Madre, para los que no tienen capacidad
     const saldos = res[0] || {};
     const plani = res[2] || {};
-    const cxmMap = plani.cxm || {}, locsMap = plani.locs || {}, _facRkb = res[3] || {}, capMap = res[4] || {}, demRkb = res[5] || {};
+    const cxmMap = plani.cxm || {}, locsMap = plani.locs || {}, _facRkb = res[3] || {};
+    const capObj = res[4] || { pelada: {}, porEmp: {} }, capMap = capObj.pelada || {}, demRkb = res[5] || {}, emRkb = res[6] || {};
     const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
     const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; })
       .sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); })
@@ -29531,13 +29561,18 @@ async function showRacksBajarModal(legajo, _resume) {
         // sec preseleccionada = la ubicación con más stock (planimetría viva, v5.22)
         /* v25.89 (Luis, 01/10): primero lo más URGENTE — la góndola que, contando lo que ya está
            en A guardar y restando lo pedido, queda más vacía (≡ prioridad de Guardado a Góndola). */
-        const _capR = Number(capMap[_ocgNorm(a.cod)]) || 0, _gonR = Math.round(Number(a.terminado) || 0);
+        const _capR = _rkbCapDe(a.cod, capObj), _gonR = Math.round(Number(a.terminado) || 0);
         const _agR = Math.max(0, Number(a.a_guardar) || 0), _pedR = Number(demRkb[_ocgNorm(a.cod)]) || 0;
+        const _emR = Number(emRkb[_ocgNorm(a.cod)]) || Number(emRkb[_ocgNorm(String(a.cod).replace(/\s+(LK|CH)$/i, ""))]) || 0;   // v29.58: Est. Madre (caj/mes)
         return { cod: a.cod, desc: artNombre(a.cod, a.desc), racks: Math.round(a.racks), cxm: _cxmR, locs: locs, sec: (locs[0] ? locs[0].sector : ""), baja: 0, manual: false,
-                 cap: _capR, gon: _gonR, aGuardar: _agR, ped: _pedR,
+                 cap: _capR, gon: _gonR, aGuardar: _agR, ped: _pedR, em: _emR,
                  prio: _capR > 0 ? (_gonR + _agR - _pedR) / _capR : Infinity };   // v24.68: capacidad y lo que hay en góndola
       }).sort(function (x, y) {
         if (x.prio !== y.prio) return x.prio - y.prio;
+        /* v29.58 (Luis, 13/10): el que NO tiene capacidad cargada va al final — sin capacidad no
+           hay hueco que medir — y entre ésos manda la ESTADÍSTICA MADRE, de mayor a menor: lo
+           que más se vende primero. Sin E.M. (no está en gv_proyeccion_articulo) desempata el código. */
+        if (!isFinite(x.prio) && (x.em || 0) !== (y.em || 0)) return (y.em || 0) - (x.em || 0);
         return (parseInt(x.cod, 10) || 0) - (parseInt(y.cod, 10) || 0);
       });
     _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, cxmMap: cxmMap, locsMap: locsMap, capMap: capMap, filtro: "", tsInicio: _rkIni || Date.now() };
@@ -29547,7 +29582,7 @@ async function showRacksBajarModal(legajo, _resume) {
 }
 function rkbRender() {
   if (!_rkb) return; const body = document.getElementById("rkbBody"); if (!body) return;
-  let h = '<div class="rkb-hint">Bajás en <b>master cajas</b> (lo que físicamente movés del rack). Aparece <b>ordenado por urgencia</b>: primero la góndola más vacía contando lo que ya está en A guardar y lo pedido. Los que dicen <b>“cajas”</b> todavía no tienen el master cargado. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram). Al registrar, <b>el stock pasa a A guardar al instante</b>: después se guarda en góndola con «Guardado a Góndola».</div>';
+  let h = '<div class="rkb-hint">Bajás en <b>master cajas</b> (lo que físicamente movés del rack). Aparece <b>ordenado por urgencia</b>: primero la góndola más vacía contando lo que ya está en A guardar y lo pedido; los que no tienen capacidad cargada van al final, de mayor a menor venta. Los que dicen <b>“cajas”</b> todavía no tienen el master cargado. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram). Al registrar, <b>el stock pasa a A guardar al instante</b>: después se guarda en góndola con «Guardado a Góndola».</div>';
   h += '<input id="rkbSearch" class="rkb-search" type="search" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_rkb.filtro || "") + '" oninput="rkbSearchInput(this.value)">';
   const fq = String(_rkb.filtro || "").trim(), fUp = fq.toUpperCase();
   const shown = fq ? _rkb.items.filter(function (it) { return codEmpiezaCon(it.cod, fq); }) : _rkb.items;   // v21.43
@@ -62219,7 +62254,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.57"></script>
+<script src="importacion.js?v=29.58"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65149,13 +65184,13 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.57"></script>
-<script src="hotsale.js?v=29.57"></script>
-<script src="estadisticas.js?v=29.57"></script>
-<script src="ads.js?v=29.57"></script>
-<script src="plantel.js?v=29.57"></script>
+<script src="cobranzas.js?v=29.58"></script>
+<script src="hotsale.js?v=29.58"></script>
+<script src="estadisticas.js?v=29.58"></script>
+<script src="ads.js?v=29.58"></script>
+<script src="plantel.js?v=29.58"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.57"></script>
+<script src="ayuda.js?v=29.58"></script>
 
 </body>
 </html>

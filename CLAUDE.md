@@ -8777,3 +8777,33 @@ identificar cuando son eventos duplicados"*. Trigger **`ab_gv_evento_duplicado`*
 - Probado como anon en transacción abortada: copias h_rkb / h_mg y R1 con otro id descartadas (3 al log), uno legítimo entra.
 - Rollback: `alter table public."Registros_Produccion_Virgilio" disable trigger ab_gv_evento_duplicado;`
   El marcador interno dice `v29.25-evdup` (llave). Centinela `gv_evento_duplicado`. `sql/gv_evento_duplicado_v2950.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.58): en BAJAR DE RACKS la capacidad del DUAL es POR EMPRESA — y sin capacidad se ordena por E.M.
+
+El orden por urgencia de Bajar de racks (v25.89, `(góndola + A guardar − pedido) ÷ capacidad`, menor primero)
+tenía dos agujeros, medidos el 13/10 sobre los 57 códigos con stock en racks:
+
+1. **El dual iba último.** `vista_saldos_stock` emite la clave CON sufijo (`437E LK`) y `ocgFetchCapacidad` indexa
+   el código **pelado** (`437E`): no matcheaba, `prio = Infinity`. Eran 3 filas vivas (437E LK con **225 cajas en
+   racks**, 438E LK 78, 809E CH 336) con la góndola a medio llenar. La capacidad por empresa **ya estaba** en
+   `Capacidad_Sector` (437E: LK 120 / CH 48): faltaba cruzar **(cod, empresa)**. Lo hacen `rkbFetchCapacidad()`
+   (devuelve `pelada` y `porEmp`, nunca pegadas) y **`_rkbCapDe(cod, capObj)`**. Para un código no dual da
+   exactamente lo mismo que antes.
+2. **Sin `cajas_max` cargada van al final, y entre ésos manda la ESTADÍSTICA MADRE** (`gv_proyeccion_articulo`,
+   mayor a menor): sin capacidad no hay hueco que medir, así que primero lo que más se vende. Al 13/10 son 3
+   (**505I con 1.475 cajas en racks** y la góndola en 0 — su celda del Mapa no tiene capacidad —, 938E 228 sin
+   celda, AB3 60) y **ninguno está en `gv_proyeccion_articulo`**, así que hoy la E.M. de los tres es 0 y
+   desempata el código: el orden entre ellos sólo cambia cuando alguno tenga venta.
+
+⚠ **El ratio mide «qué tan vacía está la celda», no cuántas cajas entran.** El 606E queda 6.º con prio 0,00
+teniendo **218 de hueco** y 120 en racks, detrás del 361E (hueco 41, cap 32). Está así a propósito: el objetivo es
+que ninguna celda se quede sin mercadería para el picking. Si algún día se quiere «el viaje que más llena», el
+orden es `min(cap − góndola − A guardar + pedido, racks)` — es otra decisión, no un bug.
+
+⚠⚠ **El MISMO cruce pelado sigue en Guardado a Góndola y en «¿Qué bajar primero?»** (`showMGModal` y
+`showGuardarOrden`, las dos con `capMap[_ocgNorm(a.cod)]`). Ahí el dual queda con `cap = 0`, y en «¿Qué bajar
+primero?» el filtro `x.it.cap > 0` **lo saca de la lista**. No se tocó: en MG la empresa viaja en la fila
+(`a.emp`), así que el arreglo es de una línea pero cambia qué filas se ven. Queda a decisión de Luis.
+
+**Chequeo:** `node tests/rkb-orden-urgencia.cjs` — corre la pantalla y mide el orden y que el 437E LK tome **120**
+(el de LK), no los 168 de las dos empresas sumadas. Verificado que falla contra el index anterior.
