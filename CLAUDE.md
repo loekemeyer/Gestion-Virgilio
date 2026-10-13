@@ -8846,7 +8846,7 @@ primero?» el filtro `x.it.cap > 0` **lo saca de la lista**. No se tocó: en MG 
 **Chequeo:** `node tests/rkb-orden-urgencia.cjs` — corre la pantalla y mide el orden y que el 437E LK tome **120**
 (el de LK), no los 168 de las dos empresas sumadas. Verificado que falla contra el index anterior.
 
-## ⚠ REGLA (Luis, 2026-10-13, v29.62, D11): el GUARDADO A GÓNDOLA puede entrar A MEDIAS — y queda así
+## ⚠ REGLA (Luis, 2026-10-13, v29.64, D11): el GUARDADO A GÓNDOLA puede entrar A MEDIAS — y queda así
 
 **Luis, textual:** *"d11 no, dejalo así"*. Medido en la auditoría del módulo de operarios: un guardado (MG)
 son **dos filas sueltas** (`a_guardar −N` / `terminado +N`, cada una con su `client_id`, el mismo `creado`) y la
@@ -8859,8 +8859,12 @@ conteo. **Cuánto pasó en toda la historia: 1 vez, 1 caja** — 599E, 30/09/202
 id 104074491, `terminado +1` sin su `a_guardar −1` (góndola 599E = 40, físico 39). El guard está bien: lo que
 falla es que las dos patas viajan por separado. **No volver a proponer el arreglo sin que Luis lo pida.**
 
-⚠ **La caja del 599E NO se corrigió** (es una corrección de datos que Claude detectó solo: pide el «sí» de Luis).
-Cómo se ve si vuelve a pasar: un `guardado` de `terminado` sin su par de `a_guardar` con el mismo `creado`:
+✅ **La caja del 599E se corrigió el 13/10** (D12, Luis: *"d12 si, corregila"*): ajuste `terminado −1` con
+`ref = 'CORR MG 104074491'` (mov 145964321). Góndola 599E 40 → **39**, igual al caché `stocks_carga_rapida`. El
+movimiento original NO se borra: la corrección va como ajuste aparte.
+
+Cómo se ve si vuelve a pasar: un `guardado` de `terminado` sin su par de `a_guardar` con el mismo `creado`, sin
+su ajuste de corrección:
 
 ```sql
 select m.cod_art, m.creado, m.legajo, m.delta
@@ -8869,5 +8873,10 @@ select m.cod_art, m.creado, m.legajo, m.delta
    and not exists (select 1 from public."Movimientos_Stock" x
                     where x.tipo = 'guardado' and x.deposito = 'a_guardar'
                       and x.cod_art = m.cod_art and x.creado = m.creado and x.legajo = m.legajo)
- order by m.creado desc;   -- al 13/10: 1 fila (599E, 30/09)
+   and not exists (select 1 from public."Movimientos_Stock" c
+                    where c.ref = 'CORR MG ' || m.id::text)
+ order by m.creado desc;
 ```
+
+Al 13/10 queda **1 fila y es de antes del módulo actual**: 542, 22/07/2026, `legajo` y `client_id` en NULL (una
+carga de panel, no del celular). **No se tocó**: corregirla es otra decisión de datos y pide el «sí».
