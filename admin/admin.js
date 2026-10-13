@@ -338,6 +338,11 @@ async function emailOtpFlow() {
       if (r.error) {
         if (r.error.code === "invalid_code") {
           verifyErr.textContent = "Código inválido o vencido.";
+        } else if (r.error.code === "esperar") {
+          // 2026-10-13: el servidor acepta 1 intento cada 5 segundos.
+          verifyErr.textContent = "Esperá 5 segundos y volvé a intentar.";
+          verifyBtn.disabled = false;
+          return;
         } else {
           verifyErr.textContent = "Error: " + r.error.message;
         }
@@ -16739,7 +16744,9 @@ async function lkVerifyOtp() {
     var r = await _lkOtpFn("verify", code);
     if (!r.ok || !r.data || (!r.data.tmp_password && !r.data.access_token)) {
       var det = (r.data && (r.data.detail || r.data.error)) || "HTTP " + r.status;
-      if (errEl) errEl.textContent = det === "invalid_code" ? "Código inválido o expirado." : "No se pudo verificar: " + det;
+      if (errEl) errEl.textContent = det === "invalid_code" ? "Código inválido o expirado."
+        : (r.data && r.data.error === "esperar") ? "Esperá 5 segundos y volvé a intentar." // 2026-10-13: 1 intento cada 5 s
+        : "No se pudo verificar: " + det;
       if (btnEl) { btnEl.disabled = false; btnEl.textContent = "Verificar código"; }
       return;
     }

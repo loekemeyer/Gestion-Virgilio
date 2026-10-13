@@ -1832,10 +1832,77 @@ y SP. Sector SC y SP usa un nomenclador similar al de gondolas y racks y puede q
 | **Rack** | letra(s) + **2 dígitos**, con `AD`/`AT` en los de insumo: `AD05`, `X22`, `R01AD`, `V09AT`, `AF13` | master cajas de artículo · fleje · plástico · importados | `Movimientos_Stock` dep. `racks` / `racks_ch` / `insumos` |
 | **SC y SP** | letra(s) + **UN dígito**: `A1`…`L6` (52 celdas) + `MEDIO` | **piezas de Cervantes**: `partes_crudo` (SC) y `parte_procesado` (SP) | **`GP2.inventario`** (ubicación «Sector Crudo» / «Sector Procesado»), NO Virgilio |
 
+### ⚠⚠ v30.03 (Luis, 13/10): SC y SP es SU PROPIO LUGAR — la celda se llama **`IN-A1`** y su tipo es **`scp`**
+
+**Luis:** *"hagamos que sea su propio sector, lugar. IN-A1 por ejemplo? queda bien asi?"* · *"claro,
+agrega al mapa este sector"* · *"una vez hecho fijate que vincule bien con insumos y con todo lo que
+tenga que vincular bien … y una vez tengamos la base bien armada, limpiamos todo"*.
+
+> ## **ES UN SOLO SECTOR Y NO SE PARTE: `IN-<letra><número>`, y nada más que eso.**
+> **Luis, 13/10:** *"no importa SP o SC, ese sector tiene de los dos. todo ese sector es
+> IN-\*Letra\*\*Numero\*, no te compliques mas que eso"*. La grilla está **INTERCALADA** —`G1`-`G4`
+> tiene piezas de SC y `G5`-`G6` de SP; `L1`-`L4` SP y `L5`-`L6` SC; `H1` SP y `H2`-`H7` SC—, así
+> que **un prefijo `SC-` / `SP-` habría que renombrarlo cada vez que una pieza cambia de celda**.
+> SC y SP son **de qué es la PIEZA** (su categoría de Insumos), no de qué es la CELDA: el Mapa
+> **no rotula la celda por sector** y el encabezado no los cuenta aparte.
+
+| pieza | qué es |
+|---|---|
+| `GV_Lugar` | las 55 celdas con **`tipo = 'scp'`**, empresa `IN`, nombre `IN-A1`…`IN-L6`. Se dieron de alta **IN-K4, IN-K5 e IN-K6**, que tenían piezas cargadas y no existían |
+| **`gv_scp_sector(txt)`** | el resolvedor de la grilla: `IN-A1`, `IN A1`, `in-a1` y el **`A1` pelado** (es lo que se tipea hoy) |
+| **`gv_insumo_sector(txt)`** | el **cuello ÚNICO de una posición de INSUMO** = `coalesce(gv_rack_sector, gv_scp_sector)`: rack de insumo (`R01AD`, `AF13`, `X20`) **o** celda de SC/SP. Lo usan `gv_insumo_ubicacion` y las **dos** RPC que escriben una posición (`gv_insumo_ubicaciones_guardar`, `gv_insumo_posicion_guardar`) |
+| **`gv_scp_celda`** | la vista de la solapa nueva: una fila por celda, con la pieza, su sector (SC/SP) y su saldo |
+| Mapa | tercer modo **📐 SC y SP** (`pmapModo('scp')`), una solapa por columna; tocar una celda abre su editor y escribe por **la misma RPC** que las posiciones de racks |
+| `Insumos_Ubicaciones.sector` | las 63 filas de la grilla pasaron a `IN-xx` |
+
+> ## ⚠⚠ **Lo que esto CIERRA: `gv_rack_sector('A1')` ahora devuelve NULL.**
+> `gv_rack_sector` filtra `tipo = 'rack'`, así que **Ingreso a racks no puede ofrecer una celda de
+> SC/SP ni guardar una caja ahí**. Antes devolvía `A1`. Es el mismo pozo de la v29.67 (el operario
+> escribió `AB3` en el campo del código) visto del otro lado.
+
+- **Al agregar una celda a SC/SP va con el prefijo**: `insert into "GV_Lugar"(sector,tipo,empresa) values ('IN-C3','scp','IN');`
+  Los dos CHECK se ampliaron (`tipo` acepta `scp`; el nombre acepta `IN-xx`).
+- **El saldo de una pieza de SC/SP lo lleva GP2**, no Virgilio: acá se dice **DÓNDE** está. En
+  `GP2.ubicacion` no hay celdas (SC y SP son **una** ubicación cada uno), así que la celda física
+  existe sólo en `Insumos_Ubicaciones.sector`. El espejo `gv_gp2_espejo_sync` copia todo `GV_Lugar`
+  sin filtrar tipo, así que GP2 ve las 55 celdas solo (medido: `GP2.virgilio_lugar` tipo `scp` = 55).
+- **Y de paso se arreglaron 3 insumos** que estaban en rojo: `gv_insumo_ubicacion` pasó de **145 a
+  148** posiciones resueltas. Quedan **2** sin lugar, y son las dos de **`medio`**.
+- ⚠⚠ **`medio` NO ES UN LUGAR y no se le inventa uno** (Luis, 13/10: *"medio no se que es ni que
+  debería ser, no va para mi, es como que algo no tenga lugar"*). Sus dos filas salieron, y las piezas
+  **`A1`** (Mgo Plano 501 Pint., 7 cajones) y **`H1`** (Manija Redonda p/cromar, 10 cajones) pasaron
+  a la alerta **«insumo con stock y sin posición»** del Mapa, que es donde se ven y donde se las
+  ubica con un click. **Si vuelve a aparecer un `medio`, es eso: algo sin lugar.**
+- ⚠ **`gv_rack_celda` ya no ve la grilla** (Luis, 13/10: *"d1 dale"*). Su rama de insumos traía
+  `gv_insumo_ubicacion` **sin mirar el tipo del lugar**, así que las 63 filas de SC/SP salían como
+  `sin_lugar` en la solapa Racks — la vista no sabía que esas celdas habían dejado de ser racks. El
+  parche le agrega `exists (… GV_Lugar lr where lr.sector = u.sector and lr.tipo = 'rack')`. La
+  **regla protegida** que toca (*"una celda por DIRECCIÓN: un rack partido se ve como sus N partes"*)
+  **sigue en pie**: no cambia nada de las partes. Medido: de 306 filas a 243 y el **md5 de esas 243
+  es el mismo antes y después**; `prkRacks` del front saltea `^IN[-\s]` como segunda red.
+- ⚠⚠ **Y se LIMPIÓ `Insumos_Ubicaciones`** (Luis: *"d3 limpia"*): **150 → 110 filas**, las 110
+  resuelven, **0 con código fantasma** y **0 fuera del nombre canónico**. Salieron las **38** que no
+  matcheaban ningún código de `Insumos` y tenían su gemelo válido en la misma celda (29 el fleje sin
+  el `N°`, 4 con su código ISIS, 8 la pieza con un punto de más, 5 basura `-` `--` `---` `----`
+  `N|24`; las 38 en cantidad 0) y las **2 de `medio`**; **30** pasaron al nombre canónico
+  (`N7` → `N07`, `R1AD` → `R01AD`, `V9 AT` → `V09AT`, `AF1` → `AF01`, `Z2` → `Z02`).
+  Backup: `zz_backups."GV_Backup_InsUbic_20261013"` · `select jsonb_pretty(public.gv_scp_limpiar(true));`
+  dice qué haría, fila por fila.
+
+**Chequeo:** `select public.gv_scp_sector('A1'), public.gv_rack_sector('A1'), public.gv_insumo_sector('R1Ad');`
+→ `IN-A1`, **NULL**, `R01AD` · `select count(*) from public.gv_scp_celda;` (63 en 55 celdas) ·
+`select * from public.gv_reglas_perdidas;` · `select count(*) from public."Insumos_Ubicaciones";` (110,
+todas resueltas y con el nombre canónico) · `node tests/pmap-scp.cjs`.
+`sql/gv_sector_scp_v2998.sql` (rollback: `select public.gv_scp_revertir();`), 5 centinelas.
+⚠ Los objetos de la base, los 5 centinelas, el `.sql` y los comentarios del código dicen **v29.98**
+(la versión con que se aplicaron): es la llave de idempotencia, **no cambiarla**; la app salió en la
+v30.03 porque otras sesiones se adelantaron.
+
 ### El mislabel que esto RETIRA
 
 ⚠⚠ **El bullet de la v22.80 dice que la grilla `A1…L6` son «racks de insumos». ES FALSO y queda RETIRADO.**
-Se dieron de alta así el 25/09 —tipo `rack`, empresa `IN`— y de ahí salió la confusión. Medido el 13/10:
+Se dieron de alta así el 25/09 —tipo `rack`, empresa `IN`— y de ahí salió la confusión; **la v30.03 las
+pasó a `tipo = 'scp'` y a nombre `IN-A1`** (bloque de arriba). Medido el 13/10, antes de tocar nada:
 
 - las **52 celdas de un dígito** de `GV_Lugar` son **exactamente** donde viven `parte_procesado` (SP: `A1`-`A6`,
   `B1`-`B6`, `C1`, `C2`, `C5`, `C6`, `D1`, `D3`-`D6`, `E1`, `E2`, `E5`, `E6`, `F1`, `F2`, `F6`, `G5`, `G6`, `H1`,
@@ -1844,9 +1911,9 @@ Se dieron de alta así el 25/09 —tipo `rack`, empresa `IN`— y de ahí salió
   un dígito → vacío). No son racks: no guardan cajas.
 - `K4`, `K5` y `K6` tienen piezas de SC cargadas y **no existen en `GV_Lugar`**: el alta del 25/09 los salteó.
 
-⚠ **`gv_rack_sector('A1')` devuelve `A1` y `gv_rack_sector('A01')` devuelve NULL** (A01 es góndola). O sea que
-el resolvedor de racks **acepta una celda de SC/SP**: hoy no hizo daño porque nadie guardó una caja ahí, pero
-**Ingreso a racks la ofrece**. Es el mismo pozo que `A1 ≠ A01`, un paso más adelante.
+⚠ **`gv_rack_sector('A1')` devolvía `A1`** (y `('A01')` NULL, porque A01 es góndola): el resolvedor de racks
+**aceptaba una celda de SC/SP** y **Ingreso a racks la ofrecía**. No hizo daño porque nadie guardó una caja ahí.
+**Cerrado en la v30.03**: con `tipo = 'scp'` ese `coalesce` no la encuentra más y devuelve NULL.
 
 ### Y en GP2 no hay celdas: SC y SP son UNA ubicación cada uno
 
@@ -4236,6 +4303,14 @@ privado `loekemeyer/Impo-Comex`**; acá va sólo el build web (`client/dist-web`
 - **v29.23: PARIDAD con el viejo, flujo por flujo** (subir, verificar, editar, corregir, guardar, descargar): `tests/impo-comex-paridad-{lakout,multidoc,marks,cajas,inal}.cjs`
   comparan pedidos a la puerta, pantalla y descargas contra lo que hizo el viejo (`impo-comex/`), grabado en el test o en
   `tests/tools/`. Mientras exista `impo-comex/` se regraban desde el viejo (ver la cabecera de cada test). **Al borrar el viejo, los tests siguen andando.**
+- ⚠ **v30.06 (Elías, 13/10): el botón del IMPO COMEX VIEJO se ocultó** — en Pedidos Importación queda un solo
+  **🛃 IMPO COMEX** que abre el nuevo (`openImpoComex2`). `openImpoComex()` y la carpeta `impo-comex/` siguen (los
+  tests de paridad graban desde ahí) hasta que se borren.
+- ⚠ **r81 (Elías, 13/10) — Cajas marca la OTRA MARCA del frente**: la IA lee TODAS las marcas del frente del cartón
+  (`marcas_frente`) y la empresa de referencia es el **prefijo del código de barras** (779558700 LK / 779800543 CH) o,
+  sin barras, el **CUIT del comercializador**. Una marca de la otra empresa → fila `marca_frente` **diferencia GRAVE**.
+  Vive en `Impo-Comex/supabase/functions/_shared/cajas.ts` (deploy `Impo_Comex_verify-cajas`, v26) y lo comparten el
+  viejo y el nuevo; acá sólo cambiaron el rótulo y el formato del campo (`ic-cajas.js`, `logica/cajasEtiquetas.js`).
 
 ## ⚠ REGLA (Luis, 2026-09-28, v23.45): la importación se RECIBE desde el panel — 📥 RECIBIR
 
@@ -9443,16 +9518,51 @@ El servidor lo numeró `TMP-0037` y los 144 Kg quedaron en un código que no exi
    el nombre y la ubicación inicial. `TMP-0037` **nunca se aceptó**: quedó pendiente desde las 09:09. Y no se podía
    — `insumo_identificar` **frena** un TMP contra un código en uso (*"una sugerencia del operario no se puede
    fusionar contra un insumo en uso"*), que es correcto: fusionar dos stocks lo decide una persona, no un botón.
-3. **La puerta ya está cerrada**: la **v29.56** (13/10 09:35, 26 minutos después) sacó el alta de un insumo nuevo
-   por el operario (`insNuevoOpen` arranca con un `alert` y un `return`). `TMP-0037` fue el último que entró por ahí
-   y el único TMP que quedaba vivo. **Lo que sigue abierto no es el código: es el LUGAR** — un código del catálogo
-   de GP2 (`gv_insumo_desde_gp2`) también se recibe sin posición, y queda en esa alarma.
+3. **El alta se cerró a las 09:35 y Luis la REABRIÓ el mismo día** (v30.05, abajo): la v29.56 había tapado
+   `insNuevoOpen` con un `alert`, y `TMP-0037` fue el último que entró por ahí. Hoy el botón está de vuelta **con
+   el aviso de parecidos** adelante. **Y lo que sigue abierto no es el código: es el LUGAR** — un código del
+   catálogo de GP2 (`gv_insumo_desde_gp2`) también se recibe sin posición, y queda en esa alarma.
 
 Los 144 Kg se fusionaron en `N°19` con el mecanismo de la casa (se renombra el `cod_art` del movimiento, el TMP
 sale del catálogo y queda en `Insumos_Historial`), **sin tocar la ubicación** (Luis: *"hay que ver dónde está"*).
 ⚠ Ojo con el efecto: `N°19` ya tenía R06AT, así que **el Mapa ahora dice R06AT y la alarma se apagó** — si no
 están ahí, lo corrige el conteo, no un aviso. Detalle, verificación y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
 §3.v3000. Lo sostiene `tests/stk-busca-decimal.cjs`.
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v30.05): el operario SÍ PUEDE crear un código nuevo al RECIBIR — con el aviso de parecidos
+
+**Luis, textual:** *"hay que darles la opción de poder crear códigos nuevos cuando reciben si no están en la lista
+(antes tenían un botón abajo que les permitía hacer eso no, ponéselos)"*.
+
+> **Se RETIRA la v29.56** (*"en Recepción de insumos el operario ya NO da de alta un código nuevo"*, de esta
+> misma mañana). El **«+ Agregar insumo»** vuelve a estar en la grilla de categorías y dentro de cada categoría.
+
+| dónde | alta |
+|---|---|
+| **RI (recibir)**, categoría común | **SÍ** — el botón en los dos lugares |
+| **RI**, categoría **CERRADA** (bolsas, cajas) | **NO**: su catálogo es conocido y completo (Thomas, v29.25/30). El botón no se dibuja y `insNuevoOpen` se planta si lo llaman a mano |
+| **EI (entregar)** | **NO**, como siempre: dar de alta algo al sacarlo sería sacar stock de algo que nunca entró |
+
+**Y el alta AVISA antes de crear.** Es la lección del `TMP-0037` (arriba): el operario escribió `13.6 x 0.8`
+teniendo el fleje en la lista como `N°19` (*13,6 x 0,8*) y se creó un código que no existía para nadie. Ahora
+`insNuevoOk` busca los parecidos **por los NÚMEROS del detalle** — sin importar coma ni punto ni el orden — y los
+muestra: *«⚠ Puede que ya exista: · N°19 — 13,6 x 0,8 · Fleje N° 19»*. Cancelando **no crea nada y deja la lista
+filtrada por ese número**; «crear igual» crea. **No bloquea**: lo que no puede es crearse en silencio teniendo el
+gemelo a la vista.
+
+⚠ **La identidad la sigue poniendo el servidor** (`nuevo_insumo_tmp` → `TMP-00NN`) y el código de verdad se lo
+pone un admin en Stock y Compras → Insumos. **Un TMP no se fusiona desde el front contra un código en uso**
+(`insumo_identificar` lo frena, y está bien): si de verdad son el mismo, lo resuelve una persona.
+
+⚠⚠ **El REMITO que la recepción pide NO se guarda en Virgilio.** `_insDocState` (n° de remito / factura y sus
+fechas) se usa para GP2 — bolsas contra su OC — y después se tira (`insDocCancel` lo pone en `null`): el
+movimiento no lo lleva en ninguna columna. Lo cargado a mano desde una sesión lo pone en `ref` (`Remito 38880`)
+y en la descripción, pero **lo que carga el operario desde el celular queda sin el remito**. Cerrarlo es un
+cambio aparte (una columna, o el `ref`), y **no está hecho**.
+
+**Chequeo:** `node tests/ins-alta-duplicado.cjs` (corre el alta de verdad: avisa con el candidato, cancelar no
+crea y deja el filtro, «crear igual» crea, y una medida que de verdad no está entra derecho) ·
+`node tests/ins-categorias.cjs` · `node tests/ins-ri-cat-bolsas.cjs` · `node tests/ins-admin.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.57): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
 
@@ -10059,7 +10169,7 @@ vuelve a nacer muerto). ⚠ Ese barrido lleva un guard de *"¿encontré al menos
 **Barrido del 13/10 sobre toda la IIFE** (funciones declaradas ahí y usadas en un handler
 inline sin exponer): **0 casos más**. El panel por rol era el único.
 
-### ⚠ v29.98 (Luis, 13/10): el panel por rol es UNA LÍNEA con BADGE — el checklist se despliega
+### ⚠ v30.03 (Luis, 13/10): el panel por rol es UNA LÍNEA con BADGE — el checklist se despliega
 
 **Luis, con la captura:** *"esa visual es horrible … ajusta eso en un menu colapsable con un
 badge. que el arreglo sea general y no solo para luis"*.
@@ -10092,3 +10202,63 @@ el `onclick`**: ahí el identificador que se llama es un método, y el barrido g
 **Chequeo:** `node tests/rol-panel-click.cjs` — mide, con la pantalla corriendo y para los 5
 roles, que arranque plegado en una línea, que el badge lleve palabra, que «cambiar» sea angosto y
 que tocar la barra despliegue el checklist.
+
+### ⚠ v30.04 (13/10): EL PASE `disenador-gvui` sobre el panel por rol
+
+Se corrió el agente sobre la pantalla CORRIENDO (no leyendo el CSS) a 1280 y a 390 px, en los
+tres estados del contador. Devolvió **5 ALTA · 6 MEDIA · 4 BAJA**; se aplicó todo:
+
+| qué estaba mal, medido | cómo quedó |
+|---|---|
+| el ✓ verde `#16a34a` daba **3,15:1** y el `—` de «no pude leer» `#94a3b8` **2,45** (AA pide 4,5) | el PUNTO sigue en `--gv-muted` (es un ícono) y el NÚMERO va aparte: `--gv-ok` **4,68** · `--gv-error` **6,04** · `--gv-ink-2` **7,07** |
+| el **DATO** del plegado (el badge) medía **12,5 px** contra el nombre —que es el RÓTULO— a 14 | badge **16 px** (`--gv-fs-lg`), nombre **12** (`--gv-fs-sm`): la jerarquía deja de estar al revés |
+| «cambiar» era un `<span onclick>` **adentro del `<button>` de la barra**: **22 px** de alto, `tabIndex -1` y un lector leía la barra entera como un solo control | `<button>` hermano dentro de `.rolp-head`, **44 px**, alcanzable por teclado, y la barra con `aria-expanded` |
+| **6 tamaños y 11 hex propios** con `gv-ui.css` ya cargado en `index.html:14` | 0 propios: todo sale de los tokens |
+| el cuadro «¿Quién sos?» **no tenía salida** (ni ✕, ni backdrop, ni Escape) | cierra con Escape o tocando el fondo **sólo si ya hay alguien elegido**: en el primer ingreso sigue obligando a elegir |
+| rótulos de hasta **7 palabras** que repetían el hint, y un 📥 en 1 de 8 | «Movimientos por resolver», «Ingresos a racks sin revisar», «Programados con cuarentena»; sin emoji |
+
+⚠ **Y apareció uno que el pase no vio**, midiendo a 390 px: sin **`min-width:0`** en la barra y en
+`.rolp-quien`, el contenido les pone un min-width implícito, no encogen, y **«cambiar» se salía
+12 px del panel**, pegado al borde de la pantalla. Es el pozo clásico de un hijo de flex con texto.
+
+⚠⚠ **Dos candados nuevos, y el segundo es el que importa:** el bloque **(g)** de
+`tests/rol-panel-click.cjs` mide sobre la pantalla corriendo el **contraste calculado** de los tres
+estados, la escala, la jerarquía badge > nombre, los 44 px y el desborde, **a 1280 y a 390**.
+Verificado que falla contra el index anterior reproduciendo los números del pase (2,45 · 3,15 ·
+13 px · 22 px · `tabIndex -1`).
+
+> ⚠ **El helper de contraste va como FUNCIÓN, no como string en un template literal.** Ahí el `\d`
+> del regex pierde la barra —en un template una escapada desconocida deja sólo la letra—, el match
+> no devuelve nada y **TODO contraste sale 1:1**: el test queda verde con los colores mal puestos.
+> Pasó en el primer intento y lo cazó que los 18 chequeos dieran exactamente «1:1».
+
+### ⚠ v30.05 (Luis, 13/10): el rol de JUAN es la IMPRESIÓN, y el panel NO TOCA EL HELPER
+
+**Luis:** *"agregale un usuario tambien a Juan. Necesita que la impresion automatica de notas de
+picking/armado salga y nada más. fijate que esto no joda con el helper"*.
+
+Área nueva **`impresion`** («Impresión de notas»), con **dos** ítems y nada más — Juan no ve la PPP,
+ni compras, ni cobranzas:
+
+| ítem | qué dice | abre |
+|---|---|---|
+| **Impresión automática** | si en ESTA PC el helper está conectado, contesta y la estación está prendida | ⚙️ Helper de impresión |
+| **Hojas sin imprimir** | picking y armado pendientes de `colaImpFetch` (el facturado no es de Juan) | 📅 Cola por día |
+
+> ## **El panel MIRA el helper; no lo prende, no lo apaga y no le pega a 127.0.0.1 de más.**
+
+- No llama a `gvHelperConectar`, `gvHelperGuardar` ni `psSetAuto`: eso sigue siendo del pop-up de
+  ⚙️ Configuración, donde conectar = esta PC imprime sola (v26.30).
+- ⚠⚠ **Y sólo pinguea el loopback si el helper está CONECTADO en esa PC.** Desconectado, el
+  navegador no sale a `127.0.0.1` — en un celular Chrome pediría permiso de red local para nada
+  (regla v26.24). Es lo único que podía «joder con el helper» y es lo que mide el candado.
+- Los ítems de Juan son **LOCALES** (`it.local`, se miden en el navegador) y no en `gv_rol_panel`.
+  Por eso `rolPanelCargar` tiene ahora dos clases de ítem; **un área sin ítems remotos ni llama a la
+  RPC**. Cada local resuelve por su cuenta y repinta: uno lento no traba a los otros, y una lectura
+  rota deja «—», nunca «✓ al día».
+
+**Chequeo:** `node tests/rol-panel-click.cjs`, bloque **(h)** — con el helper desconectado mide que
+**no salga un solo request a 127.0.0.1**, que Juan vea sus 2 ítems y que `gv_helper_imp_v1` y
+`ps_auto_virgilio` queden **sin tocar**; con el helper conectado y contestando, que sí lo pinguee y
+marque ✓ sin apagarle nada. Verificado que falla sacando el guard: *«el panel le pegó a 127.0.0.1
+con el helper DESCONECTADO»*.

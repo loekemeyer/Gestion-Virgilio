@@ -315,6 +315,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ins-categorias (idea 7917 / v7.31: navegación + alta por categorías en RI/EI) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-categorias.cjs
+echo "== ins-alta-duplicado (v30.05: el alta avisa si la medida ya existe) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-alta-duplicado.cjs
 
 echo "== ssg-carrera-cron (v7.06: SSG no avisa si el cron ya descontó el picking de la tanda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ssg-carrera-cron.cjs
@@ -842,6 +844,8 @@ echo "== pmap-gondolas (v17.23: 🗺️ Mapa de góndolas — celdas de a 5, la 
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-gondolas.cjs
 echo "== pmap-racks (v22.67: 📦 pestaña Racks del Mapa — solo lectura, vista gv_rack_celda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-racks.cjs
+echo "== pmap-scp (v29.98: 📐 SC y SP — la tercera clase de lugar, grilla IN-A1…) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-scp.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-punto-unico.cjs
 echo "== pmap-discontinuado (v30.03: la celda con un codigo discontinuado se libera; la compartida pierde solo a ese) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-discontinuado.cjs
