@@ -27349,6 +27349,20 @@ const INS_RI_SIN = ["importados"];
 const INS_CAT_CERRADA = ["plastico", "cajas"];
 const INS_CAJA_X_PAQ = 25;   // v29.30 (Thomas, D22): cada paquete trae 25 cajas
 const INS_CAJA_MARCAS = ["Loeke", "Chef"];   // v29.31 (Thomas, D26): sólo se anota, no parte el stock
+/* v29.56 (Luis, 13/10): la marca se pide al RECIBIR CUALQUIER insumo, no sólo cajas.
+   Es el mismo insumo en el mismo lugar físico y el movimiento sigue siendo empresa
+   `Mixto` (lo fuerza el trigger gv_insumo_unidad_base): la marca NO parte el stock, sólo
+   queda escrita en la descripción del movimiento y se consulta por gv_insumo_recepcion_marca.
+   Las cajas siguen con Loeke/Chef (Thomas, D26); el resto suma «Mixto» (las dos). */
+const INS_MARCAS = ["Loeke", "Chef", "Mixto"];
+function _insMarcasDe(k) { return k === "cajas" ? INS_CAJA_MARCAS : INS_MARCAS; }
+function _insMarcaHtml(it, i, isIn) {
+  if (!isIn || !it) return "";
+  const k = insCatOf(it), ms = _insMarcasDe(k);
+  return '<div class="ins-uni" style="justify-content:center;"><span class="ins-uni-l' + (it.marca ? "" : " falta") + '">Marca:</span> ' +
+    ms.map(function (m) { return '<button class="ins-uchip' + (it.marca === m ? " on" : "") + '" onclick="insSetCajaMarca(' + i + ',\'' + m + '\')">' + m + '</button>'; }).join("") + '</div>' +
+    (it.qty > 0 && !it.marca ? '<div class="ins-warn">⚠ elegí ' + (k === "cajas" ? "si las cajas son de Loeke o de Chef" : "de qué empresa viene") + '</div>' : '');
+}
 function insSetCajaMarca(i, m) { if (!_ins || !_ins.items[i]) return; _ins.items[i].marca = (_ins.items[i].marca === m) ? "" : m; insRender(); }
 async function insRecibirCat() {
   let ov = document.getElementById("insChooserModal");
@@ -28145,10 +28159,8 @@ function _insQtyHtml(it, i, isIn) {
       (_paq && it.qty > 0 ? ' <span style="font-size:13px;color:#475569;font-weight:800;">= ' + _insNum(it.qty * INS_CAJA_X_PAQ) + ' cajas</span>' : '') + '</div>' +
       (function () { const _stC = _insStockForUnit(Object.assign({}, it, { unidad: "Uni" })), _q = it.qty * (_paq ? INS_CAJA_X_PAQ : 1);
         return (!isIn && _q > _stC) ? '<div class="ins-warn">⚠ el stock quedaría en ' + _insNum(_stC - _q) + ' cajas</div>' : ''; })() +
-      // v29.31 (Thomas, D26): al RECIBIR se anota de qué marca vienen; es la misma caja (mismo stock)
-      (isIn ? '<div class="ins-uni" style="justify-content:center;"><span class="ins-uni-l' + (it.marca ? "" : " falta") + '">Marca:</span> ' +
-        INS_CAJA_MARCAS.map(function (m) { return '<button class="ins-uchip' + (it.marca === m ? " on" : "") + '" onclick="insSetCajaMarca(' + i + ',\'' + m + '\')">' + m + '</button>'; }).join("") + '</div>' +
-        (it.qty > 0 && !it.marca ? '<div class="ins-warn">⚠ elegí si las cajas son de Loeke o de Chef</div>' : '') : '') +
+      // v29.31 (Thomas, D26) · v29.56: al RECIBIR se anota de qué marca vienen; es la misma caja (mismo stock)
+      _insMarcaHtml(it, i, isIn) +
       '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + (isIn && it.qty > 0 && !it.marca ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
       '</div></div>';
   }
@@ -28167,7 +28179,8 @@ function _insQtyHtml(it, i, isIn) {
       '<button class="ins-qb" onclick="insChg(' + i + ',1)">+</button></div>' +
       '<div class="ins-uni" style="justify-content:center;">' + _bol + '</div>' +
       (neg ? '<div class="ins-warn">⚠ el stock de Bolsas quedaría en ' + _insNum(stk - it.qty) + '</div>' : "") +
-      '<button class="ins-qok ' + (isIn ? "in" : "out") + '" onclick="insCloseQty()">Listo</button>' +
+      _insMarcaHtml(it, i, isIn) +
+      '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + (isIn && it.qty > 0 && !it.marca ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
       '</div></div>';
   }
   let chips = _mcSolo ? ('<button class="ins-uchip on">' + escapeHtml(_mcSolo) + '</button> <span style="font-size:12px;color:#64748b;">sale siempre en MC enteras</span>') : _insUnitsFor(it, insLoadUnits()).map(function (u) {
@@ -28188,7 +28201,8 @@ function _insQtyHtml(it, i, isIn) {
     (!it.unidad ? '<div class="ins-warn">⚠ elegí en qué se mide (esta categoría no tiene una fija)</div>' : "") +
     (it.unidad && !insUniPermitida(_k, it.unidad) ? '<div class="ins-warn">⛔ «' + escapeHtml(it.unidad) + '» no está permitida en ' + escapeHtml(insCatLbl(_k)) + ' (se carga en ' + escapeHtml(insCatUnis(_k).join(" / ")) + ')</div>' : "") +
     (neg ? '<div class="ins-warn">⚠ el stock de ' + escapeHtml(it.unidad) + ' quedaría en ' + _insNum(stk - it.qty) + '</div>' : "") +
-    '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + (it.qty > 0 && (!it.unidad || !insUniPermitida(_k, it.unidad)) ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
+    _insMarcaHtml(it, i, isIn) +
+    '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + ((it.qty > 0 && (!it.unidad || !insUniPermitida(_k, it.unidad))) || (isIn && it.qty > 0 && !it.marca) ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
     '</div></div>';
 }
 /* v29.35 (D43): un componente de GP2 que Virgilio no tiene se da de alta (código y nombre de GP2) antes de cargar
@@ -28256,11 +28270,11 @@ async function insConfirmar() {
   }
   // v24.69: lo que tiene MC sale en MC — si quedó otra unidad (cargada antes), se corrige acá
   if (!isIn) sel.forEach(function (it) { const mc = _insSaleMC(it); if (mc) it.unidad = mc; });
-  // v29.31 (Thomas, D26): caja recibida sin marca no se registra
-  const sinMarca = isIn ? sel.filter(function (it) { return insCatOf(it) === "cajas" && !it.marca; }) : [];
+  // v29.31 (Thomas, D26) · v29.56 (Luis, 13/10): insumo recibido sin marca no se registra
+  const sinMarca = isIn ? sel.filter(function (it) { return !it.marca; }) : [];
   if (sinMarca.length) {
-    try { alert("Falta la marca (Loeke o Chef) de:\n\n  " + sinMarca.map(function (it) { return _insBtnCod(it); }).join("\n  ")); } catch (_e) {}
-    _ins.cat = "cajas"; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = _ins.items.indexOf(sinMarca[0]);
+    try { alert("Falta la marca (de qué empresa viene) de:\n\n  " + sinMarca.map(function (it) { return _insBtnCod(it) + (it.nombre ? " · " + it.nombre : ""); }).join("\n  ")); } catch (_e) {}
+    _ins.cat = insCatOf(sinMarca[0]) || _ins.cat; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = _ins.items.indexOf(sinMarca[0]);
     insRender(); return;
   }
   const sinUni = sel.filter(function (it) { return !it.unidad; });
@@ -28286,7 +28300,9 @@ async function insConfirmar() {
     // v29.29 (Thomas): bolsa plástica = siempre Bolsas, y queda escrito cuántos kg son
     if (insCatOf(it) === "plastico") { uni = "Bolsas"; nota = " · " + _insNum(qty) + " bolsas = " + _insNum(_insKgBolsas(qty)) + " kg"; }
     // v29.30 (Thomas, D24): caja cargada en paquetes → se guarda en cajas (× 25), con lo cargado anotado
-    if (insCatOf(it) === "cajas") { if (_insUEq(uni, "Paquetes")) { nota = " · cargado " + _insNum(qty) + " paquetes × " + INS_CAJA_X_PAQ; qty = qty * INS_CAJA_X_PAQ; } uni = "Uni"; if (isIn && it.marca) nota += " · marca " + it.marca; }
+    if (insCatOf(it) === "cajas") { if (_insUEq(uni, "Paquetes")) { nota = " · cargado " + _insNum(qty) + " paquetes × " + INS_CAJA_X_PAQ; qty = qty * INS_CAJA_X_PAQ; } uni = "Uni"; }
+    // v29.56 (Luis, 13/10): de qué empresa vino, en toda recepción. No parte el stock (sigue Mixto).
+    if (isIn && it.marca) nota += " · marca " + it.marca;
     return { cod_art: it.cod, descripcion: ((it.nombre || "") + nota).trim() || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: it.ubic || it.sector || null };
   });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);

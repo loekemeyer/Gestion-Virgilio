@@ -8613,6 +8613,40 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
   (ABS, AI, EBA, NY c/Carga 25%, NY Recup, NY Virgen, PE Polie, PP 2630, PS PE). Una bolsa nueva aparece cuando se le da ubicación.
 - `tests/ins-ri-cat-bolsas.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-13, v29.56): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
+
+**Luis:** *"se pide que se marque la empresa (LK o CH) cuando un operario recibe insumos. esto no debería afectar
+nada (mismo insumo físicamente, mismo lugar físico) pero debería quedar registro"*. Antes se pedía **sólo en cajas**
+(v29.31, Thomas D26).
+
+- El pop-up de cantidad de **Recibir insumos** pide la **Marca** en TODA categoría, obligatoria (el botón «Listo»
+  queda deshabilitado y `insEnviar` frena). **Cajas**: Loeke / Chef. **El resto**: Loeke / Chef / **Mixto** (las dos).
+  Al **entregar** (EI) no se pide. `INS_MARCAS`, `_insMarcasDe`, `_insMarcaHtml`.
+- **La marca NO parte el stock**: el movimiento sigue siendo el mismo insumo en el mismo lugar y con
+  **`empresa = 'Mixto'`** (lo fuerza `gv_insumo_unidad_base`, regla v24.89 — medido: 446 de 446 movimientos). Queda
+  escrita en la **descripción** (`· marca Loeke`), como ya hacía cajas.
+- Consultable en **`gv_insumo_recepcion_marca`** (una fila por recepción, con `marca`, categoría, unidad y origen):
+  si el dato sólo vive en un string de la descripción no se puede agrupar.
+- ⚠ **Al agregar un dato que acompaña un movimiento de insumos sin cambiar el saldo, va en la descripción, nunca en
+  `empresa`**: esa columna la pisa el trigger y la leen el espejo a GP2 y los lectores de stock.
+- `sql/gv_insumo_marca_empresa_v2956.sql`, `tests/ins-marca-empresa.cjs` (verificado que falla contra la v29.55).
+
+### ⚠ Y los saldos de insumos en unidad VIEJA (MC) son de antes de la v24.69
+
+`gv_insumo_unidad_base` convierte a la unidad base, pero es **BEFORE INSERT solamente**: las 18 líneas cargadas en
+MC antes de esa versión (546P 10 · H201Part 5 · 439E 1 · 505C 1 · 590E 1; la última del **25/08**) quedaron así, y
+`vista_saldos_insumos_x_unidad` **agrupa por unidad** → esos códigos muestran dos saldos (Uni positivo + MC negativo).
+**No es un bug vivo**: `gv_importados_stock_insumos` los convierte con el factor y da el número correcto (505C
+**98.000** · 439E **312** · 590E **0**, `sin_factor` en 0). Los 5 saldos negativos de insumos son exactamente esas
+unidades viejas, todos de categoría `importados`: **cero negativos en las categorías del operario**.
+
+⚠ **Un INSERT compensatorio NO los arregla**: la línea nueva con unidad `MC` la convierte el trigger y el saldo MC
+sigue ahí. Hay que reexpresar las filas viejas con un **UPDATE** (que no dispara ese trigger). El SQL, con su backup
+y su verificación, está en `sql/gv_insumo_marca_empresa_v2956.sql` — **pendiente del «sí»**.
+⚠ **Las 45 «Cajas» de 546P no se tocan** (Luis, 13/10, D8: *"dejalo"*): esa unidad no tiene factor en
+`Insumos_Factores` y no se inventa. Y 546P no está mapeado a ningún importado, así que su stock hoy no lo lee
+ninguna pantalla de compra.
+
 ## ⚠ REGLA (v29.24, 09/10): el REPLAY de Terminar Día no re-manda los items SÓLO de Historial (`h_*`)
 
 - `bulkSendDayReplay` re-manda el Historial del día con `client_id = item.id`. Las tareas de módulo (guardado MG, bajar/ingreso
