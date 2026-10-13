@@ -6420,7 +6420,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.75"></script>
+<script type="module" src="recepcion.js?v=29.78"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10732,7 +10732,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.75";
+const APP_VERSION = "v29.78";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30302,16 +30302,17 @@ async function _irCodChk(cod) {
   return out;
 }
 let _irChkT = null;
+function _irCodEfe() { if (!_ir) return ""; return _irNorm(_ir.cod) || _irNorm(_ir.codPick); }
 function _irChkPedir() {
   if (_irChkT) { clearTimeout(_irChkT); _irChkT = null; }
   if (!_ir) return;
   if (_ir.modo === "nacional") { _ir.chk = null; return; }
-  const k = _irNorm(_ir.cod);
+  const k = _irCodEfe();   // v29.77: en Importación el código sale de la LISTA; lo tipeado se chequea igual (AB3)
   if (!k) { _ir.chk = null; return; }
   if (_IR_CHK[k]) { _ir.chk = _IR_CHK[k]; return; }
   _ir.chk = null;
   _irChkT = setTimeout(function () {
-    _irCodChk(k).then(function (res) { if (_ir && _irNorm(_ir.cod) === k) { _ir.chk = res; irRender(); } }).catch(function () {});
+    _irCodChk(k).then(function (res) { if (_ir && _irCodEfe() === k) { _ir.chk = res; irRender(); } }).catch(function () {});
   }, 450);
 }
 function _irChkMal(chk) { return !!(chk && (chk.baja || (chk.pos && chk.existe === false))); }
@@ -30319,8 +30320,10 @@ function _irChkWarn(chk) {
   if (!chk) return "";
   if (chk.baja) return '<div class="ir-warn">⚠ El código <b>' + escapeHtml(chk.cod) + '</b> no se usa más'
     + (chk.baja !== "-" ? ': es el <b>' + escapeHtml(chk.baja) + '</b>. Cargalo como ' + escapeHtml(chk.baja) + '.' : '.') + '</div>';
-  if (chk.pos && chk.existe === false) return '<div class="ir-warn">⚠ <b>' + escapeHtml(chk.cod) + '</b> no es un artículo: es la <b>POSICIÓN de rack ' + escapeHtml(chk.pos)
-    + '</b>.<br>Acá va el <b>código del artículo</b> (ej. 956E); la posición va abajo, en <b>Sector</b>.</div>';
+  /* v29.78 (Luis, 13/10: «No tiene que avisar que es una posicion, simplemente no tiene que dejar») —
+     una posición de rack (AB3) no lleva cartel: no está en la lista, no se puede elegir y «usar igual»
+     no se ofrece (_irChkMal). El aviso que decía «es la POSICIÓN de rack AB03» se retiró. */
+  if (chk.pos && chk.existe === false) return "";
   if (chk.existe === false) return '<div class="ir-warn" style="background:#fffbeb;border-color:#fcd34d;color:#92400e">⚠ El código <b>' + escapeHtml(chk.cod) + '</b> no existe en el maestro. Revisalo antes de cargar.</div>';
   return "";
 }
@@ -30330,11 +30333,34 @@ async function _irCodGuard(codN) {
   if (_ir) { _ir.chk = chk; }
   if (chk.baja) { try { alert("El código " + codN + " no se usa más" + (chk.baja !== "-" ? ": es el " + chk.baja + ". Cargalo como " + chk.baja + "." : ".")); } catch (_e) {} irRender(); return false; }
   if (chk.existe === true) return true;
-  if (chk.pos) { try { alert("«" + codN + "» NO es un artículo: es la POSICIÓN de rack " + chk.pos + ".\n\nEn «Código» va el código del artículo (ej. 956E) y la posición va abajo, en «Sector»."); } catch (_e) {} irRender(); return false; }
+  if (chk.pos) { irRender(); return false; }   // v29.78: una posición de rack no se carga, y no lleva cartel
   irRender();
   const q = " " + cajas + " cajas en " + sec + "?";
   if (chk.existe === false) return confirm("No existe el código " + codN + ".\n\n¿Lo creo y le cargo" + q);
   return confirm("No pude verificar si el código " + codN + " existe.\n\n¿Cargo igual" + q);
+}
+/* v29.77 (Luis, 13/10: «mas que candado, solo debería dar opciones de poner un codigo ya existente.
+   a medida que se escribe se sugiere el codigo») — el campo Código de Importación SUGIERE códigos que
+   existen, en vez de aceptar texto libre. El universo es el MISMO que decide el candado de la v29.67
+   (`gv_stock_cod_conocido`), listado por `gv_stock_cod_lista()`: así la pantalla no puede sugerir un
+   código que después el candado rechaza. Deja afuera los dados de baja y los insumos puros (A1 es
+   insumo Y posición de rack: justo la confusión que esto viene a cerrar); el insumo importado (323ES)
+   entra porque está en Importados. Devuelve el código como lo escriben los maestros (026, no 26).
+   ⚠ Si la lectura falla, la lista queda vacía y el campo sigue aceptando lo tipeado con el candado de
+   la v29.67 — «no pude leer» no es «ese código no existe». */
+async function irFetchCodigos() {
+  const arr = [];
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_stock_cod_lista", { method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    (Array.isArray(j) ? j : []).forEach(function (x) {
+      const c = String(x.cod || "").trim(); if (!c) return;
+      arr.push({ cod: c, k: _ocgNorm(c), nom: String(x.nombre || "").trim(), imp: x.importado === true });
+    });
+  } catch (_e) {}
+  return arr;
 }
 async function irFetchCxM(plani) {
   const cx = {};
@@ -30376,6 +30402,7 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
     await loadArtNombres();
     const cxm = await irFetchCxM(plani);
     const saldos = await stockFetchSaldos().catch(function () { return {}; });   // v6.28: para el "nacional" (stock en a_guardar/excedente)
+    const cods = await irFetchCodigos();   // v29.77: los códigos que se pueden sugerir en Importación
     const seen = {}, libres = [], ocupados = {};
     (plani || []).forEach(function (r) { const sec = String(r.sector || "").trim(); if (sec && String(r.estado) === "ocupado" && r.cod_art) ocupados[sec.toUpperCase()] = String(r.cod_art); });
     (plani || []).forEach(function (r) {
@@ -30385,7 +30412,7 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
       if (!ocupados[secU]) libres.push(sec);
     });
     libres.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
-    _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, libres: libres, ocupados: ocupados, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
+    _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, cods: cods, libres: libres, ocupados: ocupados, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", codNuevo: false, masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
     _ir.tsInicio = _irIni || Date.now(); if (!_irIni) { try { gvRacksTramo("IRI", _ir.legajo, _ir.tsInicio); } catch (_e) {} }   // v23.66: el tramo de racks arranca al abrir · v26.83: o sigue el abierto
     irRender();
   } catch (e) { const b = document.getElementById("irBody"); if (b) b.innerHTML = '<div class="ir-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -30398,7 +30425,7 @@ function irRender() {
   const secU = String(_ir.sector || "").trim().toUpperCase(), ocupadoPor = _ir.ocupados[secU] || "";
   const sectorOcupadoOtro = ocupadoPor && _irNorm(ocupadoPor) !== codN;
   const nombre = _ir.cod ? (artNombre(_ir.cod, "") || "") : "";
-  const chk = (_ir.chk && _ir.chk.cod === codN) ? _ir.chk : null;   // v29.67: candado del código (solo importación)
+  const chk = (_ir.chk && _ir.chk.cod === _irCodEfe()) ? _ir.chk : null;   // v29.67: candado del código (solo importación)
   const codMal = !nac && _irChkMal(chk);
   const origTxt = _ir.origen === "excedente" ? "excedente" : "a guardar";
   const disp = nac ? _irDisp(_ir.cod, _ir.origen) : 0;
@@ -30419,10 +30446,12 @@ function irRender() {
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas a mover' + (_ir.cod ? ' (máx ' + Math.round(disp) + ')' : '') + '</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div>';
     if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(codCanonSuf(_ir.cod)) + ' en ' + origTxt + '.</div>';
   } else {
-    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
-    h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="ej. 582E" value="' + escapeHtml(codBase(_ir.cod)) + '" oninput="irSetCod(this.value)"></div>';
-    if (_ir.cod) h += '<div class="ir-desc">' + escapeHtml(nombre || "(código nuevo, sin nombre)") + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
+    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: elegí el <b>código</b> de la lista (escribí el código o el nombre y te lo sugiero), cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
+    // v29.77: el campo BUSCA entre los códigos que existen; el código se elige de la lista (o se escribe entero)
+    h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="🔎 código o nombre (ej. 956E)" value="' + escapeHtml(_ir.codPick || "") + '" oninput="irSetPick(this.value)"></div>';
+    if (_ir.cod) h += '<div class="ir-desc">Elegido: <b>' + escapeHtml(codBase(_ir.cod)) + '</b> ' + escapeHtml(nombre || (_ir.codNuevo ? "(código nuevo, sin nombre)" : "")) + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
     if (chk) h += _irChkWarn(chk);
+    h += _irListaImp();
     h += '<div class="ir-row2"><div class="ir-fld"><div class="ir-lbl">Masters</div><div class="ir-stp"><button class="ir-sb" onclick="irChgM(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.masters) || 0) + '" oninput="irSetM(this.value)"><button class="ir-sb" onclick="irChgM(1)">+</button></div></div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas (inner)</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div></div>';
   }
@@ -30444,7 +30473,19 @@ function irRender() {
   else h += '<button class="gv-anular" onclick="irAnular()">⛔ Anular ingreso</button>';
   _renderKeepFocus(body, h);
 }
-function irSetCod(v) { if (!_ir) return; _ir.cod = String(v == null ? "" : v).toUpperCase().replace(/\s+/g, ""); const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0 && Number(_ir.masters) > 0) _ir.inner = Number(_ir.masters) * cxm; _irChkPedir(); irRender(); }
+/* v29.77 — irSetCod ya no cuelga de ningún input (en Importación el código se elige de la lista con
+   irPickCod): queda como setter programático. Si el código no está en el universo, se marca como
+   «código nuevo», que es el mismo estado que deja el «usar igual» — así el candado lo pregunta. */
+function irSetCod(v) {
+  if (!_ir) return;
+  _ir.cod = String(v == null ? "" : v).toUpperCase().replace(/\s+/g, "");
+  if (_ir.modo !== "nacional") {
+    _ir.codPick = codBase(_ir.cod);
+    const hit = _irCodBuscar(_ocgNorm(_ir.cod));
+    if (hit) { _ir.cod = hit.cod; _ir.codNuevo = false; } else _ir.codNuevo = !!_ir.cod;
+  }
+  _irCxmAplicar(); _irChkPedir(); irRender();
+}
 function irSetM(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || n < 0) n = 0; _ir.masters = n; const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0) _ir.inner = n * cxm; irRender(); }
 function irChgM(d) { if (!_ir) return; irSetM(Math.max(0, (Number(_ir.masters) || 0) + d)); }
 function irSetI(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || n < 0) n = 0; _ir.inner = n; irRender(); }
@@ -30453,10 +30494,75 @@ function irSetSec(v) { if (!_ir) return; _ir.sector = String(v == null ? "" : v)
 function irSetEmp(e) { if (!_ir) return; _ir.emp = (e === "CH") ? "CH" : "LK"; irRender(); }
 /* v6.28 — Ingreso a racks NACIONAL: mover stock existente (a_guardar/excedente) a racks. */
 function _irDisp(cod, origen) { if (!_ir || !_ir.saldos || !cod) return 0; const e = _ir.saldos[String(cod)]; if (!e) return 0; return Math.max(0, Number(e[origen === "excedente" ? "excedente" : "a_guardar"]) || 0); }
-function irSetModo(m) { if (!_ir) return; _ir.modo = (m === "nacional" ? "nacional" : "import"); _ir.cod = ""; _ir.codPick = ""; _ir.masters = 0; _ir.inner = 0; _ir.chk = null; irRender(); }
+function irSetModo(m) { if (!_ir) return; _ir.modo = (m === "nacional" ? "nacional" : "import"); _ir.cod = ""; _ir.codPick = ""; _ir.codNuevo = false; _ir.masters = 0; _ir.inner = 0; _ir.chk = null; irRender(); }
 function irSetOrigen(o) { if (!_ir) return; _ir.origen = (o === "excedente" ? "excedente" : "a_guardar"); _ir.cod = ""; _ir.inner = 0; irRender(); }
-function irSetPick(v) { if (!_ir) return; _ir.codPick = String(v == null ? "" : v); irRender(); }
-function irPickCod(codEnc) { if (!_ir) return; const cod = decodeURIComponent(codEnc); _ir.cod = cod; const disp = _irDisp(cod, _ir.origen); if (Number(_ir.inner) > disp) _ir.inner = disp; irRender(); }
+function irSetPick(v) {
+  if (!_ir) return;
+  _ir.codPick = String(v == null ? "" : v);
+  /* v29.77 — en Importación lo tipeado es la BÚSQUEDA: el código queda elegido sólo si coincide EXACTO
+     con uno que existe (así tipear el código entero sigue andando sin tocar la lista) o si lo tocan en
+     la lista. El «usar igual» (código nuevo) se mantiene mientras no cambie el texto. */
+  if (_ir.modo !== "nacional") {
+    const k = _ocgNorm(_ir.codPick);
+    if (!(_ir.codNuevo && _ocgNorm(_ir.cod) === k && k)) {
+      const hit = k ? _irCodBuscar(k) : null;
+      _ir.cod = hit ? hit.cod : "";
+      _ir.codNuevo = false;
+    }
+    _irCxmAplicar();
+    _irChkPedir();
+  }
+  irRender();
+}
+function _irCxmAplicar() { if (!_ir) return; const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0 && Number(_ir.masters) > 0) _ir.inner = Number(_ir.masters) * cxm; }
+function _irCodBuscar(k) {
+  if (!_ir || !k) return null;
+  const arr = _ir.cods || [];
+  for (let i = 0; i < arr.length; i++) if (arr[i].k === k) return arr[i];
+  return null;
+}
+function irPickCod(codEnc) {
+  if (!_ir) return;
+  const cod = decodeURIComponent(codEnc);
+  _ir.cod = cod; _ir.codNuevo = false;
+  if (_ir.modo === "nacional") { const disp = _irDisp(cod, _ir.origen); if (Number(_ir.inner) > disp) _ir.inner = disp; }
+  else { _ir.codPick = codBase(cod); _irCxmAplicar(); _irChkPedir(); }
+  irRender();
+}
+/* v29.77 — la salida: un importado que todavía no está en ningún maestro (el alta va por Importación →
+   ➕ Agregar / modificar). No se ofrece si lo tipeado es una POSICIÓN de rack o un código de baja: eso
+   lo frena el candado de la v29.67, que es el caso que originó todo (AB3). */
+function irCodNuevo() {
+  if (!_ir) return;
+  const k = _irNorm(_ir.codPick); if (!k) return;
+  _ir.cod = k; _ir.codNuevo = true; _irCxmAplicar(); _irChkPedir(); irRender();
+}
+function _irListaImp() {
+  if (!_ir) return "";
+  const arr0 = _ir.cods || [];
+  const f = String(_ir.codPick || "").toLowerCase().trim();
+  const chk = (_ir.chk && _ir.chk.cod === _irCodEfe()) ? _ir.chk : null;
+  if (!arr0.length) return '';   // la lectura falló: el campo queda libre con el candado de la v29.67
+  if (!f) return '<div class="ir-desc" style="color:#64748b">Escribí el <b>código</b> o el <b>nombre</b> y te sugiero los que existen (' + arr0.length + ' códigos · 🚢 = importado).</div>';
+  const arr = arr0.filter(function (x) { return (x.cod + " " + x.nom).toLowerCase().indexOf(f) >= 0; });
+  if (!arr.length) {
+    let v = '<div class="ir-warn" style="background:#fffbeb;border-color:#fcd34d;color:#92400e">⚠ No hay ningún código que coincida con "' + escapeHtml(_ir.codPick) + '".</div>';
+    if (!_irChkMal(chk)) v += '<button class="gv-anular" style="border-color:#fcd34d;color:#92400e;margin:-4px 0 11px" onclick="irCodNuevo()">✎ Cargar «' + escapeHtml(_irNorm(_ir.codPick)) + '» igual (código nuevo)</button>';
+    return v;
+  }
+  const kSel = _ocgNorm(_ir.cod);
+  let h = '<div style="max-height:190px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;margin:-2px 0 11px;">';
+  arr.slice(0, 40).forEach(function (x) {
+    const on = kSel && x.k === kSel;
+    h += '<button onclick="irPickCod(\'' + encodeURIComponent(x.cod) + '\')" style="display:flex;width:100%;align-items:baseline;gap:8px;padding:8px 10px;border:none;border-bottom:1px solid #f1f5f9;background:' + (on ? "#0e7490" : "#fff") + ';color:' + (on ? "#fff" : "#0f172a") + ';cursor:pointer;text-align:left;font-size:13.5px;">'
+      + '<span style="font-family:Consolas,Menlo,monospace;font-weight:800;">' + escapeHtml(x.cod) + '</span>'
+      + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:' + (on ? "#e0f2fe" : "#475569") + ';">' + escapeHtml(x.nom || "—") + '</span>'
+      + (x.imp ? '<span style="white-space:nowrap;font-size:12px;">🚢</span>' : '') + '</button>';
+  });
+  if (arr.length > 40) h += '<div class="ir-more" style="padding:7px 10px;">+' + (arr.length - 40) + ' más — afiná la búsqueda</div>';
+  h += '</div>';
+  return h;
+}
 function _irListaNac() {
   if (!_ir) return "";
   const orig = _ir.origen === "excedente" ? "excedente" : "a_guardar";
@@ -30581,7 +30687,7 @@ async function irCargar() {
   // nacional: descontar del saldo local (origen −, racks +) para refrescar el buscador
   if (nac && _ir.saldos && _ir.saldos[_ir.cod]) { const key = _ir.origen === "excedente" ? "excedente" : "a_guardar"; _ir.saldos[_ir.cod][key] = (Number(_ir.saldos[_ir.cod][key]) || 0) - inner; _ir.saldos[_ir.cod].racks = (Number(_ir.saldos[_ir.cod].racks) || 0) + inner; }
   _ir.done.push({ cod: cod, sector: sector, masters: masters, inner: inner, nac: nac ? origTxt : "" });
-  _ir.cod = ""; _ir.codPick = ""; _ir.masters = 0; _ir.inner = 0; _ir.sector = (_ir.libres[0] || ""); _ir.confirming = false; _ir.chk = null;
+  _ir.cod = ""; _ir.codPick = ""; _ir.codNuevo = false; _ir.masters = 0; _ir.inner = 0; _ir.sector = (_ir.libres[0] || ""); _ir.confirming = false; _ir.chk = null;
   irRender();
   try { alert("✓ " + (nac ? "Trasladado" : "Cargado") + ": " + inner + " cajas de " + cod + " → " + sector + (nac ? " (desde " + origTxt + ")" : "") + "."); } catch (_e) {}
 }
@@ -62453,7 +62559,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.75"></script>
+<script src="importacion.js?v=29.78"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65453,15 +65559,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.75"></script>
-<script src="hotsale.js?v=29.75"></script>
-<script src="estadisticas.js?v=29.75"></script>
-<script src="ads.js?v=29.75"></script>
-<script src="plantel.js?v=29.75"></script>
+<script src="cobranzas.js?v=29.78"></script>
+<script src="hotsale.js?v=29.78"></script>
+<script src="estadisticas.js?v=29.78"></script>
+<script src="ads.js?v=29.78"></script>
+<script src="plantel.js?v=29.78"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.75"></script>
+<script src="analisis.js?v=29.78"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.75"></script>
+<script src="ayuda.js?v=29.78"></script>
 
 </body>
 </html>

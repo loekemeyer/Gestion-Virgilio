@@ -171,8 +171,15 @@ cantidad ya viene cargada), o cerralo con Terminar Día.
 
 Para subir mercadería a los racks.
 1. Tocá **IR** y **Enviar**. Elegí el modo:
-   - **«📦 Importación»**: un contenedor que llega. Cargás **masters**, **cajas por master**, la
-     **posición** de rack (te sugiere libres) y la empresa **LK · Loeke** o **CH · Chef**.
+   - **«📦 Importación»**: un contenedor que llega. En **Código** escribís el código o el nombre y la
+     app te **sugiere los códigos que existen** (🚢 = importado): tocá el que corresponde. Después
+     cargás **masters**, **cajas por master**, la **posición** de rack (te sugiere libres) y la
+     empresa **LK · Loeke** o **CH · Chef**.
+     ⚠ Acá va el **código** del artículo; la posición de rack va abajo, en **Sector** (si escribís una
+     posición no te la va a dejar cargar). Si el código no aparece en la lista, fijate que no te falte
+     una letra (606 es **606E**); si de verdad es nuevo, está el botón
+     **✎ Cargar «956E» igual (código nuevo)** (con el código que escribiste) y te pregunta antes de
+     crearlo.
    - **«🏠 Nacional»**: subir a racks algo que ya está en **A guardar** o en **Excedente**.
 2. **«Revisar carga →»** → **«✓ Confirmar carga»** (o «← Volver» para corregir). Repetí por cada
    palet.
