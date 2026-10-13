@@ -1,4 +1,4 @@
--- v29.57 (Luis, 2026-10-13) — GP2 filtra "Insumos de Virgilio sin asignar" por LAS MISMAS categorías
+-- v29.60 (Luis, 2026-10-13) — GP2 filtra "Insumos de Virgilio sin asignar" por LAS MISMAS categorías
 -- de Gestión Virgilio. Para eso el espejo GV → GP2 suma un 4.º bloque: las categorías de insumos.
 --
 -- Luis: "que los insumos sin asignar de virgilio en ese menu sean filtrables por las categorias que
@@ -13,7 +13,8 @@
 -- escribe en el schema GP2 con una función public.gv_* SECURITY DEFINER; GP2 sólo lee (su Regla 0).
 -- La tabla la crea la migración del repo de GP2: db/migracion_virgilio_categorias_20261013.sql.
 --
--- APLICADO el 2026-10-13 (proyecto hrxfctzncixxqmpfhskv). El parche va sobre pg_get_functiondef, es
+-- APLICADO el 2026-10-13 (proyecto hrxfctzncixxqmpfhskv). ⚠ El marcador que quedó DENTRO de la
+-- función dice `(v29.57)` — es con la versión que se aplicó y es la llave: no cambiarlo. El parche va sobre pg_get_functiondef, es
 -- IDEMPOTENTE (si ya nombra virgilio_insumo_categoria no toca nada) y falla con un raise si no
 -- matchea el ancla: varias sesiones editan gv_gp2_espejo_sync y un CREATE OR REPLACE de una copia
 -- vieja se come los bloques de las otras.

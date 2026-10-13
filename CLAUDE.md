@@ -7723,14 +7723,14 @@ chinos y para avisar en la página que no tenemos stock"*.
   con `aceptado` = ya tiene código real (no `TMP-`). La escribe `gv_gp2_aceptado_sync()` (cron `gv-gp2-aceptado-sync`,
   cada 10 min, poda lo que desaparece). Al 30/09: 24 filas, 7 aceptadas, 17 con TMP. **323ES quedó Mixto.**
   `sql/gv_gp2_aceptado_virgilio_v2515.sql`.
-- **v29.57 (Luis, 13/10): y VE LAS CATEGORÍAS DE INSUMOS** — cuarta tabla espejo, **`GP2.virgilio_insumo_categoria`**
+- **v29.60 (Luis, 13/10): y VE LAS CATEGORÍAS DE INSUMOS** — cuarta tabla espejo, **`GP2.virgilio_insumo_categoria`**
   (clave, nombre, emoji, orden, activa), bloque 4 de `gv_gp2_espejo_sync`. Con eso GP2 → Stock general → pestaña
   **Virgilio** filtra «Insumos de Virgilio sin asignar» por **las mismas categorías de acá**, con sus nombres
   (`virgilio_insumos_sin_match_bundle` devuelve `categorias` y cada fila su `cat_nombre`). ⚠ **El nombre de una
   categoría no se escribe en el front de GP2**: su mapa a mano (`VINS_RUBRO`) estaba desfasado en **4 de 6** —
   decía «Plásticos» por «Bolsas plásticas», «Flejes» por «Flejes y alambres», y no conocía «Sector Crudo» ni
   «Sector Procesado». Al agregar una categoría en `Insumos_Categorias`, GP2 la ve sola en ≤ 10 min.
-  `sql/gv_gp2_espejo_categorias_v2957.sql` · GP2 `db/migracion_virgilio_categorias_20261013.sql`, CONOCIMIENTO 4kn.
+  `sql/gv_gp2_espejo_categorias_v2960.sql` · GP2 `db/migracion_virgilio_categorias_20261013.sql`, CONOCIMIENTO 4kn.
 - **v25.17 (Luis, 30/09, D5): GP2 ve el stock de insumos y el Mapa de Virgilio**, en tres tablas de **solo lectura** del
   schema GP2 (así no rompe su Regla 0): `virgilio_insumo_stock`, `virgilio_insumo_ubicacion` y `virgilio_lugar`. Las
   llena `gv_gp2_espejo_sync()` (cron `gv-gp2-espejo-sync`, c/10 min, reescribe sólo si cambió el md5). Luis: *"que los
