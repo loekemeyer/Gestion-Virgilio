@@ -55,10 +55,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.c = _ins.items.some(function (x) { return x.cod === "NY NUEVO"; });
     const g11 = _ins.items.filter(function (x) { return x.cod === "G11" || x.gp2Cod === "G11"; });
     out.d = g11.length === 1 && g11[0].cod === "G11" && g11[0].gp2Comp === 4;
-    _ins.items[ip].qty = 3; _ins.items[ip].unidad = "Uni";
+    // v29.56: al RECIBIR, la marca (de qué empresa viene) es obligatoria en toda categoría
+    _ins.items[ip].qty = 3; _ins.items[ip].unidad = "Uni"; _ins.items[ip].marca = "Loeke";
     let mov = null; const _sm = window.stockMove; window.stockMove = function (rows) { mov = rows; };
     insCloseQty(); await insConfirmar(); window.stockMove = _sm;
-    out.e = !!mov && mov[0] && mov[0].cod_art === "PC1A" && mov[0].delta === 3;
+    out.e = !!mov && mov[0] && mov[0].cod_art === "PC1A" && mov[0].delta === 3 && / marca Loeke/.test(mov[0].descripcion || "");
     gp2 = null; window._insRiCat = "partes_plasticas";
     await showInsumoModal("RI", "104");
     out.f = !_ins.items.some(function (x) { return x.gp2Comp && !x.cod; }) && !_ins.items.some(function (x) { return x.cod === "NY NUEVO"; });

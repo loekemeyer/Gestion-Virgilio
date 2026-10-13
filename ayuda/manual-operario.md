@@ -199,8 +199,10 @@ Tocá **📦** y **Enviar**. Hay **3 opciones**:
   y Compras para que lo carguen. En **plásticos**, al entregar aparecen sólo las bolsas que
   se usan (con lugar en el Mapa); al recibir aparecen además las bolsas de GP2.
   Las bolsas se cargan sólo en **Bolsas** (abajo se ve cuántos kg son). En **cajas** aparecen las 11
-  cajas (Caja Nº 1 … Nº 29); se cargan en **Cajas** o en **Paquetes** (cada paquete = 25 cajas). Al
-  **recibir** cajas hay que marcar si son de **Loeke** o de **Chef** (es la misma caja; queda anotado).
+  cajas (Caja Nº 1 … Nº 29); se cargan en **Cajas** o en **Paquetes** (cada paquete = 25 cajas).
+  Al **recibir** cualquier insumo hay que elegir la **Marca**: de qué empresa viene. En cajas es
+  **Loeke** o **Chef**; en el resto está además **Mixto** (sirve para las dos). Es el mismo insumo
+  en el mismo lugar — la marca sólo queda anotada, no parte el stock. Sin marca no se registra.
 - **📤 Entregar insumos**: sale stock de insumos. Primero **«¿Qué envío es?»**: **🏭 Envío a
   inyectores** (elegís el inyector y aparecen sólo las bolsas plásticas; es la única forma de sacar
   bolsas) o **📦 Envío a otros** (todo lo demás, sin bolsas plásticas);
