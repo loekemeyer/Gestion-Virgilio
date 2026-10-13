@@ -5106,6 +5106,55 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
 
+## ⚠ REGLA (Luis, 2026-10-13, v29.68): ANÁLISIS PRODUCTIVO por tanda — y el s/caja del PKC NO es un detector
+
+Botón **📈 Análisis Productivo** en el panel del supervisor y en la botonera del operario (ahí **sólo** para
+los legajos de `GV_Analisis_Acceso`; hoy **Juan, legajo 8**). El monitor ya evalúa por OPERARIO y por DÍA
+(Monitor → Ritmo, v29.47-48): esto es la misma cuenta abierta **por TANDA**, con el detalle código por código.
+
+| pieza | qué hace |
+|---|---|
+| `gv_analisis_lista(dias, legajo, buscar)` | las tandas del período con el rendimiento de picking y de armado, su dificultad y **cuántos avisos DUROS** tiene cada una (se calculan para todo el período de una, 1,4 s a 60 días) |
+| `gv_analisis_tanda(tanda, legajo)` | el detalle: esperado por dificultad vs real, composición del tiempo (bruto · pausas · huecos · cola), m³/h, cajas/h, el promedio de ese operario y el del depósito en esa dificultad, la tabla línea por línea y los avisos (260 ms) |
+| `gv_analisis_cod_base(dias)` | cuánto tarda **normalmente** una línea de cada código: mediana de 120 días, y la misma mediana descontando el término por caja del D17 (3,74 s). 194 de 289 códigos tienen 8+ líneas medidas y cubren el 96 % |
+| `GV_Analisis_Acceso` | quién lo ve desde el celular. Agregar a alguien es un `insert`, no un deploy |
+
+> ## **El `ts` del PKC dice cuándo se TOCÓ OK, no cuándo se levantó la caja.**
+> Medido el 13/10 sobre 120 días: marcar «menos de 1 s por caja con 5+ cajas» salta en **148 de 560 tandas
+> (26 %)**, y agrupando las ráfagas en **283 de 588 (48 %)**. Eso no es fraude: es que se confirma en bloque.
+> Por eso el s/caja del PKC va como **dato** en la tabla, con lo normal del código al lado, y **no dispara
+> una alarma por sí solo**. No volver a proponerlo como detector.
+
+**Los tres avisos que SÍ tienen señal, y por qué:**
+
+1. **El picking dio completo y el armado declaró faltante** de ese código. No depende del reloj.
+   Medido: **14 casos en 13 de 486 tandas (2,7 %), 44 cajas**.
+2. **Paso confirmado sin tiempo frente a la góndola**: del registro por paso (`GV_Picking_Paso_Evento`,
+   v26.25, **desde el 05/10**), de que la pantalla MOSTRÓ el código a que se confirmó. Mediana **29 s**,
+   p10 7,1 s; **36 de 1.081 pasos (3,3 %)** bajan de 2 s. Con el filtro de 3+ cajas quedan **6 pasos en 6
+   tandas**, más 10 con menos de 1 s por caja en 5+ cajas. Una tanda anterior al 05/10 no tiene este dato y
+   la pantalla lo dice: **no se inventa el aviso**.
+3. **El conteo cíclico de góndola de ese picking** (CG, v28.58) que no coincide con el sistema.
+
+El resto (línea lenta, huecos de +5 min, celular bloqueado, reconfirmaciones, sin stock en góndola,
+ritmo alto o bajo contra su dificultad) va como **media/baja**: son para mirar, no para acusar.
+
+⚠ **El tiempo «frente a la góndola» es desde el ÚLTIMO `mostrado` anterior a la confirmación**, no desde el
+primero: `gv_picking_paso.primera_vez` es el primero y da negativos cuando la cola manda el `mostrado`
+después del `ok`. Con el primero el aviso saltaba en el 46 % de las tandas; con el último, en el 13 %.
+
+⚠ **No es un candado**: el legajo lo manda el celular y no se puede verificar (el operario entra con el
+código de la TV, no con una sesión). Frena a quien lo lee, como el semáforo de repos. El supervisor entra
+por su sesión de Google.
+
+⚠ El marcador de la regla va en **código** (`v_regla constant text := 'v29.64-acceso'`), no en un comentario
+de línea: el centinela saca los comentarios antes de buscar (regla v21.82) y el patrón quedaba en rojo.
+
+**Chequeo:** `select public.gv_analisis_lista(14, '8');` · `select public.gv_analisis_tanda('<TANDA>', '8');` ·
+`select * from public.gv_reglas_perdidas;` · `node tests/analisis-productivo.cjs`.
+`sql/gv_analisis_productivo_v2964.sql`, `analisis.js`. ⚠ Los objetos de la base y los centinelas dicen
+**v29.64** (la versión con que se aplicaron): es la llave, no cambiarla.
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.50): los INSTRUCTIVOS de pared se GENERAN, no se dibujan
 
 Hoja de **40 × 50 cm** con el paso a paso de un módulo, pantalla por pantalla, para colgar en el
