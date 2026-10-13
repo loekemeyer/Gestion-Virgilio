@@ -135,9 +135,15 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     let vis = function () { return Array.from(document.querySelectorAll("#insBody .ins-itbtn .ins-itcod")).map(function (x) { return x.textContent.trim(); }).sort(); };
     const h1 = document.getElementById("insBody").innerHTML;
     out.f = _ins.provFleje === "Basconia" && JSON.stringify(vis()) === JSON.stringify(["N°13"]) &&
-      /Flejes de <b>Basconia<\/b>/.test(h1) && /Ver los 2 flejes sin proveedor/.test(h1);
+      /Flejes y alambres de <b>Basconia<\/b>/.test(h1) && />Otros \(2\)</.test(h1);
+    /* v29.87: «Otros» muestra SÓLO los que todavía no están vinculados (no los mezcla con los
+       del proveedor) y se vuelve con «‹ Volver a los de Basconia». */
     insProvOtros();
-    out.f2 = JSON.stringify(vis()) === JSON.stringify(["N° 43", "N°13", "N°56"].sort());
+    const h2 = document.getElementById("insBody").innerHTML;
+    out.f2 = JSON.stringify(vis()) === JSON.stringify(["N° 43", "N°56"].sort()) &&
+      /todavía no están asignados/.test(h2) && /‹ Volver a los de Basconia/.test(h2) && !/N°13/.test(h2);
+    insProvOtros();
+    out.f2b = JSON.stringify(vis()) === JSON.stringify(["N°13"]);
     // buscando se ve TODO, aunque no sea de ese proveedor
     _ins.filtro = "N°41"; insRender();
     out.f3 = JSON.stringify(vis()) === JSON.stringify(["N°41"]);
@@ -165,11 +171,31 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const hb = document.getElementById("insUbicGp2").innerHTML;
     out.h = /Kollplast/.test(hb) && /Pat Bet Plast/.test(hb) && /Pettofrezza/.test(hb) && !/JL Matriceria/.test(hb) &&
       (window._insGp2Cache.mv.inyectores || []).length === 3;
+    /* ---- (i) v29.87 (Luis: "crea tabla si sólo está en el front el dato"): cajas por paquete,
+       marcas y apodos salen de la BASE; si no contesta, quedan los defaults del front. */
+    const defs = { paq: INS_CAJA_X_PAQ, marcas: INS_MARCAS.join(","), cajas: INS_CAJA_MARCAS.join(","), apodo: INS_INY_APODO["Pat Bet Plast"] };
+    let cfgCae = false;
+    window.fetch = async function (u) {
+      if (cfgCae) return { ok: false, status: 500, json: async () => null };
+      if (/gv_insumo_config/.test(String(u))) return { ok: true, json: async () => [
+        { clave: "caja_x_paquete", valor: 30, valor_texto: null },
+        { clave: "marcas", valor: null, valor_texto: "Loeke, Chef, Mixto, Krea" },
+        { clave: "marcas_cajas", valor: null, valor_texto: "Loeke,Chef" }] };
+      if (/gv_insumo_apodos/.test(String(u))) return { ok: true, json: async () => [{ nombre: "Kollplast", apodo: "Koll" }] };
+      return { ok: true, json: async () => [] };
+    };
+    await insFetchConfig();
+    out.i = INS_CAJA_X_PAQ === 30 && INS_MARCAS.join(",") === "Loeke,Chef,Mixto,Krea" &&
+      INS_INY_APODO["Kollplast"] === "Koll" && INS_INY_APODO["Pat Bet Plast"] === undefined &&
+      defs.paq === 25 && defs.marcas === "Loeke,Chef,Mixto" && defs.cajas === "Loeke,Chef" && defs.apodo === "Manolo";
+    cfgCae = true;
+    await insFetchConfig();   // la base no contesta: NO se pierde lo que ya había
+    out.i2 = INS_CAJA_X_PAQ === 30 && INS_MARCAS.join(",") === "Loeke,Chef,Mixto,Krea";
     out.origCalls = origCalls.join(",");
     return out;
   });
   await b.close();
-  const keys = ["a","b","a2","c","d","e","f0","ui","f","f2","f3","g0","g","h"];
+  const keys = ["a","b","a2","c","d","e","f0","ui","f","f2","f2b","f3","g0","g","h","i","i2"];
   const malos = keys.filter((k) => !r[k]);
   if (malos.length || errs.length) {
     console.error("✗ ins-ri-origen-menu:", malos.join(", ") || "(ok)", "| errores:", errs.join(" | ") || "(ninguno)");

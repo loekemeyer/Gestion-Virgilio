@@ -113,3 +113,68 @@ insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pi
    select count(*) from public.gv_insumo_fleje_proveedor();                  -- 53 al 13/10
    select ambito, nombre, motivo from public."GV_Insumo_Origen_Excluido";    -- lo que GP2 tiene y acá no va
 */
+
+/* ============================================================================================
+   v29.87 (Luis, 13/10): "crea tabla si sólo está en el front el dato".
+   Lo que quedaba escrito en `index.html` y es DATO del negocio, no código:
+     · el apodo con que el operario conoce a un origen («Manolo» = Pat Bet Plast)  → GV_Insumo_Origen_Apodo
+     · cuántas cajas trae un paquete (25) y las marcas que se pueden elegir al recibir → GV_Insumo_Config
+   El front los hidrata en `insLoadMeta` (`insFetchConfig`) y lo que tiene escrito queda de
+   FALLBACK: si la base no contesta, el operario carga igual que antes.
+   ⚠ `gv_insumo_origenes` NO devuelve el apodo: cambiarle las columnas pide DROP + CREATE y el
+   connector se cuelga con la palabra de borrado (regla del 07/10). Va en su propia RPC.
+   Rollback: drop function public.gv_insumo_config(); drop function public.gv_insumo_apodos();
+             drop table public."GV_Insumo_Config", public."GV_Insumo_Origen_Apodo";
+   ============================================================================================ */
+
+create table if not exists public."GV_Insumo_Origen_Apodo" (
+  nombre     text primary key,
+  apodo      text not null,
+  nota       text,
+  creado_en  timestamptz not null default now()
+);
+alter table public."GV_Insumo_Origen_Apodo" enable row level security;
+revoke insert, update, delete, truncate on public."GV_Insumo_Origen_Apodo" from anon, authenticated;
+
+create table if not exists public."GV_Insumo_Config" (
+  clave        text primary key,
+  valor        numeric,
+  valor_texto  text,
+  nota         text,
+  creado_en    timestamptz not null default now()
+);
+alter table public."GV_Insumo_Config" enable row level security;
+revoke insert, update, delete, truncate on public."GV_Insumo_Config" from anon, authenticated;
+
+insert into public."GV_Insumo_Origen_Apodo" (nombre, apodo, nota) values
+  ('Pat Bet Plast', 'Manolo', 'Thomas D12 (06/10): el nombre con que lo conoce el operario')
+on conflict (nombre) do nothing;
+
+insert into public."GV_Insumo_Config" (clave, valor, valor_texto, nota) values
+  ('caja_x_paquete', 25, null, 'Thomas D22 (09/10): cada paquete de cajas trae 25'),
+  ('marcas', null, 'Loeke,Chef,Mixto', 'Luis 13/10: de que empresa viene el insumo recibido (Mixto = las dos)'),
+  ('marcas_cajas', null, 'Loeke,Chef', 'Thomas D26: las cajas son de Loeke o de Chef, no Mixto')
+on conflict (clave) do nothing;
+
+create or replace function public.gv_insumo_config()
+returns table (clave text, valor numeric, valor_texto text)
+language sql stable security definer set search_path = public as $fn$
+  -- v29.87: los numeros y las listas del modulo de insumos que vivian en el front
+  select c.clave, c.valor, c.valor_texto from public."GV_Insumo_Config" c order by c.clave;
+$fn$;
+revoke all on function public.gv_insumo_config() from public;
+grant execute on function public.gv_insumo_config() to anon, authenticated, service_role;
+
+create or replace function public.gv_insumo_apodos()
+returns table (nombre text, apodo text)
+language sql stable security definer set search_path = public as $fn$
+  -- v29.87: el apodo con que el operario conoce a un origen (antes vivia en el front)
+  select a.nombre, a.apodo from public."GV_Insumo_Origen_Apodo" a order by a.nombre;
+$fn$;
+revoke all on function public.gv_insumo_apodos() from public;
+grant execute on function public.gv_insumo_apodos() to anon, authenticated, service_role;
+
+/* chequeo (como anon)
+   select * from public.gv_insumo_config();   -- caja_x_paquete 25 · marcas Loeke,Chef,Mixto · marcas_cajas Loeke,Chef
+   select * from public.gv_insumo_apodos();   -- Pat Bet Plast → Manolo
+*/

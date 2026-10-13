@@ -27318,6 +27318,7 @@ let _insMetaOk = false;
 async function insLoadMeta(force) {
   await insFetchFactores();            // v8.26 — factores SIEMPRE frescos (los edita el admin)
   if (_insMetaOk && !force) return;   // sólo cachea dentro de una misma apertura
+  await insFetchConfig();              // v29.87 — cajas por paquete, marcas y apodos (tablas, no código)
   try {
     const h = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const r = await Promise.all([
@@ -27481,15 +27482,43 @@ function insChooserGo(which) {
 const INS_RI_SIN = ["importados"];
 /* v29.25/29.30 (Thomas): categorías con lista CERRADA — el operario no da de alta nada nuevo ahí. */
 const INS_CAT_CERRADA = ["plastico", "cajas"];
-const INS_CAJA_X_PAQ = 25;   // v29.30 (Thomas, D22): cada paquete trae 25 cajas
-const INS_CAJA_MARCAS = ["Loeke", "Chef"];   // v29.31 (Thomas, D26): sólo se anota, no parte el stock
+/* v29.87 (Luis, 13/10: "crea tabla si sólo está en el front el dato") — estos tres son DATOS del
+   negocio, no código: viven en `GV_Insumo_Config` (cajas por paquete, marcas) y en
+   `GV_Insumo_Origen_Apodo` (el apodo del inyector), y los hidrata `insLoadMeta`. Lo que queda
+   escrito acá es el FALLBACK: si la base no contesta, el operario carga igual que antes. */
+let INS_CAJA_X_PAQ = 25;   // v29.30 (Thomas, D22): cada paquete trae 25 cajas
+let INS_CAJA_MARCAS = ["Loeke", "Chef"];   // v29.31 (Thomas, D26): sólo se anota, no parte el stock
 /* v29.56 (Luis, 13/10): la marca se pide al RECIBIR CUALQUIER insumo, no sólo cajas.
    Es el mismo insumo en el mismo lugar físico y el movimiento sigue siendo empresa
    `Mixto` (lo fuerza el trigger gv_insumo_unidad_base): la marca NO parte el stock, sólo
    queda escrita en la descripción del movimiento y se consulta por gv_insumo_recepcion_marca.
    Las cajas siguen con Loeke/Chef (Thomas, D26); el resto suma «Mixto» (las dos). */
-const INS_MARCAS = ["Loeke", "Chef", "Mixto"];
+let INS_MARCAS = ["Loeke", "Chef", "Mixto"];
 function _insMarcasDe(k) { return k === "cajas" ? INS_CAJA_MARCAS : INS_MARCAS; }
+/* v29.87: la config del módulo (números y listas) y los apodos, de la base. Cada dato que llega
+   pisa su default; el que no llega queda con el de acá. */
+async function insFetchConfig() {
+  const h = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
+  try {
+    const r = await Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_config", { method: "POST", headers: h, body: "{}", cache: "no-store" }),
+      fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_apodos", { method: "POST", headers: h, body: "{}", cache: "no-store" })
+    ]);
+    if (r[0].ok) {
+      const cfg = await r[0].json();
+      if (Array.isArray(cfg)) cfg.forEach(function (c) {
+        const lista = String(c.valor_texto || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+        if (c.clave === "caja_x_paquete" && Number(c.valor) > 0) INS_CAJA_X_PAQ = Number(c.valor);
+        if (c.clave === "marcas" && lista.length) INS_MARCAS = lista;
+        if (c.clave === "marcas_cajas" && lista.length) INS_CAJA_MARCAS = lista;
+      });
+    }
+    if (r[1].ok) {
+      const ap = await r[1].json();
+      if (Array.isArray(ap) && ap.length) { INS_INY_APODO = {}; ap.forEach(function (a) { if (a.nombre && a.apodo) INS_INY_APODO[a.nombre] = a.apodo; }); }
+    }
+  } catch (_e) { /* sin red: quedan los defaults de arriba */ }
+}
 function _insMarcaHtml(it, i, isIn) {
   if (!isIn || !it) return "";
   const k = insCatOf(it), ms = _insMarcasDe(k);
@@ -27876,8 +27905,9 @@ function insUbicGp2Ok(mode, i) {
     insUbicOk("EI", { modo: "EI", inyector: nom, mv: mv });
   }
 }
-/* v29.27 (Thomas, D12): apodo del inyector de GP2 en el botón («Manolo es Pat Bet Plast»). */
-const INS_INY_APODO = { "Pat Bet Plast": "Manolo" };
+/* v29.27 (Thomas, D12): apodo del inyector de GP2 en el botón («Manolo es Pat Bet Plast»).
+   v29.87: lo carga `insFetchConfig` de `GV_Insumo_Origen_Apodo`; esto es el fallback. */
+let INS_INY_APODO = { "Pat Bet Plast": "Manolo" };
 /* v29.22 — bolsa plástica que se manda a un inyector: plástico, con código real y ubicación. */
 function _insEsBolsaIny(it) {
   return !!it && insCatOf(it) === "plastico" && !_insEsTmp(it) && !it.noCode && String(it.ubic || "").trim() !== "";
@@ -28225,24 +28255,30 @@ function insRender() {
     const base = f
       ? (cat ? _ins.items.filter(function (it) { return insCatOf(it) === (cat === "?" ? "" : cat); }) : _ins.items)
       : _ins.items.filter(function (it) { const k = insCatOf(it); return cat === "?" ? k === "" : k === cat; });
-    /* v29.82 (Luis): recibiendo flejes DE UN PROVEEDOR se ven sólo los que GP2 le tiene asignados.
-       Los que GP2 no tiene asignados a nadie NO se esconden: quedan atrás de un botón, contados.
+    /* v29.87 (Luis, 13/10) — "elegido el proveedor, muestra los flejes y alambres que están
+       asignados a él y, mientras haya algún fleje y/o alambre que aparezca un botón que diga
+       «otros» y que permita seleccionar de los que todavía no están vinculados".
+       Son DOS listas, no una: la del proveedor y la de los que GP2 no le asignó a nadie. «Otros»
+       cambia de una a la otra; nunca se mezclan, y nada queda inalcanzable.
        Buscando (`f`) no se filtra nada: si el operario escribe el código, lo tiene que encontrar. */
     let baseP = base, nSinProv = 0;
     if (!f && cat === "fleje" && _ins.provFleje && _ins.flejeProv) {
       nSinProv = base.filter(function (it) { return !_insProvDe(it); }).length;
       baseP = base.filter(function (it) {
         const pv = _insProvDe(it);
-        return pv ? _insK(pv) === _insK(_ins.provFleje) : !!_ins.provOtros;
+        return _ins.provOtros ? !pv : (pv && _insK(pv) === _insK(_ins.provFleje));
       });
     }
     const shown = (f ? baseP.filter(function (it) { return stkMatchBusq(f, it.cod || it.gp2Cod || "", (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || ""), true); }) : baseP)   // v21.43
       .slice().sort(_insSortCat(cat));
     if (!f && cat === "fleje" && _ins.provFleje) {
-      h += '<div class="ins-depw" style="background:#eef2ff;border-color:#a5b4fc;color:#1e293b;">🚛 Flejes de <b>' + escapeHtml(_ins.provFleje) + '</b>' +
+      h += '<div class="ins-depw" style="background:#eef2ff;border-color:#a5b4fc;color:#1e293b;">' +
+        (_ins.provOtros ? '🧵 <b>Otros</b> — los que todavía no están asignados a ningún proveedor en GP2'
+                        : '🚛 Flejes y alambres de <b>' + escapeHtml(_ins.provFleje) + '</b>') +
         (_ins.flejeProv ? '' : ' — <b>no se pudo leer</b> qué flejes son suyos: se muestran todos') + '</div>';
+      // «Otros» sólo si de verdad hay alguno sin vincular
       if (_ins.flejeProv && nSinProv) h += '<button class="ins-back" style="width:100%;margin-bottom:8px;" onclick="insProvOtros()">' +
-        (_ins.provOtros ? '➖ Ocultar los ' + nSinProv + ' flejes sin proveedor asignado' : '➕ Ver los ' + nSinProv + ' flejes sin proveedor asignado en GP2') + '</button>';
+        (_ins.provOtros ? '‹ Volver a los de ' + escapeHtml(_ins.provFleje) : 'Otros (' + nSinProv + ')') + '</button>';
     }
     if (_ins.soloBolsas) h += '<div class="ins-bar"><span class="ins-bar-t">🧪 Bolsas plásticas</span></div>';
     else h += '<div class="ins-bar"><button class="ins-back" onclick="insBack()">‹ Atrás</button>' +
