@@ -945,6 +945,11 @@
       "objeto": "gv_gp2_inventario",
       "regla": "El codigo de Virgilio de un componente sale de GP2.insumo_equivalencia, la tabla UNICA de equivalencias; la columna componente.codigo_virgilio se borro (v29.74)",
       "quien": "Luis"
+    },
+    {
+      "objeto": "gv_insumo_isis_sync",
+      "regla": "GP2 es el canonico del codigo ISIS: lo que se guarda en GP2.insumo_equivalencia.isis se escribe en Insumos.isis de Virgilio, incluido vaciarlo; nunca al reves (v29.79)",
+      "quien": "Luis"
     }
   ]
 }

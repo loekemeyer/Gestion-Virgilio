@@ -9013,6 +9013,27 @@ del lado de GP2 lo sostienen sus tests. En GV quedan los ids 388 y 406.
 
 `sql/gv_insumo_equivalencia_unica_v2974.sql` (rollback en la cabecera), `tests/ins-bolsa-sin-equivalencia.cjs`.
 
+### ⚠ v29.79 (Luis, 13/10): GP2 es el CANÓNICO del código ISIS — se replica a `Insumos`
+
+**Luis:** *"si hay diferencias actualmente, asumi que el de GP2 es el canonico y remplazacelo a Virgilio"* ·
+*"que haya boton para confirmar que se guarda/vincula el codigo ISIS con el de Virgilio y/o con el de Cervantes
+o en cualquier permutacion de esas combinaciones"*.
+
+> El dueño del ISIS de un insumo es **`GP2.insumo_equivalencia.isis`**. Lo que se guarda ahí se escribe en
+> **`public."Insumos".isis`**, **incluido vaciarlo**. **Nunca al revés.**
+
+- Lo hace el trigger **`public.gv_insumo_isis_sync`** (de GV, sobre la tabla de GP2 — mismo patrón que
+  `gv_ingreso_virgilio_denegado`, v25.37). **No hay ciclo**: `gv_gp2_espejo_sync` copia `Insumos.isis` a
+  `GP2.virgilio_insumo_stock`, que es **otra** tabla, y el bundle del editor ya leía la equivalencia primero.
+- Pasa el bloqueo `aaa_gv_anon_bloqueo` porque es SECURITY DEFINER (`current_user` = postgres, regla v29.16).
+- Del lado de GP2 (Stock general v3.7.0): el botón **«🔗 Vincular»** tiene columna propia y guarda en
+  **cualquier permutación** (sólo Cervantes · sólo ISIS · los dos); un ISIS vacío **limpia** el dato en los
+  dos lados. El vínculo con Cervantes no se borra desde ahí, a propósito.
+- ⚠ **Para corregir el ISIS de un insumo de Virgilio se edita en GP2**, no en `Insumos`: si se toca sólo del
+  lado de Virgilio, el próximo guardado desde GP2 lo pisa.
+- Rollback: `drop trigger zz_gv_insumo_isis_sync on "GP2".insumo_equivalencia;`
+  Adenda en `gestion-productiva-2.0/db/migracion_insumo_equivalencia_unica_20261013.sql`.
+
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
 
 - **Nombres**: un insumo de Virgilio vinculado a GP2 lleva el nombre de GP2 (v29.34: cajas, bolsas, C15, C6, A15, G11, G13).
