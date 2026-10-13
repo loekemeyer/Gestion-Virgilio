@@ -8722,7 +8722,7 @@ F48A 3 cajas de góndola de más (ya salieron o están en el pallet), y el factu
   formato real (`Z98Z`: los guards miran `^[A-Z][0-9]{2}[A-Z]$`) y las Entregas en UN insert (el armado las manda juntas;
   de a una, el trigger separa la tanda con la primera línea sola).
 
-## ⚠ REGLA (Luis, 2026-10-13, v29.50, D3): el SERVIDOR reconoce un EVENTO DUPLICADO aunque llegue con OTRO client_id
+## ⚠ REGLA (Luis, 2026-10-13, v29.53, D3): el SERVIDOR reconoce un EVENTO DUPLICADO aunque llegue con OTRO client_id
 
 Luis: *"no habría problema con que los mande de vuelta. el punto es que el server debería procesarlo correctamente e
 identificar cuando son eventos duplicados"*. Trigger **`ab_gv_evento_duplicado`** (BEFORE INSERT en
