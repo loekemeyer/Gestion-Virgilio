@@ -207,6 +207,13 @@ function responder(url) {
   if (q.includes("/rpc/gv_ppp_prog_arbol"))      return DATOS.arbol;
   /* v26.55 (Luis, 04/10): E31A se pickeó al 80 % (en m³): su m³ pasa a ser 1,2 en TODO el tablero. */
   if (q.includes("/rpc/gv_tanda_m3_pickeado"))   return [{ tanda: "E31A", fraccion: 0.8, tp: iso(T0 - 2.5 * H), calc_at: iso(T0) }];
+  /* v29.74 (Luis): dónde quedó físicamente cada tanda pickeada — lo MÁS RECIENTE entre el PUB
+     del picking, el freno y el AUB del armado. E30A sigue en la mesa; E31A ya quedó armada en
+     AB7 y una de sus NP fue a otro sector. */
+  if (q.includes("/rpc/gv_tanda_ubicacion"))     return [
+    { tanda: "E30A", ubicacion: "Mesa 2", fuente: "picking", ts: iso(T0 - 1.4 * H), legajo: "8", por_np: false, otras: null },
+    { tanda: "E31A", ubicacion: "AB7", fuente: "armado", ts: iso(T0 - 0.5 * H), legajo: "277", por_np: false, otras: "AC1" }
+  ];
   if (q.includes("/gv_monitor_horas_operario"))  return DATOS.horas;
   if (q.includes("/Facturacion_NP"))             return DATOS.facturadas;
   if (q.includes("/rpc/gv_monitor_ingresos"))          return DATOS.fichadas;
@@ -226,9 +233,11 @@ function responder(url) {
   p.on("pageerror", (e) => errs.push(e.message));
 
   let pedidoPk = null, pidioViejo = false;   // v26.55: qué tandas le pidió la TV a gv_tanda_m3_pickeado
+  let pedidoUb = null;                       // v29.74: y a gv_tanda_ubicacion
   await p.route("**/rest/v1/**", (route) => {
     if (route.request().url().includes("gv_tanda_m3_pickeado")) { try { pedidoPk = JSON.parse(route.request().postData() || "null"); } catch (_e) { pedidoPk = "mal"; } }
     if (route.request().url().includes("gv_picking_pickeado")) pidioViejo = true;
+    if (route.request().url().includes("gv_tanda_ubicacion")) { try { pedidoUb = JSON.parse(route.request().postData() || "null"); } catch (_e) { pedidoUb = "mal"; } }
     const filas = responder(route.request().url());
     route.fulfill({
       status: 200,
@@ -314,6 +323,17 @@ function responder(url) {
   ok(/E30A/.test(r.pen) && /E31A/.test(r.pen) && !/98805/.test(r.pen), "Pendientes de hoy lista mal los pedidos: " + r.pen);
   ok(/class="pen">Pend</.test(r.pen) && /class="fac">Fact</.test(r.pen), "cada pedido pendiente dice su estado (el más atrasado)");
   ok(r.pen.indexOf("E30A") < r.pen.indexOf("E31A"), "lo más atrasado va primero");
+  /* v29.74 (Luis): "cuando muestra una tanda que está pickeada, que muestre dónde quedó
+     físicamente". El chip va DENTRO de la celda del código (en la pared lo escaso es el ancho),
+     en la tabla de tandas y en «Pendientes de salir hoy», con el lugar visible. */
+  ok(/t-ubic/.test(r.tandas) && /📍 Mesa 2/.test(r.tandas),
+     "E30A está pickeada y la dejaron en Mesa 2: el chip tiene que estar en su celda: " + r.tandas.slice(0, 400));
+  ok(/📍 Mesa 2/.test(r.pen) && /📍 AB7 \+/.test(r.pen),
+     "en Pendientes de salir hoy también, y E31A (armada en AB7, con otra NP en AC1) lleva el «+»: " + r.pen.slice(0, 400));
+  ok(/title="[^"]*lo dejó ahí el picking[^"]*legajo 8/.test(r.tandas),
+     "el título del chip dice de dónde salió el dato y quién lo cargó: " + (r.tandas.match(/title="[^"]*📍[^"]*"/) || [""])[0]);
+  ok(pedidoUb && Array.isArray(pedidoUb.p_tandas) && pedidoUb.p_tandas.indexOf("E30A") >= 0,
+     "la TV tiene que pedirle a gv_tanda_ubicacion las tandas del tablero: " + JSON.stringify(pedidoUb));
   /* v25.01 (Luis): las luces P/A no se corren cuando alguien agarra la tanda. */
   const cliE32 = r.tkCli.find((x) => /^E32A/.test(x.tanda)), cliE30 = r.tkCli.find((x) => /^E30A/.test(x.tanda));
   ok(cliE32 && cliE32.rota && /Simon Zeitune E Hijo · Cortopassi/.test(cliE32.txt) && !/\+\d/.test(cliE32.txt), "el cliente de E32A no entra: tiene que rotar " + JSON.stringify(cliE32));

@@ -9336,3 +9336,47 @@ pregunta («¿esas cajas están físicamente?») sólo la puede contestar el dep
 ⚠⚠ **NO se avisa cuando una baja queda sin guardar: Luis dijo que NO** (13/10, D16: *"no lo armes"*). Se le ofreció un
 aviso (Telegram o cartel) para el BR que al día siguiente sigue sin su MG, y lo bajó. **No volver a proponerlo.** El
 caso se encuentra con la consulta de arriba, a mano.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.74): el MONITOR dice DÓNDE QUEDÓ FÍSICAMENTE una tanda pickeada
+
+**Luis:** *"cuando muestra una tanda en la pantalla que está pickeada, que muestre dónde quedó físicamente
+(último dato entre lo que indicó quien la pickeó sobre dónde la dejó o la mesa de armado en la que la están
+armando)"*.
+
+El dato **ya se registraba en tres lugares y no lo mostraba ninguna pantalla**:
+
+| cuándo | dónde vive | qué dice |
+|---|---|---|
+| al TERMINAR el picking (TP) | evento **`PUB`** (`texto` = tanda, `descripcion` = lugar) | Mesa 1 · Mesa 2 · Carro · AA9… |
+| al FRENAR el picking | **`GV_Tanda_Freno.ubicacion`** (v26.61) | dónde quedó el carro |
+| al TERMINAR el armado (TAP) | evento **`AUB`** | AA1..AD8, el sector de armado |
+
+- Lo resuelve **`gv_tanda_ubicacion(text[])`** (lectura, anon, ~17 ms para 57 tandas): UNA fila por tanda con
+  la ubicación del **`ts` más reciente** entre las tres fuentes, más `fuente`, `legajo` y **`otras`** (lo que esa
+  misma fuente dejó en otro lado, p. ej. NP repartidas en dos sectores).
+- Se ve en **la TV de pared, la 📺 Vista TV y el Mon. Admin** (`monitor/tv.html` → `admin.html` por el build):
+  chip **📍 Mesa 2** dentro de la celda del código, en la tabla de tandas y en «🚚 Pendientes de salir hoy».
+  **Va abajo del código y no en una columna propia**: en la pared lo escaso es el ANCHO, y el que busca el
+  pallet lee primero la tanda. El `title` dice de dónde salió el dato, quién lo cargó y a qué hora.
+- **Es SECURITY DEFINER a propósito**: cruza `PPP_Web_Programacion`, que `anon` no ve por RLS, y una función
+  INVOKER devolvería MENOS filas sin dar error (la trampa de la v20.45). Verificado con `set local role anon`:
+  55 de 57 tandas (las 2 que faltan no tienen ninguna ubicación registrada).
+- **Una lectura rota no borra el chip**: si la RPC falla, la tanda se dibuja como antes.
+
+⚠ **La «mesa de armado en la que la están armando» NO se registra mientras arman**: el AUB se emite al TERMINAR
+(TAP). Mientras el armado está en curso, el último dato es el del picking — que justamente suele decir
+«Mesa 1» / «Mesa 2» (medido 30 días: 53 Mesa 1 · 45 Mesa 2 · 18 Carro). **Si se quiere la mesa en vivo, hay que
+preguntarla al dar AP**, y eso es un cambio en el módulo del operario: lo decide Luis.
+
+⚠ **El AUB hoy viene por TANDA, no por NP.** Medido el 13/10: 130 filas por tanda (la última, de hoy) contra 408
+por NP cuya última es del 30/09 — o sea que `_stkFetchNpsByTanda` no le trae las NP a la tanda web y
+`askArmadoUbicaciones` cae a su fallback de «una ubicación para toda la tanda». La RPC cubre **las dos formas**,
+así que no cambia nada mostrar una u otra; el fallback en sí es otro tema.
+
+⚠ **No se agregó al monitor viejo de `index.html`** (el que abre el supervisor desde la app): la pared y el Mon.
+Admin son los que se miran, y acá no hay riesgo de «dos verdades» porque es un dato que se muestra, no un número
+que se calcula. Si se quiere ahí también, se agrega.
+
+**Chequeo:** `select tanda, ubicacion, fuente from public.gv_tanda_ubicacion(array['F58B','F86A']);` ·
+`select * from public.gv_reglas_perdidas;` · `node tests/mon-tv.cjs` (4 chequeos nuevos, verificado que fallan
+contra el tv.html anterior) · `node tests/mon-admin.cjs`. `sql/gv_tanda_ubicacion_v2974.sql`.

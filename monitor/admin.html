@@ -161,6 +161,11 @@ tr.dia td{background:#0e1830;color:#93c5fd;font-size:calc(1.9*var(--u));font-wei
 /* Tabla de tandas: el código de tanda es lo que se busca de lejos. */
 .t-tanda{font-weight:900;font-size:calc(3.3*var(--u));color:#f8fafc;letter-spacing:.03em;white-space:nowrap}
 .t-m3{font-weight:900;font-size:calc(3.1*var(--u));color:#e2e8f0}
+/* v29.74 (Luis): DÓNDE quedó físicamente la tanda pickeada. Va abajo del código y no en una
+   columna propia: en la pared lo escaso es el ANCHO, y el que lo busca lee primero la tanda. */
+.t-ubic{display:block;font-size:calc(1.9*var(--u));font-weight:800;color:#fbbf24;letter-spacing:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.05;margin-top:.15vh}
+table.pen td.p-tanda .t-ubic{font-size:calc(1.7*var(--u))}
 .t-fe{color:#94a3b8;font-weight:800}
 /* Celda de estado: ✅ terminado · ◍ girando en curso · vacío sin actividad. */
 .st{display:inline-flex;align-items:center;gap:.35vw;justify-content:center;white-space:nowrap}
@@ -958,6 +963,37 @@ function cargarCredito(tandas) {
       (f || []).forEach(function (x) { var k = String(x.tanda).toUpperCase() + "|" + x.fase; if (!m.has(k)) m.set(k, []); m.get(k).push(x); }); return m; })
     .catch(function () { return new Map(); });
 }
+/* v29.74 (Luis, 13/10): "cuando muestra una tanda que está pickeada, que muestre dónde quedó
+   físicamente (último dato entre lo que indicó quien la pickeó sobre dónde la dejó o la mesa de
+   armado en la que la están armando)". Lo resuelve `gv_tanda_ubicacion`: el MÁS RECIENTE entre el
+   PUB del picking, la ubicación del freno y el AUB del armado. Sin respuesta: Map vacío (la tanda
+   se dibuja como siempre — "no pude leer" no es "no se sabe dónde está"). */
+function cargarUbicacion(tandas) {
+  if (!tandas.length) return Promise.resolve(new Map());
+  var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+  return conTimeout(fetch(SB_URL + "/rest/v1/rpc/gv_tanda_ubicacion", { method: "POST", cache: "no-store", signal: ctrl ? ctrl.signal : undefined,
+    headers: Object.assign({ "Content-Type": "application/json" }, H), body: JSON.stringify({ p_tandas: tandas }) }), ctrl, "gv_tanda_ubicacion")
+    .then(function (r) { return r.ok ? r.json() : []; }).then(function (f) { var m = new Map();
+      (f || []).forEach(function (x) { var k = String(x.tanda || "").trim().toUpperCase();
+        if (k && String(x.ubicacion || "").trim()) m.set(k, x); }); return m; })
+    .catch(function (e) { console.warn("[tv] ubicacion:", e.message); return new Map(); });
+}
+/* HH:MM en hora de Buenos Aires (UTC-3 fijo, regla del repo): el televisor puede no tener
+   el locale, así que no se usa toLocaleTimeString. */
+function _ubicHora(ts) {
+  var d = new Date(ts); if (isNaN(d.getTime())) return "";
+  var x = new Date(d.getTime() - 3 * 3600000);
+  return String(x.getUTCHours()).padStart(2, "0") + ":" + String(x.getUTCMinutes()).padStart(2, "0");
+}
+/* El chip 📍 de una celda de tanda. Dice el lugar (es el dato) y el título, de dónde salió. */
+function ubicChip(u) {
+  if (!u) return "";
+  var lug = String(u.ubicacion || "").trim(); if (!lug) return "";
+  var de = u.fuente === "armado" ? "quedó armado acá" : (u.fuente === "freno" ? "ahí quedó el carro al frenar el picking" : "lo dejó ahí el picking");
+  var t = "📍 " + lug + " — " + de + (u.legajo ? " (legajo " + u.legajo + ")" : "") + (u.ts ? " · " + _ubicHora(u.ts) : "") +
+    (u.otras ? " · partes también en " + u.otras : "");
+  return '<span class="t-ubic" title="' + esc(t) + '">📍 ' + esc(lug) + (u.otras ? " +" : "") + '</span>';
+}
 /* v23.64 (Luis: "está guardando") — la bajada de racks y el guardado viven en
    Movimientos_Stock, no en los eventos: entran como eventos `GST` sólo para
    "En este momento". Si falla, nada. ≡ index.html monGuardadoHoy. */
@@ -1494,7 +1530,8 @@ function pintar(d) {
     }
     filas.push('<tr' + (enCurso ? ' class="curso"' : (salioT ? ' class="salio-sinfc"' : '')) + '>' +
       '<td class="t-tanda">' + esc(v.tanda) +
-        (salioT ? ' <span class="t-salio" title="Ya se registró la carga al camión (CCN)">🚚</span>' : '') + '</td>' +
+        (salioT ? ' <span class="t-salio" title="Ya se registró la carga al camión (CCN)">🚚</span>' : '') +
+        ubicChip(d.ubic && d.ubic.get(String(v.tanda || "").trim().toUpperCase())) + '</td>' +
       '<td class="num t-m3">' + n1(v.m3) + '</td>' +
       '<td class="t-cli" title="' + esc((v.clientes || []).join(" · ")) + '"><div><span class="tk">' + esc(clienteTanda(v)) + '</span></div></td>' +
       '<td class="num t-np" title="' + esc((v.nps || []).join(" · ")) + '">' + ((v.nps || []).length || "—") + '</td>' +   // v25.54: cuántas NP
@@ -1622,7 +1659,8 @@ function pintar(d) {
       ? '<table class="pen"><tbody>' +
         pens.slice(0, PEN_MAX).map(function (x) {
           var et = PEN_TXT[x.est] || PEN_TXT.pendiente;
-          return '<tr><td class="p-tanda">' + esc(x.tanda) + '</td>' +
+          return '<tr><td class="p-tanda">' + esc(x.tanda) +
+            ubicChip(d.ubic && d.ubic.get(String(x.tanda || "").trim().toUpperCase())) + '</td>' +
             '<td class="p-zona">' + esc(x.zonas.join("·") || "—") + '</td>' +
             '<td class="p-cli" title="' + esc(x.rsFull) + '"><div><span class="tk">' + esc(x.rs) + '</span></div></td>' +
             '<td class="p-np" title="' + esc(x.nps.join(" · ")) + '"><div><span class="tk">' + esc(npsCortas(x.nps)) + '</span></div></td>' +
@@ -1823,8 +1861,8 @@ function cicloCorrer() {
     var crKeys = [];   // v26.67: tandas cerradas o frenadas hoy → si alguna está frenada, se reparte
     eventos.forEach(function (ev) { var t = String(ev.texto || "").trim().toUpperCase();
       if (t && /^(TP|TAP|PKF|APF)$/.test(ev.opcion) && dayKey(ev.ts_cliente) === hoy && crKeys.indexOf(t) < 0) crKeys.push(t); });
-    return Promise.all([cargarStatus(keys), cargarPickeado(pkKeys), cargarCredito(crKeys), cargarFcParseada(arbol)]).then(function (sp) {
-      var status = sp[0], pickeado = sp[1], credito = sp[2], fcParse = sp[3];
+    return Promise.all([cargarStatus(keys), cargarPickeado(pkKeys), cargarCredito(crKeys), cargarFcParseada(arbol), cargarUbicacion(pkKeys)]).then(function (sp) {
+      var status = sp[0], pickeado = sp[1], credito = sp[2], fcParse = sp[3], ubic = sp[4];
       /* v26.55: copia (la programación está cacheada: no se toca) con el m³ PICKEADO de cada tanda con TP. */
       if (pickeado.size) { var p2 = new Map(); prog.forEach(function (v, k) { var f = pickeado.get(k);
         p2.set(k, f == null ? v : Object.assign({}, v, { m3: (Number(v.m3) || 0) * f, m3Ped: Number(v.m3) || 0 })); }); prog = p2; }
@@ -1858,7 +1896,7 @@ function cicloCorrer() {
         actividad: actividadActual(guardado.length ? eventos.concat(guardado) : eventos, hoy, fjHoy, fichados),
         alertas: Array.from(alertas).sort(),
         empleados: empleados, facturadas: facturadas, despachadas: despachadas,
-        horas: horas, arbol: arbol, eventos: eventos, credito: credito, fcParse: fcParse
+        horas: horas, arbol: arbol, eventos: eventos, credito: credito, fcParse: fcParse, ubic: ubic
       });
 
       ultimoOk = Date.now(); fallos = 0;
