@@ -1151,6 +1151,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== stk-buscar-cero (Regresion v20) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-buscar-cero.cjs
+echo "== stk-busca-decimal (v30.00: buscar 13.6 encuentra 13,6) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-busca-decimal.cjs
 echo "== stk-pedidas-neto (Regresion v24.04) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-pedidas-neto.cjs
 echo "== stk-refrescar-ya (v25.18) =="

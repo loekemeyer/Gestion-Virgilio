@@ -9297,6 +9297,41 @@ public.gv_insumo_origenes('plastico');` · `select * from public.gv_insumo_confi
 (el que quedó viejo: exigía JL Matriceria entre los inyectores, y de paso le pegaba a la base de verdad).
 `sql/gv_insumo_origenes_v2982.sql`, centinelas 416-418.
 
+## ⚠ REGLA (Luis, 2026-10-13, v30.00): el SEPARADOR DECIMAL no decide una búsqueda — y un TMP no se da de alta sobre un código que ya existe
+
+**Luis, con los 144 Kg del `TMP-0037`:** *"¿cómo es que se aceptó sin lugar? ¿se permite eso? ¿cómo es que se
+guardó sin código?"*.
+
+> ## **`stkMatchBusq` normaliza el decimal de los DOS lados: buscar `13.6` encuentra `13,6`.**
+> En los flejes la MEDIDA es el nombre, y **39 de 48 tienen decimal** (27 con coma, 12 con punto).
+
+Lo que costó no normalizarlo: el 13/10 09:09 el legajo 104 recibió 144 Kg de un fleje `13.6 x 0.8`, no lo encontró
+en la lista — se llama **`N°19`**, *«13,6 x 0,8 · Fleje N° 19»*, con **coma** — y lo dio de alta como insumo nuevo.
+El servidor lo numeró `TMP-0037` y los 144 Kg quedaron en un código que no existe para nadie. El arreglo sólo
+**agrega** matches (`(\d),(\d)` → `$1.$2`), no saca ninguno, y vale para TODO buscador que use esa función.
+
+**Tres cosas del circuito que la pregunta destapó, y conviene tener a mano:**
+
+1. **La recepción de un insumo NUNCA pregunta el lugar.** Pide categoría → origen → documentación (remito /
+   factura) → el insumo de la lista → cantidad + unidad + **marca** (v29.57). El lugar de un insumo vive en el
+   **Mapa** y lo pone un supervisor; la red es la alarma **`gv_mapa_stock_sin_lugar`** (*"hay N en stock y el insumo
+   no está en ninguna posición del Mapa"*). ⚠ **Al 13/10 esa alarma tiene 19 insumos**, 7 de ellos cajas: existe,
+   pero nadie la mira.
+2. **«Aceptar» es del ADMIN, no de la recepción** (Stock y Compras → Insumos): es el paso que le pone el código real,
+   el nombre y la ubicación inicial. `TMP-0037` **nunca se aceptó**: quedó pendiente desde las 09:09. Y no se podía
+   — `insumo_identificar` **frena** un TMP contra un código en uso (*"una sugerencia del operario no se puede
+   fusionar contra un insumo en uso"*), que es correcto: fusionar dos stocks lo decide una persona, no un botón.
+3. **La puerta ya está cerrada**: la **v29.56** (13/10 09:35, 26 minutos después) sacó el alta de un insumo nuevo
+   por el operario (`insNuevoOpen` arranca con un `alert` y un `return`). `TMP-0037` fue el último que entró por ahí
+   y el único TMP que quedaba vivo. **Lo que sigue abierto no es el código: es el LUGAR** — un código del catálogo
+   de GP2 (`gv_insumo_desde_gp2`) también se recibe sin posición, y queda en esa alarma.
+
+Los 144 Kg se fusionaron en `N°19` con el mecanismo de la casa (se renombra el `cod_art` del movimiento, el TMP
+sale del catálogo y queda en `Insumos_Historial`), **sin tocar la ubicación** (Luis: *"hay que ver dónde está"*).
+⚠ Ojo con el efecto: `N°19` ya tenía R06AT, así que **el Mapa ahora dice R06AT y la alarma se apagó** — si no
+están ahí, lo corrige el conteo, no un aviso. Detalle, verificación y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
+§3.v3000. Lo sostiene `tests/stk-busca-decimal.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.57): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
 
 (los comentarios del código, el `.sql` y la vista dicen **v29.56**: otra sesión se llevó ese número mientras se escribía esto.)
