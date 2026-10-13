@@ -9027,8 +9027,9 @@ inyectado: arrancarlo pide **un conteo de lo que cada inyector tiene hoy**, no u
 | front (`index.html`) | **una bolsa sin equivalencia NO pasa en silencio**: con un inyector elegido, cualquier ítem que el bundle no reconozca frena con el confirm («¿registrar igual sólo en Virgilio?»). El criterio **no usa `insCatOf`**: si el catálogo de categorías no se leyó devuelve `""` para todo y el guard no frenaría nada |
 | `isis` | cargado desde `Insumos.isis`: **29 de 79**. Las bolsas tienen el ISIS igual al código de Cervantes (2455 = ABS); ⚠ **AI no**: componente 2465, ISIS 1135 — mirar si no es un error de carga en `Insumos` |
 
-⚠ **Queda sin cruzar `EBA`** (20 bolsas, celda Q34): no existe como componente en Cervantes. Hay que darlo de
-alta en GP2 (sector Bolsas Plásticas) o decir que no va.
+⚠ **`EBA` queda CERRADO** (Luis, 13/10: *"se definirá después; el admin que está creando la página tiene que
+setear el código de Cervantes"*): sus 20 bolsas (celda Q34) no cruzan al espejo porque no tiene componente en
+Cervantes. **No se da de alta desde acá y no se vuelve a sugerir.**
 ⚠ **`CAJA Nº 1` y `CAJA Nº 22` tienen el mismo ISIS (`0127`)** en `Insumos`: uno de los dos está mal.
 ⚠ Los centinelas de las 3 funciones de **GP2** no entran en `GV_Reglas_Centinela` (sólo alcanza `public`):
 del lado de GP2 lo sostienen sus tests. En GV quedan los ids 388 y 406.
@@ -9055,6 +9056,8 @@ o en cualquier permutacion de esas combinaciones"*.
   lado de Virgilio, el próximo guardado desde GP2 lo pisa.
 - Rollback: `drop trigger zz_gv_insumo_isis_sync on "GP2".insumo_equivalencia;`
   Adenda en `gestion-productiva-2.0/db/migracion_insumo_equivalencia_unica_20261013.sql`.
+- **El Cód. Cervantes del editor sólo acepta códigos que EXISTEN** (Luis, 13/10, Stock general v3.8.0): es un
+  `datalist` con todos los componentes de GP2; uno inventado no habilita el botón y no llega a la base.
 
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
 
