@@ -1017,6 +1017,19 @@ código, comentarios ni mensajes de commit).
 - **`desactiva caveman`** = responder solo el **próximo mensaje** normal/completo, y después **volver solo** a caveman.
 - **`caveman desactivacion total`** = apagar caveman por completo (queda desactivado hasta que se reactive).
 
+⚠⚠ **Los dos hooks de caveman son TEXTO SUGERIDO, no un candado** (medido el 13/10): el `additionalContext` de
+`PreToolUse`/`PostToolUse` llega al modelo en cada llamada a herramienta y compite con el resto del contexto —
+incluidas las reglas de ESTE archivo que piden lo contrario (el SQL exacto antes de escribir, las decisiones Dn
+del cierre, «medir antes de opinar»). Cuando chocan, gana el archivo y la respuesta se pasa de tres líneas.
+
+⚠⚠ **NO se arma un hook `Stop` que mida la respuesta y la BLOQUEE** (Luis, 13/10: *"¿de qué sirve el stop si la
+generación ya se hizo y los tokens se gastaron? no hagas eso"*). Un bloqueo llega **después** de generar: paga el
+texto largo y la reescritura, o sea gasta el doble de lo que caveman intenta ahorrar. **No volver a proponerlo.**
+
+⚠ Y lo que de verdad pesa en este repo es el INPUT, no el output: `CLAUDE.md` son **9.076 líneas / ~204 mil
+tokens** y entra dos veces por sesión, contra los ~50 tokens que ahorra cada respuesta recortada. Toda discusión
+de ahorro que empiece por el estilo de la respuesta está mirando el lado chico.
+
 ## ⚠ REGLA de TONO (Luis, 2026-09-19): sin dramatismo
 
 **Luis, textual:** *"no me gusta el tono de gravedad y suspenso que le pones a tus mensajes"*.
@@ -1783,6 +1796,15 @@ uno nuevo · AD adelante AT atrás · sí, ponelo en el mapa"*.
   (celdas de góndola) quedan en rojo ⚠ en la pestaña Insumos.
 - El Mapa de racks muestra los insumos (🧰, con la cantidad declarada en el módulo, en su unidad).
 - `Insumos_Ubicaciones_Unificadas` está muerta desde el 11/08: nadie la lee ni la escribe.
+- ⚠⚠ **`Insumos_Ubicaciones.cantidad` es DECORATIVA: no se carga a mano y no se corrige** (medido el 13/10, con
+  el conteo de 505C). **142 de 149 filas están en 0 o null** (112 códigos de 116), **ninguna función la lee** para
+  calcular algo —sólo las dos RPC que la escriben, `gv_insumo_ubicaciones_guardar` y `gv_insumo_posicion_guardar`—
+  y el front **omite el número cuando es 0** (`_stkInsUbicStr` en Stocks y el `🧰 insumo` del Mapa): nadie ve un
+  «0» en pantalla. El saldo real de un insumo sale SIEMPRE de `Movimientos_Stock` (deposito `insumos`, convertido
+  con `Insumos_Factores`), que es lo que leen el módulo, las compras y el espejo a GP2.
+  ⚠ **Cargarle el número a un código suelto es peor que dejarlo vacío**: lo vuelve el 5.º con dato entre 112 sin
+  dato, sin que nada lo reconcilie después — es el pozo de la copia que nadie poda (regla v23.00). Si algún día
+  esa columna tiene que valer, se llena sola desde el saldo, no a mano.
 - `sql/gv_insumos_ubicacion_v2279.sql` (rollback en la cabecera), `tests/ins-aceptar-ubic.cjs`.
 
 ### ⚠⚠ EL MAPA ES EL PUNTO PRINCIPAL — y avisa el stock sin lugar (Luis, 25/09, v22.82)
