@@ -9621,20 +9621,25 @@ Cierra el agujero que la v29.74 dejó anotado: el **PUB** dice dónde dejó la t
 | **al EMPEZAR el armado (AP)** | **`AUI`** (v29.90) | **la mesa en la que la están armando** |
 | al terminar el armado (TAP) | `AUB` | el sector donde quedó el pedido |
 
-- El cuadro (`askArmadoMesa`) ofrece **Mesa 1**, **Mesa 2** y **✏️ Otro lugar…**, más **Después**. Lo emite
+- El cuadro (`askArmadoMesa`) ofrece **Mesa 1**, **Mesa 2** y **✏️ Otro lugar…** para escribirlo. Lo emite
   `emitArmadoMesa` con el molde de `emitPickUbic` (encola + manda, id único: si vuelve a tocar AP con otra
   mesa, manda la más reciente). `texto` = tanda, `descripcion` = mesa.
+- ⚠⚠ **LA MESA ES OBLIGATORIA: NO hay «Después» ni ningún escape** (Luis, 13/10: *"como que «Despues»? no es
+  una opcion eso ni debería serlo"*). El primer intento tenía ese botón y quedó **retirado**: o una mesa, o
+  «✏️ Otro lugar…». **No volver a ponerlo.**
 - **`ts_inicio` NULL a propósito**: NO abre tarea (el `abre` de las horas es una **lista blanca**:
   EP/AP/MGI/RKI/IRI/MDI/toggles) y no cierra ninguna. Es un evento de **DETALLE**, como PUB / AUB / PKG.
-- ⚠⚠ **NO frena el armado, y el cómo importa**: la pregunta va **al final** del bloque del AP, **después** de
-  `showCompletarWizard` y **SIN `await`** (`askArmadoMesa(texto).then(…)`), así que el cuadro sale **encima**
-  del asistente — que ya está abierto — y `send()` no espera a nadie. **Con `await` delante del asistente
+- ⚠⚠ **Obligatoria para el operario, pero NO frena el código, y el cómo importa**: la pregunta va **al final**
+  del bloque del AP, **después** de `showCompletarWizard` y **SIN `await`** (`askArmadoMesa(texto).then(…)`),
+  así que el cuadro sale **encima** del asistente — que ya está abierto — y `send()` no espera a nadie. En la
+  pantalla es obligatoria igual (el overlay tapa todo y no tiene salida), pero si el cuadro **no se dibuja**
+  el operario tiene el asistente abierto abajo en vez de quedar trabado. **Con `await` delante del asistente
   quedaba todo colgado de un toque**: tres tests que manejan un AP de verdad (`ap-resume`, `dos-en-curso`,
   `tanda-sin-articulos`) se quedaron esperando el cuadro para siempre, y en el celular un cuadro que no
   resuelve dejaba al operario sin el asistente de Completar. Retomar una tanda frenada emite un AP nuevo →
   vuelve a preguntar (puede ser otra mesa); **reabrir** el asistente («▶ Seguir armado») no pregunta nada.
-  ⚠ Al escribir un test que mande un AP por `send()`, stubear `window.askArmadoMesa` (devolver `null` =
-  «Después») para que el cuadro no quede abierto encima de la pantalla.
+  ⚠ Al escribir un test que mande un AP por `send()`, stubear `window.askArmadoMesa` (devolver `null`) para
+  que el cuadro no quede abierto encima de la pantalla.
 - **Forward-facing**: no hay un solo `AUI` en la historia y **no se backfillea**. El 15/09 de
   `tests/tools/vista-15.json` da idéntico (verificado, md5 `f5c7560f…`): sólo se movió la **huella**.
 
@@ -9652,6 +9657,6 @@ Cierra el agujero que la v29.74 dejó anotado: el **PUB** dice dónde dejó la t
   de **AB7 (armado)** a **Mesa 2 (armado_mesa)**.
 
 **Chequeo:** `select * from public.gv_reglas_perdidas;` y `select * from public.gv_huellas_cambiadas;` (las dos
-vacías) · `node tests/arm-mesa-inicio.cjs` (corre la pantalla: el AP con mesa encola AP+AUI, «Después» no
+vacías) · `node tests/arm-mesa-inicio.cjs` (corre la pantalla: el AP con mesa encola AP+AUI, sin contestar no se
 encola AUI, el cuadro que explota **no** traba el asistente) · `node tests/mon-tv.cjs`.
 `sql/gv_armado_mesa_aui_v2990.sql` (rollback al pie).
