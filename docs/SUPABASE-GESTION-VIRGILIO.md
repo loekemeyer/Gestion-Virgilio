@@ -31834,7 +31834,6 @@ Objetos nuevos: `gv_picking_estimar(text[])` (anon, 1,45 s para las 37 pendiente
 - Rollback: `cron.alter_job(155, command := <el viejo, en la cabecera del sql>)`, poner `caja_extra` en 0 (y restar
   0,0061 × (cajas − cajas30) del caché), recrear `gv_ppp_plantel` desde `sql/gv_ritmo_picking_v2947.sql`.
 
-<<<<<<< HEAD
 ## §3.v3008 — el excedente cargado por un conteo no se reparte hacia atrás (Giuliana, 13/10/2026, problema 766; el marcador de la base y el .sql dicen v29.62: otra sesión se llevó los números hasta la v30.07)
 
 El conteo de la estantería P (13/10) cargó excedente en 26 códigos (ajustes `ref = 'CONTEO P 13/10'`) y la corrida
@@ -31856,7 +31855,7 @@ cambian exactamente esos 28 saldos (14 excedente +N, 14 góndola −N). Aplicado
 y dejaba 4 góndolas en negativo. Centinela: `least\(f\.picked, greatest\(f\.tomado, 0\)\)`.
 Backup de la definición anterior: `zz_backups."GV_Backup_Etapa1_def_20261013"` (md5 prosrc 7d6a3bb2…).
 `sql/reconciliar_pipeline_stock_etapa1_v2962.sql`.
-=======
+
 ### §3.v2982 — Recepción de insumos: el ORIGEN es una lista cerrada por categoría (Luis, 13/10/2026)
 
 - **Nuevo, nada existente tocado**: tabla `GV_Insumo_Origen_Excluido` (RLS on, sin escritura para anon/authenticated),
@@ -31951,4 +31950,29 @@ procesadas o las `IVBCM`/`IVBLM` de Brawin, otras medidas), así que se crearon:
   a 21 insumos): hay que darles celda desde el Mapa. Y **sin equivalencia en GP2**, así que no se espejan.
 - **Verificado**: saldo 122,1 y 128,4 Kg, unidad Kg, empresa Mixto, 0 posiciones, los dos en la alarma.
 - **Rollback**: borrar los dos movimientos por su `client_id` y las dos filas de `Insumos`.
->>>>>>> origin/main
+
+### §3.v3006 — El remito de una recepción de insumos queda en `Movimientos_Stock.gv_doc` (Luis, 13/10/2026)
+
+**Nuevo**: columna **`gv_doc jsonb`** en `Movimientos_Stock` (nullable, prefijo `gv_`, sin default y sin
+backfill — es tabla COMPARTIDA con Producción Virgilio) + índice de expresión
+`mov_stock_gv_doc_remito_idx` sobre `gv_doc->>'remito'`. La escribe la recepción de insumos con
+`{tipo, remito, fecha_remito, factura, fecha_factura, proveedor}`, **igual en todas las filas de esa
+recepción** (es un papel).
+
+- **Qué estaba roto**: el front pedía el remito y lo tiraba (`insDocCancel` ponía `_insDocState = null` antes de
+  abrir la lista). Y `insEnviar` le pasaba a GP2 el remito leído de ese mismo objeto ya nulo: **las OC de bolsas
+  se recibían con el remito vacío**. Los dos se arreglan con `window._insDoc`.
+- **`gv_insumo_recepcion_marca`** suma 4 columnas AL FINAL: `remito`, `factura`, `doc_tipo`, `gv_doc`.
+  ⚠ `create or replace view` borra las `reloptions`: el `security_invoker = true` se repuso y se verificó
+  (`set local role anon` → la vista sigue devolviendo filas).
+- **Impacto en otras pantallas: 0.** Nadie más escribe esa columna y nada la exige; `Producción Virgilio` no la
+  conoce (la columna es nullable). Lo recibido antes de hoy queda con `gv_doc` nulo a propósito.
+- **D1 (Luis)**: la recepción del remito **38880** quedó con **origen Cervantes**, **marca Mixto** en los dos
+  insumos y el remito en `gv_doc`. Verificado por la vista. El módulo ya ofrece bien las dos cosas: para flejes
+  las marcas son `Loeke,Chef,Mixto` (`GV_Insumo_Config.marcas`) y `gv_insumo_origenes('fleje')` trae **Cervantes**
+  + los 8 proveedores.
+- **D3 (Luis)**: *"dejalos sin lugar asignado"* — los dos códigos nuevos quedan sin posición y se ven en
+  `gv_mapa_stock_sin_lugar` (21 insumos). **No se les asigna celda.**
+- **Rollback**: `alter table public."Movimientos_Stock" drop column gv_doc;` +
+  `drop index if exists public.mov_stock_gv_doc_remito_idx;` y la vista a su versión anterior.
+  `sql/gv_mov_stock_gv_doc_v3006.sql`.

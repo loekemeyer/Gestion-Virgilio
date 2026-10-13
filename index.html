@@ -27907,6 +27907,19 @@ function insDocOk(mode) {
   }
   if (!ok) return;
 
+  /* v30.06 (Luis, 13/10: "que no se pierda dios mio, como que se pierde?") — el papel se
+     GUARDA. `_insDocState` es el estado del FORMULARIO y `insDocCancel` lo borra al cerrar el
+     modal, así que acá se copia a `window._insDoc`, que sobrevive hasta que la recepción se
+     manda (insEnviar lo escribe en la columna `gv_doc` de cada movimiento) o se anula.
+     ⚠ Y por lo mismo el remito nunca le llegaba a GP2: `insEnviar` lo leía de `_insDocState`,
+     que para entonces ya era null — las OC de bolsas se recibían con el remito vacío. */
+  window._insDoc = {
+    tipo: st.tipoDoc || null,
+    remito: st.nroRemito || null, fecha_remito: st.fechaRemito || null,
+    factura: st.nroFactura || null, fecha_factura: st.fechaFactura || null,
+    proveedor: st.proveedor || window._insUbicacion || null
+  };
+
   // Cerrar modal y continuar al modal de insumos
   insDocCancel();
   _insArrancarToggle(mode);
@@ -27942,7 +27955,7 @@ function _insArrancarToggle(mode) {
 function insDocCancel() {
   var ov = document.getElementById("insDocModal");
   if (ov) ov.style.display = "none";
-  window._insDocState = null;
+  window._insDocState = null;   // el estado del FORMULARIO; el papel guardado vive en _insDoc
 }
 /* ===== v14.95 — BOLSAS PLÁSTICAS ↔ GESTIÓN PRODUCTIVA 2.0 (schema GP2, mismo proyecto) =====
    La materia prima plástica (PP, ABS, AI, NV, NR, N25, PE, PS: bolsas de 25 kg) la COMPRA GP2 y
@@ -28763,6 +28776,14 @@ async function insConfirmar() {
   }
   // v9.15: incluir la ubicación origen/destino (preguntada al inicio) en el ref de cada row
   const ubic = window._insUbicacion || null;
+  /* v30.06 — el papel (remito / factura) que se pidió al abrir. Viene de `window._insDoc`, que
+     `insDocOk` deja puesto; `_insDocState` ya es null para cuando llega acá. Sólo las claves que
+     tienen algo: una recepción sin papel no escribe un jsonb de nulls. */
+  const doc = (function () {
+    const d = window._insDoc; if (!d) return null;
+    const o = {}; Object.keys(d).forEach(function (k) { if (d[k]) o[k] = d[k]; });
+    return Object.keys(o).length ? o : null;
+  })();
   /* v11.76: si el insumo tiene factor de conversión (Insumos_Factores) y la
      unidad elegida NO es la base, convertir qty a la unidad base para que el
      movimiento caiga en el mismo grupo de la vista.  Así no quedan saldos
@@ -28780,14 +28801,18 @@ async function insConfirmar() {
     if (insCatOf(it) === "cajas") { if (_insUEq(uni, "Paquetes")) { nota = " · cargado " + _insNum(qty) + " paquetes × " + INS_CAJA_X_PAQ; qty = qty * INS_CAJA_X_PAQ; } uni = "Uni"; }
     // v29.56 (Luis, 13/10): de qué empresa vino, en toda recepción. No parte el stock (sigue Mixto).
     if (isIn && it.marca) nota += " · marca " + it.marca;
-    return { cod_art: it.cod, descripcion: ((it.nombre || "") + nota).trim() || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: it.ubic || it.sector || null };
+    const row = { cod_art: it.cod, descripcion: ((it.nombre || "") + nota).trim() || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: it.ubic || it.sector || null };
+    // v30.06 (Luis, 13/10): el REMITO / la FACTURA van en el movimiento (columna gv_doc), no se
+    // pierden. Lo mismo para todas las filas de la recepcion: es UN papel.
+    if (doc) row.gv_doc = doc;
+    return row;
   });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
   // v14.95 — bolsas plásticas ↔ GP2: PRIMERO GP2 (es el que manda). Si rechaza, el operario decide
   // si registra igual sólo en Virgilio (queda a la vista que los dos ledgers difieren).
   let gp2Msg = "";
   if (_ins.gp2) {
-    const g = await _insGp2Enviar(_ins.gp2, sel, _ins.legajo, (window._insDocState && window._insDocState.nroRemito) || "");
+    const g = await _insGp2Enviar(_ins.gp2, sel, _ins.legajo, (doc && doc.remito) || "");
     if (!_ins) return;   // se cerró mientras esperaba
     if (!g.ok) {
       let sigue = false;
@@ -28800,7 +28825,7 @@ async function insConfirmar() {
   closeIns();
   window._insUbicacion = null;  // limpiar
   stockMove(rows);   // offline-safe (vir_stock_pend)
-  try { window._insDocState = null; } catch (_e) {}
+  try { window._insDocState = null; window._insDoc = null; } catch (_e) {}
 
   try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)." + (ubic ? "\n" + (isIn ? "Origen" : "Destino") + ": " + ubic : "") + gp2Msg); } catch (_e) {}
 }
@@ -28821,6 +28846,7 @@ async function insAnular() {
   // la apertura con anular_toggle_virgilio.
   const ok = gvToggleAnular(legajo, mode);
   try { opDraftClear(legajo); } catch (_e) {}   // el borrador ya no vale
+  try { window._insDoc = null; } catch (_e) {}  // v30.06: el papel de una recepcion anulada no queda
   closeIns(true);                                // cierra el modal; el toggle ya lo cerró gvToggleAnular
   try {
     renderLegajoHistory(legajo);
