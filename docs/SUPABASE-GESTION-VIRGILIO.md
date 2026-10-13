@@ -31852,3 +31852,16 @@ Objetos nuevos: `gv_picking_estimar(text[])` (anon, 1,45 s para las 37 pendiente
 - **Rollback**: `drop function public.gv_insumo_origenes(text); drop function public.gv_insumo_fleje_proveedor();`
   `drop table public."GV_Insumo_Origen_Excluido";` + borrar los centinelas 416-418. El front cae solo al texto libre
   y a ver todos los flejes (fail-open). `sql/gv_insumo_origenes_v2982.sql`.
+
+### §3.v2987 — Los datos del módulo de insumos que vivían en el front (Luis, 13/10/2026)
+
+- **Nuevo**: `GV_Insumo_Origen_Apodo` (apodo del origen) y `GV_Insumo_Config` (`caja_x_paquete` 25,
+  `marcas` Loeke,Chef,Mixto, `marcas_cajas` Loeke,Chef), las dos con RLS y sin escritura para
+  anon/authenticated; `gv_insumo_config()` y `gv_insumo_apodos()` (SECURITY DEFINER, anon). Verificado como anon.
+- **Impacto: 0** — el front los usa para pisar sus defaults (`INS_CAJA_X_PAQ`, `INS_MARCAS`, `INS_CAJA_MARCAS`,
+  `INS_INY_APODO`, que pasaron de `const` a `let`); si la lectura falla queda exactamente lo de antes.
+- ⚠ **No se le agregó la columna `apodo` a `gv_insumo_origenes`**: cambiar las columnas de salida pide
+  `DROP` + `CREATE` y el connector se cuelga 60 s con la palabra de borrado (regla del 07/10, medido otra vez
+  hoy: la llamada no llega a Postgres y nada se aplica). Por eso el apodo va en su propia RPC.
+- **Rollback**: `drop function public.gv_insumo_config(); drop function public.gv_insumo_apodos();`
+  `drop table public."GV_Insumo_Config", public."GV_Insumo_Origen_Apodo";` — el front vuelve a sus defaults solo.

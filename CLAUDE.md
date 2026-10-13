@@ -9000,7 +9000,9 @@ el codigo"*. El 13/10 09:34 el legajo 104 escribió la **posición** `AB3` en el
   (ABS, AI, EBA, NY c/Carga 25%, NY Recup, NY Virgen, PE Polie, PP 2630, PS PE). Una bolsa nueva aparece cuando se le da ubicación.
 - `tests/ins-ri-cat-bolsas.cjs`.
 
-## ⚠⚠ REGLA (Luis, 2026-10-13, v29.82): el ORIGEN de una recepción de insumos es una LISTA CERRADA por categoría — y hay UN SOLO «Enviar»
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.89): el ORIGEN de una recepción de insumos es una LISTA CERRADA por categoría — y hay UN SOLO «Enviar»
+
+(el `.sql`, los centinelas 416-418 y los comentarios del código dicen **v29.82**: es la versión con la que se aplicaron, la llave — no cambiarla.)
 
 **Luis:** *"quiero que el menu sea reducido dependiendo de que es lo que estan recibiendo"* · *"tienen que
 apretar «enviar» dos veces … ¿hace falta que sea asi?"*.
@@ -9021,6 +9023,10 @@ apretar «enviar» dos veces … ¿hace falta que sea asi?"*.
   paso Remito / Factura / los dos. El «‹ Atrás» de ahí vuelve a las **categorías**, no a un paso que no existe.
 - **Flejes**: con **Cervantes** se ven **todos**; con un **proveedor**, sólo los que GP2 le tiene asignados
   (`gv_insumo_fleje_proveedor`, por el código de Virgilio o por el componente de GP2 que la lista ya muestra).
+  Y **mientras quede alguno sin vincular**, el botón **«Otros (N)»** cambia a la lista de **los que todavía
+  no están asignados a ningún proveedor** (Luis, v29.87: *"que aparezca un botón que diga «otros» y que
+  permita seleccionar de los que todavía no están vinculados"*). Son **dos listas, no una**: nunca se
+  mezclan, y se vuelve con «‹ Volver a los de \<proveedor\>».
 - **Las bolsas sólo se ENVÍAN a los inyectores habilitados** (ámbito `inyector`): el mismo filtro se le aplica a
   `material_virgilio_bundle` en «📤 Envío a inyectores».
 
@@ -9037,6 +9043,29 @@ GP2 escrita** — y las dos **para revisar allá**, porque o GP2 está mal o la 
 ⚠ **Arcolor y Julio Garcia e Hijos NO hacen falta excluirlos**: GP2 dice que entregan en **Cervantes 2868**, así
 que el filtro `entrega_en is null` ya los deja afuera de una recepción **de Virgilio**. Si algún día entregan acá,
 se les borra ese campo en GP2 y aparecen solos.
+
+**Los tres los confirmó Luis el 13/10** y no se vuelven a preguntar: *"pone una excepcion en los inyectores para
+que solo aparezcan los 3 que te dije, bolsas plasticas son los que ya estan configurados en GV, lo de arcolor y
+julio tal cual, solo cervantes no virgilio"*.
+
+### ⚠ Y lo que quedaba SÓLO EN EL FRONT pasó a una tabla (Luis, v29.87)
+
+**Luis:** *"crea tabla si sólo está en el front el dato"*. Tres datos del negocio que vivían escritos en
+`index.html`:
+
+| dato | ahora vive en | lo lee |
+|---|---|---|
+| el apodo del origen («Manolo» = Pat Bet Plast) | **`GV_Insumo_Origen_Apodo`** | `gv_insumo_apodos()` |
+| cuántas cajas trae un paquete (25) | **`GV_Insumo_Config`** `caja_x_paquete` | `gv_insumo_config()` |
+| las marcas que se eligen al recibir (Loeke · Chef · Mixto; en cajas sin Mixto) | **`GV_Insumo_Config`** `marcas` / `marcas_cajas` | `gv_insumo_config()` |
+
+Los hidrata **`insFetchConfig`** desde `insLoadMeta`; `INS_CAJA_X_PAQ`, `INS_MARCAS`, `INS_CAJA_MARCAS` e
+`INS_INY_APODO` pasaron de `const` a `let` y **quedan de FALLBACK**: si la base no contesta, el operario carga
+igual que antes. **Al agregar un dato del módulo de insumos, va a la tabla y se hidrata acá: no se escribe un
+número más en `index.html`.**
+
+⚠ `gv_insumo_origenes` **no** devuelve el apodo: agregarle una columna pide `DROP` + `CREATE` y el connector se
+cuelga con la palabra de borrado (regla del 07/10). Por eso va en su propia RPC, no en la que ya existía.
 
 ### ⚠⚠ La lista cerrada NO puede dejar al operario sin poder cargar
 
@@ -9062,8 +9091,10 @@ que arrancó es la lista en pantalla. **El aviso de FALLA se mantiene.** Vale pa
 operario por volver a entrar sería peor que el segundo Enviar que esto saca.
 
 **Chequeo:** `select * from public.gv_reglas_perdidas;` (vacía) · `select nombre, fuente from
-public.gv_insumo_origenes('plastico');` · `node tests/ins-ri-origen-menu.cjs` (verificado que falla contra la
-v29.85). `sql/gv_insumo_origenes_v2982.sql`, centinelas 416-418.
+public.gv_insumo_origenes('plastico');` · `select * from public.gv_insumo_config();` ·
+`node tests/ins-ri-origen-menu.cjs` (verificado que falla contra la v29.85) · `node tests/ins-envio-tipo.cjs`
+(el que quedó viejo: exigía JL Matriceria entre los inyectores, y de paso le pegaba a la base de verdad).
+`sql/gv_insumo_origenes_v2982.sql`, centinelas 416-418.
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.57): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
 

@@ -209,7 +209,8 @@ Tocá **📦** y **Enviar**. Hay **3 opciones**:
   nada**: siempre vienen de **Cervantes** y siempre con **remito**, así que vas directo al N° de
   remito. Después la **documentación** (Remito, Factura o los dos) y **la lista se abre sola**: no hay
   que volver a tocar Enviar. En **flejes**, si elegís un proveedor ves **sólo los flejes de él**; con
-  **Cervantes** ves todos. Adentro aparecen **todos los
+  **Cervantes** ves todos. Si lo que te trajeron no está en su lista, el botón **«Otros»** te muestra los
+  flejes y alambres que todavía no están asignados a ningún proveedor. Adentro aparecen **todos los
   insumos del rubro con el nombre de GP2**, también los que nunca se recibieron en Virgilio: buscá el
   tuyo por nombre o código, cargá la cantidad y **«✓ Registrar entrada»**. **Sólo recibís lo que ya
   está en la lista**: no se puede agregar un insumo nuevo. Si llegó algo que no figura, avisá a Stock
