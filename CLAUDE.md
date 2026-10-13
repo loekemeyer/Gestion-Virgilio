@@ -9882,3 +9882,37 @@ vuelve a nacer muerto). ⚠ Ese barrido lleva un guard de *"¿encontré al menos
 
 **Barrido del 13/10 sobre toda la IIFE** (funciones declaradas ahí y usadas en un handler
 inline sin exponer): **0 casos más**. El panel por rol era el único.
+
+### ⚠ v29.98 (Luis, 13/10): el panel por rol es UNA LÍNEA con BADGE — el checklist se despliega
+
+**Luis, con la captura:** *"esa visual es horrible … ajusta eso en un menu colapsable con un
+badge. que el arreglo sea general y no solo para luis"*.
+
+El panel se dibujaba abierto: ~560 px de alto empujando el panel de administración entero, con
+«Hola, Luis» partido en dos renglones, el veredicto en prosa y un «cambiar» de una pantalla de
+ancho. Es la regla de espacio del 28/09 y el punto 4 de GV-UI (*lo explicativo se pliega; ningún
+bloque largo se dibuja abierto*).
+
+| | |
+|---|---|
+| plegado (lo que se ve al entrar) | **44 px**: `▶ Luis · Administración general` + badge + `cambiar` |
+| badge | **`3 para mirar`** (rojo) · **`✓ al día`** (verde) · **`sin contadores`** (gris). El color NUNCA va solo: lleva palabra (GV-UI 5) |
+| desplegado | el checklist de siempre, 474 px |
+| abierto/cerrado | `localStorage gv_rol_abierto`, por dispositivo. **Arranca plegado**: el dato es el badge |
+
+⚠ **Vale para los CINCO roles y las tres áreas**, que es lo que pidió Luis: es el mismo render
+(`rolPanelRender`), no hay nada propio de Luis. Lo mide el test sobre los 5.
+
+⚠ **El `button{width:100%;padding:16px;font-size:22px}` global de la línea 26 también muerde acá**
+(mismo pozo que el pop-up de Importados, v23.93): sin `#rolPanel button{width:auto}` el «cambiar»
+sale de una pantalla de ancho. Y el reset se lleva puesto el ancho de la BARRA y de las FILAS, así
+que las dos vuelven con `#rolPanel .rolp-bar, #rolPanel .rolp-row{width:100%}`.
+
+⚠ **«cambiar» vive DENTRO de la barra que despliega**: se le pasa el evento
+(`rolPickerAbrir(event)`, que corta la propagación). **No se escribe `event.stopPropagation()` en
+el `onclick`**: ahí el identificador que se llama es un método, y el barrido genérico del test
+—que exige que todo `onclick` resuelva contra `window`— lo marcaría como función faltante.
+
+**Chequeo:** `node tests/rol-panel-click.cjs` — mide, con la pantalla corriendo y para los 5
+roles, que arranque plegado en una línea, que el badge lleve palabra, que «cambiar» sea angosto y
+que tocar la barra despliegue el checklist.

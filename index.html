@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=29.97">
+<link rel="stylesheet" href="gv-ui.css?v=29.98">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6422,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.97"></script>
+<script type="module" src="recepcion.js?v=29.98"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6541,20 +6541,37 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <h1 class="sup-title">Administración</h1>
     <!-- v29.85 (Thomas, 13/10): panel por ROL. Según quién sos (área), checklist de qué mirar. -->
     <style>
-      #rolPanel{max-width:560px;margin:4px auto 16px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px 14px;box-shadow:0 6px 18px rgba(15,23,42,.06);}
-      .rolp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
-      .rolp-hola{display:block;font-size:17px;font-weight:800;color:#0f172a;line-height:1.1;}
-      .rolp-area{display:block;font-size:11.5px;font-weight:600;color:#475569;margin-top:2px;}
+      /* v29.97 (Luis, 13/10: *"esa visual es horrible … ajusta eso en un menu colapsable
+         con un badge. que el arreglo sea general y no solo para luis"*): el panel por rol es
+         UNA LÍNEA con su badge; el checklist se despliega. Regla de espacio del 28/09 y
+         GV-UI (v29.83): lo explicativo se pliega y nada largo se dibuja abierto.
+         ⚠ El `button{width:100%;padding:16px;font-size:22px}` global de la línea 26 también
+         muerde acá: sin el reset, «cambiar» salía de una pantalla de ancho. */
+      #rolPanel{max-width:620px;margin:4px auto 12px;}
+      #rolPanel button{width:auto;margin:0;font-size:inherit;}
+      #rolPanel .rolp-bar, #rolPanel .rolp-row{width:100%;}   /* el reset de arriba les comía el ancho */
+      .rolp-bar{display:flex;align-items:center;gap:10px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:8px 12px;min-height:44px;cursor:pointer;text-align:left;box-shadow:0 2px 8px rgba(15,23,42,.05);}
+      .rolp-bar:hover{background:#f8fafc;}
+      .rolp-car{flex:0 0 auto;font-size:12px;color:#64748b;width:12px;transition:transform .12s;}
+      #rolPanel.abierto .rolp-car{transform:rotate(90deg);}
+      .rolp-quien{flex:1 1 auto;font-size:14px;font-weight:800;color:#0f172a;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .rolp-area{font-weight:600;color:#64748b;font-size:11.5px;}
+      .rolp-badge{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:800;line-height:1.3;}
+      .rolp-b-rojo{background:#fee2e2;color:#991b1b;}
+      .rolp-b-verde{background:#dcfce7;color:#166534;}
+      .rolp-b-gris{background:#f1f5f9;color:#475569;}
       .rolp-cambiar{flex:0 0 auto;background:transparent;border:1px solid #cbd5e1;border-radius:8px;color:#475569;font-size:11.5px;font-weight:700;padding:4px 10px;cursor:pointer;}
-      .rolp-vered{font-size:12.5px;color:#334155;margin:8px 0 6px;font-weight:600;}
+      .rolp-body{display:none;background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;margin:-6px 0 0;padding:10px 12px 10px;}
+      #rolPanel.abierto .rolp-body{display:block;}
+      #rolPanel.abierto .rolp-bar{border-radius:12px 12px 0 0;}
       .rolp-list{display:flex;flex-direction:column;gap:4px;}
-      .rolp-row{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:9px 11px;cursor:pointer;min-height:44px;}
+      .rolp-row{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:8px 11px;cursor:pointer;min-height:44px;}
       .rolp-row:hover{background:#eff6ff;}
       .rolp-dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;}
       .rolp-lbl{flex:1 1 auto;font-size:13.5px;font-weight:700;color:#0f172a;line-height:1.2;}
       .rolp-hint{display:block;font-size:11px;font-weight:500;color:#64748b;margin-top:1px;}
       .rolp-sub{font-size:11px;font-weight:600;color:#92400e;}
-      .rolp-num{flex:0 0 auto;font-size:18px;font-weight:800;min-width:26px;text-align:right;font-variant-numeric:tabular-nums;}
+      .rolp-num{flex:0 0 auto;font-size:17px;font-weight:800;min-width:26px;text-align:right;font-variant-numeric:tabular-nums;}
     </style>
     <div id="rolPanel" style="display:none;"></div>
     <div id="cgAside" style="display:none;"></div>
@@ -10755,7 +10772,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.97";
+const APP_VERSION = "v29.98";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -63092,7 +63109,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.97"></script>
+<script src="importacion.js?v=29.98"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63496,7 +63513,10 @@ function rolPanelInit() {
   rolPanelRender(k);
 }
 
-function rolPickerAbrir() {
+function rolPickerAbrir(ev) {
+  /* v29.97: «cambiar» vive DENTRO de la barra que despliega: sin cortar la propagación,
+     tocarlo abriría el cuadro y de paso plegaría el panel. */
+  try { if (ev && ev.stopPropagation) ev.stopPropagation(); } catch (_e) {}
   var ov = document.getElementById("rolPickerOv");
   if (!ov) {
     ov = document.createElement("div"); ov.id = "rolPickerOv";
@@ -63511,7 +63531,7 @@ function rolPickerAbrir() {
   ov.style.display = "flex";
 }
 function rolElegir(k) { _rolSet(k); var ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none"; rolPanelRender(k); }
-/* v29.96: este bloque vive dentro de una CLOSURE (como gsLoad/gsResolver), asi que una funcion
+/* v29.97: este bloque vive dentro de una CLOSURE (como gsLoad/gsResolver), asi que una funcion
    llamada desde un onclick hay que exponerla o el boton queda MUERTO (tests/dead-handlers.cjs). */
 window.rolPickerAbrir = rolPickerAbrir; window.rolElegir = rolElegir;
 
@@ -63522,24 +63542,38 @@ window.rolPickerAbrir = rolPickerAbrir; window.rolElegir = rolElegir;
 window.rolElegir = rolElegir;
 window.rolPickerAbrir = rolPickerAbrir;
 window.GV_ROL_ITEMS = GV_ROL_ITEMS;
+window.rolPanelToggle = rolPanelToggle;
 
 function rolPanelRender(k) {
   var cont = document.getElementById("rolPanel"); if (!cont) return;
   var r = GV_SUP_ROLES[k]; if (!r) { rolPickerAbrir(); return; }
   window.__gvRol = r.area;
   cont.style.display = "block";
+  cont.className = _rolAbierto() ? "abierto" : "";
   cont.innerHTML =
-    '<div class="rolp-head"><div><span class="rolp-hola">Hola, ' + r.nombre + '</span><span class="rolp-area">' + GV_AREA_NOMBRE[r.area] + '</span></div>' +
-    '<button class="rolp-cambiar" onclick="rolPickerAbrir()">cambiar</button></div>' +
-    '<div class="rolp-vered" id="rolpVered">Cargando…</div>' +
-    '<div class="rolp-list" id="rolpList"></div>';
+    '<button class="rolp-bar" onclick="rolPanelToggle()">' +
+      '<span class="rolp-car">\u25B6</span>' +
+      '<span class="rolp-quien">' + r.nombre + ' <span class="rolp-area">\u00B7 ' + GV_AREA_NOMBRE[r.area] + '</span></span>' +
+      '<span class="rolp-badge rolp-b-gris" id="rolpBadge">\u2026</span>' +
+      '<span class="rolp-cambiar" onclick="rolPickerAbrir(event)">cambiar</span>' +
+    '</button>' +
+    '<div class="rolp-body"><div class="rolp-list" id="rolpList"></div></div>';
   rolPanelCargar();
+}
+
+/* v29.97: abierto/cerrado por dispositivo. Arranca CERRADO: el dato es el badge. */
+function _rolAbierto() { try { return localStorage.getItem("gv_rol_abierto") === "1"; } catch (_e) { return false; } }
+function rolPanelToggle() {
+  var cont = document.getElementById("rolPanel"); if (!cont) return;
+  var ab = !cont.classList.contains("abierto");
+  cont.className = ab ? "abierto" : "";
+  try { localStorage.setItem("gv_rol_abierto", ab ? "1" : "0"); } catch (_e) {}
 }
 
 function rolPanelCargar() {
   var area = window.__gvRol || "admin";
   var items = GV_ROL_ITEMS.filter(function (it) { return it.areas.indexOf(area) >= 0; });
-  var listEl = document.getElementById("rolpList"); var verEl = document.getElementById("rolpVered");
+  var listEl = document.getElementById("rolpList"); var bgEl = document.getElementById("rolpBadge");
   function paint(data) {
     if (!listEl) return;
     var alerts = 0;
@@ -63548,18 +63582,19 @@ function rolPanelCargar() {
       var n = data ? (it.cnt(data) || 0) : null;
       if (n > 0) alerts++;
       var dot = (n === null) ? "#94a3b8" : (n > 0 ? "#dc2626" : "#16a34a");
-      var num = (n === null) ? "—" : (n > 0 ? String(n) : "✓");
+      var num = (n === null) ? "\u2014" : (n > 0 ? String(n) : "\u2713");
       var tall = (it.tall && data) ? it.tall(data) : 0;
-      var extra = (it.id === "ads" && tall > 0) ? ' · <span class="rolp-sub">' + tall + ' talleristas flojos</span>' : '';
+      var extra = (it.id === "ads" && tall > 0) ? ' \u00B7 <span class="rolp-sub">' + tall + ' talleristas flojos</span>' : '';
       return '<button class="rolp-row" onclick="GV_ROL_ITEMS[' + idx + '].open()">' +
         '<span class="rolp-dot" style="background:' + dot + '"></span>' +
         '<span class="rolp-lbl">' + it.label + extra + '<span class="rolp-hint">' + it.hint + '</span></span>' +
         '<span class="rolp-num" style="color:' + dot + '">' + num + '</span></button>';
     }).join("");
-    if (verEl) {
-      if (data === null) verEl.innerHTML = '<span style="color:#92400e">No pude leer los contadores · tocá un ítem igual</span>';
-      else if (alerts === 0) verEl.innerHTML = '<span style="color:#166534">✓ Nada pendiente en tu área</span>';
-      else verEl.innerHTML = '<b>' + alerts + '</b> cosa' + (alerts === 1 ? '' : 's') + ' para mirar';
+    /* el BADGE es el dato de la barra: el color NUNCA va solo (GV-UI 5), lleva palabra. */
+    if (bgEl) {
+      if (data === null) { bgEl.className = "rolp-badge rolp-b-gris"; bgEl.textContent = "sin contadores"; bgEl.title = "No se pudieron leer los contadores \u00B7 tocá un ítem igual"; }
+      else if (alerts === 0) { bgEl.className = "rolp-badge rolp-b-verde"; bgEl.textContent = "\u2713 al día"; bgEl.title = "Nada pendiente en tu área"; }
+      else { bgEl.className = "rolp-badge rolp-b-rojo"; bgEl.textContent = alerts + (alerts === 1 ? " para mirar" : " para mirar"); bgEl.title = "Tocá para ver el detalle"; }
     }
   }
   paint(null);
@@ -66220,15 +66255,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.97"></script>
-<script src="hotsale.js?v=29.97"></script>
-<script src="estadisticas.js?v=29.97"></script>
-<script src="ads.js?v=29.97"></script>
-<script src="plantel.js?v=29.97"></script>
+<script src="cobranzas.js?v=29.98"></script>
+<script src="hotsale.js?v=29.98"></script>
+<script src="estadisticas.js?v=29.98"></script>
+<script src="ads.js?v=29.98"></script>
+<script src="plantel.js?v=29.98"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.97"></script>
+<script src="analisis.js?v=29.98"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.97"></script>
+<script src="ayuda.js?v=29.98"></script>
 
 </body>
 </html>
