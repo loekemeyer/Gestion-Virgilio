@@ -418,3 +418,49 @@ ni compras, ni cobranzas:
 marque ✓ sin apagarle nada. Verificado que falla sacando el guard: *«el panel le pegó a 127.0.0.1
 con el helper DESCONECTADO»*.
 
+### ⚠ v30.14 (Luis, 13/10): el rol de PAGOS — un deadline vencido tapa la pantalla, no cada remito
+
+**Luis:** *"cuando uno se loguea a GV ahora pregunta quien es uno. Creale un usuario a Pagos"* y, sobre
+Recepción de Mercadería: *"cuando se registra en el sistema corre un timmer. si en la misma hora al
+siguiente día habil no se proceso (o se marco como no recibido) les tiene que saltar una alerta en el
+planify a los de pagos (Mel, Nora y Pablo) y en GV si estan logueados como pagos de que tienen que
+resolverlo en ese momento si o si (procesarlo o marcarlo como «No recibido»)"*.
+
+> ## **Esto NO es volver al trigger de v18.81 (dado de baja a pedido del dueño).**
+> Aquel avisaba a Pagos por CADA remito, al instante. Éste avisa **sólo si venció un plazo sin que
+> nadie lo haya resuelto** — ni procesado ni marcado «No recibido». Son dos reglas distintas, no la
+> misma reabierta: una es *"avisá siempre"*, la otra es *"avisá sólo si nadie hizo nada a tiempo"*.
+
+| pieza | qué hace |
+|---|---|
+| área nueva **`pagos`** (`GV_SUP_ROLES.pagos`, `GV_AREA_NOMBRE`) | «Pagos», al lado de admin/ventas/impo/impresión |
+| ítem **«Recepciones vencidas sin resolver»** (`GV_ROL_ITEMS`, áreas `admin`+`pagos`) | el mismo conteo que el cartel bloqueante; `gv_rol_panel` suma `recep_pagos_vencida` |
+| **cartel bloqueante** (`pagosAlertaInit`/`_Check`/`_Render`/`_Stop`) | tapa toda la pantalla, **sin ✕ ni Escape**, sólo mientras el rol elegido sea Pagos; se arma al elegir el rol y se repite **cada 60 s**; se cae solo cuando la lista queda en 0 y se auto-apaga si deja de ser Pagos o deja de haber sesión de supervisor — no depende de que el logout de turno se acuerde de llamarlo |
+| botón del cartel **«Ir a resolver ahora»** | `abrirRecepcionPagosVencidas()` → el deep-link que ya usa Planify, `window.recepcionAbrirPendientes()` |
+
+**El deadline es "al siguiente día hábil, a la misma hora"**, no "24 h corridas": `gv_proximo_dia_habil_desde`
+(nuevo, pisa `gv_es_dia_habil`) + la hora del `created_at` original. **Resuelto** = `Control_Modo_OP.estado <>
+'pendiente'` (el «Enviar» final) **o** `gv_no_recibido_at` cargado (el botón «No recibido»): cualquiera de los
+dos cierra la alerta.
+
+**Base** (`gv_recepcion_pagos_vencida()` + `GV_Recepcion_Pagos_Alerta` + `gv_recepcion_pagos_alerta_tick()`,
+cron cada 10 min jobid 159): crea **una** tarea de Planify `broadcast=true, department_id=6` por recepción
+vencida nueva, y cierra (`done=true`) la de las que ya se resolvieron. **No hizo falta tocar Planify**: Mel
+(Melany Pierola), Nora (Nora Heredia) y Pablo (Martos Pablo) son exactamente los activos del departamento 6
+("Pagos"), así que el mecanismo de broadcast por sector que ya existe alcanza solo.
+
+⚠ **El tick ya corrió contra datos reales al aplicar la migración** y encontró un caso genuino: Carriero,
+remito 1751 (vencido). Creó la tarea de verdad — no es un simulacro, Mel/Nora/Pablo la ven la próxima vez que
+abran Planify.
+
+**Chequeo:** `node tests/rol-panel-click.cjs`, bloque **(i)** — el área dice "Pagos", el ítem marca el número
+real (no "✓"), el cartel aparece con el dato mockeado y tiene botón, y se cae solo al resolverse **sin cambiar
+de rol** (llamando a `pagosAlertaCheck()` directo, el mismo chequeo que corre solo cada minuto). ⚠ El mock
+genérico `**/rest/v1/**` tiene que registrarse **ANTES** que los específicos de cada RPC: Playwright prueba
+las rutas en el orden inverso al de registro (la última agregada va primero), así que un catch-all agregado
+después tapa a los específicos.
+
+⚠ Los objetos de la base, el centinela y los comentarios del código dicen **v30.14** (la versión con que se
+aplicaron): es la llave de idempotencia, **no cambiarla**; la app salió en v30.18 porque otras sesiones se
+adelantaron entre medio.
+
