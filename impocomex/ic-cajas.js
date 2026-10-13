@@ -17,13 +17,13 @@
   const FORMATO = {
     codigo: '437E', total_cajas: '463', caja_en_rango: '288/463', unidades_por_master: '144', unidades_por_inner: '12',
     peso_bruto_kg: '15,5', peso_neto_kg: '14', medidas_cm: '35 x 34,5 x 32,5', consignatario: 'TIERRA NATIVA SA', made_in: 'MADE IN CHINA',
-    codigo_barras: '13 dígitos', articulo: 'nombre impreso', comercializador: 'nombre del frente',
+    codigo_barras: '13 dígitos', articulo: 'nombre impreso', comercializador: 'nombre del frente', marca_frente: 'marcas del frente, separadas por /',
     cuit_importador: 'ej. 30-12345678-9', cuit_comercializador: 'ej. 30-12345678-9',
   };
   const REGION_KEY = {
     codigo: 'codigo', total_cajas: 'numeracion', caja_en_rango: 'numeracion', unidades_por_master: 'cantidad',
     unidades_por_inner: 'cantidad', peso_bruto_kg: 'gw_kg', peso_neto_kg: 'nw_kg', medidas_cm: 'medidas',
-    consignatario: 'consignatario', codigo_barras: 'codigo_barras', marca: 'marca', articulo: 'nombre_articulo',
+    consignatario: 'consignatario', codigo_barras: 'codigo_barras', marca: 'marca', marca_frente: 'marca', articulo: 'nombre_articulo',
     comercializador: 'comercializador', cuit_importador: 'cuit_importador', cuit_comercializador: 'cuit_comercializador',
   };
   const RESULTADO = {

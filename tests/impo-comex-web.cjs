@@ -13,7 +13,7 @@ const ok = (c, m) => { if (!c) fallas.push(m); };
 const html = (fs.readFileSync(path.join(raiz, "index.html"), "utf8") + "\n" + fs.readFileSync(path.join(raiz, "importacion.js"), "utf8"));
 const i = html.indexOf("function _impTabsHtml(");
 const tabs = i >= 0 ? html.slice(i, html.indexOf("\n}\n", i)) : "";
-ok(/onclick="openImpoComex\(\)"[^>]*>🛃 IMPO COMEX</.test(tabs), "(a) falta el botón 🛃 IMPO COMEX en _impTabsHtml");
+ok(!/onclick="openImpoComex\(\)"/.test(tabs), "(a) v30.06: el botón del IMPO COMEX viejo (impo-comex/) no va más en _impTabsHtml");
 ok(/function openImpoComex\(\)\s*\{\s*location\.href\s*=\s*"impo-comex\/"/.test(html), "(a) openImpoComex no abre impo-comex/");
 
 const dir = path.join(raiz, "impo-comex");
@@ -31,7 +31,7 @@ if (fs.existsSync(path.join(dir, "index.html"))) {
 // (e) v29.18 — IMPO COMEX nuevo, sin build (Elías, 09/10): impocomex/ con scripts clásicos que cuelgan de window.IC.
 //     El botón «🛃 IMPO COMEX nuevo» lo abre; cada modo está en su ic-<modo>.js y la lógica de parseo es la
 //     original copiada tal cual en impocomex/logica/. Tampoco lleva token ni datos personales.
-ok(/onclick="openImpoComex2\(\)"[^>]*>🛃 IMPO COMEX nuevo</.test(tabs), "(e) falta el botón 🛃 IMPO COMEX nuevo en _impTabsHtml");
+ok(/onclick="openImpoComex2\(\)"[^>]*>🛃 IMPO COMEX</.test(tabs), "(e) falta el botón 🛃 IMPO COMEX (el nuevo) en _impTabsHtml");
 ok(/function openImpoComex2\(\)[\s\S]{0,400}impocomex\/ic-base\.js/.test(html), "(e) openImpoComex2 no carga impocomex/ic-base.js");
 const nuevo = path.join(raiz, "impocomex");
 ok(fs.existsSync(path.join(nuevo, "ic-base.js")), "(e) falta impocomex/ic-base.js");

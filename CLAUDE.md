@@ -4303,6 +4303,14 @@ privado `loekemeyer/Impo-Comex`**; acá va sólo el build web (`client/dist-web`
 - **v29.23: PARIDAD con el viejo, flujo por flujo** (subir, verificar, editar, corregir, guardar, descargar): `tests/impo-comex-paridad-{lakout,multidoc,marks,cajas,inal}.cjs`
   comparan pedidos a la puerta, pantalla y descargas contra lo que hizo el viejo (`impo-comex/`), grabado en el test o en
   `tests/tools/`. Mientras exista `impo-comex/` se regraban desde el viejo (ver la cabecera de cada test). **Al borrar el viejo, los tests siguen andando.**
+- ⚠ **v30.06 (Elías, 13/10): el botón del IMPO COMEX VIEJO se ocultó** — en Pedidos Importación queda un solo
+  **🛃 IMPO COMEX** que abre el nuevo (`openImpoComex2`). `openImpoComex()` y la carpeta `impo-comex/` siguen (los
+  tests de paridad graban desde ahí) hasta que se borren.
+- ⚠ **r81 (Elías, 13/10) — Cajas marca la OTRA MARCA del frente**: la IA lee TODAS las marcas del frente del cartón
+  (`marcas_frente`) y la empresa de referencia es el **prefijo del código de barras** (779558700 LK / 779800543 CH) o,
+  sin barras, el **CUIT del comercializador**. Una marca de la otra empresa → fila `marca_frente` **diferencia GRAVE**.
+  Vive en `Impo-Comex/supabase/functions/_shared/cajas.ts` (deploy `Impo_Comex_verify-cajas`, v26) y lo comparten el
+  viejo y el nuevo; acá sólo cambiaron el rótulo y el formato del campo (`ic-cajas.js`, `logica/cajasEtiquetas.js`).
 
 ## ⚠ REGLA (Luis, 2026-09-28, v23.45): la importación se RECIBE desde el panel — 📥 RECIBIR
 
