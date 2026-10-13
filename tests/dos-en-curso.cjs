@@ -40,6 +40,9 @@ catch (_e) {
   await p.route("**/*.supabase.co/**", (r) => r.abort());
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(async () => {
+    /* v29.90: el AP pregunta la MESA (evento AUI) y ese cuadro espera un toque; acá se
+       contesta «Después» (null) para que `send()` no quede esperando a nadie. */
+    window.askArmadoMesa = async function () { return null; };
     const out = {};
     const leg = "999";
     legajoInput.value = leg;

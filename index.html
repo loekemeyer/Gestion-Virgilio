@@ -10,6 +10,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
+<link rel="stylesheet" href="gv-ui.css?v=29.93">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6420,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.76"></script>
+<script type="module" src="recepcion.js?v=29.93"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6537,6 +6539,24 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div id="supervisorPanel" class="hidden">
     <div class="app-brand">Gestion <span class="app-brand-hi">Virgilio</span></div>
     <h1 class="sup-title">Administración</h1>
+    <!-- v29.85 (Thomas, 13/10): panel por ROL. Según quién sos (área), checklist de qué mirar. -->
+    <style>
+      #rolPanel{max-width:560px;margin:4px auto 16px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px 14px;box-shadow:0 6px 18px rgba(15,23,42,.06);}
+      .rolp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+      .rolp-hola{display:block;font-size:17px;font-weight:800;color:#0f172a;line-height:1.1;}
+      .rolp-area{display:block;font-size:11.5px;font-weight:600;color:#475569;margin-top:2px;}
+      .rolp-cambiar{flex:0 0 auto;background:transparent;border:1px solid #cbd5e1;border-radius:8px;color:#475569;font-size:11.5px;font-weight:700;padding:4px 10px;cursor:pointer;}
+      .rolp-vered{font-size:12.5px;color:#334155;margin:8px 0 6px;font-weight:600;}
+      .rolp-list{display:flex;flex-direction:column;gap:4px;}
+      .rolp-row{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:9px 11px;cursor:pointer;min-height:44px;}
+      .rolp-row:hover{background:#eff6ff;}
+      .rolp-dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;}
+      .rolp-lbl{flex:1 1 auto;font-size:13.5px;font-weight:700;color:#0f172a;line-height:1.2;}
+      .rolp-hint{display:block;font-size:11px;font-weight:500;color:#64748b;margin-top:1px;}
+      .rolp-sub{font-size:11px;font-weight:600;color:#92400e;}
+      .rolp-num{flex:0 0 auto;font-size:18px;font-weight:800;min-width:26px;text-align:right;font-variant-numeric:tabular-nums;}
+    </style>
+    <div id="rolPanel" style="display:none;"></div>
     <div id="cgAside" style="display:none;"></div>
     <!-- v29.69 (Luis, 13/10): góndolas que informó el operario en el picking, para dar de alta en el Mapa -->
     <div id="gsAside" style="display:none;"></div>
@@ -6832,6 +6852,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="sup-action-btn" onclick="cfgGo(openPrintStation)"><span class="sup-ico">🖨️</span><span>Cola de impresión</span></button>
         <!-- v26.28 (Luis, 02/10): conectar esta PC con el helper local de impresión -->
         <button class="sup-action-btn" onclick="cfgGo(openHelperImpresion)" title="Conectar esta PC con el helper local: picking, armado y facturado salen sin el cuadro de impresión"><span class="sup-ico">🖨️</span><span>Helper de impresión</span></button>
+        <!-- v29.84 (Elías): la TV de pared pide el código de ingreso con un secreto propio; acá se la aprueba -->
+        <button class="sup-action-btn" onclick="cfgGo(openVincularTv)" title="Aprobar el código de 6 dígitos que muestra una TV nueva para que pueda mostrar el código de ingreso, y desvincular las que ya no se usan"><span class="sup-ico">📺</span><span>Vincular TV</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openAyudaConfig)" title="Cargar las API keys y elegir el modelo del asistente de ayuda de los operarios (todavía sin botón en la botonera)"><span class="sup-ico">🤖</span><span>Asistente IA operarios</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openMailsEditor)"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openLugarEditor)"><span class="sup-ico">📍</span><span>Lugares del depósito</span></button>
@@ -7055,6 +7077,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <!-- Modal: Planilla Conteo Cajas -->
 
 <script src="supabase-config.js?v=1202"></script>
+<script src="monitor/tv-clave.js?v=1"></script>
 <script>
 /* v18.67 — el botón «Entrar con legajo» está arriba en el HTML y la función de verdad se define en el último
    <script> (44k líneas después): en un celular lento el tap llega antes y tiraba
@@ -10732,7 +10755,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.76";
+const APP_VERSION = "v29.93";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11367,6 +11390,61 @@ function emitPickUbic(tanda, ubic, legajo) {
   if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
   try { updatePendingIndicator(); } catch (_e) {}
 }
+/* v29.90 (Luis, 13/10): al EMPEZAR EL ARMADO (AP) se pregunta EN QUÉ MESA va a armar.
+   Es el dato que faltaba para que el monitor diga dónde está FÍSICAMENTE una tanda que
+   se está armando (v29.74): el PUB dice dónde la dejó el picking y el AUB dónde quedó
+   al TERMINAR, pero mientras arman no había nada. Se guarda en un evento aparte 'AUI'
+   (texto=tanda, descripcion=mesa) y SIN ts_inicio: no abre tarea ni cuenta horas.
+   ⚠ LA MESA ES OBLIGATORIA (Luis, 13/10: *"como que \"Despues\"? no es una opcion eso ni
+   debería serlo"*): el cuadro NO tiene escape — o una mesa, o «✏️ Otro lugar…». Igual NO
+   frena el código: sale DESPUÉS de registrar el AP y DESPUÉS de abrir el asistente, sin
+   await, así que si el cuadro no se dibuja el operario tiene el asistente abierto abajo.
+   Y es forward-facing: lo ya armado no se toca ni se backfillea. */
+const ARM_MESA_OPCIONES = ["Mesa 1", "Mesa 2"];
+function askArmadoMesa(tanda) {
+  return new Promise(function (resolve) {
+    if (!document.getElementById("auiCss")) {
+      const s = document.createElement("style"); s.id = "auiCss";
+      s.textContent = "#auiModal{display:none;position:fixed;inset:0;z-index:1450;background:rgba(2,6,23,.78);overflow:auto;padding:14px;}#auiModal.show{display:flex;align-items:center;justify-content:center;}.aui-card{background:#f8fafc;max-width:430px;width:100%;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.aui-head{padding:14px 16px;background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;}.aui-title{font-size:17px;font-weight:800;}.aui-sub{font-size:12.5px;opacity:.92;margin-top:3px;}.aui-body{padding:14px;}.aui-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;}.aui-opt{padding:19px 6px;border:2px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px;font-weight:800;color:#0f172a;cursor:pointer;width:auto;margin:0;}.aui-opt:active{background:#faf5ff;border-color:#7c3aed;}.aui-otra{grid-column:1/-1;border-color:#fcd34d;background:#fffbeb;color:#92400e;font-size:15px;padding:15px 6px;}";
+      document.head.appendChild(s);
+    }
+    let ov = document.getElementById("auiModal");
+    if (!ov) { ov = document.createElement("div"); ov.id = "auiModal"; document.body.appendChild(ov); }
+    function done(v) { ov.classList.remove("show"); ov.innerHTML = ""; resolve(v); }
+    const opts = ARM_MESA_OPCIONES.map(function (o) { return '<button class="aui-opt" data-u="' + escapeHtml(o) + '">' + escapeHtml(o) + '</button>'; }).join("") + '<button class="aui-opt aui-otra" data-otra="1">✏️ Otro lugar…</button>';
+    ov.innerHTML = '<div class="aui-card"><div class="aui-head"><div class="aui-title">📍 ¿En qué mesa vas a armar ' + escapeHtml(String(tanda || "")) + '?</div><div class="aui-sub">Hay que elegir una: así el monitor dice dónde está la tanda mientras la armás.</div></div><div class="aui-body"><div class="aui-grid">' + opts + '</div></div></div>';
+    ov.classList.add("show");
+    ov.querySelectorAll(".aui-opt").forEach(function (b) { b.onclick = function () {
+      if (b.getAttribute("data-otra")) {
+        let t = "";
+        try { t = String(prompt("✏️ ¿Dónde vas a armar? (escribilo, ej. Mesa 3 / AB7)") || ""); } catch (_e) { t = ""; }
+        t = t.trim();
+        if (t) done(t);   // si cancela o deja vacío, NO cierra: puede elegir otra opción
+      } else {
+        done(b.getAttribute("data-u"));
+      }
+    }; });
+    /* sin botón de escape a propósito: la mesa es obligatoria (Luis, 13/10) */
+  });
+}
+/* Emite el evento AUI (mesa donde se está armando). Mismo patrón que emitPickUbic:
+   encola + intenta enviar, con id único (si vuelve a tocar AP con otra mesa, el más
+   reciente manda; gv_tanda_ubicacion toma el último ts). El legajo de PRUEBA no
+   persiste (lo frena enqueueReport). */
+function emitArmadoMesa(tanda, mesa, legajo) {
+  if (!mesa) return;
+  const t = String(tanda || "").trim().toUpperCase(); if (!t) return;
+  const nowMs = Date.now();
+  const payload = {
+    legajo: String(legajo || "").trim(), opcion: "AUI", descripcion: String(mesa),
+    texto: t, ts: nowMs,
+    id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+    ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
+}
 /* v5.86 — Al TERMINAR ARMADO (TAP) el armador elige EN QUÉ UBICACIÓN queda cada
    nota de pedido de la tanda (columnas AB/AA/AC/AD del sector de armado). Igual
    idea que el PUB del picking, pero POR NP (los pedidos de una misma tanda pueden
@@ -11474,7 +11552,8 @@ function _horaCortaAR(iso) {
   } catch (_e) { return ""; }
 }
 
-async function send() {
+async function send(_opts) {
+  const _sinAviso   = !!(_opts && _opts.sinAviso);   // v29.82: lo llamó un módulo, no un toque
   const legajoStr   = String(legajoInput.value || "").trim();
   const opcion      = selected;
   const descripcion = desc[selected] || "";
@@ -12016,7 +12095,7 @@ async function send() {
   if (r.ok) {
     removeFromQueue(payload.id);
     setHistoryItemStatus(legajoStr, getTodayKey(), payload.id, "sent", new Date().toISOString(), r.created_at);
-    alert("Reporte enviado correctamente");
+    if (!_sinAviso) alert("Reporte enviado correctamente");
   } else {
     // Si fue rechazo del server (datos inválidos, etc.) marco "failed" en el historial.
     // Si fue caída de red, dejo "queued" — se reintenta solo.
@@ -12043,6 +12122,12 @@ async function send() {
     // v8.75: antes tenía un Paso 1 de reparto manual de faltantes; hoy el reparto es
     // automático (proporcional) y el wizard arranca directo en Separar.
     showCompletarWizard(legajoStr, texto);
+    /* v29.90: ¿en qué mesa va a armar? (evento AUI, lo lee el monitor). Va ACÁ, al final y
+       SIN await: el cuadro sale ENCIMA del asistente — que ya está abierto — y el armado no
+       espera a nadie. Si el cuadro falla o lo saltea con «Después», no pasa nada más. */
+    try {
+      askArmadoMesa(texto).then(function (m) { if (m) emitArmadoMesa(texto, m, legajoStr); }).catch(function () {});
+    } catch (_e) {}
   }
   // Al INICIAR carga camión (1er toque de CC): checklist de NPs listas (TAP).
   if (opcion === "CC") {
@@ -12567,12 +12652,15 @@ async function monClaveRefrescar() {
   const e = document.getElementById("monClave");
   if (!e) return;
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_tv_clave_actual", {
-      method: "POST", cache: "no-store",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
-      body: "{}" });
-    if (!r.ok) return;
-    const j = await r.json();
+    /* v29.84 (Elías): con la sesión del supervisor, o con el secreto de esta pantalla si es el kiosko
+       (monitor/tv-clave.js ≡ monitor/tv.html). Ya no se pide pelado con la clave pública. */
+    if (typeof window.gvTvClaveLeer !== "function") return;
+    const j = await window.gvTvClaveLeer(SUPABASE_URL, SUPABASE_KEY, function () {
+      return (window.sbAuth && window.sbAuth.getAccessToken) ? window.sbAuth.getAccessToken() : null; });
+    const box = document.getElementById("monClaveBox");
+    if (box) box.title = (j && j.vincular)
+      ? "Esta pantalla no está vinculada. Código para vincularla: " + j.vincular + " (⚙️ Configuración → 📺 Vincular TV)"
+      : "Código para entrar desde el celular — dura un minuto";
     if (!j || !j.clave) return;
     e.textContent = j.clave;
     _monClvQueda = Math.max(1, Math.min(MON_CLV_CICLO, Number(j.cambia_en_s) || MON_CLV_CICLO));
@@ -27319,6 +27407,7 @@ let _insMetaOk = false;
 async function insLoadMeta(force) {
   await insFetchFactores();            // v8.26 — factores SIEMPRE frescos (los edita el admin)
   if (_insMetaOk && !force) return;   // sólo cachea dentro de una misma apertura
+  await insFetchConfig();              // v29.87 — cajas por paquete, marcas y apodos (tablas, no código)
   try {
     const h = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const r = await Promise.all([
@@ -27413,6 +27502,29 @@ async function insFetchGp2Ri() {
     return r.ok ? await r.json() : null;
   } catch (_e) { return null; }
 }
+/* v29.82 (Luis) — de qué proveedor es cada fleje, para que al elegir un proveedor el operario vea
+   SÓLO los de él. La clave es el código de Virgilio y, para el fleje que todavía no existe acá, el
+   componente de GP2 que la lista de recepción ya muestra (v29.35). null = no se pudo leer. */
+async function insFetchFlejeProv() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_fleje_proveedor", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return null;
+    const m = {};
+    rows.forEach(function (x) {
+      const pv = String(x.proveedor || "").trim(); if (!pv) return;
+      if (x.cod) m[_insK(x.cod)] = pv;
+      if (x.comp_id) m["#" + x.comp_id] = pv;
+    });
+    return m;
+  } catch (_e) { return null; }
+}
+/* El proveedor de un fleje de la lista: por su código, o por el componente de GP2 que trae. */
+function _insProvDe(it) {
+  if (!_ins || !_ins.flejeProv || !it) return "";
+  return (it.cod ? _ins.flejeProv[_insK(it.cod)] : "") || (it.gp2Comp ? _ins.flejeProv["#" + it.gp2Comp] : "") || "";
+}
 async function insFetchCatalogo() {
   try {
     // v22.80: la ubicación que ve el operario es la del módulo de Insumos resuelta contra el Mapa (vista_insumos).
@@ -27427,10 +27539,10 @@ async function insFetchCatalogo() {
    sentido recibiendo). Popup liviano al estilo de showMGChooser. */
 function insumoChooser(legajo) {
   let ov = document.getElementById("insChooserModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
   const btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
   const sub = 'font-weight:600;opacity:.85;';
-  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;margin:auto;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📦 Insumos y Productos Movimiento</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué querés hacer?</div>' +
     '<button onclick="insChooserGo(\'RI\')" style="' + btn + 'background:#4f46e5;">📥 Recibir insumos <span style="' + sub + '">(entra stock — o agregá uno nuevo)</span></button>' +
@@ -27459,15 +27571,43 @@ function insChooserGo(which) {
 const INS_RI_SIN = ["importados"];
 /* v29.25/29.30 (Thomas): categorías con lista CERRADA — el operario no da de alta nada nuevo ahí. */
 const INS_CAT_CERRADA = ["plastico", "cajas"];
-const INS_CAJA_X_PAQ = 25;   // v29.30 (Thomas, D22): cada paquete trae 25 cajas
-const INS_CAJA_MARCAS = ["Loeke", "Chef"];   // v29.31 (Thomas, D26): sólo se anota, no parte el stock
+/* v29.87 (Luis, 13/10: "crea tabla si sólo está en el front el dato") — estos tres son DATOS del
+   negocio, no código: viven en `GV_Insumo_Config` (cajas por paquete, marcas) y en
+   `GV_Insumo_Origen_Apodo` (el apodo del inyector), y los hidrata `insLoadMeta`. Lo que queda
+   escrito acá es el FALLBACK: si la base no contesta, el operario carga igual que antes. */
+let INS_CAJA_X_PAQ = 25;   // v29.30 (Thomas, D22): cada paquete trae 25 cajas
+let INS_CAJA_MARCAS = ["Loeke", "Chef"];   // v29.31 (Thomas, D26): sólo se anota, no parte el stock
 /* v29.56 (Luis, 13/10): la marca se pide al RECIBIR CUALQUIER insumo, no sólo cajas.
    Es el mismo insumo en el mismo lugar físico y el movimiento sigue siendo empresa
    `Mixto` (lo fuerza el trigger gv_insumo_unidad_base): la marca NO parte el stock, sólo
    queda escrita en la descripción del movimiento y se consulta por gv_insumo_recepcion_marca.
    Las cajas siguen con Loeke/Chef (Thomas, D26); el resto suma «Mixto» (las dos). */
-const INS_MARCAS = ["Loeke", "Chef", "Mixto"];
+let INS_MARCAS = ["Loeke", "Chef", "Mixto"];
 function _insMarcasDe(k) { return k === "cajas" ? INS_CAJA_MARCAS : INS_MARCAS; }
+/* v29.87: la config del módulo (números y listas) y los apodos, de la base. Cada dato que llega
+   pisa su default; el que no llega queda con el de acá. */
+async function insFetchConfig() {
+  const h = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
+  try {
+    const r = await Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_config", { method: "POST", headers: h, body: "{}", cache: "no-store" }),
+      fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_apodos", { method: "POST", headers: h, body: "{}", cache: "no-store" })
+    ]);
+    if (r[0].ok) {
+      const cfg = await r[0].json();
+      if (Array.isArray(cfg)) cfg.forEach(function (c) {
+        const lista = String(c.valor_texto || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+        if (c.clave === "caja_x_paquete" && Number(c.valor) > 0) INS_CAJA_X_PAQ = Number(c.valor);
+        if (c.clave === "marcas" && lista.length) INS_MARCAS = lista;
+        if (c.clave === "marcas_cajas" && lista.length) INS_CAJA_MARCAS = lista;
+      });
+    }
+    if (r[1].ok) {
+      const ap = await r[1].json();
+      if (Array.isArray(ap) && ap.length) { INS_INY_APODO = {}; ap.forEach(function (a) { if (a.nombre && a.apodo) INS_INY_APODO[a.nombre] = a.apodo; }); }
+    }
+  } catch (_e) { /* sin red: quedan los defaults de arriba */ }
+}
 function _insMarcaHtml(it, i, isIn) {
   if (!isIn || !it) return "";
   const k = insCatOf(it), ms = _insMarcasDe(k);
@@ -27478,8 +27618,8 @@ function _insMarcaHtml(it, i, isIn) {
 function insSetCajaMarca(i, m) { if (!_ins || !_ins.items[i]) return; _ins.items[i].marca = (_ins.items[i].marca === m) ? "" : m; insRender(); }
 async function insRecibirCat() {
   let ov = document.getElementById("insChooserModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
-  const card = function (inner) { return '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' + inner + '</div>'; };
+  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
+  const card = function (inner) { return '<div style="background:#f8fafc;max-width:380px;width:100%;margin:auto;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' + inner + '</div>'; };
   ov.innerHTML = card('<div style="font-size:18px;font-weight:800;">📥 Recibir insumos</div><div style="font-size:13px;color:#64748b;margin-top:8px;">Cargando…</div>');
   ov.style.display = "flex";
   try { await insLoadMeta(true); } catch (_e) { /* quedan los defaults */ }
@@ -27494,6 +27634,15 @@ function insRecibirCatGo(k) {
   window._insEnvioSub = null;
   closeInsumoChooser();
   window._insRiCat = k;
+  window._insProvFleje = null;
+  /* v29.82 (Luis, 13/10): "SC y SP no preguntar de quien es, no entregan con factura nunca
+     (solo remito, siempre es Cervantes, que ni pregunte)" — se saltean las DOS preguntas:
+     el origen queda fijo en Cervantes y la documentacion arranca en el N de remito. */
+  if (k === "partes_crudo" || k === "parte_procesado") {
+    window._insUbicacion = "Cervantes"; window._insGp2 = null;
+    askInsDocumentacion("RI", "Cervantes", { soloRemito: true });
+    return;
+  }
   askInsUbicacion("RI");
 }
 /* v21.74 — Entregar insumos: DOS botones antes del destino.
@@ -27501,9 +27650,9 @@ function insRecibirCatGo(k) {
    "Envío a otros"      → sólo el destino en texto libre. */
 function insEnvioTipo() {
   let ov = document.getElementById("insChooserModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
   const btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
-  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;margin:auto;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📤 Entregar insumos</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué envío es?</div>' +
     '<button onclick="insEnvioTipoGo(\'iny\')" style="' + btn + 'background:#0d9488;">🏭 Envío a inyectores</button>' +
@@ -27528,14 +27677,17 @@ function askInsUbicacion(mode, sub) {
   const hint = isIn ? "Origen/Proveedor" : "Destino/Ubicación";
 
   let ov = document.getElementById("insUbicModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insUbicModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement("div"); ov.id = "insUbicModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
 
-  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;margin:auto;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">' + (isIn ? "📥 Recepción" : "📤 Entrega") + '</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + (soloIny ? "¿A qué inyector lo envías?" : titulo) + '</div>' +
     // v14.95 — bolsas plásticas: los inyectores (EI) / las OC de material de GP2 (RI) como botones,
     // arriba del texto libre. Se llenan async; si GP2 no responde queda el texto libre de siempre.
     '<div id="insUbicGp2">' + (soloIny ? '<div style="font-size:13px;color:#64748b;margin-bottom:10px;">Cargando inyectores…</div>' : '') + '</div>' +
+    // v29.82 (Luis): el ORIGEN es una lista cerrada por categoria (gv_insumo_origenes, que sale
+    // de GP2). Se llena async; si la base no contesta queda el texto libre de siempre.
+    '<div id="insUbicProv"></div>' +
     '<div id="insUbicLibre"' + (soloIny ? ' style="display:none;"' : '') + '>' +
     '<input type="text" id="insUbicInput" placeholder="' + hint + ' (ej: Cervantes, Centro, Proveedor X)" ' +
       'style="width:100%;box-sizing:border-box;height:48px;border:2px solid #cbd5e1;border-radius:12px;padding:0 12px;font-size:16px;margin-bottom:12px;" />' +
@@ -27550,6 +27702,9 @@ function askInsUbicacion(mode, sub) {
   // v29.22: las OC de bolsas de GP2 sólo si lo que se recibe son plásticos
   const _riCat = isIn ? (window._insRiCat || "") : "";
   if (!soloOtros && (!isIn || !_riCat || _riCat === "plastico")) _insGp2Opciones(mode, soloIny);
+  // v29.82: los origenes de ESA categoria, como botones. Sin categoria (EI, o una sesion vieja)
+  // no hay lista cerrada que mostrar: queda el texto libre.
+  if (isIn && _riCat) _insOrigenBotones(mode, _riCat);
 
   // Auto-focus en el input
   setTimeout(() => {
@@ -27561,11 +27716,14 @@ function insUbicCancel() {
   const ov = document.getElementById("insUbicModal");
   if (ov) ov.style.display = "none";
 }
-function insUbicOk(mode, _gp2) {
+function insUbicOk(mode, _gp2, _fijo) {
   let ubicacion = "";
   if (_gp2) {
     ubicacion = _gp2.modo === "EI" ? _gp2.inyector : (_gp2.oc.proveedor || ("OC " + _gp2.oc.numero));
     window._insGp2 = _gp2;
+  } else if (_fijo) {
+    ubicacion = String(_fijo).trim();      // v29.82: salió de la lista cerrada de GP2
+    window._insGp2 = null;
   } else {
     const inp = document.getElementById("insUbicInput");
     ubicacion = (inp && inp.value) ? String(inp.value).trim() : "";
@@ -27584,26 +27742,75 @@ function insUbicOk(mode, _gp2) {
     askInsDocumentacion(mode, ubicacion);
     return;
   }
-  selectOption(mode);
+  _insArrancarToggle(mode);   // v29.82: un solo «Enviar» (el de la botonera)
 }
 
+/* v29.82 (Luis, 13/10) — "quiero que el menu sea reducido dependiendo de que es lo que estan
+   recibiendo": el origen de una recepción es una lista CERRADA, la que corresponde a esa categoría.
+   NO está escrita acá: sale de `gv_insumo_origenes`, que la arma con los proveedores y los
+   inyectores de GP2 menos lo anotado en GV_Insumo_Origen_Excluido. Agregar o sacar un origen es
+   un insert, no un deploy.
+     bolsas plásticas → sus proveedores (los que entregan acá)      cajas → sus proveedores
+     partes plásticas → los inyectores + Cervantes                  flejes → sus proveedores + Cervantes
+   ⚠ Si la base no contesta queda el TEXTO LIBRE de siempre: "no pude leer" no es "no hay de dónde
+   recibir", y el operario no se puede quedar sin poder cargar lo que ya tiene en la mano. Por lo
+   mismo, con la lista puesta sigue habiendo un "✏ Otro origen" para el camión que no estaba previsto. */
+async function _insOrigenBotones(mode, cat) {
+  const box = document.getElementById("insUbicProv");
+  if (!box) return;
+  box.innerHTML = '<div style="font-size:13px;color:#64748b;margin-bottom:10px;">Cargando…</div>';
+  let rows = null;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_origenes", {
+      method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_cat: cat }), cache: "no-store" });
+    if (r.ok) rows = await r.json();
+  } catch (_e) { rows = null; }
+  if (!Array.isArray(rows) || !rows.length) { box.innerHTML = ""; return; }   // sin lista: el texto libre de siempre
+  window._insOrigenes = rows;
+  const btn = "width:100%;margin-bottom:8px;padding:13px 14px;border:2px solid #a5b4fc;border-radius:12px;background:#eef2ff;color:#0f172a;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
+  box.innerHTML = rows.map(function (o, i) {
+    const ap = Object.prototype.hasOwnProperty.call(INS_INY_APODO, o.nombre) ? INS_INY_APODO[o.nombre] : "";
+    const em = o.fuente === "cervantes" ? "🏭 " : (o.fuente === "inyector" ? "🧩 " : "🚛 ");
+    return '<button onclick="insUbicOrigen(' + i + ',\'' + mode + '\',\'' + cat + '\')" style="' + btn + '">' + em + escapeHtml(o.nombre) +
+      (ap ? ' <span style="font-weight:700;color:#475569;">(' + escapeHtml(ap) + ')</span>' : '') + '</button>';
+  }).join("") +
+    '<button onclick="_insOrigenOtro()" style="width:100%;margin:2px 0 10px;padding:15px;border:none;border-radius:10px;background:#f1f5f9;color:#475569;font-weight:700;cursor:pointer;font-size:13px;">✏ Otro origen</button>';
+  // la lista cerrada es lo que se usa: el texto libre queda atrás del botón de arriba
+  const lib = document.getElementById("insUbicLibre"); if (lib) lib.style.display = "none";
+  const bt = document.getElementById("insUbicContinuar"); if (bt) bt.style.display = "none";
+}
+function _insOrigenOtro() {
+  const lib = document.getElementById("insUbicLibre"); if (lib) lib.style.display = "";
+  const bt = document.getElementById("insUbicContinuar"); if (bt) bt.style.display = "";
+  const inp = document.getElementById("insUbicInput"); if (inp) inp.focus();
+}
+function insUbicOrigen(i, mode, cat) {
+  const o = (window._insOrigenes || [])[i]; if (!o) return;
+  /* v29.82: "Si es cervantes, aparecen todos los flejes. Sino, por proveedor (cada proveedor en
+     GP2 tiene asignados sus flejes correspondientes)". El filtro viaja con la sesión. */
+  window._insProvFleje = (cat === "fleje" && o.fuente === "proveedor") ? o.nombre : null;
+  insUbicOk(mode, null, o.nombre);
+}
 /* Paso intermedio RI: capturar datos de documentación (remito/factura) antes de
    abrir el modal de insumos. Mismo flujo de 3 botones que mercadería. */
-function askInsDocumentacion(mode, proveedor) {
+function askInsDocumentacion(mode, proveedor, opt) {
+  var soloRemito = !!(opt && opt.soloRemito);   // v29.82: SC/SP nunca vienen con factura
   var ov = document.getElementById("insDocModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insDocModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement("div"); ov.id = "insDocModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
 
   // Estado temporal para la documentación de insumos
   window._insDocState = { tipoDoc: '', nroRemito: '', nroFactura: '', fechaRemito: '', fechaFactura: '', proveedor: proveedor || '' };
 
-  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;margin:auto;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📄 Documentación recibida</div>' +
-    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué documentación recibís?</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + (soloRemito ? "🏭 Cervantes · remito" : "¿Qué documentación recibís?") + '</div>' +
     '<div id="insDocBody"></div>' +
     '</div>';
   ov.style.display = "flex";
 
-  _insDocStep1(mode);
+  if (soloRemito) { window._insDocState.tipoDoc = 'remito'; window._insDocSolo = true; _insDocStep2(mode); }
+  else { window._insDocSolo = false; _insDocStep1(mode); }
 }
 
 function _insDocStep1(mode) {
@@ -27636,7 +27843,7 @@ function _insDocStep2(mode) {
     html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de Factura</label><input type="date" id="insDocFechaFactura" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;" value="' + hoyAR + '"></div>';
   }
   html += '<div style="display:flex;gap:10px;margin-top:14px;">' +
-    '<button onclick="_insDocStep1(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
+    '<button onclick="' + (window._insDocSolo ? "insDocCancel();insRecibirCat()" : "_insDocStep1('" + mode + "')") + '" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
     '<button onclick="insDocOk(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;font-size:16px;">Continuar</button>' +
     '</div>';
   body.innerHTML = html;
@@ -27665,7 +27872,34 @@ function insDocOk(mode) {
 
   // Cerrar modal y continuar al modal de insumos
   insDocCancel();
-  selectOption(mode);
+  _insArrancarToggle(mode);
+}
+/* v29.82 (Luis, 13/10: "actualmente tienen que apretar «enviar» dos veces … ¿hace falta que sea
+   así?") — NO hacía falta. El tiempo ya arranca con el «Enviar» de la botonera (la tarea Insumos,
+   MDI de MOD_TAREA v28.93); el segundo apretón sólo servía para que `send()` abriera el toggle
+   RI/EI. Ahora, terminada la ubicación y la documentación, el toggle se abre SOLO y la recepción
+   queda en pantalla: el operario no vuelve a la botonera a mitad de camino.
+   `send()` hace exactamente lo mismo que hacía al tocar Enviar (evento, historial, cola offline);
+   lo único que se saca es el cartel "Reporte enviado correctamente", que acá no aporta nada —
+   lo que confirma que arrancó es la lista de insumos abierta. El aviso de FALLA se mantiene. */
+function _insArrancarToggle(mode) {
+  const _leg = String((typeof legajoInput !== "undefined" && legajoInput) ? (legajoInput.value || "") : "").trim();
+  /* ⚠ Si el toggle RI/EI quedó ABIERTO (la app se reinició con la recepción a medias), `send()`
+     lo CERRARÍA: acá se RETOMA, con lo que estaba cargado. Cerrarla sin que nadie lo pida sería
+     perder la sesión del operario, y el cierre ya tiene su camino propio dentro del módulo. */
+  try {
+    const st = getLegajoState(_leg) || {};
+    if (_leg && st.toggles && st.toggles[mode]) {
+      let d = null; try { d = opDraftLoad(_leg); } catch (_e) {}
+      if (d && d.op === "INS") opDraftResume(_leg); else showInsumoModal(mode, _leg);
+      return;
+    }
+  } catch (_e) {}
+  try {
+    selected = mode;
+    if (typeof textInput !== "undefined" && textInput) textInput.value = "";
+    send({ sinAviso: true });
+  } catch (_e) { selectOption(mode); }   // si algo falla, el camino viejo (seleccionar + Enviar)
 }
 
 function insDocCancel() {
@@ -27715,11 +27949,26 @@ async function _insGp2Opciones(mode, soloIny) {
           return '<button onclick="insUbicGp2Ok(\'RI\',' + i + ')" style="' + btn + '">OC N° ' + escapeHtml(String(o.numero)) + ' · ' + escapeHtml(o.proveedor || "") +
             '<span style="' + sub + '">' + escapeHtml(its) + (o.fecha_entrega_estimada ? ' · est. ' + escapeHtml(o.fecha_entrega_estimada) : "") + '</span></button>';
         }).join("") +
-        '<div style="font-size:12px;color:#64748b;margin:2px 0 10px;">— o escribí de dónde recibís (otro insumo) —</div>';
+        '<div style="font-size:12px;color:#64748b;margin:2px 0 10px;">— o elegí de dónde recibís (otro insumo) —</div>';
     } else {
       const mv = await insGp2Rpc("material_virgilio_bundle", {});
       window._insGp2Cache = { mv: mv || null };
       if (!mv || !mv.inyectores || !mv.inyectores.length) { if (soloIny) _insUbicSinIny(box); return; }
+      /* v29.82 (Luis, 13/10): "Bolsas plásticas sólo se envían a Kollplast, Pat Bet Plast y
+         Pettofrezza". GP2 marca como inyector también a JL Matriceria; la diferencia queda anotada
+         en GV_Insumo_Origen_Excluido y se aplica acá. Si esa lectura falla, se ofrecen los de GP2
+         (lo de antes): un destino de menos deja al operario sin poder registrar la salida. */
+      try {
+        const rOk = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_origenes", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: JSON.stringify({ p_cat: "inyector" }), cache: "no-store" });
+        if (rOk.ok) {
+          const ok = await rOk.json();
+          if (Array.isArray(ok) && ok.length) {
+            const vale = {}; ok.forEach(function (o) { vale[_insK(o.nombre)] = true; });
+            const fil = mv.inyectores.filter(function (nom) { return vale[_insK(nom)]; });
+            if (fil.length) mv.inyectores = fil;
+          }
+        }
+      } catch (_e) { /* queda la lista de GP2 */ }
       box.innerHTML = (soloIny ? '' : '<div style="font-size:12.5px;font-weight:800;color:#115e59;margin-bottom:6px;">🧪 Bolsas plásticas — ¿van a un inyector?</div>') +
         mv.inyectores.map(function (nom, i) {
           const apodo = INS_INY_APODO[nom];   // v29.27 (Thomas, D12): el nombre con que lo conoce el operario
@@ -27745,8 +27994,9 @@ function insUbicGp2Ok(mode, i) {
     insUbicOk("EI", { modo: "EI", inyector: nom, mv: mv });
   }
 }
-/* v29.27 (Thomas, D12): apodo del inyector de GP2 en el botón («Manolo es Pat Bet Plast»). */
-const INS_INY_APODO = { "Pat Bet Plast": "Manolo" };
+/* v29.27 (Thomas, D12): apodo del inyector de GP2 en el botón («Manolo es Pat Bet Plast»).
+   v29.87: lo carga `insFetchConfig` de `GV_Insumo_Origen_Apodo`; esto es el fallback. */
+let INS_INY_APODO = { "Pat Bet Plast": "Manolo" };
 /* v29.22 — bolsa plástica que se manda a un inyector: plástico, con código real y ubicación. */
 function _insEsBolsaIny(it) {
   return !!it && insCatOf(it) === "plastico" && !_insEsTmp(it) && !it.noCode && String(it.ubic || "").trim() !== "";
@@ -27832,7 +28082,9 @@ async function showInsumoModal(mode, legajo, _resume) {
     // force: si el admin cambió una categoría o una unidad, el operario la ve en la
     // próxima apertura de RI/EI sin tener que recargar la app.
     await insLoadMeta(true);
-    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni(), mode === "RI" ? insFetchGp2Ri() : Promise.resolve(null)]);
+    const _provFleje = (mode === "RI") ? String(window._insProvFleje || "") : ""; window._insProvFleje = null;
+    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni(), mode === "RI" ? insFetchGp2Ri() : Promise.resolve(null),
+      _provFleje ? insFetchFlejeProv() : Promise.resolve(null)]);
     const saldos = res[1] || {};
     const xUni = res[2] || {};
     // idea 7382: default de unidad = la unidad real del saldo si el insumo tiene UNA sola
@@ -27883,6 +28135,10 @@ async function showInsumoModal(mode, legajo, _resume) {
     else if (mode === "EI") lista = lista.filter(function (x) { return insCatOf(x) !== "plastico"; });
     window._insEnvioSub = null;
     _ins = { mode: mode, legajo: String(legajo || "").trim(), items: lista, filtro: "", cat: (riCat && insCatDef(riCat)) ? riCat : "", qty: null, nuevo: null };
+    /* v29.82: vino de un proveedor de flejes → se ven SÓLO sus flejes. Si el mapa no se pudo leer,
+       se ven TODOS (con el aviso): esconder flejes por una lectura caída es dejar al operario sin
+       poder cargar lo que ya descargó del camión. */
+    if (_provFleje) { _ins.provFleje = _provFleje; _ins.flejeProv = res[4] || null; _ins.provOtros = false; }
     if (envIny) { _ins.soloBolsas = true; _ins.cat = "plastico"; }
     // v14.95 — bolsas ↔ GP2: si en la ubicación se eligió un inyector / una OC de GP2, queda en la
     // sesión (viaja con el borrador). RI con OC: precarga las bolsas pendientes de cada material.
@@ -28088,8 +28344,31 @@ function insRender() {
     const base = f
       ? (cat ? _ins.items.filter(function (it) { return insCatOf(it) === (cat === "?" ? "" : cat); }) : _ins.items)
       : _ins.items.filter(function (it) { const k = insCatOf(it); return cat === "?" ? k === "" : k === cat; });
-    const shown = (f ? base.filter(function (it) { return stkMatchBusq(f, it.cod || it.gp2Cod || "", (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || ""), true); }) : base)   // v21.43
+    /* v29.87 (Luis, 13/10) — "elegido el proveedor, muestra los flejes y alambres que están
+       asignados a él y, mientras haya algún fleje y/o alambre que aparezca un botón que diga
+       «otros» y que permita seleccionar de los que todavía no están vinculados".
+       Son DOS listas, no una: la del proveedor y la de los que GP2 no le asignó a nadie. «Otros»
+       cambia de una a la otra; nunca se mezclan, y nada queda inalcanzable.
+       Buscando (`f`) no se filtra nada: si el operario escribe el código, lo tiene que encontrar. */
+    let baseP = base, nSinProv = 0;
+    if (!f && cat === "fleje" && _ins.provFleje && _ins.flejeProv) {
+      nSinProv = base.filter(function (it) { return !_insProvDe(it); }).length;
+      baseP = base.filter(function (it) {
+        const pv = _insProvDe(it);
+        return _ins.provOtros ? !pv : (pv && _insK(pv) === _insK(_ins.provFleje));
+      });
+    }
+    const shown = (f ? baseP.filter(function (it) { return stkMatchBusq(f, it.cod || it.gp2Cod || "", (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || ""), true); }) : baseP)   // v21.43
       .slice().sort(_insSortCat(cat));
+    if (!f && cat === "fleje" && _ins.provFleje) {
+      h += '<div class="ins-depw" style="background:#eef2ff;border-color:#a5b4fc;color:#1e293b;">' +
+        (_ins.provOtros ? '🧵 <b>Otros</b> — los que todavía no están asignados a ningún proveedor en GP2'
+                        : '🚛 Flejes y alambres de <b>' + escapeHtml(_ins.provFleje) + '</b>') +
+        (_ins.flejeProv ? '' : ' — <b>no se pudo leer</b> qué flejes son suyos: se muestran todos') + '</div>';
+      // «Otros» sólo si de verdad hay alguno sin vincular
+      if (_ins.flejeProv && nSinProv) h += '<button class="ins-back" style="width:100%;margin-bottom:8px;" onclick="insProvOtros()">' +
+        (_ins.provOtros ? '‹ Volver a los de ' + escapeHtml(_ins.provFleje) : 'Otros (' + nSinProv + ')') + '</button>';
+    }
     if (_ins.soloBolsas) h += '<div class="ins-bar"><span class="ins-bar-t">🧪 Bolsas plásticas</span></div>';
     else h += '<div class="ins-bar"><button class="ins-back" onclick="insBack()">‹ Atrás</button>' +
       '<span class="ins-bar-t">' + escapeHtml(cat ? insCatLbl(cat === "?" ? "" : cat) : "🔎 Buscar") + '</span></div>';
@@ -28367,6 +28646,7 @@ function _insSaleMC(it) {
   return mc ? mc.u : "";
 }
 function insCloseQty() { if (!_ins) return; _ins.qty = null; insRender(); }
+function insProvOtros() { if (!_ins) return; _ins.provOtros = !_ins.provOtros; insRender(); }
 function insBack() { if (!_ins || _ins.soloBolsas) return; _ins.cat = ""; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = null; insRender(); }
 /* Entrar a una categoría (pantalla 2). Volver a tocarla desde adentro = volver. */
 function insSetCat(k) { if (!_ins || _ins.soloBolsas) return; _ins.cat = (_ins.cat === k) ? "" : k; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = null; insRender(); }
@@ -28507,6 +28787,13 @@ function insEmitCierre(legajo, mode, tsInicioIso, total) {
       id: payload.id, status: "queued", ts_inicio_iso: payload.ts_inicio_iso
     });
   } catch (_e) { /* no-op */ }
+  /* v29.90 (Luis, 13/10): el candado del legajo de prueba tambien aca. Esta era la UNICA
+     escritura de un evento de operario que llamaba a `_enqueueReportRaw` DIRECTO, salteandose
+     el gate que `enqueueReport` y `enqueueAutoClose` si tienen. Por eso el 13/10 el monitor
+     mostro al legajo 1 «en jornada» con un cierre de Recepcion de Insumos (12:32→12:33) SIN su
+     apertura: la apertura la descarto el gate y el cierre salio igual. Y un cierre huerfano no
+     se distingue de una tarea abierta: la vista lo lee como jornada viva. */
+  try { if (esLegajoPrueba(payload.legajo)) return; } catch (_e) {}
   try { _enqueueReportRaw(payload); } catch (_e) { /* no-op */ }
   try { updatePendingIndicator(); } catch (_e) {}
 }
@@ -29364,6 +29651,24 @@ function _modTareaVisible(m) {
   return m.ovs.some(function (id) { var e = document.getElementById(id); return !!e && getComputedStyle(e).display !== "none"; });
 }
 /* La barra (Anular / Terminé) se ve mientras el módulo de una tarea abierta está en pantalla. */
+/* v29.81 (Luis, 13/10: «la barra de abajo con Anular y Terminé tapa opciones y botones … que no tape
+   nada, priorizá la visión de smartphone») — la barra es fixed y se comía el último renglón de la lista
+   (caso: Completar Pedido en el celular). Mientras se ve, los overlays de esos módulos TERMINAN arriba
+   de la barra (`bottom: <alto>`), así su scroll llega hasta el final, y el body lleva el mismo colchón
+   para la botonera de atrás. Al irse la barra se devuelve todo. Al agregar un módulo a MOD_TAREA, sus
+   overlays van en `ovs` — de ahí sale esta lista. */
+var _MODBAR_OVS = (function () { var a = []; Object.keys(MOD_TAREA).forEach(function (c) { a = a.concat(MOD_TAREA[c].ovs || []); }); return a; })();
+function _modTareaColchon(px) {
+  px = Number(px) || 0;
+  try { document.documentElement.style.setProperty("--gv-modbar", px + "px"); } catch (_e) {}
+  var pb = px ? px + "px" : "";
+  try { if (document.body.style.paddingBottom !== pb) document.body.style.paddingBottom = pb; } catch (_e) {}
+  _MODBAR_OVS.forEach(function (id) {
+    var e = document.getElementById(id); if (!e) return;
+    var val = (px && getComputedStyle(e).display !== "none") ? px + "px" : "";
+    if (e.style.bottom !== val) e.style.bottom = val;
+  });
+}
 var _modTareaTimer = null;
 function _modTareaVigilar() {
   var leg = String((typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim();
@@ -29372,6 +29677,7 @@ function _modTareaVigilar() {
   var bar = document.getElementById("modTareaBar");
   if (!cod) {
     if (bar) bar.style.display = "none";
+    _modTareaColchon(0);
     var algun = leg && Object.keys(MOD_TAREA).some(function (c) { return modTareaActiva(leg, c); });
     if (!algun && _modTareaTimer) { clearInterval(_modTareaTimer); _modTareaTimer = null; }
     return;
@@ -29394,6 +29700,7 @@ function _modTareaVigilar() {
       '<button type="button" onclick="modTareaBoton(\'' + cod + '\',false)" style="' + bs + 'background:#16a34a;color:#fff;">🏁 Terminé</button>';
   }
   bar.style.display = "flex";
+  _modTareaColchon(bar.offsetHeight || 56);
 }
 function modTareaBoton(code, anular) {
   var m = MOD_TAREA[code]; if (!m) return;
@@ -30312,16 +30619,17 @@ async function _irCodChk(cod) {
   return out;
 }
 let _irChkT = null;
+function _irCodEfe() { if (!_ir) return ""; return _irNorm(_ir.cod) || _irNorm(_ir.codPick); }
 function _irChkPedir() {
   if (_irChkT) { clearTimeout(_irChkT); _irChkT = null; }
   if (!_ir) return;
   if (_ir.modo === "nacional") { _ir.chk = null; return; }
-  const k = _irNorm(_ir.cod);
+  const k = _irCodEfe();   // v29.77: en Importación el código sale de la LISTA; lo tipeado se chequea igual (AB3)
   if (!k) { _ir.chk = null; return; }
   if (_IR_CHK[k]) { _ir.chk = _IR_CHK[k]; return; }
   _ir.chk = null;
   _irChkT = setTimeout(function () {
-    _irCodChk(k).then(function (res) { if (_ir && _irNorm(_ir.cod) === k) { _ir.chk = res; irRender(); } }).catch(function () {});
+    _irCodChk(k).then(function (res) { if (_ir && _irCodEfe() === k) { _ir.chk = res; irRender(); } }).catch(function () {});
   }, 450);
 }
 function _irChkMal(chk) { return !!(chk && (chk.baja || (chk.pos && chk.existe === false))); }
@@ -30329,8 +30637,10 @@ function _irChkWarn(chk) {
   if (!chk) return "";
   if (chk.baja) return '<div class="ir-warn">⚠ El código <b>' + escapeHtml(chk.cod) + '</b> no se usa más'
     + (chk.baja !== "-" ? ': es el <b>' + escapeHtml(chk.baja) + '</b>. Cargalo como ' + escapeHtml(chk.baja) + '.' : '.') + '</div>';
-  if (chk.pos && chk.existe === false) return '<div class="ir-warn">⚠ <b>' + escapeHtml(chk.cod) + '</b> no es un artículo: es la <b>POSICIÓN de rack ' + escapeHtml(chk.pos)
-    + '</b>.<br>Acá va el <b>código del artículo</b> (ej. 956E); la posición va abajo, en <b>Sector</b>.</div>';
+  /* v29.78 (Luis, 13/10: «No tiene que avisar que es una posicion, simplemente no tiene que dejar») —
+     una posición de rack (AB3) no lleva cartel: no está en la lista, no se puede elegir y «usar igual»
+     no se ofrece (_irChkMal). El aviso que decía «es la POSICIÓN de rack AB03» se retiró. */
+  if (chk.pos && chk.existe === false) return "";
   if (chk.existe === false) return '<div class="ir-warn" style="background:#fffbeb;border-color:#fcd34d;color:#92400e">⚠ El código <b>' + escapeHtml(chk.cod) + '</b> no existe en el maestro. Revisalo antes de cargar.</div>';
   return "";
 }
@@ -30340,11 +30650,34 @@ async function _irCodGuard(codN) {
   if (_ir) { _ir.chk = chk; }
   if (chk.baja) { try { alert("El código " + codN + " no se usa más" + (chk.baja !== "-" ? ": es el " + chk.baja + ". Cargalo como " + chk.baja + "." : ".")); } catch (_e) {} irRender(); return false; }
   if (chk.existe === true) return true;
-  if (chk.pos) { try { alert("«" + codN + "» NO es un artículo: es la POSICIÓN de rack " + chk.pos + ".\n\nEn «Código» va el código del artículo (ej. 956E) y la posición va abajo, en «Sector»."); } catch (_e) {} irRender(); return false; }
+  if (chk.pos) { irRender(); return false; }   // v29.78: una posición de rack no se carga, y no lleva cartel
   irRender();
   const q = " " + cajas + " cajas en " + sec + "?";
   if (chk.existe === false) return confirm("No existe el código " + codN + ".\n\n¿Lo creo y le cargo" + q);
   return confirm("No pude verificar si el código " + codN + " existe.\n\n¿Cargo igual" + q);
+}
+/* v29.77 (Luis, 13/10: «mas que candado, solo debería dar opciones de poner un codigo ya existente.
+   a medida que se escribe se sugiere el codigo») — el campo Código de Importación SUGIERE códigos que
+   existen, en vez de aceptar texto libre. El universo es el MISMO que decide el candado de la v29.67
+   (`gv_stock_cod_conocido`), listado por `gv_stock_cod_lista()`: así la pantalla no puede sugerir un
+   código que después el candado rechaza. Deja afuera los dados de baja y los insumos puros (A1 es
+   insumo Y posición de rack: justo la confusión que esto viene a cerrar); el insumo importado (323ES)
+   entra porque está en Importados. Devuelve el código como lo escriben los maestros (026, no 26).
+   ⚠ Si la lectura falla, la lista queda vacía y el campo sigue aceptando lo tipeado con el candado de
+   la v29.67 — «no pude leer» no es «ese código no existe». */
+async function irFetchCodigos() {
+  const arr = [];
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_stock_cod_lista", { method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    (Array.isArray(j) ? j : []).forEach(function (x) {
+      const c = String(x.cod || "").trim(); if (!c) return;
+      arr.push({ cod: c, k: _ocgNorm(c), nom: String(x.nombre || "").trim(), imp: x.importado === true });
+    });
+  } catch (_e) {}
+  return arr;
 }
 async function irFetchCxM(plani) {
   const cx = {};
@@ -30386,6 +30719,7 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
     await loadArtNombres();
     const cxm = await irFetchCxM(plani);
     const saldos = await stockFetchSaldos().catch(function () { return {}; });   // v6.28: para el "nacional" (stock en a_guardar/excedente)
+    const cods = await irFetchCodigos();   // v29.77: los códigos que se pueden sugerir en Importación
     const seen = {}, libres = [], ocupados = {};
     /* v29.78 (Luis, 13/10) — SUB-POSICIONES: `sector` de Racks_Planimetria ES la DIRECCIÓN (Y25 o Y25-2),
        así que `ocupados` y `libres` ya vienen por parte. Lo único nuevo son dos mapas: en qué rack está
@@ -30404,7 +30738,7 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
       if (!ocupados[secU]) libres.push(sec);
     });
     libres.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
-    _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, libres: libres, ocupados: ocupados, partesDe: partesDe, rackDe: rackDe, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
+    _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, cods: cods, libres: libres, ocupados: ocupados, partesDe: partesDe, rackDe: rackDe, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", codNuevo: false, masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
     _ir.tsInicio = _irIni || Date.now(); if (!_irIni) { try { gvRacksTramo("IRI", _ir.legajo, _ir.tsInicio); } catch (_e) {} }   // v23.66: el tramo de racks arranca al abrir · v26.83: o sigue el abierto
     irRender();
   } catch (e) { const b = document.getElementById("irBody"); if (b) b.innerHTML = '<div class="ir-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -30417,7 +30751,7 @@ function irRender() {
   const secU = String(_ir.sector || "").trim().toUpperCase(), ocupadoPor = _ir.ocupados[secU] || "";
   const sectorOcupadoOtro = ocupadoPor && _irNorm(ocupadoPor) !== codN;
   const nombre = _ir.cod ? (artNombre(_ir.cod, "") || "") : "";
-  const chk = (_ir.chk && _ir.chk.cod === codN) ? _ir.chk : null;   // v29.67: candado del código (solo importación)
+  const chk = (_ir.chk && _ir.chk.cod === _irCodEfe()) ? _ir.chk : null;   // v29.67: candado del código (solo importación)
   const codMal = !nac && _irChkMal(chk);
   const origTxt = _ir.origen === "excedente" ? "excedente" : "a guardar";
   const disp = nac ? _irDisp(_ir.cod, _ir.origen) : 0;
@@ -30438,10 +30772,12 @@ function irRender() {
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas a mover' + (_ir.cod ? ' (máx ' + Math.round(disp) + ')' : '') + '</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div>';
     if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(codCanonSuf(_ir.cod)) + ' en ' + origTxt + '.</div>';
   } else {
-    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
-    h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="ej. 582E" value="' + escapeHtml(codBase(_ir.cod)) + '" oninput="irSetCod(this.value)"></div>';
-    if (_ir.cod) h += '<div class="ir-desc">' + escapeHtml(nombre || "(código nuevo, sin nombre)") + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
+    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: elegí el <b>código</b> de la lista (escribí el código o el nombre y te lo sugiero), cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
+    // v29.77: el campo BUSCA entre los códigos que existen; el código se elige de la lista (o se escribe entero)
+    h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="🔎 código o nombre (ej. 956E)" value="' + escapeHtml(_ir.codPick || "") + '" oninput="irSetPick(this.value)"></div>';
+    if (_ir.cod) h += '<div class="ir-desc">Elegido: <b>' + escapeHtml(codBase(_ir.cod)) + '</b> ' + escapeHtml(nombre || (_ir.codNuevo ? "(código nuevo, sin nombre)" : "")) + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
     if (chk) h += _irChkWarn(chk);
+    h += _irListaImp();
     h += '<div class="ir-row2"><div class="ir-fld"><div class="ir-lbl">Masters</div><div class="ir-stp"><button class="ir-sb" onclick="irChgM(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.masters) || 0) + '" oninput="irSetM(this.value)"><button class="ir-sb" onclick="irChgM(1)">+</button></div></div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas (inner)</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div></div>';
   }
@@ -30463,7 +30799,19 @@ function irRender() {
   else h += '<button class="gv-anular" onclick="irAnular()">⛔ Anular ingreso</button>';
   _renderKeepFocus(body, h);
 }
-function irSetCod(v) { if (!_ir) return; _ir.cod = String(v == null ? "" : v).toUpperCase().replace(/\s+/g, ""); const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0 && Number(_ir.masters) > 0) _ir.inner = Number(_ir.masters) * cxm; _irChkPedir(); irRender(); }
+/* v29.77 — irSetCod ya no cuelga de ningún input (en Importación el código se elige de la lista con
+   irPickCod): queda como setter programático. Si el código no está en el universo, se marca como
+   «código nuevo», que es el mismo estado que deja el «usar igual» — así el candado lo pregunta. */
+function irSetCod(v) {
+  if (!_ir) return;
+  _ir.cod = String(v == null ? "" : v).toUpperCase().replace(/\s+/g, "");
+  if (_ir.modo !== "nacional") {
+    _ir.codPick = codBase(_ir.cod);
+    const hit = _irCodBuscar(_ocgNorm(_ir.cod));
+    if (hit) { _ir.cod = hit.cod; _ir.codNuevo = false; } else _ir.codNuevo = !!_ir.cod;
+  }
+  _irCxmAplicar(); _irChkPedir(); irRender();
+}
 function irSetM(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || n < 0) n = 0; _ir.masters = n; const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0) _ir.inner = n * cxm; irRender(); }
 function irChgM(d) { if (!_ir) return; irSetM(Math.max(0, (Number(_ir.masters) || 0) + d)); }
 function irSetI(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || n < 0) n = 0; _ir.inner = n; irRender(); }
@@ -30554,10 +30902,75 @@ function irSetSec(v) { if (!_ir) return; _ir.sector = String(v == null ? "" : v)
 function irSetEmp(e) { if (!_ir) return; _ir.emp = (e === "CH") ? "CH" : "LK"; irRender(); }
 /* v6.28 — Ingreso a racks NACIONAL: mover stock existente (a_guardar/excedente) a racks. */
 function _irDisp(cod, origen) { if (!_ir || !_ir.saldos || !cod) return 0; const e = _ir.saldos[String(cod)]; if (!e) return 0; return Math.max(0, Number(e[origen === "excedente" ? "excedente" : "a_guardar"]) || 0); }
-function irSetModo(m) { if (!_ir) return; _ir.modo = (m === "nacional" ? "nacional" : "import"); _ir.cod = ""; _ir.codPick = ""; _ir.masters = 0; _ir.inner = 0; _ir.chk = null; irRender(); }
+function irSetModo(m) { if (!_ir) return; _ir.modo = (m === "nacional" ? "nacional" : "import"); _ir.cod = ""; _ir.codPick = ""; _ir.codNuevo = false; _ir.masters = 0; _ir.inner = 0; _ir.chk = null; irRender(); }
 function irSetOrigen(o) { if (!_ir) return; _ir.origen = (o === "excedente" ? "excedente" : "a_guardar"); _ir.cod = ""; _ir.inner = 0; irRender(); }
-function irSetPick(v) { if (!_ir) return; _ir.codPick = String(v == null ? "" : v); irRender(); }
-function irPickCod(codEnc) { if (!_ir) return; const cod = decodeURIComponent(codEnc); _ir.cod = cod; const disp = _irDisp(cod, _ir.origen); if (Number(_ir.inner) > disp) _ir.inner = disp; irRender(); }
+function irSetPick(v) {
+  if (!_ir) return;
+  _ir.codPick = String(v == null ? "" : v);
+  /* v29.77 — en Importación lo tipeado es la BÚSQUEDA: el código queda elegido sólo si coincide EXACTO
+     con uno que existe (así tipear el código entero sigue andando sin tocar la lista) o si lo tocan en
+     la lista. El «usar igual» (código nuevo) se mantiene mientras no cambie el texto. */
+  if (_ir.modo !== "nacional") {
+    const k = _ocgNorm(_ir.codPick);
+    if (!(_ir.codNuevo && _ocgNorm(_ir.cod) === k && k)) {
+      const hit = k ? _irCodBuscar(k) : null;
+      _ir.cod = hit ? hit.cod : "";
+      _ir.codNuevo = false;
+    }
+    _irCxmAplicar();
+    _irChkPedir();
+  }
+  irRender();
+}
+function _irCxmAplicar() { if (!_ir) return; const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0 && Number(_ir.masters) > 0) _ir.inner = Number(_ir.masters) * cxm; }
+function _irCodBuscar(k) {
+  if (!_ir || !k) return null;
+  const arr = _ir.cods || [];
+  for (let i = 0; i < arr.length; i++) if (arr[i].k === k) return arr[i];
+  return null;
+}
+function irPickCod(codEnc) {
+  if (!_ir) return;
+  const cod = decodeURIComponent(codEnc);
+  _ir.cod = cod; _ir.codNuevo = false;
+  if (_ir.modo === "nacional") { const disp = _irDisp(cod, _ir.origen); if (Number(_ir.inner) > disp) _ir.inner = disp; }
+  else { _ir.codPick = codBase(cod); _irCxmAplicar(); _irChkPedir(); }
+  irRender();
+}
+/* v29.77 — la salida: un importado que todavía no está en ningún maestro (el alta va por Importación →
+   ➕ Agregar / modificar). No se ofrece si lo tipeado es una POSICIÓN de rack o un código de baja: eso
+   lo frena el candado de la v29.67, que es el caso que originó todo (AB3). */
+function irCodNuevo() {
+  if (!_ir) return;
+  const k = _irNorm(_ir.codPick); if (!k) return;
+  _ir.cod = k; _ir.codNuevo = true; _irCxmAplicar(); _irChkPedir(); irRender();
+}
+function _irListaImp() {
+  if (!_ir) return "";
+  const arr0 = _ir.cods || [];
+  const f = String(_ir.codPick || "").toLowerCase().trim();
+  const chk = (_ir.chk && _ir.chk.cod === _irCodEfe()) ? _ir.chk : null;
+  if (!arr0.length) return '';   // la lectura falló: el campo queda libre con el candado de la v29.67
+  if (!f) return '<div class="ir-desc" style="color:#64748b">Escribí el <b>código</b> o el <b>nombre</b> y te sugiero los que existen (' + arr0.length + ' códigos · 🚢 = importado).</div>';
+  const arr = arr0.filter(function (x) { return (x.cod + " " + x.nom).toLowerCase().indexOf(f) >= 0; });
+  if (!arr.length) {
+    let v = '<div class="ir-warn" style="background:#fffbeb;border-color:#fcd34d;color:#92400e">⚠ No hay ningún código que coincida con "' + escapeHtml(_ir.codPick) + '".</div>';
+    if (!_irChkMal(chk)) v += '<button class="gv-anular" style="border-color:#fcd34d;color:#92400e;margin:-4px 0 11px" onclick="irCodNuevo()">✎ Cargar «' + escapeHtml(_irNorm(_ir.codPick)) + '» igual (código nuevo)</button>';
+    return v;
+  }
+  const kSel = _ocgNorm(_ir.cod);
+  let h = '<div style="max-height:190px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;margin:-2px 0 11px;">';
+  arr.slice(0, 40).forEach(function (x) {
+    const on = kSel && x.k === kSel;
+    h += '<button onclick="irPickCod(\'' + encodeURIComponent(x.cod) + '\')" style="display:flex;width:100%;align-items:baseline;gap:8px;padding:8px 10px;border:none;border-bottom:1px solid #f1f5f9;background:' + (on ? "#0e7490" : "#fff") + ';color:' + (on ? "#fff" : "#0f172a") + ';cursor:pointer;text-align:left;font-size:13.5px;">'
+      + '<span style="font-family:Consolas,Menlo,monospace;font-weight:800;">' + escapeHtml(x.cod) + '</span>'
+      + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:' + (on ? "#e0f2fe" : "#475569") + ';">' + escapeHtml(x.nom || "—") + '</span>'
+      + (x.imp ? '<span style="white-space:nowrap;font-size:12px;">🚢</span>' : '') + '</button>';
+  });
+  if (arr.length > 40) h += '<div class="ir-more" style="padding:7px 10px;">+' + (arr.length - 40) + ' más — afiná la búsqueda</div>';
+  h += '</div>';
+  return h;
+}
 function _irListaNac() {
   if (!_ir) return "";
   const orig = _ir.origen === "excedente" ? "excedente" : "a_guardar";
@@ -30682,7 +31095,7 @@ async function irCargar() {
   // nacional: descontar del saldo local (origen −, racks +) para refrescar el buscador
   if (nac && _ir.saldos && _ir.saldos[_ir.cod]) { const key = _ir.origen === "excedente" ? "excedente" : "a_guardar"; _ir.saldos[_ir.cod][key] = (Number(_ir.saldos[_ir.cod][key]) || 0) - inner; _ir.saldos[_ir.cod].racks = (Number(_ir.saldos[_ir.cod].racks) || 0) + inner; }
   _ir.done.push({ cod: cod, sector: sector, masters: masters, inner: inner, nac: nac ? origTxt : "" });
-  _ir.cod = ""; _ir.codPick = ""; _ir.masters = 0; _ir.inner = 0; _ir.sector = (_ir.libres[0] || ""); _ir.confirming = false; _ir.chk = null;
+  _ir.cod = ""; _ir.codPick = ""; _ir.codNuevo = false; _ir.masters = 0; _ir.inner = 0; _ir.sector = (_ir.libres[0] || ""); _ir.confirming = false; _ir.chk = null;
   irRender();
   try { alert("✓ " + (nac ? "Trasladado" : "Cargado") + ": " + inner + " cajas de " + cod + " → " + sector + (nac ? " (desde " + origTxt + ")" : "") + "."); } catch (_e) {}
 }
@@ -34409,7 +34822,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
      picking/armado de ESA tanda. Un evento automatico (PKC, ENT, TAL, GST, MGR, *X...) no corta la cola; un
      tramo que ya estaba abierto al cerrar (ts_inicio antes del TP/TAP) la deja en 0; una bajada de racks sin
      tramo la corta (ese tramo ya cuenta como racks); un segundo TP/TAP de la MISMA tanda no la corta. */
-  const COLA_AUTO = new Set(["PUB","AUB","PKC","ENT","RSP","ROC","RAG","FGU","FSS","IMPT","TAL","GST","MGR","PKM","SSG","PSP","PKG","NPD","PKAX"]);
+  const COLA_AUTO = new Set(["PUB","AUB","PKC","ENT","RSP","ROC","RAG","FGU","FSS","IMPT","TAL","GST","MGR","PKM","SSG","PSP","PKG","NPD","PKAX","AUI"]);
   const _colaEvs = new Map(), _colaRk = new Map();
   for (const ev of events) {
     const leg = String(ev.legajo || "").trim();
@@ -58390,6 +58803,78 @@ function gvHelperRender(ping){
   ov.innerHTML = gvHelperHtml();
   if (ping && gvHelperActivo() && Date.now() - _gvHelper.pingTs > 3000) helperVivo().then(function (){ gvHelperRender(false); });
 }
+/* ============================================================
+   📺 VINCULAR TV (v29.78, Elías, 13/10/2026)
+   ============================================================
+   La TV de pared (monitor/tv.html) ya no pide el código de ingreso con la clave pública: guarda un secreto
+   propio y, la primera vez, muestra un código de 6 dígitos. Acá un supervisor lo aprueba (gv_tv_vincular_aprobar)
+   y desde ese momento esa TV muestra el código. También se ven las TV vinculadas y se desvinculan
+   (gv_tv_pantallas / gv_tv_revocar). Todo con la sesión del supervisor (gvWriteHdr). */
+/* GV-UI (v29.83): el pop-up usa los tokens y clases de gv-ui.css; acá sólo va el layout. */
+const GV_VTV_CSS = "#gvVtvOv{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:9999}" +
+  "#gvVtvOv.show{display:flex}#gvVtvOv .vtv{width:min(560px,94vw);max-height:90vh;overflow:auto;display:flex;flex-direction:column;gap:var(--gv-sp-4)}" +
+  "#gvVtvOv .vtv-cab{display:flex;justify-content:space-between;align-items:center;gap:var(--gv-sp-3)}" +
+  "#gvVtvOv .vtv-cab b{font-size:var(--gv-fs-lg)}#gvVtvOv .vtv-form{display:flex;gap:var(--gv-sp-3);flex-wrap:wrap;align-items:center}" +
+  "#gvVtvOv #gvVtvCod{width:9ch;font-size:var(--gv-fs-xl);letter-spacing:.1em;text-align:center}#gvVtvOv #gvVtvNom{flex:1;min-width:160px}" +
+  "#gvVtvOv button{min-height:var(--gv-tap)}";
+let _gvVtvMsg = "";
+async function openVincularTv() {
+  if (!requireSupervisor()) return;
+  if (!document.getElementById("gvVtvCss")) { const st = document.createElement("style"); st.id = "gvVtvCss"; st.textContent = GV_VTV_CSS; document.head.appendChild(st); }
+  let ov = document.getElementById("gvVtvOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "gvVtvOv";
+    ov.addEventListener("click", function (e) { if (e.target === ov) closeVincularTv(); });
+    document.body.appendChild(ov);
+  }
+  _gvVtvMsg = "";
+  ov.classList.add("show");
+  await gvVtvRender();
+}
+function closeVincularTv() { const ov = document.getElementById("gvVtvOv"); if (ov) ov.classList.remove("show"); }
+async function _gvVtvRpc(fn, body) {
+  const h = await facAuthWriteHeaders();
+  if (!h) throw new Error("Iniciá sesión con Google como supervisor.");
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, { method: "POST", cache: "no-store", headers: h, body: JSON.stringify(body || {}) });
+  const t = await r.text();
+  let j = null; try { j = t ? JSON.parse(t) : null; } catch (_e) {}
+  if (!r.ok) throw new Error((j && j.message) || ("HTTP " + r.status));
+  return j;
+}
+async function gvVtvRender() {
+  const ov = document.getElementById("gvVtvOv"); if (!ov) return;
+  let filas = null, err = "";
+  try { filas = await _gvVtvRpc("gv_tv_pantallas", {}); } catch (e) { err = String(e.message || e); }
+  const fmt = function (x) { if (!x) return "—"; try { return new Date(x).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (_e) { return "—"; } };
+  const activas = (filas || []).filter(function (f) { return f.estado === "activa"; }).length;
+  const estado = err ? '<div class="gv-err">No pude leer las TV vinculadas: ' + escapeHtml(err) + '</div>'
+    : '<div class="gv-state ' + (activas ? "ok" : "media") + '"><span class="v">' + (activas ? activas + (activas === 1 ? " TV vinculada" : " TV vinculadas") : "Ninguna TV vinculada") + '</span></div>';
+  const tabla = (err || !filas || !filas.length) ? ""
+    : '<div class="gv-tblwrap"><table class="gv-tbl compact"><tr><th>TV</th><th>Estado</th><th>Aprobada</th><th>Último uso</th><th></th></tr>' + filas.map(function (f) {
+        return '<tr><td class="t">' + escapeHtml(f.nombre || ("TV " + f.id)) + '</td><td><span class="gv-badge ' + (f.estado === "activa" ? "ok" : "err") + '">' + escapeHtml(f.estado) + '</span></td><td>' + fmt(f.aprobado_en) +
+          "</td><td>" + fmt(f.ultimo_uso) + "</td><td>" + (f.estado === "activa" ? '<button onclick="gvVtvRevocar(' + Number(f.id) + ')">Desvincular</button>' : "") + "</td></tr>";
+      }).join("") + "</table></div>";
+  ov.innerHTML = '<div class="vtv gv gv-card"><div class="vtv-cab"><b>Vincular TV</b><button onclick="closeVincularTv()" aria-label="Cerrar">✕</button></div>' + estado +
+    '<div class="vtv-form"><input id="gvVtvCod" inputmode="numeric" maxlength="6" placeholder="código" aria-label="Código de 6 dígitos de la TV">' +
+    '<input id="gvVtvNom" placeholder="Nombre (TV depósito)" aria-label="Nombre de la TV"><button onclick="gvVtvAprobar()">Vincular</button></div>' +
+    (_gvVtvMsg ? '<div class="gv-sub" id="gvVtvMsg">' + escapeHtml(_gvVtvMsg) + '</div>' : "") + tabla + '</div>';
+}
+async function gvVtvAprobar() {
+  const cod = String((document.getElementById("gvVtvCod") || {}).value || "").replace(/\D/g, "");
+  const nom = String((document.getElementById("gvVtvNom") || {}).value || "").trim();
+  if (cod.length !== 6) { _gvVtvMsg = "Poné los 6 números que muestra la TV."; await gvVtvRender(); return; }
+  try {
+    const j = await _gvVtvRpc("gv_tv_vincular_aprobar", { p_codigo: cod, p_nombre: nom });
+    _gvVtvMsg = (j && j.ok) ? "TV vinculada: en menos de un minuto muestra el código de ingreso." : ("No se pudo vincular: " + ((j && j.error) || "probá de nuevo."));
+  } catch (e) { _gvVtvMsg = "No se pudo vincular: " + String(e.message || e); }
+  await gvVtvRender();
+}
+async function gvVtvRevocar(id) {
+  if (!confirm("¿Desvincular esta TV? Deja de mostrar el código de ingreso hasta que se la vuelva a vincular.")) return;
+  try { const j = await _gvVtvRpc("gv_tv_revocar", { p_id: id }); _gvVtvMsg = (j && j.ok) ? "TV desvinculada." : "No se pudo desvincular."; }
+  catch (e) { _gvVtvMsg = "No se pudo desvincular: " + String(e.message || e); }
+  await gvVtvRender();
+}
 function openHelperImpresion(){
   if (!requireSupervisor()) return;
   if (!document.getElementById("gvHelperCss")) { const st = document.createElement("style"); st.id = "gvHelperCss"; st.textContent = GV_HELPER_CSS; document.head.appendChild(st); }
@@ -62589,7 +63074,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.76"></script>
+<script src="importacion.js?v=29.93"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62954,6 +63439,105 @@ function showSupervisor(email) {
   try { colaImpLoadBadge(); } catch (_e) {}   // v11.60: badge Cola de impresión NP (armadas sin imprimir; rojo si +24h)
   try { expIsisLoadBadge(); } catch (_e) {}   // badge Agregar Expreso ISIS (expresos que eligió el cliente en la página)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
+  try { rolPanelInit(); } catch (_e) {}   // v29.85: panel por rol (quién sos + checklist)
+}
+
+/* ============ PANEL POR ROL (v29.85, Thomas 13/10) ============
+   El panel admin entra con un mail compartido, así que no dice quién es la
+   persona: al entrar se elige QUIÉN sos y, según el ÁREA, aparece un checklist
+   de lo que hay para mirar/hacer con contadores en vivo (gv_rol_panel) y un
+   botón que abre el módulo. NO ejecuta nada: el de atrasados abre el pop-up de
+   reprogramar a confirmar. La elección se guarda por dispositivo; "cambiar"
+   re-pregunta (el admin es compartido entre Luis y Thomas). */
+const GV_SUP_ROLES = {
+  luis:      { nombre: "Luis",           area: "admin" },
+  thomas:    { nombre: "Thomas",         area: "admin" },
+  marianela: { nombre: "Marianela",      area: "ventas" },
+  tomas:     { nombre: "Tomás González", area: "ventas" },
+  viviana:   { nombre: "Viviana",        area: "impo" }
+};
+const GV_AREA_NOMBRE = { admin: "Administración general", ventas: "Ventas", impo: "Importaciones · Comex · Cobranzas" };
+const GV_ROL_ITEMS = [
+  { id: "sin_zona",  areas: ["admin", "ventas"], label: "Pedidos sin zona",                          cnt: function (d) { return d.sin_zona_ped; },                       open: function () { openPPP(); },                hint: "Asignales zona en «A Programar»" },
+  { id: "atrasados", areas: ["admin", "ventas"], label: "Pedidos atrasados · reprogramar",           cnt: function (d) { return d.atrasados; },                          open: function () { openPPP(); },                hint: "Abrí «Pasar de día» y confirmá" },
+  { id: "cuar_prog", areas: ["admin", "ventas"], label: "Programados que deberían ir a cuarentena",  cnt: function (d) { return d.cuar_prog; },                          open: function () { openPPP(); },                hint: "Sacalos o aprobalos en «A Programar»" },
+  { id: "cuar_arm",  areas: ["admin", "ventas"], label: "Armados en cuarentena sin día",             cnt: function (d) { return d.cuar_armado; },                        open: function () { openPPP(); },                hint: "Asignales día a mano" },
+  { id: "imp_ir",    areas: ["admin", "impo"],   label: "Ingresos a racks de importación sin revisar", cnt: function (d) { return d.imp_ir; },                           open: function () { openPedidosImportacion(); }, hint: "Importación → 📥 Recibido" },
+  { id: "ads",       areas: ["admin", "impo"],   label: "Quiebres de stock a 10 días",               cnt: function (d) { return (d.ads_stock && d.ads_stock.q10) || 0; }, open: function () { openAds(); },               hint: "ADS → Stock", tall: function (d) { return d.ads_tall; } },
+  { id: "expreso",   areas: ["admin", "impo"],   label: "Expresos por cargar en ISIS",               cnt: function (d) { return d.expreso; },                            open: function () { openExpresoIsis(); },        hint: "No frena ningún pedido" },
+  { id: "conc",      areas: ["admin", "impo"],   label: "Conciliación: movimientos por resolver",    cnt: function (d) { return d.conc; },                               open: function () { openCobranzas(); },          hint: "Cobranzas → Conciliación" }
+];
+
+function _rolGet() { try { return localStorage.getItem("gv_sup_quien") || ""; } catch (_e) { return ""; } }
+function _rolSet(k) { try { localStorage.setItem("gv_sup_quien", k); } catch (_e) {} }
+
+function rolPanelInit() {
+  var cont = document.getElementById("rolPanel"); if (!cont) return;
+  var k = _rolGet();
+  if (!k || !GV_SUP_ROLES[k]) { rolPickerAbrir(); return; }
+  rolPanelRender(k);
+}
+
+function rolPickerAbrir() {
+  var ov = document.getElementById("rolPickerOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "rolPickerOv";
+    ov.style.cssText = "position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:18px;";
+    document.body.appendChild(ov);
+  }
+  var btns = Object.keys(GV_SUP_ROLES).map(function (k) {
+    var r = GV_SUP_ROLES[k];
+    return '<button onclick="rolElegir(\'' + k + '\')" style="display:block;width:100%;margin:8px 0;padding:14px;border:none;border-radius:12px;background:#2563eb;color:#fff;font-size:17px;font-weight:800;cursor:pointer;text-align:left;">' + r.nombre + ' <span style="opacity:.85;font-weight:600;font-size:12.5px;">· ' + GV_AREA_NOMBRE[r.area] + '</span></button>';
+  }).join("");
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;max-width:380px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.3);"><div style="font-size:21px;font-weight:800;color:#0f172a;">¿Quién sos?</div><div style="font-size:13px;color:#64748b;margin:3px 0 12px;">Según tu área te muestro qué hay para mirar.</div>' + btns + '</div>';
+  ov.style.display = "flex";
+}
+function rolElegir(k) { _rolSet(k); var ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none"; rolPanelRender(k); }
+
+function rolPanelRender(k) {
+  var cont = document.getElementById("rolPanel"); if (!cont) return;
+  var r = GV_SUP_ROLES[k]; if (!r) { rolPickerAbrir(); return; }
+  window.__gvRol = r.area;
+  cont.style.display = "block";
+  cont.innerHTML =
+    '<div class="rolp-head"><div><span class="rolp-hola">Hola, ' + r.nombre + '</span><span class="rolp-area">' + GV_AREA_NOMBRE[r.area] + '</span></div>' +
+    '<button class="rolp-cambiar" onclick="rolPickerAbrir()">cambiar</button></div>' +
+    '<div class="rolp-vered" id="rolpVered">Cargando…</div>' +
+    '<div class="rolp-list" id="rolpList"></div>';
+  rolPanelCargar();
+}
+
+function rolPanelCargar() {
+  var area = window.__gvRol || "admin";
+  var items = GV_ROL_ITEMS.filter(function (it) { return it.areas.indexOf(area) >= 0; });
+  var listEl = document.getElementById("rolpList"); var verEl = document.getElementById("rolpVered");
+  function paint(data) {
+    if (!listEl) return;
+    var alerts = 0;
+    listEl.innerHTML = items.map(function (it) {
+      var idx = GV_ROL_ITEMS.indexOf(it);
+      var n = data ? (it.cnt(data) || 0) : null;
+      if (n > 0) alerts++;
+      var dot = (n === null) ? "#94a3b8" : (n > 0 ? "#dc2626" : "#16a34a");
+      var num = (n === null) ? "—" : (n > 0 ? String(n) : "✓");
+      var tall = (it.tall && data) ? it.tall(data) : 0;
+      var extra = (it.id === "ads" && tall > 0) ? ' · <span class="rolp-sub">' + tall + ' talleristas flojos</span>' : '';
+      return '<button class="rolp-row" onclick="GV_ROL_ITEMS[' + idx + '].open()">' +
+        '<span class="rolp-dot" style="background:' + dot + '"></span>' +
+        '<span class="rolp-lbl">' + it.label + extra + '<span class="rolp-hint">' + it.hint + '</span></span>' +
+        '<span class="rolp-num" style="color:' + dot + '">' + num + '</span></button>';
+    }).join("");
+    if (verEl) {
+      if (data === null) verEl.innerHTML = '<span style="color:#92400e">No pude leer los contadores · tocá un ítem igual</span>';
+      else if (alerts === 0) verEl.innerHTML = '<span style="color:#166534">✓ Nada pendiente en tu área</span>';
+      else verEl.innerHTML = '<b>' + alerts + '</b> cosa' + (alerts === 1 ? '' : 's') + ' para mirar';
+    }
+  }
+  paint(null);
+  fetch(SUPABASE_URL + "/rest/v1/rpc/gv_rol_panel", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { paint(d && typeof d === "object" ? d : null); })
+    .catch(function () { paint(null); });
 }
 
 function showOperario(emp) {
@@ -63364,6 +63948,23 @@ function _tvClaveVigente() { return __tvClaveOkAt && (Date.now() - __tvClaveOkAt
 function _tvPaso(cual) {
   ["tvClaveStep", "tvNombreStep", "tvLegNumStep", "tvLegajoStep", "tvCervStep"].forEach(function (id) { const e = $(id); if (e) e.classList.toggle("hidden", id !== cual); });
 }
+/* v29.84 (Elías): el servidor frena un intento fallido 2 s por equipo/IP, y desde la 6.ª falla en 10 min
+   pide el equipo (gv_dispositivo + huella + navegador; la MAC no la da el navegador) y avisa por Telegram.
+   ≡ gv_clave_chequear (sql/gv_tv_seguridad_v2974.sql). */
+function _gvHuella() {
+  try {
+    const s = [screen.width, screen.height, screen.colorDepth, new Date().getTimezoneOffset(),
+      navigator.language, navigator.platform, navigator.hardwareConcurrency || 0, navigator.maxTouchPoints || 0].join("|");
+    let h = 0; for (let i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
+    return (h >>> 0).toString(16);
+  } catch (_e) { return null; }
+}
+function _tvClaveError(e) {
+  if (e === "espera") return "Esperá 2 segundos y probá de nuevo.";
+  if (e === "bloqueo") return "Demasiados intentos fallidos desde este celular. Esperá 10 minutos o pedile ayuda a un supervisor.";
+  if (e === "dispositivo") return "Demasiados intentos: actualizá la app y probá de nuevo.";
+  return "Clave incorrecta. Mirá la TV (cambia cada minuto).";
+}
 window.loginConClaveTv = async function () {
   const errEl = $("legajoLoginError"); if (errEl) errEl.textContent = "";
   const clave = String(($("tvClaveInput") || {}).value || "").replace(/\D/g, "");
@@ -63372,11 +63973,12 @@ window.loginConClaveTv = async function () {
   try {
     const r = await fetch(SB_URL + "/rest/v1/rpc/gv_tv_clave_validar", { method: "POST",
       headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_clave: clave }) });
+      body: JSON.stringify({ p_clave: clave, p_dispositivo: gvDispositivoId(), p_huella: _gvHuella(),
+        p_navegador: String(navigator.userAgent || "").slice(0, 200) }) });
     j = r.ok ? await r.json() : null;
   } catch (_e) { j = null; }
   if (!j) { if (errEl) errEl.textContent = "Sin conexión: probá de nuevo."; return; }
-  if (!j.ok) { if (errEl) errEl.textContent = "Clave incorrecta. Mirá la TV (cambia cada minuto)."; return; }
+  if (!j.ok) { if (errEl) errEl.textContent = _tvClaveError(j.error); return; }
   __tvClaveOkAt = Date.now();
   const lista = $("tvNombreLista");
   if (lista) {
@@ -65589,15 +66191,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.76"></script>
-<script src="hotsale.js?v=29.76"></script>
-<script src="estadisticas.js?v=29.76"></script>
-<script src="ads.js?v=29.76"></script>
-<script src="plantel.js?v=29.76"></script>
+<script src="cobranzas.js?v=29.93"></script>
+<script src="hotsale.js?v=29.93"></script>
+<script src="estadisticas.js?v=29.93"></script>
+<script src="ads.js?v=29.93"></script>
+<script src="plantel.js?v=29.93"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.76"></script>
+<script src="analisis.js?v=29.93"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.76"></script>
+<script src="ayuda.js?v=29.93"></script>
 
 </body>
 </html>

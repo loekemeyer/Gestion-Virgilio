@@ -92,6 +92,8 @@ header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1.
 .clv-arco{stroke:#38bdf8;stroke-linecap:round;
   stroke-dasharray:100.53;transition:stroke-dashoffset .9s linear,stroke .3s}
 .clv-arco.poco{stroke:#fbbf24}
+.tv-vinc{justify-self:start;font-size:calc(1.9*var(--u));font-weight:800;color:#fbbf24;line-height:1.15}
+.tv-vinc b{font-size:calc(3.2*var(--u));letter-spacing:.08em;color:#fde68a}
 .clv-txt{display:flex;align-items:baseline;gap:.9vw;white-space:nowrap}
 .clv-lab{font-size:calc(2.4*var(--u));font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;line-height:1}
 .h-clave{font-size:calc(7.4*var(--u));font-weight:900;color:#f8fafc;line-height:1;
@@ -142,6 +144,8 @@ table.rd{width:auto;margin:0 auto}
 .rd td small{display:block;font-size:.62em;font-weight:700;color:inherit;opacity:.85}
 .rd td .fcn{opacity:.75}
 .rd tr.hoy td.rd-fe{color:#93c5fd}
+.rd td.rd-fe small.rd-arm{font-size:.55em;font-weight:700;opacity:.7;letter-spacing:0}
+.rd td.rd-fe small.rd-arm.tarde{color:#f87171;opacity:1}
 .rd .sal{color:#a78bfa}.rd .fac{color:#60a5fa}.rd .arm{color:#4ade80}.rd .pro{color:#fbbf24}.rd .pen{color:#f87171}
 .rd .z{color:#334155}
 .rd td.rd-m3{color:#e2e8f0;font-variant-numeric:tabular-nums}
@@ -159,6 +163,11 @@ tr.dia td{background:#0e1830;color:#93c5fd;font-size:calc(1.9*var(--u));font-wei
 /* Tabla de tandas: el código de tanda es lo que se busca de lejos. */
 .t-tanda{font-weight:900;font-size:calc(3.3*var(--u));color:#f8fafc;letter-spacing:.03em;white-space:nowrap}
 .t-m3{font-weight:900;font-size:calc(3.1*var(--u));color:#e2e8f0}
+/* v29.74 (Luis): DÓNDE quedó físicamente la tanda pickeada. Va abajo del código y no en una
+   columna propia: en la pared lo escaso es el ANCHO, y el que lo busca lee primero la tanda. */
+.t-ubic{display:block;font-size:calc(1.9*var(--u));font-weight:800;color:#fbbf24;letter-spacing:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.05;margin-top:.15vh}
+table.pen td.p-tanda .t-ubic{font-size:calc(1.7*var(--u))}
 .t-fe{color:#94a3b8;font-weight:800}
 /* Celda de estado: ✅ terminado · ◍ girando en curso · vacío sin actividad. */
 .st{display:inline-flex;align-items:center;gap:.35vw;justify-content:center;white-space:nowrap}
@@ -339,7 +348,7 @@ td.act-dur{font-weight:900;text-align:center;font-size:calc(2.1*var(--u))}
 <div id="app" class="hide">
   <div id="offline" class="hide"></div>
   <header>
-    <div></div>
+    <div class="tv-vinc hide" id="tvVinc"></div>
     <div class="clv">
       <svg class="clv-anillo" viewBox="0 0 36 36" aria-hidden="true">
         <circle class="clv-pista" cx="18" cy="18" r="16"></circle>
@@ -399,6 +408,7 @@ td.act-dur{font-weight:900;text-align:center;font-size:calc(2.1*var(--u))}
 <script src="../supabase-config.js?v=1202"></script>
 <script>window.GV_ALERTA_MODO = "prueba";</script>
 <script src="alerta-inactivo.js?v=5"></script>
+<script src="tv-clave.js?v=1"></script>
 <script>
 /* v23.70 (Luis): dentro del admin (📺 Vista TV, en un iframe) el mouse se tiene que ver.
    En la TV de pared sigue oculto. */
@@ -955,6 +965,40 @@ function cargarCredito(tandas) {
       (f || []).forEach(function (x) { var k = String(x.tanda).toUpperCase() + "|" + x.fase; if (!m.has(k)) m.set(k, []); m.get(k).push(x); }); return m; })
     .catch(function () { return new Map(); });
 }
+/* v29.74 (Luis, 13/10): "cuando muestra una tanda que está pickeada, que muestre dónde quedó
+   físicamente (último dato entre lo que indicó quien la pickeó sobre dónde la dejó o la mesa de
+   armado en la que la están armando)". Lo resuelve `gv_tanda_ubicacion`: el MÁS RECIENTE entre el
+   PUB del picking, la ubicación del freno y el AUB del armado. Sin respuesta: Map vacío (la tanda
+   se dibuja como siempre — "no pude leer" no es "no se sabe dónde está"). */
+function cargarUbicacion(tandas) {
+  if (!tandas.length) return Promise.resolve(new Map());
+  var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+  return conTimeout(fetch(SB_URL + "/rest/v1/rpc/gv_tanda_ubicacion", { method: "POST", cache: "no-store", signal: ctrl ? ctrl.signal : undefined,
+    headers: Object.assign({ "Content-Type": "application/json" }, H), body: JSON.stringify({ p_tandas: tandas }) }), ctrl, "gv_tanda_ubicacion")
+    .then(function (r) { return r.ok ? r.json() : []; }).then(function (f) { var m = new Map();
+      (f || []).forEach(function (x) { var k = String(x.tanda || "").trim().toUpperCase();
+        if (k && String(x.ubicacion || "").trim()) m.set(k, x); }); return m; })
+    .catch(function (e) { console.warn("[tv] ubicacion:", e.message); return new Map(); });
+}
+/* HH:MM en hora de Buenos Aires (UTC-3 fijo, regla del repo): el televisor puede no tener
+   el locale, así que no se usa toLocaleTimeString. */
+function _ubicHora(ts) {
+  var d = new Date(ts); if (isNaN(d.getTime())) return "";
+  var x = new Date(d.getTime() - 3 * 3600000);
+  return String(x.getUTCHours()).padStart(2, "0") + ":" + String(x.getUTCMinutes()).padStart(2, "0");
+}
+/* El chip 📍 de una celda de tanda. Dice el lugar (es el dato) y el título, de dónde salió. */
+function ubicChip(u) {
+  if (!u) return "";
+  var lug = String(u.ubicacion || "").trim(); if (!lug) return "";
+  /* v29.90: la MESA que eligió el armador al EMPEZAR (AUI) — la tanda se está armando AHÍ */
+  var de = u.fuente === "armado_mesa" ? "la están armando acá"
+         : (u.fuente === "armado" ? "quedó armado acá"
+         : (u.fuente === "freno" ? "ahí quedó el carro al frenar el picking" : "lo dejó ahí el picking"));
+  var t = "📍 " + lug + " — " + de + (u.legajo ? " (legajo " + u.legajo + ")" : "") + (u.ts ? " · " + _ubicHora(u.ts) : "") +
+    (u.otras ? " · partes también en " + u.otras : "");
+  return '<span class="t-ubic" title="' + esc(t) + '">📍 ' + esc(lug) + (u.otras ? " +" : "") + '</span>';
+}
 /* v23.64 (Luis: "está guardando") — la bajada de racks y el guardado viven en
    Movimientos_Stock, no en los eventos: entran como eventos `GST` sólo para
    "En este momento". Si falla, nada. ≡ index.html monGuardadoHoy. */
@@ -1305,6 +1349,31 @@ function sumarHabiles(key, n) {
   }
   return k;
 }
+/* v29.90 (Luis, 13/10): el espejo de sumarHabiles. Lo necesita el día de ARMADO, que es la
+   fecha de salida MENOS 2 hábiles (norma de Thomas del 23/09: se arma el día 1, se factura el 2
+   y sale el 3). Mismo criterio de día hábil que sumarHabiles: finde + GV_Feriados. */
+function restarHabiles(key, n) {
+  var t = new Date(key + "T12:00:00-03:00").getTime(), k = key;
+  while (n > 0) {
+    t -= 86400000; k = new Date(t).toISOString().slice(0, 10);
+    var wd = new Date(k + "T12:00:00-03:00").getUTCDay();
+    if (wd === 0 || wd === 6 || FERIADOS[k]) continue;
+    n--;
+  }
+  return k;
+}
+/* v29.90 (Luis, 13/10): *"quiero que en el monitor, en el día figure así: «Mié 14/10 (debió
+   armarse Vie 09/10)» o «Vie 16/10 (debe armarse Mié 14/10)»"*. El verbo es el dato: «debió»
+   significa que la fecha de armado YA PASÓ. Va en segunda línea (el `small` de .rd td ya es
+   block) para no ensanchar la columna — regla de espacio del 28/09. */
+function diaArmado(key) {
+  if (!key) return null;
+  var arm = restarHabiles(key, 2), hoy = hoyKey();
+  return { fecha: arm, vencido: arm < hoy,
+           txt: arm < hoy ? "(debió armarse " + diaEtiqueta(arm) + ")"
+              : arm === hoy ? "(debe armarse hoy)"
+              : "(debe armarse " + diaEtiqueta(arm) + ")" };
+}
 function horaAR(ms) { var d = new Date(ms - 3 * 3600000); return d.getUTCHours() + d.getUTCMinutes() / 60; }
 /* ¿LLEGAN? Trabajo = m³ × (½ picking + ½ armado): una tanda pickeada y sin armar está a la mitad.
    Pendiente = todo lo que sale hasta la fecha meta y no está armado (lo atrasado primero, después la
@@ -1491,7 +1560,8 @@ function pintar(d) {
     }
     filas.push('<tr' + (enCurso ? ' class="curso"' : (salioT ? ' class="salio-sinfc"' : '')) + '>' +
       '<td class="t-tanda">' + esc(v.tanda) +
-        (salioT ? ' <span class="t-salio" title="Ya se registró la carga al camión (CCN)">🚚</span>' : '') + '</td>' +
+        (salioT ? ' <span class="t-salio" title="Ya se registró la carga al camión (CCN)">🚚</span>' : '') +
+        ubicChip(d.ubic && d.ubic.get(String(v.tanda || "").trim().toUpperCase())) + '</td>' +
       '<td class="num t-m3">' + n1(v.m3) + '</td>' +
       '<td class="t-cli" title="' + esc((v.clientes || []).join(" · ")) + '"><div><span class="tk">' + esc(clienteTanda(v)) + '</span></div></td>' +
       '<td class="num t-np" title="' + esc((v.nps || []).join(" · ")) + '">' + ((v.nps || []).length || "—") + '</td>' +   // v25.54: cuántas NP
@@ -1581,12 +1651,20 @@ function pintar(d) {
     };
     /* v24.70: el m³ del día es el mismo que daba «Total por día» (las tandas del día). */
     var m3Dia = function (x) { var g = porDia.get(x.key); return g ? g.total : x.m3; };
+    /* v29.90: el día de armado debajo de la fecha. Rojo sólo si ya pasó Y queda algo sin armar
+       (pendiente + proceso neto): ahí el «debió» es un atraso real, no una fecha vieja de un día
+       que ya salió entero. El color nunca va solo — el verbo («debió») lo dice igual. */
+    var _rdArm = function (x) {
+      var a = diaArmado(x.key); if (!a) return "";
+      var falta = (x.est.pendiente - (x.estSal.pendiente || 0)) + (x.est.proceso - (x.estSal.proceso || 0));
+      return '<small class="rd-arm' + (a.vencido && falta > 0 ? ' tarde' : '') + '">' + esc(a.txt) + '</small>';
+    };
     el("fcBox").innerHTML = rds.length ? '<table class="rd"><thead><tr><th></th><th>M³</th>' +
       '<th>Salió</th><th>Fact</th><th>Arm</th><th>Proc</th><th>Pend</th>' +
       '</tr></thead><tbody>' + rds.map(function (x) {
         var neto = function (k) { return x.est[k] - (x.estSal[k] || 0); };
         return '<tr' + (x.key === hoyKey() ? ' class="hoy"' : '') + '>' +
-          '<td class="rd-fe">' + esc(diaEtiqueta(x.key)) + '</td>' +
+          '<td class="rd-fe">' + esc(diaEtiqueta(x.key)) + _rdArm(x) + '</td>' +
           '<td class="rd-m3">' + n1(m3Dia(x)) + '</td>' +
           pc(x.salio, x.nps, "sal") + pc(neto("facturado"), x.nps, "fac", (d.fcParse && neto("facturado")) ? x.fcNeto + "/" : "") + pc(neto("armado"), x.nps, "arm") +
           pc(neto("proceso"), x.nps, "pro") + pc(neto("pendiente"), x.nps, "pen") + '</tr>';
@@ -1619,7 +1697,8 @@ function pintar(d) {
       ? '<table class="pen"><tbody>' +
         pens.slice(0, PEN_MAX).map(function (x) {
           var et = PEN_TXT[x.est] || PEN_TXT.pendiente;
-          return '<tr><td class="p-tanda">' + esc(x.tanda) + '</td>' +
+          return '<tr><td class="p-tanda">' + esc(x.tanda) +
+            ubicChip(d.ubic && d.ubic.get(String(x.tanda || "").trim().toUpperCase())) + '</td>' +
             '<td class="p-zona">' + esc(x.zonas.join("·") || "—") + '</td>' +
             '<td class="p-cli" title="' + esc(x.rsFull) + '"><div><span class="tk">' + esc(x.rs) + '</span></div></td>' +
             '<td class="p-np" title="' + esc(x.nps.join(" · ")) + '"><div><span class="tk">' + esc(npsCortas(x.nps)) + '</span></div></td>' +
@@ -1820,8 +1899,8 @@ function cicloCorrer() {
     var crKeys = [];   // v26.67: tandas cerradas o frenadas hoy → si alguna está frenada, se reparte
     eventos.forEach(function (ev) { var t = String(ev.texto || "").trim().toUpperCase();
       if (t && /^(TP|TAP|PKF|APF)$/.test(ev.opcion) && dayKey(ev.ts_cliente) === hoy && crKeys.indexOf(t) < 0) crKeys.push(t); });
-    return Promise.all([cargarStatus(keys), cargarPickeado(pkKeys), cargarCredito(crKeys), cargarFcParseada(arbol)]).then(function (sp) {
-      var status = sp[0], pickeado = sp[1], credito = sp[2], fcParse = sp[3];
+    return Promise.all([cargarStatus(keys), cargarPickeado(pkKeys), cargarCredito(crKeys), cargarFcParseada(arbol), cargarUbicacion(pkKeys)]).then(function (sp) {
+      var status = sp[0], pickeado = sp[1], credito = sp[2], fcParse = sp[3], ubic = sp[4];
       /* v26.55: copia (la programación está cacheada: no se toca) con el m³ PICKEADO de cada tanda con TP. */
       if (pickeado.size) { var p2 = new Map(); prog.forEach(function (v, k) { var f = pickeado.get(k);
         p2.set(k, f == null ? v : Object.assign({}, v, { m3: (Number(v.m3) || 0) * f, m3Ped: Number(v.m3) || 0 })); }); prog = p2; }
@@ -1855,7 +1934,7 @@ function cicloCorrer() {
         actividad: actividadActual(guardado.length ? eventos.concat(guardado) : eventos, hoy, fjHoy, fichados),
         alertas: Array.from(alertas).sort(),
         empleados: empleados, facturadas: facturadas, despachadas: despachadas,
-        horas: horas, arbol: arbol, eventos: eventos, credito: credito, fcParse: fcParse
+        horas: horas, arbol: arbol, eventos: eventos, credito: credito, fcParse: fcParse, ubic: ubic
       });
 
       ultimoOk = Date.now(); fallos = 0;
@@ -1907,18 +1986,34 @@ function clvAnillo() {
   a.setAttribute("stroke-dashoffset", (CLV_LARGO * (1 - f)).toFixed(1));
   a.setAttribute("class", "clv-arco" + (_clvQueda <= 10 ? " poco" : ""));
 }
+/* v29.84 (Elías): el código ya no se pide pelado con la clave pública. Adentro de Gestión va con la
+   sesión del supervisor; en la pared, con el secreto de esta TV (monitor/tv-clave.js ≡ index.html). Mientras
+   la TV no esté vinculada muestra a la izquierda el código para vincularla. */
+function tvToken() {
+  try {
+    var pa = (window.parent && window.parent !== window) ? window.parent : null;
+    if (pa && pa.sbAuth && typeof pa.sbAuth.getAccessToken === "function") return pa.sbAuth.getAccessToken();
+  } catch (_e) {}
+  return null;
+}
 function tvClave() {
   try {
-    fetch(SB_URL + "/rest/v1/rpc/gv_tv_clave_actual", { method: "POST", cache: "no-store",
-      headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" }, body: "{}" })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) {
-        if (!j || !j.clave) return;
-        var e = el("tvClave"); if (e) e.textContent = j.clave;
-        _clvQueda = Math.max(1, Math.min(CLV_CICLO, Number(j.cambia_en_s) || CLV_CICLO));
-        clvAnillo();
-      })
-      .catch(function () {});
+    if (typeof window.gvTvClaveLeer !== "function") return;
+    window.gvTvClaveLeer(SB_URL, SB_KEY, tvToken).then(function (j) {
+      var v = el("tvVinc");
+      if (v) {
+        if (j && j.vincular) {
+          v.innerHTML = "Vincular esta TV:<br><b>" + esc(j.vincular) + "</b><br>⚙️ Configuración → 📺 Vincular TV";
+          v.classList.remove("hide");
+        } else if (j && j.revocada) {
+          v.textContent = "Esta TV fue desvinculada"; v.classList.remove("hide");
+        } else if (j) { v.classList.add("hide"); }
+      }
+      if (!j || !j.clave) return;
+      var e = el("tvClave"); if (e) e.textContent = j.clave;
+      _clvQueda = Math.max(1, Math.min(CLV_CICLO, Number(j.cambia_en_s) || CLV_CICLO));
+      clvAnillo();
+    }).catch(function () {});
   } catch (_e) {}
 }
 /* Un tick por segundo: vacía la rueda y, al llegar a cero, pide el código nuevo. */
@@ -2031,7 +2126,7 @@ function popRitmo(leg, sub) {
   var mins = {}, pmin = {}, cola = {};
   /* v29.03 (Thomas, D9): Min trab suma la COLA hasta la próxima tarea registrada (≡ la vista, regla v26.43),
      así el total coincide con la celda del tablero. Sólo el primer cierre de cada tanda; sin tarea después, 0. */
-  var AUTO = /^(PUB|AUB|PKC|ENT|RSP|ROC|RAG|FGU|FSS|IMPT|TAL|GST|MGR|PKM|SSG|PSP|NPD|PKAX|FJ)$/;
+  var AUTO = /^(PUB|AUB|AUI|PKC|ENT|RSP|ROC|RAG|FGU|FSS|IMPT|TAL|GST|MGR|PKM|SSG|PSP|NPD|PKAX|FJ)$/;   /* v29.90: AUI = la mesa al empezar armado, evento de detalle */
   var todos = (D.eventos || []).filter(function (ev) { return String(ev.legajo == null ? "" : ev.legajo).trim() === String(leg) &&
     dayKey(ev.ts_cliente) === hoyKey() && !AUTO.test(ev.opcion || "") && !/X$/.test(ev.opcion || ""); });
   var colaDe = function (f, yo) { var sig = Infinity, abierto = false;

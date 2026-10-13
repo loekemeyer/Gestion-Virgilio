@@ -126,6 +126,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== mon-tv (monitor liviano de TV: solo lectura, mismas fuentes que el monitor grande) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-tv.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-dia-armado.cjs
 node tests/monitor-viejo-sin-puerta.cjs
 node tests/fc-parseada-x-de-y.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-sup-no-operario.cjs
@@ -139,6 +140,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tandas-orden-camion.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/operario-queda-botonera.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tv-clave-login.cjs
+node tests/tv-clave-segura.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cervantes-legajo.cjs
 node tests/operario-alta-validar.cjs
 echo "== mon-header-codigo (v23.93: sin QR, dos pestanas con subpestanas y el codigo con su rueda) =="
@@ -229,6 +231,8 @@ echo "== ins-ri-gp2-catalogo (v29.35: Recibir insumos muestra el catálogo de GP
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-ri-gp2-catalogo.cjs
 echo "== ins-marca-empresa (v29.56: al recibir insumos se marca de qué empresa vienen, en toda categoría) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-marca-empresa.cjs
+echo "== ins-ri-origen-menu (v29.82: origen cerrado por categoría, SC/SP sin preguntas, un solo Enviar, flejes por proveedor) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-ri-origen-menu.cjs
 echo "== ins-bolsa-sin-equivalencia (v29.74: una bolsa sin fila en GP2.insumo_equivalencia no sale en silencio) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-bolsa-sin-equivalencia.cjs
 echo "== historial-no-replay (v29.24: el replay de Terminar Día no re-manda los items h_* del Historial) =="
@@ -277,6 +281,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ir-codigo-candado (v29.67: Ingreso a racks no acepta un codigo que no existe; si es una POSICION lo dice) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ir-codigo-candado.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/modulo-tarea-enviar.cjs
+
+echo "== modbar-no-tapa (v29.81: la barra Anular/Termine no tapa el fondo de la lista — 390x740) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/modbar-no-tapa.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/sc-racks-unidad.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ayuda-chat.cjs
 node tests/ayuda-manual-al-dia.cjs
@@ -899,6 +906,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== resumen-pkc-agrupado (v19.09: el detalle del picking, una linea por tanda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/resumen-pkc-agrupado.cjs
 
+echo "== arm-mesa-inicio (v29.90: al empezar el armado se pregunta la MESA, evento AUI, sin frenar nada) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/arm-mesa-inicio.cjs
 echo "== cierre-cancelado-avisa (v19.22: cancelar el «donde dejas la tanda» avisa, no aborta en silencio) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cierre-cancelado-avisa.cjs
 
@@ -1227,6 +1236,8 @@ node tests/est-madre-unica.cjs
 echo "== ads-alertas (v27.21: ADS — Alertas Damián Stock, talleristas + quiebres; ads.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ads-alertas.cjs
 
+echo "== gv-ui-sistema (v29.83: el sistema de diseño GV-UI — tokens, paleta medida, escala) =="
+node tests/gv-ui-sistema.cjs
 echo "== analisis-productivo (v29.64: Análisis Productivo por tanda; analisis.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/analisis-productivo.cjs
 

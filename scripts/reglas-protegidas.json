@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-13 (+ v29.78 sub-posiciones de rack: gv_rack_sector/pos/partir/pos_chequear/saldo_pos/ubicar, racks_plani_*, registrar_baja_racks, Racks_Planimetria, gv_rack_celda) · 2026-10-13 (+ v29.74 gv_gp2_inventario; + v29.66 gv_gp2_espejo_insumos; + cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82/v26.93 gv_ppp_dia_ajustar; + v26.86 gv_alerta_gondola_llena_telegram; + v26.98 gv_importado_alta, gv_importados_bache_primer_pedido; + v26.99 gv_importado_guardar); + v27.89 gv_cc_sombra_tick, gv_cc_sombra_racha; + v27.92 gv_ads_stock2; + v28.34 gv_ppp_mismo_lugar_dos_dias; + v28.38 gv_ppp_web_zona_retira; + v28.40 gv_ppp_web_zona_recalc, gv_ppp_tanda_zona_fuera_regla; + v28.43 vista_importados_stock_parte; + v28.96 racks_plani_ingreso, gv_imp_imputar_ingreso_racks; + v29.05 gv_racks_ajuste_sin_posicion + v29.11 gv_imp_ir_asignar + v29.16 gv_anon_insert_log + v29.48 gv_picking_estimar, gv_ppp_plantel, gv_armado_tanda_refresh; + v29.49 reconciliar_pipeline_stock_etapa2, gv_entregas_norm, gv_npd_tope_faltante_picking; + v29.50 gv_evento_duplicado",
+  "_generado": "2026-10-13 (+ v29.78 sub-posiciones de rack: gv_rack_sector/pos/partir/pos_chequear/saldo_pos/ubicar, racks_plani_*, registrar_baja_racks, Racks_Planimetria, gv_rack_celda) · 2026-10-13 (+ v29.77 gv_stock_cod_lista; + v29.74 gv_gp2_inventario; + v29.66 gv_gp2_espejo_insumos; + cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82/v26.93 gv_ppp_dia_ajustar; + v26.86 gv_alerta_gondola_llena_telegram; + v26.98 gv_importado_alta, gv_importados_bache_primer_pedido; + v26.99 gv_importado_guardar); + v27.89 gv_cc_sombra_tick, gv_cc_sombra_racha; + v27.92 gv_ads_stock2; + v28.34 gv_ppp_mismo_lugar_dos_dias; + v28.38 gv_ppp_web_zona_retira; + v28.40 gv_ppp_web_zona_recalc, gv_ppp_tanda_zona_fuera_regla; + v28.43 vista_importados_stock_parte; + v28.96 racks_plani_ingreso, gv_imp_imputar_ingreso_racks; + v29.05 gv_racks_ajuste_sin_posicion + v29.11 gv_imp_ir_asignar + v29.16 gv_anon_insert_log + v29.48 gv_picking_estimar, gv_ppp_plantel, gv_armado_tanda_refresh; + v29.49 reconciliar_pipeline_stock_etapa2, gv_entregas_norm, gv_npd_tope_faltante_picking; + v29.50 gv_evento_duplicado; + v29.82 gv_insumo_origenes, gv_insumo_fleje_proveedor",
   "reglas": [
     {
       "objeto": "Racks_Planimetria",
@@ -262,6 +262,11 @@
       "quien": "Luis, Thomas"
     },
     {
+      "objeto": "gv_gp2_espejo_sync",
+      "regla": "El stock de insumos de Virgilio es una VISTA en vivo (GP2.virgilio_insumo_stock): el bloque 1 del sync NO lo copia mas (v29.88).",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_gp2_inventario",
       "regla": "El codigo de Virgilio de un componente sale de GP2.insumo_equivalencia, la tabla UNICA de equivalencias; la columna componente.codigo_virgilio se borro (v29.74)",
       "quien": "Luis"
@@ -405,6 +410,26 @@
       "objeto": "gv_ingreso_virgilio_denegado",
       "regla": "Si Cervantes dice No a lo que Virgilio le recibió, el pedido vuelve a EN VIAJE en Virgilio (📥 RECIBIR y 📦 Baches) con el chip «Denegado por Cervantes».",
       "quien": "dueño (30/09)"
+    },
+    {
+      "objeto": "gv_insumo_equiv_espejo",
+      "regla": "Vincular una equivalencia de insumos dispara el espejo de ESE codigo en el acto (28 ms): el cron de los :19/:49 es la red, no el camino.",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_insumo_fleje_proveedor",
+      "regla": "Elegido un proveedor de flejes, el operario ve SOLO los flejes que GP2 le tiene asignados (los que no tienen proveedor quedan atras de un boton, nunca se esconden).",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_insumo_isis_sync",
+      "regla": "GP2 es el canonico del codigo ISIS: lo que se guarda en GP2.insumo_equivalencia.isis se escribe en Insumos.isis de Virgilio, incluido vaciarlo; nunca al reves (v29.79)",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_insumo_origenes",
+      "regla": "El origen de una recepcion de insumos es una lista CERRADA por categoria, derivada de GP2 menos GV_Insumo_Origen_Excluido. SC/SP no preguntan: siempre Cervantes.",
+      "quien": "Luis"
     },
     {
       "objeto": "gv_insumo_unidad_base",
@@ -780,6 +805,11 @@
       "objeto": "gv_retira_contradictorio",
       "regla": "El centinela compara el destino que se MUESTRA (gv_np_destino.expreso) contra como se esta REPARTIENDO de verdad (gv_np_prog_reparto.es_retira). Si se le saca e",
       "quien": "Thomas"
+    },
+    {
+      "objeto": "gv_stock_cod_lista",
+      "regla": "v29.74: la lista de codigos que sugiere Ingreso a racks NO ofrece un codigo dado de baja (865ED -> 865E), igual que el candado gv_stock_cod_conocido.",
+      "quien": "Luis"
     },
     {
       "objeto": "gv_stock_tanda_pickeado_negativo",
