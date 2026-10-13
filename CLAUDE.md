@@ -9220,16 +9220,20 @@ nada (mismo insumo físicamente, mismo lugar físico) pero debería quedar regis
 
 ### ⚠ Y los saldos de insumos en unidad VIEJA (MC) son de antes de la v24.69
 
-`gv_insumo_unidad_base` convierte a la unidad base, pero es **BEFORE INSERT solamente**: las 18 líneas cargadas en
-MC antes de esa versión (546P 10 · H201Part 5 · 439E 1 · 505C 1 · 590E 1; la última del **25/08**) quedaron así, y
+`gv_insumo_unidad_base` convierte a la unidad base, pero es **BEFORE INSERT solamente**: las líneas cargadas en MC
+antes de esa versión quedaron así, y
 `vista_saldos_insumos_x_unidad` **agrupa por unidad** → esos códigos muestran dos saldos (Uni positivo + MC negativo).
 **No es un bug vivo**: `gv_importados_stock_insumos` los convierte con el factor y da el número correcto (505C
-**98.000** · 439E **312** · 590E **0**, `sin_factor` en 0). Los 5 saldos negativos de insumos son exactamente esas
-unidades viejas, todos de categoría `importados`: **cero negativos en las categorías del operario**.
+**98.000** · 439E **312** · 590E **0**, `sin_factor` en 0). Los saldos negativos de insumos son exactamente esas
+unidades viejas, todos de categoría `importados`: **cero negativos en las categorías del operario**. Al 13/10, tras
+el conteo del 546P, son **3**: 439E −5 · 590E −4 · 505C −3, los tres en MC (eran 5 con los dos grupos del 546P).
 
-⚠⚠ **NO se normalizan: quedan así** (Luis, 13/10, D9: *"dejalo"*). El UPDATE que las reexpresaría está escrito en
+⚠⚠ **NO se normalizan: quedan así** (Luis, 13/10, D9: *"dejalo"*). **Hoy son 10 filas en 5 códigos**, medido el
+13/10 después del conteo del 546P: `H201Part` 5 (saldo 0) · **`N°7` 2 (saldo 0, que la lista vieja de «18» se
+olvidaba)** · `439E` 1 (−5) · `505C` 1 (−3) · `590E` 1 (−4), la última del **25/08**. Las 10 de `546P` salieron de
+acá con su conteo (arriba). Las que molestan —el código que muestra dos saldos— son **3**, las de saldo ≠ 0. El UPDATE que las reexpresaría está escrito en
 `sql/gv_insumo_marca_empresa_v2956.sql` y **no se aplicó**: es cosmético (que cada código muestre un solo número) y
-no cambia ninguna cuenta, así que no vale pisar 18 filas de `Movimientos_Stock`. **No volver a proponerlo.** Y si
+no cambia ninguna cuenta, así que no vale pisar esas filas de `Movimientos_Stock`. **No volver a proponerlo.** Y si
 alguien lo intenta: un INSERT compensatorio NO sirve — la línea nueva con unidad `MC` la convierte el trigger y el
 saldo MC sigue ahí; el único camino es el UPDATE de las filas viejas, que no dispara ese trigger.
 
@@ -9239,9 +9243,12 @@ marca**; lo único que queda es **a quién se le dio** (`ref`: Cervantes 42 · R
 destino del 30/06 al 07/08, de antes de que el campo fuera obligatorio). O sea el circuito es **asimétrico a
 propósito**: la entrada dice de qué empresa vino y la salida no dice para cuál se usó. **No proponer pedir la marca
 al entregar ni «cerrar el círculo» por empresa.**
-⚠ **Las 45 «Cajas» de 546P no se tocan** (Luis, 13/10, D8: *"dejalo"*): esa unidad no tiene factor en
-`Insumos_Factores` y no se inventa. Y 546P no está mapeado a ningún importado, así que su stock hoy no lo lee
-ninguna pantalla de compra.
+⚠⚠ **RETIRADA la D8 («las 45 Cajas de 546P no se tocan»): el 546P SE CONTÓ EN EL DEPÓSITO y se unificó**
+(Luis, 13/10, mismo día y después de la D8: *"fui yo. está ok, se hizo el conteo en el depo"*). A las 13:59 pasó a
+**una sola unidad, `Uni`** —sus grupos «Cajas» (−45) y «MC» (−60) se reexpresaron, refs `unificación: pasa 222 MC a
+Uni (bruto 1:1)` y `fix_recatalog_bastidor`— más el ajuste del conteo (`CONTEO 546P X13`, −8.640): **30.528 → 6.768
+Uni**. **No se perdió ningún movimiento**: las líneas se reexpresaron, no se borraron. Hoy el 546P tiene **0 filas en
+«Cajas» y 0 en «MC»**. Lo que vale es esto, no la D8.
 
 ## ⚠ REGLA (v29.24, 09/10): el REPLAY de Terminar Día no re-manda los items SÓLO de Historial (`h_*`)
 
