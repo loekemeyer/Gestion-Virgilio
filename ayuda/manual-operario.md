@@ -229,8 +229,8 @@ Tocá **📦** y **Enviar**. Hay **3 opciones**:
 - **📤 Entregar insumos**: sale stock de insumos. Primero **«¿Qué envío es?»**: **🏭 Envío a
   inyectores** (elegís el inyector y aparecen sólo las bolsas plásticas; es la única forma de sacar
   bolsas) o **📦 Envío a otros** (todo lo demás, sin bolsas plásticas);
-  después el destino, el **N° de remito con el que sale** (si no hay papel, **«Sin remito —
-  seguir»**) y **la lista se abre sola** (no hay que volver a tocar Enviar): las cantidades y
+  después el destino y el **N° de remito con el que sale**, que es **obligatorio**: un insumo no
+  sale sin remito. Después **la lista se abre sola** (no hay que volver a tocar Enviar): las cantidades y
   **«✓ Registrar salida»**. Las bolsas plásticas van a **Kollplast**, **Pat Bet Plast** o
   **Pettofrezza**, y a nadie más. Un insumo que viene en caja master (MC) **sale siempre en MC
   enteras**.

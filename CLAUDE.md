@@ -9547,18 +9547,19 @@ recepción vieja. La lectura devuelve `remito` nulo ahí.
 | dónde | qué lleva `gv_doc` | obligatorio |
 |---|---|---|
 | **RI** recepción de insumos | remito / factura y sus fechas (el papel del proveedor) | **sí** (como siempre) |
-| **EI** entrega de insumos | el **remito NUESTRO**, el que sale con la mercadería | **no** — «Sin remito — seguir» deja `tipo: "sin_papel"` |
+| **EI** entrega de insumos | el **remito NUESTRO**, el que sale con la mercadería | **sí** (v30.12, Luis: *"obligatorio para mandar insumos que salgan con remito"*) — se retira el «Sin remito — seguir» de la v30.10 |
 | **RT** recepción de mercadería (`recepcion.js`) | remito, factura y **las dos fechas**, más el proveedor | ya se pedían; antes sólo el número llegaba al `ref` |
 
 - En **EI** el modal del papel aparece después del destino (un paso más, pedido por Luis) y su «‹ Atrás»
-  vuelve a la lista de destinos correcta (`window._insEiSub`: inyectores u otros).
+  vuelve a la lista de destinos correcta (`window._insEiSub`: inyectores u otros). **Sin número no sale**: el
+  campo se pinta en rojo y no hay ninguna puerta que lo saltee (el 2.º argumento de `insDocOk` ya no existe).
 - En **RT** el movimiento ya llevaba `ref: opState.remito` —el número, sin decir si era remito o factura— y
   las **fechas y el otro número se perdían**: vivían en `Entregas Prov AT` / el recibo, no en el libro de
   stock. `ref` se conserva igual (lo leen el dedup y la imputación de OC) y el detalle va en `gv_doc`.
 - **D5 (Luis): «sí, para adelante»** — ningún backfill. Lo recibido o entregado antes de hoy queda con
   `gv_doc` nulo, y no se inventa el papel de un movimiento viejo.
-- Candados: `node tests/ins-remito-guardado.cjs` (bloque (c): EI pide el papel con `soloRemito` + `opcional`,
-  lo guarda, y «Sin remito» no traba) · `node tests/rcp-remito-en-movimiento.cjs` (candado estático sobre
+- Candados: `node tests/ins-remito-guardado.cjs` (bloque (c): EI pide el papel, **sin número frena y marca el
+  campo**, no queda puerta de escape, y con número lo guarda) · `node tests/rcp-remito-en-movimiento.cjs` (candado estático sobre
   `recepcion.js`: la fila lleva `gv_doc` armado desde `opState`, sin número escrito a mano, y no se perdió el
   `ref`).
 

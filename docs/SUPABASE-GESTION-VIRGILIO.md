@@ -31984,7 +31984,7 @@ Sin SQL nuevo: la columna `gv_doc` y el índice son los de §3.v3006. Lo que cam
 | movimiento | `gv_doc` | nota |
 |---|---|---|
 | `recepcion_insumo` (RI) | remito / factura + fechas del proveedor | ya estaba (v30.06) |
-| `entrega_insumo` (EI) | el remito **nuestro**, el que sale | **nuevo**; no se exige (`tipo: "sin_papel"` si no hay) |
+| `entrega_insumo` (EI) | el remito **nuestro**, el que sale | **nuevo**, y **obligatorio** (v30.12, Luis: *"obligatorio para mandar insumos que salgan con remito"*): sin número no se manda |
 | `recepcion` (RT, `recepcion.js`) | remito, factura, las dos fechas y el proveedor | **nuevo**; `ref` sigue llevando el número, que es lo que leen el dedup y la imputación de OC |
 
 - **D5 (Luis): «sí, para adelante»** — **sin backfill**. Lo anterior queda con `gv_doc` nulo.
