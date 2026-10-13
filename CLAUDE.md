@@ -9016,3 +9016,7 @@ select m.cod_art, m.empresa, sum(m.delta) a_guardar,
 ⚠ **Un saldo en «A guardar» no es un error por sí mismo**: es mercadería bajada o recibida esperando guardarse. Lo que
 hay que mirar es si ese rack se recontó después de la baja. **La corrección va con el «sí» del dueño**, porque la
 pregunta («¿esas cajas están físicamente?») sólo la puede contestar el depósito.
+
+⚠⚠ **NO se avisa cuando una baja queda sin guardar: Luis dijo que NO** (13/10, D16: *"no lo armes"*). Se le ofreció un
+aviso (Telegram o cartel) para el BR que al día siguiente sigue sin su MG, y lo bajó. **No volver a proponerlo.** El
+caso se encuentra con la consulta de arriba, a mano.
