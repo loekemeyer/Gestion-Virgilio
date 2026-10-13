@@ -31903,3 +31903,28 @@ se apagó. Si los 144 Kg no están ahí, lo corrige el conteo; nadie lo va a ir 
 `ajustado`) y los kg están en la ubicación **75** («Sector Fleje en Virgilio»), que tiene **0 filas en
 `v_nivel_stock`**: no infla el máximo ni la OC de Cervantes. Ningún ISIS pisado (los tres estaban en null).
 Flejes vinculados: **19 → 22 de 48**.
+
+### §3.v3005 — Recepción del remito 38880 cargada a mano, y dos códigos de fleje nuevos (Luis, 13/10/2026)
+
+**Por qué a mano**: *"recién se recibieron insumos pero hubo problemas por cambios que hicimos hoy. De momento,
+voy a hacer una recepción por acá"* (Luis). Los dos insumos **no existían** en Virgilio ni en GP2 (se buscó por
+nombre, por medida y por número: `ALAMBRE LARGO·11` y `N°46B` son otros alambres; las varillas de GP2 son piezas
+procesadas o las `IVBCM`/`IVBLM` de Brawin, otras medidas), así que se crearon:
+
+| cod | nombre | categoría | recibido |
+|---|---|---|---|
+| `ALAMBRE·6 X 2,75` | 6 x 2,75 | fleje | **122,1 Kg** (2 rollos) |
+| `VARILLA·205 X 400` | 205 x 400 | fleje | **128,4 Kg** (5 cajones) |
+
+- **La grafía del código sigue la convención de los flejes sin `N°`**: prefijo + `·` + medida, como
+  `ALAMBRE LARGO·11`, `FLEJE·91 X 1,75` o `FLEJE PROLIPROPILENO·SUNCHOS 12 MM`. **No se les puso `N°97` / `N°98`**
+  a propósito: los `N°xx` de Virgilio espejan el *Fleje N°* de Cervantes y estos dos **no tienen componente en
+  GP2** (el último allá es el 96) — inventar el número crearía otra desalineación.
+- Los movimientos: `recepcion_insumo`, **Kg**, `ref = 'Remito 38880'`, `legajo = 'admin'`, `client_id`
+  `rcp-38880-…` (ids 146691976 y 146691977). La **empresa** la forzó `gv_insumo_unidad_base` a **Mixto**, como
+  todo movimiento de insumos (regla v24.89). **Sin marca**: Luis no dijo de qué empresa viene (el front la exige,
+  una carga por SQL no).
+- **Los dos quedan SIN posición**, así que salen en la alarma del Mapa (`gv_mapa_stock_sin_lugar`, que pasa de 19
+  a 21 insumos): hay que darles celda desde el Mapa. Y **sin equivalencia en GP2**, así que no se espejan.
+- **Verificado**: saldo 122,1 y 128,4 Kg, unidad Kg, empresa Mixto, 0 posiciones, los dos en la alarma.
+- **Rollback**: borrar los dos movimientos por su `client_id` y las dos filas de `Insumos`.

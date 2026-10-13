@@ -10,8 +10,8 @@
      · Atrás vuelve a las categorías conservando lo cargado (se manda todo junto)
      · buscar desde la pantalla 1 mira TODO (incluso lo a depurar)
      · la unidad por defecto sale de la categoría salvo que ya haya saldo en una sola
-     · v29.56 (Luis, 13/10): el operario NO da de alta un insumo — ni en RI ni en EI.
-       No hay "+ Agregar insumo" en ningún lado e insNuevoOpen se planta siempre.
+     · v30.05 (Luis, 13/10): el "+ Agregar insumo" vuelve al RECIBIR (en categorias y dentro de
+       cada una, menos bolsas y cajas). Al ENTREGAR sigue sin alta.
    Sin red (fetch mockeado). */
 const path = require("path");
 let chromium;
@@ -182,25 +182,22 @@ catch (_e) {
     out.movUni = mov && mov[0] ? mov[0].unidad : null;                      // "kg"
     out.movDelta = mov && mov[0] ? mov[0].delta : null;                     // -3 (EI)
 
-    // 10) v29.56 (Luis, 13/10): el operario YA NO DA DE ALTA un insumo al RECIBIR.
-    //     No hay "+ Agregar insumo" en la grilla de categorías ni dentro de una categoría,
-    //     y si algún camino viejo llama a insNuevoOpen, se planta con el aviso.
+    // 10) v30.05 (Luis, 13/10): el "+ Agregar insumo" VUELVE al RECIBIR (la v29.56 lo habia
+    //     sacado). Esta en la grilla de categorias y dentro de cada categoria, menos en las
+    //     CERRADAS (bolsas y cajas, Thomas v29.25/30). Al ENTREGAR (EI) sigue sin alta.
     await showInsumoModal("RI", "104");
     const ppRI = _ins.items.filter(function (it) { return it.cod === "PP"; })[0];
     out.uniPP = ppRI ? ppRI.unidad : null;   // "Bolsas" (saldo en 1 sola unidad)
-    out.riSinAltaP1 = !document.querySelector("#insBody .ins-catbtn.add");   // sin "+" en categorías
+    out.riAltaP1 = !!document.querySelector("#insBody .ins-catbtn.add");     // "+" en categorias
     insSetCat("fleje");
-    out.riSinAltaEnCat = !document.querySelector("#insBody .ins-itbtn.add"); // sin "+" dentro de la categoría
+    out.riAltaEnCat = !!document.querySelector("#insBody .ins-itbtn.add");   // "+" dentro de la categoria
     insBack();
-    let alertRI = ""; let altas0 = posted.length;
-    const _alRI = window.alert; window.alert = function (m) { alertRI = String(m); };
+    insSetCat("plastico");
+    out.riSinAltaEnCerrada = !document.querySelector("#insBody .ins-itbtn.add");  // bolsas: cerrada
+    insBack();
     insNuevoOpen("");
-    out.riRechazaAlta = _ins.nuevo === null && /no se puede agregar un insumo/i.test(alertRI);
-    insNuevoOpen("plastico");
-    out.riRechazaAltaBolsa = _ins.nuevo === null;
-    await new Promise(function (r) { setTimeout(r, 30); });
-    out.riNoCreoNada = posted.length === altas0;   // no se posteó ningún insumo nuevo
-    window.alert = _alRI;
+    out.riAbreAlta = !!_ins.nuevo;                      // la pantalla de alta se abre
+    insNuevoCancel();
     insBack();
 
     // 11) nada se sale del ancho del celular (390px)
@@ -219,8 +216,8 @@ catch (_e) {
     r.volvioAP1 === true && r.flejeMarcada === true && r.catCargados === true && r.qtySobrevive === 3 &&
     r.rowsBusca === 2 && r.buscaTraeDep === true &&
     r.avisoDep === true && r.nDep === 1 && r.noHayDepurar === true &&
-    r.riSinAltaP1 === true && r.riSinAltaEnCat === true &&
-    r.riRechazaAlta === true && r.riRechazaAltaBolsa === true && r.riNoCreoNada === true &&
+    r.riAltaP1 === true && r.riAltaEnCat === true &&
+    r.riSinAltaEnCerrada === true && r.riAbreAlta === true &&
     r.movN === 1 && r.confirmBloqueaSinUni === true && r.confirmAbreElQueFalta === true && r.movUbic === "V2 Ad" && r.movUni === "kg" && r.movDelta === -3 &&
     r.overflow === 0 &&
     errs.length === 0;
