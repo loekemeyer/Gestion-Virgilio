@@ -43,7 +43,7 @@ comment on view public.gv_insumo_recepcion_marca is
 
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- D7 — NORMALIZAR las 18 líneas viejas de insumos cargadas en MC (PENDIENTE del «sí»)
+-- D7/D9 — NORMALIZAR las 18 líneas viejas en MC: ⛔ NO SE APLICA (Luis, 13/10, D9: "dejalo")
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- El trigger gv_insumo_unidad_base (v24.69) convierte todo a la unidad BASE, pero es
 -- BEFORE **INSERT** solamente: las líneas cargadas en MC ANTES de esa versión quedaron
@@ -57,6 +57,10 @@ comment on view public.gv_insumo_recepcion_marca is
 -- El saldo en unidad base NO CAMBIA: es exactamente lo que ya calcula hoy
 -- gv_importados_stock_insumos con el factor (505C 98.000 · 439E 312 · 590E 0).
 -- Lo que cambia es que cada código queda con UN solo número.
+--
+-- ⚠⚠ Queda escrito SOLO como referencia: Luis decidió el 13/10 dejar los saldos como están,
+-- porque es cosmético (un solo número por código) y no cambia ninguna cuenta. NO ejecutar sin
+-- un «sí» nuevo, y no volver a proponerlo.
 --
 -- D8 (Luis, 13/10: «dejalo»): las 45 «Cajas» de 546P NO se tocan — esa unidad no tiene
 -- factor cargado en Insumos_Factores y no se inventa.
@@ -95,3 +99,11 @@ comment on view public.gv_insumo_recepcion_marca is
 
 -- ROLLBACK de D7: restaurar delta/unidad/descripcion desde
 --   zz_backups."GV_Backup_InsumoMC_20261013" por `id`.
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- D10 (Luis, 13/10): la SALIDA de insumos NO lleva empresa — "solo el registro de la
+-- entrada es importante". Medido sobre las 92 entregas (30/06 al 08/10): 92 de 92 con
+-- empresa = 'Mixto' y 0 con marca en la descripción; lo único que queda es a quién se le
+-- dio (ref: Cervantes 42 · Rafael 8 · Manolo 3 · Bryan 1, más 33 sin destino del 30/06 al
+-- 07/08). El circuito es asimétrico a propósito. NO pedir la marca al entregar.

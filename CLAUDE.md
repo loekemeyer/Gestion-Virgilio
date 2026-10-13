@@ -8642,9 +8642,18 @@ MC antes de esa versión (546P 10 · H201Part 5 · 439E 1 · 505C 1 · 590E 1; l
 **98.000** · 439E **312** · 590E **0**, `sin_factor` en 0). Los 5 saldos negativos de insumos son exactamente esas
 unidades viejas, todos de categoría `importados`: **cero negativos en las categorías del operario**.
 
-⚠ **Un INSERT compensatorio NO los arregla**: la línea nueva con unidad `MC` la convierte el trigger y el saldo MC
-sigue ahí. Hay que reexpresar las filas viejas con un **UPDATE** (que no dispara ese trigger). El SQL, con su backup
-y su verificación, está en `sql/gv_insumo_marca_empresa_v2956.sql` — **pendiente del «sí»**.
+⚠⚠ **NO se normalizan: quedan así** (Luis, 13/10, D9: *"dejalo"*). El UPDATE que las reexpresaría está escrito en
+`sql/gv_insumo_marca_empresa_v2956.sql` y **no se aplicó**: es cosmético (que cada código muestre un solo número) y
+no cambia ninguna cuenta, así que no vale pisar 18 filas de `Movimientos_Stock`. **No volver a proponerlo.** Y si
+alguien lo intenta: un INSERT compensatorio NO sirve — la línea nueva con unidad `MC` la convierte el trigger y el
+saldo MC sigue ahí; el único camino es el UPDATE de las filas viejas, que no dispara ese trigger.
+
+⚠⚠ **La SALIDA de insumos NO lleva empresa, y no se le agrega** (Luis, 13/10, D10: *"no, solo el registro de la
+entrada es importante"*). Medido sobre las 92 entregas (30/06 al 08/10): **92 de 92 con `empresa = 'Mixto'` y 0 con
+marca**; lo único que queda es **a quién se le dio** (`ref`: Cervantes 42 · Rafael 8 · Manolo 3 · Bryan 1, más 33 sin
+destino del 30/06 al 07/08, de antes de que el campo fuera obligatorio). O sea el circuito es **asimétrico a
+propósito**: la entrada dice de qué empresa vino y la salida no dice para cuál se usó. **No proponer pedir la marca
+al entregar ni «cerrar el círculo» por empresa.**
 ⚠ **Las 45 «Cajas» de 546P no se tocan** (Luis, 13/10, D8: *"dejalo"*): esa unidad no tiene factor en
 `Insumos_Factores` y no se inventa. Y 546P no está mapeado a ningún importado, así que su stock hoy no lo lee
 ninguna pantalla de compra.
