@@ -1941,7 +1941,9 @@ que se estaba guardando. Medido al 13/10: 258 racks activos, 89 posiciones con s
 **Chequeo:** `select * from public.gv_reglas_perdidas;` (16 centinelas) ·
 `select sector, rack, parte, partes, cod_art, innercajas, estado from public."Racks_Planimetria" where partes > 1;` ·
 `select * from public."GV_Rack_Particion" order by id desc;` · `node tests/rack-subposicion.cjs`.
-`sql/gv_rack_subposicion_v2978.sql` (rollback en la cabecera y al final).
+`sql/gv_rack_subposicion_v2978.sql` (rollback en la cabecera y al final). ⚠ Los objetos de la base, los
+16 centinelas y los marcadores internos dicen **v29.78** (la versión con que se aplicaron): es la llave de
+idempotencia, **no cambiarla**; la app salió en la v29.94 porque otras sesiones se adelantaron.
 
 ## ⚠ REGLA: el CÓDIGO DE CLIENTE es por EMPRESA — nunca cruzar por código solo
 
