@@ -11,7 +11,7 @@
        códigos viejos). En plásticos NO hay «+ Agregar insumo» (categoría cerrada); el alta
        generica si abre al recibir (v30.05). Sale 1 si falla.
 
-   ⚠ v30.16 — ESTE TEST VIVÍA EN ROJO SÓLO EN CI (issue #24, desde el 10/10): local pasaba
+   ⚠ v30.17 — ESTE TEST VIVÍA EN ROJO SÓLO EN CI (issue #24, desde el 10/10): local pasaba
    3 de 3 y en el runner fallaba siempre. Lo que lo hacía depender del entorno:
      · salía a la RED de verdad (`insFetchGp2Ri`, `insFetchFlejeProv`, `insFetchConfig`,
        `insGp2Rpc` y el `fetch` de `gv_insumo_origenes` de askInsUbicacion no estaban
@@ -28,7 +28,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 390, height: 844 } });
   const errs = []; p.on("pageerror", (e) => errs.push(e.message));
-  // v30.16 — nada de red: el test mide la regla, no si el runner llega a Supabase.
+  // v30.17 — nada de red: el test mide la regla, no si el runner llega a Supabase.
   await p.route("**://**", (r) => (/^file:/.test(r.request().url()) ? r.continue() : r.abort()));
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(async () => {
@@ -48,7 +48,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ]; };
     window.stockFetchSaldos = async function () { return {}; };
     window.insFetchSaldosXUni = async function () { return {}; };
-    // v30.16 — lo que el modal pide a la base: fijo, para que el resultado no dependa del runner
+    // v30.17 — lo que el modal pide a la base: fijo, para que el resultado no dependa del runner
     window.insFetchGp2Ri = async function () { return null; };
     window.insFetchFlejeProv = async function () { return null; };
     window.insFetchConfig = async function () { return null; };

@@ -1285,7 +1285,7 @@ echo "== cc-sombra-no-mostrar (v27.89: la cuenta corriente se valida en modo som
 node tests/cc-sombra-no-mostrar.cjs
 echo "== pend-demora-dias (Thomas, 07/10: la demora de Pendientes pasa a '6d 22hs' desde las 24 hs, no '165,5hs') =="
 node tests/pend-demora-dias.cjs
-# ⚠ v30.16 — ins-ri-cat-bolsas va ÚLTIMO a propósito: vivió en rojo SÓLO en CI desde el 10/10
+# ⚠ v30.17 — ins-ri-cat-bolsas va ÚLTIMO a propósito: vivió en rojo SÓLO en CI desde el 10/10
 # (issue #24) y local pasaba siempre, así que no se podía diagnosticar — el log del run se baja
 # por un host que el sandbox no alcanza y por la API sólo llega el FINAL. Último, su línea
 # (que imprime cada chequeo: a..h) entra en ese tail. Si sigue verde unos días, se puede volver
