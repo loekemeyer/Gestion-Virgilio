@@ -9114,6 +9114,32 @@ o en cualquier permutacion de esas combinaciones"*.
 - **El Cód. Cervantes del editor sólo acepta códigos que EXISTEN** (Luis, 13/10, Stock general v3.8.0): es un
   `datalist` con todos los componentes de GP2; uno inventado no habilita el botón y no llega a la base.
 
+#### ⚠ Medido el 13/10 (Luis: *"hacé la prueba de que funcione bien. que no joda ningún stock real"*)
+
+> **VINCULAR NO MUEVE UN GRAMO DE STOCK.** Lo único que escribe es la fila de la equivalencia y el `isis`
+> de `Insumos`. Medido en transacción abortada: `Movimientos_Stock` 82.475 → 82.475 · `GP2.movimiento`
+> 45 → 45 · `GP2.inventario` 148.107,85 → 148.107,85 · el espejo 380.391,3 → 380.391,3.
+
+| qué se probó | resultado |
+|---|---|
+| los dos (Cervantes + ISIS) | GP2 `9991` → GV `9991` |
+| sólo ISIS (Cervantes vacío) | el componente **se conserva** (`coalesce`) y GV toma el ISIS nuevo |
+| ISIS vacío | limpia en los dos lados, como pidió Luis |
+| minúscula (`z23a`) | guarda la grafía real `Z23A` |
+| código de Cervantes inventado | frena con `COMPONENTE_INEXISTENTE` |
+| las 8 bolsas de material | cruzan a su componente (sólo falta **EBA**, cerrado); un envío de 2 bolsas de NY Virgen mueve 50 kg del sector 57 al inyector y **no toca `Movimientos_Stock`** |
+
+⚠ **El riesgo de que un ISIS vacío borre un dato bueno es HOY CERO, y así se mide**: la pantalla pre-carga
+el ISIS del espejo, y el espejo coincide con `Insumos` en **135 de 135** filas (0 casos de «espejo vacío y
+GV tiene»). Si alguna vez el espejo quedara atrás, vincular con el campo vacío **sí** borraría el ISIS de
+Virgilio: la consulta que lo mide es el `case` de `virgilio_insumo_stock` contra `Insumos` por `upper(cod)`.
+
+⚠ **Lo que sí mueve stock es el ESPEJO, después** (cron `gv-gp2-espejo-insumos`, ≤ 10 min): al vincular un
+código con saldo, el espejo crea el depósito «<sector> en Virgilio» y le fija ese saldo (probado con N°56:
+*«ajustaría 873 kg en la ubicación 75»*). **No infla nada de Cervantes**: los 6 depósitos `virgilio_sector`
+tienen **0 filas en `v_nivel_stock`**. Centinelas al cierre: `gv_reglas_perdidas`, `gv_endpoints_rotos` y
+`gv_huellas_cambiadas` en **0**.
+
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
 
 - **Nombres**: un insumo de Virgilio vinculado a GP2 lleva el nombre de GP2 (v29.34: cajas, bolsas, C15, C6, A15, G11, G13).
