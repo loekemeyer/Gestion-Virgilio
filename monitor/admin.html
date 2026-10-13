@@ -144,6 +144,8 @@ table.rd{width:auto;margin:0 auto}
 .rd td small{display:block;font-size:.62em;font-weight:700;color:inherit;opacity:.85}
 .rd td .fcn{opacity:.75}
 .rd tr.hoy td.rd-fe{color:#93c5fd}
+.rd td.rd-fe small.rd-arm{font-size:.55em;font-weight:700;opacity:.7;letter-spacing:0}
+.rd td.rd-fe small.rd-arm.tarde{color:#f87171;opacity:1}
 .rd .sal{color:#a78bfa}.rd .fac{color:#60a5fa}.rd .arm{color:#4ade80}.rd .pro{color:#fbbf24}.rd .pen{color:#f87171}
 .rd .z{color:#334155}
 .rd td.rd-m3{color:#e2e8f0;font-variant-numeric:tabular-nums}
@@ -1344,6 +1346,31 @@ function sumarHabiles(key, n) {
   }
   return k;
 }
+/* v29.86 (Luis, 13/10): el espejo de sumarHabiles. Lo necesita el día de ARMADO, que es la
+   fecha de salida MENOS 2 hábiles (norma de Thomas del 23/09: se arma el día 1, se factura el 2
+   y sale el 3). Mismo criterio de día hábil que sumarHabiles: finde + GV_Feriados. */
+function restarHabiles(key, n) {
+  var t = new Date(key + "T12:00:00-03:00").getTime(), k = key;
+  while (n > 0) {
+    t -= 86400000; k = new Date(t).toISOString().slice(0, 10);
+    var wd = new Date(k + "T12:00:00-03:00").getUTCDay();
+    if (wd === 0 || wd === 6 || FERIADOS[k]) continue;
+    n--;
+  }
+  return k;
+}
+/* v29.86 (Luis, 13/10): *"quiero que en el monitor, en el día figure así: «Mié 14/10 (debió
+   armarse Vie 09/10)» o «Vie 16/10 (debe armarse Mié 14/10)»"*. El verbo es el dato: «debió»
+   significa que la fecha de armado YA PASÓ. Va en segunda línea (el `small` de .rd td ya es
+   block) para no ensanchar la columna — regla de espacio del 28/09. */
+function diaArmado(key) {
+  if (!key) return null;
+  var arm = restarHabiles(key, 2), hoy = hoyKey();
+  return { fecha: arm, vencido: arm < hoy,
+           txt: arm < hoy ? "(debió armarse " + diaEtiqueta(arm) + ")"
+              : arm === hoy ? "(debe armarse hoy)"
+              : "(debe armarse " + diaEtiqueta(arm) + ")" };
+}
 function horaAR(ms) { var d = new Date(ms - 3 * 3600000); return d.getUTCHours() + d.getUTCMinutes() / 60; }
 /* ¿LLEGAN? Trabajo = m³ × (½ picking + ½ armado): una tanda pickeada y sin armar está a la mitad.
    Pendiente = todo lo que sale hasta la fecha meta y no está armado (lo atrasado primero, después la
@@ -1621,12 +1648,20 @@ function pintar(d) {
     };
     /* v24.70: el m³ del día es el mismo que daba «Total por día» (las tandas del día). */
     var m3Dia = function (x) { var g = porDia.get(x.key); return g ? g.total : x.m3; };
+    /* v29.86: el día de armado debajo de la fecha. Rojo sólo si ya pasó Y queda algo sin armar
+       (pendiente + proceso neto): ahí el «debió» es un atraso real, no una fecha vieja de un día
+       que ya salió entero. El color nunca va solo — el verbo («debió») lo dice igual. */
+    var _rdArm = function (x) {
+      var a = diaArmado(x.key); if (!a) return "";
+      var falta = (x.est.pendiente - (x.estSal.pendiente || 0)) + (x.est.proceso - (x.estSal.proceso || 0));
+      return '<small class="rd-arm' + (a.vencido && falta > 0 ? ' tarde' : '') + '">' + esc(a.txt) + '</small>';
+    };
     el("fcBox").innerHTML = rds.length ? '<table class="rd"><thead><tr><th></th><th>M³</th>' +
       '<th>Salió</th><th>Fact</th><th>Arm</th><th>Proc</th><th>Pend</th>' +
       '</tr></thead><tbody>' + rds.map(function (x) {
         var neto = function (k) { return x.est[k] - (x.estSal[k] || 0); };
         return '<tr' + (x.key === hoyKey() ? ' class="hoy"' : '') + '>' +
-          '<td class="rd-fe">' + esc(diaEtiqueta(x.key)) + '</td>' +
+          '<td class="rd-fe">' + esc(diaEtiqueta(x.key)) + _rdArm(x) + '</td>' +
           '<td class="rd-m3">' + n1(m3Dia(x)) + '</td>' +
           pc(x.salio, x.nps, "sal") + pc(neto("facturado"), x.nps, "fac", (d.fcParse && neto("facturado")) ? x.fcNeto + "/" : "") + pc(neto("armado"), x.nps, "arm") +
           pc(neto("proceso"), x.nps, "pro") + pc(neto("pendiente"), x.nps, "pen") + '</tr>';

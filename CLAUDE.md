@@ -5241,6 +5241,51 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
 
+## ⚠ REGLA (Luis, 2026-10-13, v29.86): en el MONITOR, el día dice CUÁNDO DEBIÓ ARMARSE
+
+**Luis, textual:** *"quiero que en el monitor, en el día figure así: «Mié 14/10 (debió armarse Vie 9)»
+o «Vie 16/10 (debe armarse Mié 14/10)»"*.
+
+> **El dato es el VERBO.** «debió» = esa fecha de armado YA PASÓ, o sea que ese día de reparto
+> viene atrasado. «debe» = todavía hay tiempo.
+
+| pieza | qué hace |
+|---|---|
+| **`restarHabiles(key, n)`** (`monitor/tv.html`) | el espejo de `sumarHabiles`: mismo criterio de día hábil (finde + `GV_Feriados`, con la lista de respaldo si el fetch falla) |
+| **`diaArmado(key)`** | armado = **salida − 2 hábiles** (norma de Thomas del 23/09, v21.56: se arma el día 1, se factura el 2 y sale el 3 — es la misma cuenta que ya hacía `calcularMeta` con `sumarHabiles(hoy, 2)`). Devuelve `{fecha, txt, vencido}` |
+| cuadro **«NPs por Día»** | el texto va en el `<small>` de la celda del día (que `.rd td small` ya dibuja en bloque): **no ensancha la columna** — regla de espacio del 28/09 |
+| rojo (`.rd-arm.tarde`) | sólo si la fecha de armado **ya pasó Y** ese día todavía tiene NP sin armar (pendiente + proceso neto). Una fecha vieja de un día que ya salió entero no es un atraso. **El color no va solo**: el verbo lo dice igual |
+
+⚠ **Es la TV y lo hereda Mon. Admin** (`monitor/build-admin.cjs` se arma de `tv.html`). El monitor
+de `index.html` no tiene este cuadro. `monitor/tv.html` queda **afuera del sistema GV-UI** a
+propósito (regla v29.83): acá manda su escala en `--u`.
+
+⚠ **El caso difícil es el feriado, y es justo el ejemplo de Luis:** dos hábiles antes del
+**miércoles 14/10** son el **viernes 9**, no el lunes 12, porque el 12/10 es feriado. Contar días
+corridos da el número equivocado tres veces por mes.
+
+**Chequeo:** `node tests/mon-dia-armado.cjs` — corre la TV con el reloj fijo en el martes 13/10 y
+mide los dos ejemplos textuales de Luis, el caso «debe armarse hoy» y que la columna no se
+ensanche. Verificado que falla al sacar la etiqueta, al ignorar los feriados y al correr el límite
+del verbo.
+
+### ⚠⚠ Y el LEGAJO DE PRUEBA entraba al monitor por el cierre de insumos
+
+Lo que destapó el pedido: el 13/10 el monitor mostraba al **legajo 1 «en jornada»** con un cierre
+de Recepción de Insumos (12:32→12:33) **sin su apertura**. `insEmitCierre` era la **única**
+escritura de un evento de operario que llamaba a **`_enqueueReportRaw` DIRECTO**, salteándose el
+gate que `enqueueReport` (`esOperadorPrueba`) y `enqueueAutoClose` (`esLegajoPrueba`) sí tienen:
+la apertura la descartó el gate y el cierre salió igual.
+
+> **Un cierre huérfano no se distingue de una tarea abierta**, así que
+> `gv_monitor_horas_operario_dia` lo lee como jornada viva — y el legajo 1 cuenta en el monitor
+> desde la v27.63 (Thomas, D13), así que queda ahí con el tiempo muerto corriendo.
+
+**Al escribir un evento de operario se llama a `enqueueReport`.** `_enqueueReportRaw` es la lógica
+interna y **no tiene candado**: quien la use directo se lo pone él. Hoy son tres llamadores y los
+tres filtran el legajo de prueba. Lo sostiene el bloque **(d)** de `tests/legajo1-confirma.cjs`,
+que lo mide sobre la cola de verdad (verificado que falla sin el guard).
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.69): el código SIN GÓNDOLA en el Mapa se lo PREGUNTA AL OPERARIO
 
 **Luis:** *"si el modulo de pickeo los promptea a pickear un codigo para el que no tiene registro de
@@ -9178,6 +9223,62 @@ o en cualquier permutacion de esas combinaciones"*.
   Adenda en `gestion-productiva-2.0/db/migracion_insumo_equivalencia_unica_20261013.sql`.
 - **El Cód. Cervantes del editor sólo acepta códigos que EXISTEN** (Luis, 13/10, Stock general v3.8.0): es un
   `datalist` con todos los componentes de GP2; uno inventado no habilita el botón y no llega a la base.
+
+#### ⚠ Medido el 13/10 (Luis: *"hacé la prueba de que funcione bien. que no joda ningún stock real"*)
+
+> **VINCULAR NO MUEVE UN GRAMO DE STOCK.** Lo único que escribe es la fila de la equivalencia y el `isis`
+> de `Insumos`. Medido en transacción abortada: `Movimientos_Stock` 82.475 → 82.475 · `GP2.movimiento`
+> 45 → 45 · `GP2.inventario` 148.107,85 → 148.107,85 · el espejo 380.391,3 → 380.391,3.
+
+| qué se probó | resultado |
+|---|---|
+| los dos (Cervantes + ISIS) | GP2 `9991` → GV `9991` |
+| sólo ISIS (Cervantes vacío) | el componente **se conserva** (`coalesce`) y GV toma el ISIS nuevo |
+| ISIS vacío | limpia en los dos lados, como pidió Luis |
+| minúscula (`z23a`) | guarda la grafía real `Z23A` |
+| código de Cervantes inventado | frena con `COMPONENTE_INEXISTENTE` |
+| las 8 bolsas de material | cruzan a su componente (sólo falta **EBA**, cerrado); un envío de 2 bolsas de NY Virgen mueve 50 kg del sector 57 al inyector y **no toca `Movimientos_Stock`** |
+
+⚠ **El riesgo de que un ISIS vacío borre un dato bueno es HOY CERO, y así se mide**: la pantalla pre-carga
+el ISIS del espejo, y el espejo coincide con `Insumos` en **135 de 135** filas (0 casos de «espejo vacío y
+GV tiene»). Si alguna vez el espejo quedara atrás, vincular con el campo vacío **sí** borraría el ISIS de
+Virgilio: la consulta que lo mide es el `case` de `virgilio_insumo_stock` contra `Insumos` por `upper(cod)`.
+
+⚠ **Lo que sí mueve stock es el ESPEJO**: al vincular un código con saldo, le fija ese saldo en el depósito
+«<sector> en Virgilio». **No infla nada de Cervantes**: los 6 depósitos `virgilio_sector` tienen **0 filas en
+`v_nivel_stock`**. Centinelas al cierre: `gv_reglas_perdidas`, `gv_endpoints_rotos` y `gv_huellas_cambiadas`
+en **0**.
+
+#### ⚠ v29.87 (Luis, 13/10): el espejo NO espera al cron — vincular lo dispara en el acto
+
+**Luis, textual:** *"¿por qué tarda 10 min? debería ser lectura de una tabla en conjunto, instantáneo, no?"*.
+Tenía razón, y lo que se mide es el tamaño del desperdicio:
+
+| cuánto cuesta de verdad | medido 13/10 |
+|---|---|
+| calcular el stock de insumos **en vivo** (el bloque 1 de `gv_gp2_espejo_sync`) | **20 ms** · 163 filas |
+| `gv_gp2_espejo_insumos(null, true)`, los 5 rubros | **28 ms** |
+| leer el espejo ya copiado | 0,5 ms |
+| el cron 112 entero (4 bloques con sus md5) | 123 ms, **cada 10 min** |
+| el cron 152 del inventario | **cada 30 min** (`:19,:49`) |
+
+> **~40 ms de trabajo esperaban en una cola de 10 y 30 minutos.** El motivo nunca fue el costo: el espejo
+> se armó como **copia** por la Regla 0 de GP2 (GP2 no lee `public`).
+
+- **El hueco concreto**: el stock ya se adelanta solo en cada movimiento de insumos (trigger
+  `zz_gv_gp2_espejo_insumos` de `Movimientos_Stock`), pero **vincular no es un movimiento**, así que un
+  código recién vinculado no mostraba su stock en GP2 hasta el cron. Hoy lo dispara el vínculo:
+  **`public.gv_insumo_equiv_espejo`** (trigger `zz_gv_insumo_equiv_espejo` AFTER INSERT OR UPDATE OF
+  `componente_id` sobre `GP2.insumo_equivalencia`, mismo patrón que el del ISIS).
+- Medido: vincular N°56 tarda **57 ms** y sus **873 kg aparecen en el acto** en «Sector Fleje en Virgilio».
+  Un vínculo que cambia **sólo el ISIS no dispara** el espejo (4,8 ms, 0 filas de log).
+- ⚠ **Nunca frena el vínculo**: el error va a `GV_GP2_Espejo_Log` con `resultado = 'error'` y lo rehace el
+  cron. Rollback: `alter table "GP2".insumo_equivalencia disable trigger zz_gv_insumo_equiv_espejo;`
+- ⚠⚠ **Lo que queda y es decisión de Luis**: `GP2.virgilio_insumo_stock` sigue siendo una **tabla copiada**
+  cada 10 min, y el bloque 1 de `gv_gp2_espejo_sync` es textualmente un `select` — **podría ser una VISTA**
+  y la pantalla leería el saldo **en vivo** (20 ms), sin cron y sin desfase. Lo único que lo frena es la
+  Regla 0, que ya tiene precedente aprobado por el dueño (`GP2.v_produccion_todas` lee `reg_prod_3_0`).
+  No se cambia sin su sí. Centinela 420. `sql/gv_insumo_equiv_espejo_v2987.sql`.
 
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
 

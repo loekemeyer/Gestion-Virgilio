@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=29.86">
+<link rel="stylesheet" href="gv-ui.css?v=29.88">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6422,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.86"></script>
+<script type="module" src="recepcion.js?v=29.88"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10737,7 +10737,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.86";
+const APP_VERSION = "v29.88";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -28698,6 +28698,13 @@ function insEmitCierre(legajo, mode, tsInicioIso, total) {
       id: payload.id, status: "queued", ts_inicio_iso: payload.ts_inicio_iso
     });
   } catch (_e) { /* no-op */ }
+  /* v29.86 (Luis, 13/10): el candado del legajo de prueba tambien aca. Esta era la UNICA
+     escritura de un evento de operario que llamaba a `_enqueueReportRaw` DIRECTO, salteandose
+     el gate que `enqueueReport` y `enqueueAutoClose` si tienen. Por eso el 13/10 el monitor
+     mostro al legajo 1 «en jornada» con un cierre de Recepcion de Insumos (12:32→12:33) SIN su
+     apertura: la apertura la descarto el gate y el cierre salio igual. Y un cierre huerfano no
+     se distingue de una tarea abierta: la vista lo lee como jornada viva. */
+  try { if (esLegajoPrueba(payload.legajo)) return; } catch (_e) {}
   try { _enqueueReportRaw(payload); } catch (_e) { /* no-op */ }
   try { updatePendingIndicator(); } catch (_e) {}
 }
@@ -62852,7 +62859,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.86"></script>
+<script src="importacion.js?v=29.88"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65870,15 +65877,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.86"></script>
-<script src="hotsale.js?v=29.86"></script>
-<script src="estadisticas.js?v=29.86"></script>
-<script src="ads.js?v=29.86"></script>
-<script src="plantel.js?v=29.86"></script>
+<script src="cobranzas.js?v=29.88"></script>
+<script src="hotsale.js?v=29.88"></script>
+<script src="estadisticas.js?v=29.88"></script>
+<script src="ads.js?v=29.88"></script>
+<script src="plantel.js?v=29.88"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.86"></script>
+<script src="analisis.js?v=29.88"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.86"></script>
+<script src="ayuda.js?v=29.88"></script>
 
 </body>
 </html>

@@ -32,7 +32,9 @@ const KB = Buffer.byteLength(src) / 1024;
 /* v26.51: techo 100 → 105 KB — entró el prorrateo del m³ de picking por lo pickeado (D24). Sigue siendo el 2 % del index. */
 /* v26.70: techo 105 → 110 KB — la v26.67 ya pesaba 104,9 KB y entraron D28 (lectura rota ≠ cero) y D29 (anchos por dato). */
 /* v28.93: techo 110 → 115 KB — la v28.79 ya pesaba 109,95 KB y entró la tarea de módulo (MDI/MDT) en «En este momento». */
-if (KB > 115) fallas.push("pesa " + KB.toFixed(0) + " KB (techo 115): dejó de ser la versión liviana");
+/* v29.86: techo 115 → 118 KB — entró el día de armado en el cuadro de días (restarHabiles +
+   diaArmado, con su comentario). Sigue siendo el 2 % del index.html (~5 MB), que es lo que cuida. */
+if (KB > 118) fallas.push("pesa " + KB.toFixed(0) + " KB (techo 118): dejó de ser la versión liviana");
 for (const pesado of ["supabase.umd.js", "supabase.js", "chart.umd", "jspdf", "xlsx", "cdn."]) {
   if (src.includes(pesado)) fallas.push("carga " + pesado + " — la TV no lo necesita");
 }
