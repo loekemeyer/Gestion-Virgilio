@@ -904,6 +904,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== resumen-pkc-agrupado (v19.09: el detalle del picking, una linea por tanda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/resumen-pkc-agrupado.cjs
 
+echo "== arm-mesa-inicio (v29.90: al empezar el armado se pregunta la MESA, evento AUI, sin frenar nada) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/arm-mesa-inicio.cjs
 echo "== cierre-cancelado-avisa (v19.22: cancelar el «donde dejas la tanda» avisa, no aborta en silencio) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cierre-cancelado-avisa.cjs
 

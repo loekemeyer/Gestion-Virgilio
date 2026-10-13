@@ -944,7 +944,10 @@ function _ubicHora(ts) {
 function ubicChip(u) {
   if (!u) return "";
   var lug = String(u.ubicacion || "").trim(); if (!lug) return "";
-  var de = u.fuente === "armado" ? "quedó armado acá" : (u.fuente === "freno" ? "ahí quedó el carro al frenar el picking" : "lo dejó ahí el picking");
+  /* v29.90: la MESA que eligió el armador al EMPEZAR (AUI) — la tanda se está armando AHÍ */
+  var de = u.fuente === "armado_mesa" ? "la están armando acá"
+         : (u.fuente === "armado" ? "quedó armado acá"
+         : (u.fuente === "freno" ? "ahí quedó el carro al frenar el picking" : "lo dejó ahí el picking"));
   var t = "📍 " + lug + " — " + de + (u.legajo ? " (legajo " + u.legajo + ")" : "") + (u.ts ? " · " + _ubicHora(u.ts) : "") +
     (u.otras ? " · partes también en " + u.otras : "");
   return '<span class="t-ubic" title="' + esc(t) + '">📍 ' + esc(lug) + (u.otras ? " +" : "") + '</span>';
@@ -1299,7 +1302,7 @@ function sumarHabiles(key, n) {
   }
   return k;
 }
-/* v29.86 (Luis, 13/10): el espejo de sumarHabiles. Lo necesita el día de ARMADO, que es la
+/* v29.90 (Luis, 13/10): el espejo de sumarHabiles. Lo necesita el día de ARMADO, que es la
    fecha de salida MENOS 2 hábiles (norma de Thomas del 23/09: se arma el día 1, se factura el 2
    y sale el 3). Mismo criterio de día hábil que sumarHabiles: finde + GV_Feriados. */
 function restarHabiles(key, n) {
@@ -1312,7 +1315,7 @@ function restarHabiles(key, n) {
   }
   return k;
 }
-/* v29.86 (Luis, 13/10): *"quiero que en el monitor, en el día figure así: «Mié 14/10 (debió
+/* v29.90 (Luis, 13/10): *"quiero que en el monitor, en el día figure así: «Mié 14/10 (debió
    armarse Vie 09/10)» o «Vie 16/10 (debe armarse Mié 14/10)»"*. El verbo es el dato: «debió»
    significa que la fecha de armado YA PASÓ. Va en segunda línea (el `small` de .rd td ya es
    block) para no ensanchar la columna — regla de espacio del 28/09. */
@@ -1600,7 +1603,7 @@ function pintar(d) {
     };
     /* v24.70: el m³ del día es el mismo que daba «Total por día» (las tandas del día). */
     var m3Dia = function (x) { var g = porDia.get(x.key); return g ? g.total : x.m3; };
-    /* v29.86: el día de armado debajo de la fecha. Rojo sólo si ya pasó Y queda algo sin armar
+    /* v29.90: el día de armado debajo de la fecha. Rojo sólo si ya pasó Y queda algo sin armar
        (pendiente + proceso neto): ahí el «debió» es un atraso real, no una fecha vieja de un día
        que ya salió entero. El color nunca va solo — el verbo («debió») lo dice igual. */
     var _rdArm = function (x) {

@@ -127,7 +127,7 @@ function popRitmo(leg, sub) {
   var mins = {}, pmin = {}, cola = {};
   /* v29.03 (Thomas, D9): Min trab suma la COLA hasta la próxima tarea registrada (≡ la vista, regla v26.43),
      así el total coincide con la celda del tablero. Sólo el primer cierre de cada tanda; sin tarea después, 0. */
-  var AUTO = /^(PUB|AUB|PKC|ENT|RSP|ROC|RAG|FGU|FSS|IMPT|TAL|GST|MGR|PKM|SSG|PSP|NPD|PKAX|FJ)$/;
+  var AUTO = /^(PUB|AUB|AUI|PKC|ENT|RSP|ROC|RAG|FGU|FSS|IMPT|TAL|GST|MGR|PKM|SSG|PSP|NPD|PKAX|FJ)$/;   /* v29.90: AUI = la mesa al empezar armado, evento de detalle */
   var todos = (D.eventos || []).filter(function (ev) { return String(ev.legajo == null ? "" : ev.legajo).trim() === String(leg) &&
     dayKey(ev.ts_cliente) === hoyKey() && !AUTO.test(ev.opcion || "") && !/X$/.test(ev.opcion || ""); });
   var colaDe = function (f, yo) { var sig = Infinity, abierto = false;

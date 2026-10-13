@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=29.89">
+<link rel="stylesheet" href="gv-ui.css?v=29.90">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6422,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.89"></script>
+<script type="module" src="recepcion.js?v=29.90"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10737,7 +10737,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.89";
+const APP_VERSION = "v29.90";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11364,6 +11364,59 @@ function emitPickUbic(tanda, ubic, legajo) {
   const nowMs = Date.now();
   const payload = {
     legajo: String(legajo || "").trim(), opcion: "PUB", descripcion: String(ubic),
+    texto: t, ts: nowMs,
+    id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+    ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
+}
+/* v29.90 (Luis, 13/10): al EMPEZAR EL ARMADO (AP) se pregunta EN QUÉ MESA va a armar.
+   Es el dato que faltaba para que el monitor diga dónde está FÍSICAMENTE una tanda que
+   se está armando (v29.74): el PUB dice dónde la dejó el picking y el AUB dónde quedó
+   al TERMINAR, pero mientras arman no había nada. Se guarda en un evento aparte 'AUI'
+   (texto=tanda, descripcion=mesa) y SIN ts_inicio: no abre tarea ni cuenta horas.
+   ⚠ NO frena el armado: la pregunta sale DESPUÉS de registrar el AP y tiene «Después»,
+   así que ningún camino deja al operario sin el asistente de Completar. Y es
+   forward-facing: lo ya armado no se toca ni se backfillea. */
+const ARM_MESA_OPCIONES = ["Mesa 1", "Mesa 2"];
+function askArmadoMesa(tanda) {
+  return new Promise(function (resolve) {
+    if (!document.getElementById("auiCss")) {
+      const s = document.createElement("style"); s.id = "auiCss";
+      s.textContent = "#auiModal{display:none;position:fixed;inset:0;z-index:1450;background:rgba(2,6,23,.78);overflow:auto;padding:14px;}#auiModal.show{display:flex;align-items:center;justify-content:center;}.aui-card{background:#f8fafc;max-width:430px;width:100%;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.aui-head{padding:14px 16px;background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;}.aui-title{font-size:17px;font-weight:800;}.aui-sub{font-size:12.5px;opacity:.92;margin-top:3px;}.aui-body{padding:14px;}.aui-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;}.aui-opt{padding:19px 6px;border:2px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px;font-weight:800;color:#0f172a;cursor:pointer;width:auto;margin:0;}.aui-opt:active{background:#faf5ff;border-color:#7c3aed;}.aui-otra{grid-column:1/-1;border-color:#fcd34d;background:#fffbeb;color:#92400e;font-size:15px;padding:15px 6px;}.aui-x{margin-top:12px;width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:800;font-size:14px;cursor:pointer;}";
+      document.head.appendChild(s);
+    }
+    let ov = document.getElementById("auiModal");
+    if (!ov) { ov = document.createElement("div"); ov.id = "auiModal"; document.body.appendChild(ov); }
+    function done(v) { ov.classList.remove("show"); ov.innerHTML = ""; resolve(v); }
+    const opts = ARM_MESA_OPCIONES.map(function (o) { return '<button class="aui-opt" data-u="' + escapeHtml(o) + '">' + escapeHtml(o) + '</button>'; }).join("") + '<button class="aui-opt aui-otra" data-otra="1">✏️ Otro lugar…</button>';
+    ov.innerHTML = '<div class="aui-card"><div class="aui-head"><div class="aui-title">📍 ¿En qué mesa vas a armar ' + escapeHtml(String(tanda || "")) + '?</div><div class="aui-sub">Así el monitor dice dónde está la tanda mientras la armás.</div></div><div class="aui-body"><div class="aui-grid">' + opts + '</div><button class="aui-x">Después</button></div></div>';
+    ov.classList.add("show");
+    ov.querySelectorAll(".aui-opt").forEach(function (b) { b.onclick = function () {
+      if (b.getAttribute("data-otra")) {
+        let t = "";
+        try { t = String(prompt("✏️ ¿Dónde vas a armar? (escribilo, ej. Mesa 3 / AB7)") || ""); } catch (_e) { t = ""; }
+        t = t.trim();
+        if (t) done(t);   // si cancela o deja vacío, NO cierra: puede elegir otra opción
+      } else {
+        done(b.getAttribute("data-u"));
+      }
+    }; });
+    const x = ov.querySelector(".aui-x"); if (x) x.onclick = function () { done(null); };
+  });
+}
+/* Emite el evento AUI (mesa donde se está armando). Mismo patrón que emitPickUbic:
+   encola + intenta enviar, con id único (si vuelve a tocar AP con otra mesa, el más
+   reciente manda; gv_tanda_ubicacion toma el último ts). El legajo de PRUEBA no
+   persiste (lo frena enqueueReport). */
+function emitArmadoMesa(tanda, mesa, legajo) {
+  if (!mesa) return;
+  const t = String(tanda || "").trim().toUpperCase(); if (!t) return;
+  const nowMs = Date.now();
+  const payload = {
+    legajo: String(legajo || "").trim(), opcion: "AUI", descripcion: String(mesa),
     texto: t, ts: nowMs,
     id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
     ts_inicio_iso: null
@@ -12048,6 +12101,12 @@ async function send() {
     // v8.75: antes tenía un Paso 1 de reparto manual de faltantes; hoy el reparto es
     // automático (proporcional) y el wizard arranca directo en Separar.
     showCompletarWizard(legajoStr, texto);
+    /* v29.90: ¿en qué mesa va a armar? (evento AUI, lo lee el monitor). Va ACÁ, al final y
+       SIN await: el cuadro sale ENCIMA del asistente — que ya está abierto — y el armado no
+       espera a nadie. Si el cuadro falla o lo saltea con «Después», no pasa nada más. */
+    try {
+      askArmadoMesa(texto).then(function (m) { if (m) emitArmadoMesa(texto, m, legajoStr); }).catch(function () {});
+    } catch (_e) {}
   }
   // Al INICIAR carga camión (1er toque de CC): checklist de NPs listas (TAP).
   if (opcion === "CC") {
@@ -28505,7 +28564,7 @@ function insEmitCierre(legajo, mode, tsInicioIso, total) {
       id: payload.id, status: "queued", ts_inicio_iso: payload.ts_inicio_iso
     });
   } catch (_e) { /* no-op */ }
-  /* v29.86 (Luis, 13/10): el candado del legajo de prueba tambien aca. Esta era la UNICA
+  /* v29.90 (Luis, 13/10): el candado del legajo de prueba tambien aca. Esta era la UNICA
      escritura de un evento de operario que llamaba a `_enqueueReportRaw` DIRECTO, salteandose
      el gate que `enqueueReport` y `enqueueAutoClose` si tienen. Por eso el 13/10 el monitor
      mostro al legajo 1 «en jornada» con un cierre de Recepcion de Insumos (12:32→12:33) SIN su
@@ -34449,7 +34508,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
      picking/armado de ESA tanda. Un evento automatico (PKC, ENT, TAL, GST, MGR, *X...) no corta la cola; un
      tramo que ya estaba abierto al cerrar (ts_inicio antes del TP/TAP) la deja en 0; una bajada de racks sin
      tramo la corta (ese tramo ya cuenta como racks); un segundo TP/TAP de la MISMA tanda no la corta. */
-  const COLA_AUTO = new Set(["PUB","AUB","PKC","ENT","RSP","ROC","RAG","FGU","FSS","IMPT","TAL","GST","MGR","PKM","SSG","PSP","PKG","NPD","PKAX"]);
+  const COLA_AUTO = new Set(["PUB","AUB","PKC","ENT","RSP","ROC","RAG","FGU","FSS","IMPT","TAL","GST","MGR","PKM","SSG","PSP","PKG","NPD","PKAX","AUI"]);
   const _colaEvs = new Map(), _colaRk = new Map();
   for (const ev of events) {
     const leg = String(ev.legajo || "").trim();
@@ -62666,7 +62725,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.89"></script>
+<script src="importacion.js?v=29.90"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65684,15 +65743,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.89"></script>
-<script src="hotsale.js?v=29.89"></script>
-<script src="estadisticas.js?v=29.89"></script>
-<script src="ads.js?v=29.89"></script>
-<script src="plantel.js?v=29.89"></script>
+<script src="cobranzas.js?v=29.90"></script>
+<script src="hotsale.js?v=29.90"></script>
+<script src="estadisticas.js?v=29.90"></script>
+<script src="ads.js?v=29.90"></script>
+<script src="plantel.js?v=29.90"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.89"></script>
+<script src="analisis.js?v=29.90"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.89"></script>
+<script src="ayuda.js?v=29.90"></script>
 
 </body>
 </html>

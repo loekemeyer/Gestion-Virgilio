@@ -32,7 +32,7 @@ const KB = Buffer.byteLength(src) / 1024;
 /* v26.51: techo 100 → 105 KB — entró el prorrateo del m³ de picking por lo pickeado (D24). Sigue siendo el 2 % del index. */
 /* v26.70: techo 105 → 110 KB — la v26.67 ya pesaba 104,9 KB y entraron D28 (lectura rota ≠ cero) y D29 (anchos por dato). */
 /* v28.93: techo 110 → 115 KB — la v28.79 ya pesaba 109,95 KB y entró la tarea de módulo (MDI/MDT) en «En este momento». */
-/* v29.86: techo 115 → 118 KB — entró el día de armado en el cuadro de días (restarHabiles +
+/* v29.90: techo 115 → 118 KB — entró el día de armado en el cuadro de días (restarHabiles +
    diaArmado, con su comentario). Sigue siendo el 2 % del index.html (~5 MB), que es lo que cuida. */
 if (KB > 118) fallas.push("pesa " + KB.toFixed(0) + " KB (techo 118): dejó de ser la versión liviana");
 for (const pesado of ["supabase.umd.js", "supabase.js", "chart.umd", "jspdf", "xlsx", "cdn."]) {
@@ -214,7 +214,9 @@ function responder(url) {
      AB7 y una de sus NP fue a otro sector. */
   if (q.includes("/rpc/gv_tanda_ubicacion"))     return [
     { tanda: "E30A", ubicacion: "Mesa 2", fuente: "picking", ts: iso(T0 - 1.4 * H), legajo: "8", por_np: false, otras: null },
-    { tanda: "E31A", ubicacion: "AB7", fuente: "armado", ts: iso(T0 - 0.5 * H), legajo: "277", por_np: false, otras: "AC1" }
+    { tanda: "E31A", ubicacion: "AB7", fuente: "armado", ts: iso(T0 - 0.5 * H), legajo: "277", por_np: false, otras: "AC1" },
+    /* v29.90: la MESA que eligió el armador al EMPEZAR (AUI) — la están armando AHÍ */
+    { tanda: "E32A", ubicacion: "Mesa 1", fuente: "armado_mesa", ts: iso(T0 - 0.2 * H), legajo: "104", por_np: false, otras: null }
   ];
   if (q.includes("/gv_monitor_horas_operario"))  return DATOS.horas;
   if (q.includes("/Facturacion_NP"))             return DATOS.facturadas;
@@ -332,6 +334,9 @@ function responder(url) {
      "E30A está pickeada y la dejaron en Mesa 2: el chip tiene que estar en su celda: " + r.tandas.slice(0, 400));
   ok(/📍 Mesa 2/.test(r.pen) && /📍 AB7 \+/.test(r.pen),
      "en Pendientes de salir hoy también, y E31A (armada en AB7, con otra NP en AC1) lleva el «+»: " + r.pen.slice(0, 400));
+  /* v29.90: la mesa del AP se lee como "la están armando acá", no como el picking ni como el AUB. */
+  ok(/📍 Mesa 1/.test(r.tandas) && /title="[^"]*la están armando acá[^"]*legajo 104/.test(r.tandas),
+     "E32A se está armando en Mesa 1 (evento AUI): el chip lo tiene que decir: " + r.tandas.slice(0, 600));
   ok(/title="[^"]*lo dejó ahí el picking[^"]*legajo 8/.test(r.tandas),
      "el título del chip dice de dónde salió el dato y quién lo cargó: " + (r.tandas.match(/title="[^"]*📍[^"]*"/) || [""])[0]);
   ok(pedidoUb && Array.isArray(pedidoUb.p_tandas) && pedidoUb.p_tandas.indexOf("E30A") >= 0,

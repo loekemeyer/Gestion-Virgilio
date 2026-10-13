@@ -84,11 +84,14 @@ empezó…».
 
 ## Armado de pedidos (AP · TAP)
 
-1. Tocá **AP**, elegí la tanda pickeada y **Enviar**. Se abre el asistente de armado.
-2. Primero hay que clasificar **cada pedido** en **🎁 Lío / 🏷 Etiqueta / 🚶 Nada**.
-3. **Paso 1 · Separar**: separás la mesa por pedido.
-4. **Paso 2 · Líos**: armás los líos; cada uno se cierra con **«✓ Cerrar lío»**.
-5. Al final tocás **«Terminar»**: queda registrado el **TAP** y salen los papeles de cada pedido.
+1. Tocá **AP**, elegí la tanda pickeada y **Enviar**.
+2. Te pregunta **en qué mesa vas a armar**: **Mesa 1**, **Mesa 2** o **✏️ Otro lugar…** para
+   escribirlo. Sirve para que el monitor diga dónde está la tanda mientras la armás. Si no
+   sabés todavía, tocá **Después**: no frena nada y el asistente se abre igual.
+3. Primero hay que clasificar **cada pedido** en **🎁 Lío / 🏷 Etiqueta / 🚶 Nada**.
+4. **Paso 1 · Separar**: separás la mesa por pedido.
+5. **Paso 2 · Líos**: armás los líos; cada uno se cierra con **«✓ Cerrar lío»**.
+6. Al final tocás **«Terminar»**: queda registrado el **TAP** y salen los papeles de cada pedido.
 
 Los faltantes se reparten solos: no hay que cargarlos a mano.
 

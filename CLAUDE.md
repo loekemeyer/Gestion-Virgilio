@@ -5241,7 +5241,7 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
 
-## ⚠ REGLA (Luis, 2026-10-13, v29.86): en el MONITOR, el día dice CUÁNDO DEBIÓ ARMARSE
+## ⚠ REGLA (Luis, 2026-10-13, v29.90): en el MONITOR, el día dice CUÁNDO DEBIÓ ARMARSE
 
 **Luis, textual:** *"quiero que en el monitor, en el día figure así: «Mié 14/10 (debió armarse Vie 9)»
 o «Vie 16/10 (debe armarse Mié 14/10)»"*.
@@ -9490,10 +9490,10 @@ El dato **ya se registraba en tres lugares y no lo mostraba ninguna pantalla**:
   55 de 57 tandas (las 2 que faltan no tienen ninguna ubicación registrada).
 - **Una lectura rota no borra el chip**: si la RPC falla, la tanda se dibuja como antes.
 
-⚠ **La «mesa de armado en la que la están armando» NO se registra mientras arman**: el AUB se emite al TERMINAR
-(TAP). Mientras el armado está en curso, el último dato es el del picking — que justamente suele decir
-«Mesa 1» / «Mesa 2» (medido 30 días: 53 Mesa 1 · 45 Mesa 2 · 18 Carro). **Si se quiere la mesa en vivo, hay que
-preguntarla al dar AP**, y eso es un cambio en el módulo del operario: lo decide Luis.
+⚠ **RETIRADA la nota de que la mesa no se registra mientras arman** (decía que el AUB se emite al TERMINAR y
+que preguntarla al dar AP lo decidía Luis): desde la **v29.90 SÍ se registra** — el AP la pregunta y emite un
+**`AUI`** (regla al final de este archivo). Lo que sigue valiendo es que el **AUB** sale al TERMINAR (TAP), así
+que entre el AP y el TAP el dato vivo es el del AUI.
 
 ⚠ **El AUB hoy viene por TANDA, no por NP.** Medido el 13/10: 130 filas por tanda (la última, de hoy) contra 408
 por NP cuya última es del 30/09 — o sea que `_stkFetchNpsByTanda` no le trae las NP a la tanda web y
@@ -9507,3 +9507,55 @@ que se calcula. Si se quiere ahí también, se agrega.
 **Chequeo:** `select tanda, ubicacion, fuente from public.gv_tanda_ubicacion(array['F58B','F86A']);` ·
 `select * from public.gv_reglas_perdidas;` · `node tests/mon-tv.cjs` (4 chequeos nuevos, verificado que fallan
 contra el tv.html anterior) · `node tests/mon-admin.cjs`. `sql/gv_tanda_ubicacion_v2974.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.90): al EMPEZAR EL ARMADO se pregunta la MESA — evento `AUI`
+
+⚠ **En la base los 4 centinelas y la huella dicen `v29.86`** (la versión con la que se aplicó, antes de que otras sesiones se llevaran la 29.86 a la 29.89): es la etiqueta de cuándo entró, **no se cambia**.
+
+**Luis:** *"d1 si, que pregunte la mesa al empezar armado. fijate que no rompa nada. todo esto
+fowardfacing"*.
+
+Cierra el agujero que la v29.74 dejó anotado: el **PUB** dice dónde dejó la tanda el picking y el
+**AUB** dónde quedó al TERMINAR el armado, pero **mientras arman no había nada**.
+
+| cuándo | evento | qué dice |
+|---|---|---|
+| al terminar el picking (TP) | `PUB` | dónde dejó la tanda |
+| al frenar el picking | `GV_Tanda_Freno.ubicacion` | dónde quedó el carro |
+| **al EMPEZAR el armado (AP)** | **`AUI`** (v29.90) | **la mesa en la que la están armando** |
+| al terminar el armado (TAP) | `AUB` | el sector donde quedó el pedido |
+
+- El cuadro (`askArmadoMesa`) ofrece **Mesa 1**, **Mesa 2** y **✏️ Otro lugar…**, más **Después**. Lo emite
+  `emitArmadoMesa` con el molde de `emitPickUbic` (encola + manda, id único: si vuelve a tocar AP con otra
+  mesa, manda la más reciente). `texto` = tanda, `descripcion` = mesa.
+- **`ts_inicio` NULL a propósito**: NO abre tarea (el `abre` de las horas es una **lista blanca**:
+  EP/AP/MGI/RKI/IRI/MDI/toggles) y no cierra ninguna. Es un evento de **DETALLE**, como PUB / AUB / PKG.
+- ⚠⚠ **NO frena el armado, y el cómo importa**: la pregunta va **al final** del bloque del AP, **después** de
+  `showCompletarWizard` y **SIN `await`** (`askArmadoMesa(texto).then(…)`), así que el cuadro sale **encima**
+  del asistente — que ya está abierto — y `send()` no espera a nadie. **Con `await` delante del asistente
+  quedaba todo colgado de un toque**: tres tests que manejan un AP de verdad (`ap-resume`, `dos-en-curso`,
+  `tanda-sin-articulos`) se quedaron esperando el cuadro para siempre, y en el celular un cuadro que no
+  resuelve dejaba al operario sin el asistente de Completar. Retomar una tanda frenada emite un AP nuevo →
+  vuelve a preguntar (puede ser otra mesa); **reabrir** el asistente («▶ Seguir armado») no pregunta nada.
+  ⚠ Al escribir un test que mande un AP por `send()`, stubear `window.askArmadoMesa` (devolver `null` =
+  «Después») para que el cuadro no quede abierto encima de la pantalla.
+- **Forward-facing**: no hay un solo `AUI` en la historia y **no se backfillea**. El 15/09 de
+  `tests/tools/vista-15.json` da idéntico (verificado, md5 `f5c7560f…`): sólo se movió la **huella**.
+
+> ⚠⚠ **Un evento de detalle nuevo tiene que entrar en las 5 listas de «automáticos» de la COLA** (v26.43), o
+> cortaría la cola de un TP/TAP y bajaría las horas de picking y de armado sin que nada avise:
+> `gv_monitor_horas_operario_dia` · `gv_horas_operario_detalle_v2` (x2) · `gv_picking_tanda_calc` ·
+> `gv_armado_tanda_calc`, más `COLA_AUTO` de `index.html` y el `AUTO` de `monitor/build-admin.cjs`. Son las
+> mismas 5 que ya nombran a PKG / NPD / PKAX.
+
+- `gv_tanda_ubicacion` suma AUI como cuarta fuente, con **`fuente = 'armado_mesa'`**; sigue ganando el `ts`
+  **más reciente**, así que la secuencia PUB → AUI → AUB se ordena sola. En la TV y en el Mon. Admin el chip
+  dice **📍 Mesa 1** y el `title` **«la están armando acá»**.
+- Probado como `anon` en transacción abortada (AP + AUI 2 s después): los dos **entran**, el trigger
+  `gv_evento_duplicado` descarta **0** (su R1 exige `ts_inicio` en las dos filas) y la ubicación de F86A pasó
+  de **AB7 (armado)** a **Mesa 2 (armado_mesa)**.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` y `select * from public.gv_huellas_cambiadas;` (las dos
+vacías) · `node tests/arm-mesa-inicio.cjs` (corre la pantalla: el AP con mesa encola AP+AUI, «Después» no
+encola AUI, el cuadro que explota **no** traba el asistente) · `node tests/mon-tv.cjs`.
+`sql/gv_armado_mesa_aui_v2990.sql` (rollback al pie).
