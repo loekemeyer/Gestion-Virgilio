@@ -1227,6 +1227,8 @@ node tests/est-madre-unica.cjs
 echo "== ads-alertas (v27.21: ADS — Alertas Damián Stock, talleristas + quiebres; ads.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ads-alertas.cjs
 
+echo "== gv-ui-sistema (v29.83: el sistema de diseño GV-UI — tokens, paleta medida, escala) =="
+node tests/gv-ui-sistema.cjs
 echo "== analisis-productivo (v29.64: Análisis Productivo por tanda; analisis.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/analisis-productivo.cjs
 

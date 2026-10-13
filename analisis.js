@@ -1,6 +1,6 @@
 /* ============================================================================
    ANÁLISIS PRODUCTIVO POR TANDA (v29.64, pedido de Luis 13/10/2026)
-   Rediseño visual v29.75 — es la PANTALLA DE REFERENCIA del sistema de diseño
+   Rediseño visual v29.81 — es la PANTALLA DE REFERENCIA del sistema de diseño
    de la app (regla «GV-UI» en CLAUDE.md). Al tocar acá, no romper esos 8 puntos.
    ----------------------------------------------------------------------------
    "en el modulo de operarios de Juan y en el Admin, un boton Analisis Productivo.
@@ -58,7 +58,7 @@ function _anDia(iso) {
 }
 function _anHora(ts) { return ts ? String(ts).slice(11, 16) : "—"; }
 /* Verde si llegó al ritmo esperado, rojo si no. Sin dato, gris. */
-function _anCol(x) { var n = Number(x); return !(n > 0) ? "#64748b" : (n >= 1 ? "#15803d" : "#b91c1c"); }
+function _anCol(x) { var n = Number(x); return !(n > 0) ? "var(--gv-ink-2)" : (n >= 1 ? "var(--gv-ok)" : "var(--gv-error)"); }
 /* Los textos de los avisos los arma la base sin tildes (vienen de un plpgsql). Acá sólo se
    acentúan y se les saca el relleno: es cosmético, no cambia ni un número. */
 var _AN_TILDES = { codigo: "código", codigos: "códigos", mostro: "mostró", tardo: "tardó",
@@ -97,95 +97,68 @@ function _anCss() {
   if (document.getElementById("anCss")) return;
   var st = document.createElement("style"); st.id = "anCss";
   st.textContent = [
-    "#anOv{position:fixed;inset:0;z-index:9650;background:#f6f7f9;display:none;flex-direction:column;",
-    "  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;-webkit-font-smoothing:antialiased;}",
-    "#anOv *{box-sizing:border-box;}",
-    "#anOv button{width:auto;margin-top:0;padding:7px 13px;font-size:14px;line-height:1.2;border-radius:10px;",
-    "  border:1px solid #d7dde5;background:#fff;color:#0f172a;cursor:pointer;font-weight:600;}",
-    "#anOv button:hover{border-color:#94a3b8;}",
-    "#anOv input{width:auto;margin-top:0;font:inherit;font-size:15px;padding:6px 10px;border:1px solid #d7dde5;border-radius:10px;background:#fff;}",
+    /* Lo genérico (tipografía, color, botón, chip, tabla, details, veredicto, item,
+       estados) vive en gv-ui.css. Acá va SÓLO el layout propio de esta pantalla. */
+    "#anOv{position:fixed;inset:0;z-index:9650;display:none;flex-direction:column;}",
     /* barra superior */
-    "#anOv .an-top{display:flex;align-items:center;gap:10px;padding:11px 16px;background:#0f172a;color:#fff;flex-wrap:wrap;}",
-    "#anOv .an-top .tit{font-weight:700;font-size:16px;letter-spacing:.2px;}",
+    "#anOv .an-top{display:flex;align-items:center;gap:var(--gv-sp-4);padding:11px var(--gv-sp-5);",
+    "  background:var(--gv-dark);color:#fff;flex-wrap:wrap;}",
+    "#anOv .an-top .tit{font-weight:700;font-size:var(--gv-fs-lg);letter-spacing:.2px;}",
     "#anOv .an-top .sp{flex:1;}",
-    "#anOv .an-top button{background:rgba(255,255,255,.10);color:#fff;border-color:rgba(255,255,255,.25);}",
-    "#anOv .an-bar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px 16px;background:#fff;border-bottom:1px solid #e6eaef;font-size:14px;}",
-    "#anOv .an-bar .chip{padding:5px 12px;border-radius:999px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;color:#475569;}",
-    "#anOv .an-bar .chip.on{background:#0f172a;color:#fff;border-color:#0f172a;font-weight:700;}",
-    "#anOv .an-bar .an-sep{width:8px;}",
-    "#anOv .an-body{flex:1;overflow:auto;padding:14px 16px 40px;}",
+    "#anOv .an-top button{background:rgba(255,255,255,.10);color:#fff;border-color:rgba(255,255,255,.35);}",
+    "#anOv .an-bar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px var(--gv-sp-5);",
+    "  background:var(--gv-surface);border-bottom:1px solid var(--gv-line);font-size:var(--gv-fs-md);}",
+    "#anOv .an-bar .an-sep{width:var(--gv-sp-3);}",
+    "#anOv .an-body{flex:1;overflow:auto;padding:var(--gv-sp-5) var(--gv-sp-5) var(--gv-sp-8);}",
     "#anOv .an-wrap{max-width:1040px;margin:0 auto;}",
-    /* ── lista ── */
-    "#anOv .an-t{background:#fff;border:1px solid #e6eaef;border-radius:14px;padding:11px 14px;margin-bottom:9px;cursor:pointer;",
-    "  display:grid;grid-template-columns:1fr auto;gap:10px 14px;align-items:center;transition:border-color .12s;}",
-    "#anOv .an-t:hover{border-color:#0f172a;}",
-    "#anOv .an-t .cod{font-size:20px;font-weight:800;letter-spacing:.4px;line-height:1;}",
-    "#anOv .an-t .d{font-size:12.5px;color:#64748b;margin-top:3px;}",
+    /* ── lista: una tarjeta por tanda ── */
+    "#anOv .an-t{background:var(--gv-surface);border:1px solid var(--gv-line);border-radius:var(--gv-r);",
+    "  padding:11px var(--gv-sp-5);margin-bottom:9px;cursor:pointer;display:grid;",
+    "  grid-template-columns:1fr auto;gap:var(--gv-sp-4) var(--gv-sp-5);align-items:center;transition:border-color .12s;}",
+    "#anOv .an-t:hover{border-color:var(--gv-dark);}",
+    "#anOv .an-t .cod{font-size:var(--gv-fs-xl);font-weight:800;letter-spacing:.4px;line-height:1;}",
+    "#anOv .an-t .d{font-size:var(--gv-fs-sm);color:var(--gv-ink-2);margin-top:3px;}",
     "#anOv .an-t .f{text-align:right;white-space:nowrap;}",
-    "#anOv .an-t .fases{grid-column:1/-1;display:flex;gap:22px;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding-top:8px;}",
-    "#anOv .an-t .l{display:flex;align-items:baseline;gap:7px;font-size:13px;color:#64748b;}",
-    "#anOv .an-t .l .r{font-size:17px;font-weight:800;}",
-    "#anOv .an-t .l .q{font-size:11px;letter-spacing:.6px;color:#94a3b8;font-weight:700;text-transform:uppercase;}",
-    "#anOv .al{display:inline-block;background:#dc2626;color:#fff;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:700;}",
-    "#anOv .mk{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;margin-right:6px;}",
-    "#anOv .mk-a{background:#fee2e2;color:#991b1b;} #anOv .mk-r{background:#dcfce7;color:#166534;}",
-    /* ── detalle: encabezado ── */
-    "#anOv .an-hd{margin:2px 0 12px;}",
-    "#anOv .an-hd .cod{font-size:30px;font-weight:800;letter-spacing:.5px;line-height:1.05;}",
-    "#anOv .an-hd .sub{font-size:13.5px;color:#64748b;margin-top:4px;}",
-    /* ── detalle: estado + acciones ── */
-    "#anOv .an-state{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid #e6eaef;",
-    "  border-left:5px solid #94a3b8;border-radius:12px;padding:10px 14px;margin-bottom:12px;}",
-    "#anOv .an-state.alta{border-left-color:#dc2626;} #anOv .an-state.media{border-left-color:#d97706;} #anOv .an-state.ok{border-left-color:#16a34a;}",
-    "#anOv .an-state .v{font-size:16px;font-weight:700;flex:1;min-width:180px;}",
-    "#anOv .an-state.alta .v{color:#991b1b;} #anOv .an-state.media .v{color:#92400e;} #anOv .an-state.ok .v{color:#166534;}",
-    "#anOv .an-state .nota{font-size:13px;color:#64748b;font-weight:500;}",
-    "#anOv .an-mk-b{font-size:13px;padding:6px 12px;}",
-    "#anOv .an-mk-b.a{border-color:#fca5a5;color:#991b1b;} #anOv .an-mk-b.r{border-color:#86efac;color:#166534;}",
-    /* ── detalle: el dato principal ── */
-    "#anOv .an-hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(248px,1fr));gap:12px;margin-bottom:14px;}",
-    "#anOv .an-fase{background:#fff;border:1px solid #e6eaef;border-radius:14px;padding:14px 16px;}",
-    "#anOv .an-fase .q{font-size:11.5px;letter-spacing:1px;text-transform:uppercase;color:#94a3b8;font-weight:700;}",
-    "#anOv .an-fase .big{font-size:46px;font-weight:800;line-height:1.02;letter-spacing:-1px;margin:2px 0 1px;}",
-    "#anOv .an-fase .cmp{font-size:15px;color:#0f172a;font-weight:600;}",
-    "#anOv .an-fase .who{font-size:13.5px;color:#64748b;margin-top:3px;}",
+    "#anOv .an-t .fases{grid-column:1/-1;display:flex;gap:22px;flex-wrap:wrap;",
+    "  border-top:1px solid var(--gv-line-soft);padding-top:var(--gv-sp-3);}",
+    "#anOv .an-t .l{display:flex;align-items:baseline;gap:7px;font-size:var(--gv-fs-sm);color:var(--gv-ink-2);}",
+    "#anOv .an-t .l .r{font-size:var(--gv-fs-lg);font-weight:800;font-variant-numeric:tabular-nums;}",
+    /* el rótulo de 4 letras va en mayúscula a propósito: es una etiqueta, no una palabra que leer */
+    "#anOv .an-t .l .q{font-size:var(--gv-fs-xs);letter-spacing:.6px;color:var(--gv-ink-2);font-weight:700;text-transform:uppercase;}",
+    "#anOv .mk{margin-right:6px;}",
+    /* ── detalle ── */
+    "#anOv .an-hd{margin:var(--gv-sp-1) 0 var(--gv-sp-4);}",
+    "#anOv .an-hd .cod{font-size:var(--gv-fs-2xl);font-weight:800;letter-spacing:.5px;line-height:1.05;}",
+    "#anOv .an-hd .sub{font-size:var(--gv-fs-md);color:var(--gv-ink-2);margin-top:var(--gv-sp-2);}",
+    "#anOv .gv-state{margin-bottom:var(--gv-sp-4);}",
+    "#anOv .an-state-nota{font-size:var(--gv-fs-sm);color:var(--gv-ink-2);font-weight:500;}",
+    "#anOv .an-mk-b{font-size:var(--gv-fs-sm);padding:6px var(--gv-sp-4);}",
+    "#anOv .an-mk-b.a{border-color:var(--gv-error-line);color:var(--gv-error);}",
+    "#anOv .an-mk-b.r{border-color:var(--gv-ok-line);color:var(--gv-ok);}",
+    /* el dato principal */
+    "#anOv .an-hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(248px,1fr));",
+    "  gap:var(--gv-sp-4);margin-bottom:var(--gv-sp-5);}",
+    "#anOv .an-fase{background:var(--gv-surface);border:1px solid var(--gv-line);",
+    "  border-radius:var(--gv-r);padding:var(--gv-sp-5) var(--gv-sp-5);}",
+    "#anOv .an-fase .cmp{font-size:var(--gv-fs-md);color:var(--gv-ink);font-weight:600;}",
+    "#anOv .an-fase .who{font-size:var(--gv-fs-md);color:var(--gv-ink-2);margin-top:3px;}",
     "#anOv .an-fase .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;}",
-    "#anOv .an-fase .tag{font-size:12px;color:#475569;background:#f1f5f9;border-radius:999px;padding:3px 9px;}",
-    "#anOv .an-fase .tag.d3{background:#fee2e2;color:#991b1b;} #anOv .an-fase .tag.d2{background:#ffedd5;color:#9a3412;}",
-    /* ── detalle: hallazgos ── */
-    "#anOv .an-av{display:flex;gap:9px;align-items:flex-start;background:#fff;border:1px solid #e6eaef;border-radius:11px;",
-    "  padding:9px 13px;margin-bottom:7px;font-size:14.5px;line-height:1.35;color:#0f172a;}",
-    "#anOv .an-av .dot{width:9px;height:9px;border-radius:50%;flex:0 0 9px;margin-top:6px;background:#94a3b8;}",
-    "#anOv .an-av.alta{background:#fef4f4;border-color:#fecaca;} #anOv .an-av.alta .dot{background:#dc2626;}",
-    "#anOv .an-av.media .dot{background:#d97706;}",
-    "#anOv .an-av.baja{color:#475569;}",
-    /* ── detalle: lo plegado ── */
-    "#anOv details{background:#fff;border:1px solid #e6eaef;border-radius:12px;margin-bottom:8px;overflow:hidden;}",
-    "#anOv summary{cursor:pointer;padding:11px 14px;font-size:14.5px;font-weight:700;color:#0f172a;list-style:none;display:flex;align-items:center;gap:8px;}",
-    "#anOv summary::-webkit-details-marker{display:none;}",
-    "#anOv summary::before{content:'›';display:inline-block;font-size:19px;color:#94a3b8;transform:rotate(0deg);transition:transform .15s;line-height:1;}",
-    "#anOv details[open] summary::before{transform:rotate(90deg);}",
-    "#anOv summary .n{font-weight:500;color:#94a3b8;font-size:13.5px;}",
-    "#anOv .an-in{padding:2px 14px 14px;}",
-    "#anOv .an-kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:10px 6px;margin:4px 0 10px;}",
-    "#anOv .an-kpi div b{display:block;font-size:19px;font-weight:700;line-height:1.15;}",
-    "#anOv .an-kpi div span{display:block;font-size:11.5px;color:#64748b;margin-top:1px;}",
-    "#anOv .an-kv{font-size:13px;color:#64748b;line-height:1.5;}",
-    "#anOv .an-kv b{color:#334155;font-weight:700;}",
-    "#anOv .an-gl{font-size:13.5px;color:#475569;line-height:1.55;}",
-    "#anOv .an-gl b{color:#0f172a;}",
-    /* ── tabla ── */
-    "#anOv .an-tblwrap{overflow:auto;border-top:1px solid #eef2f7;}",
-    "#anOv table{border-collapse:collapse;width:100%;font-size:13.5px;}",
-    "#anOv th{background:#f8fafc;color:#64748b;font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;",
-    "  padding:7px 8px;text-align:center;line-height:1.2;position:sticky;top:0;border-bottom:1px solid #e6eaef;}",
-    "#anOv td{padding:6px 8px;text-align:center;border-top:1px solid #f1f5f9;white-space:nowrap;}",
-    "#anOv td.t{text-align:left;max-width:210px;overflow:hidden;text-overflow:ellipsis;color:#475569;}",
-    "#anOv tr.mala td{background:#fef4f4;}",
-    "#anOv .msg{text-align:center;padding:40px 20px;color:#94a3b8;font-size:15px;}",
-    "#anOv .err{text-align:center;padding:22px;color:#b91c1c;font-weight:700;}",
-    "@media(max-width:560px){#anOv .an-body{padding:12px 11px 40px;}#anOv .an-hd .cod{font-size:25px;}",
-    "  #anOv .an-fase .big{font-size:38px;}#anOv .an-fase{padding:12px 13px;}}"
+    "#anOv .an-fase .tag{font-size:var(--gv-fs-sm);color:var(--gv-ink-2);background:var(--gv-surface-2);",
+    "  border-radius:var(--gv-r-pill);padding:3px 9px;}",
+    "#anOv .an-fase .tag.d3{background:var(--gv-error-bg);color:var(--gv-error);}",
+    "#anOv .an-fase .tag.d2{background:var(--gv-warn-bg);color:var(--gv-warn);}",
+    /* lo plegado */
+    "#anOv .an-in{padding:var(--gv-sp-1) var(--gv-sp-5) var(--gv-sp-5);}",
+    "#anOv .an-kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));",
+    "  gap:var(--gv-sp-4) 6px;margin:var(--gv-sp-2) 0 var(--gv-sp-4);}",
+    "#anOv .an-kpi div b{display:block;font-size:var(--gv-fs-xl);font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums;}",
+    "#anOv .an-kpi div span{display:block;font-size:var(--gv-fs-sm);color:var(--gv-ink-2);margin-top:1px;}",
+    "#anOv .an-kv{font-size:var(--gv-fs-sm);color:var(--gv-ink-2);line-height:1.5;}",
+    "#anOv .an-kv b{color:var(--gv-ink);font-weight:700;}",
+    "#anOv .an-gl{font-size:var(--gv-fs-md);color:var(--gv-ink-2);line-height:1.55;}",
+    "#anOv .an-gl b{color:var(--gv-ink);}",
+    "@media(max-width:560px){#anOv .an-body{padding:var(--gv-sp-4) 11px var(--gv-sp-8);}",
+    "  #anOv .an-fase{padding:var(--gv-sp-4) 13px;}}"
   ].join("\n");
   document.head.appendChild(st);
 }
@@ -194,7 +167,7 @@ function _anCss() {
 function openAnalisisProductivo(legajo) {
   _anCss();
   var ov = document.getElementById("anOv");
-  if (!ov) { ov = document.createElement("div"); ov.id = "anOv"; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement("div"); ov.id = "anOv"; ov.className = "gv"; document.body.appendChild(ov); }
   ov.style.display = "flex";
   // El supervisor va sin legajo (manda su sesión); el operario manda el suyo.
   _an.legajo = legajo || (typeof window.gvLegajoActual === "function" ? window.gvLegajoActual() : null) || null;
@@ -260,8 +233,8 @@ function _anRender() {
           (_an.tanda ? '<button onclick="anVolver()">← Tandas</button>' : '') +
           '<span class="sp"></span><button onclick="anCerrar()">Cerrar</button></div>';
   if (!_an.tanda) {
-    var c = function (n, t) { return '<span class="chip' + (_an.dias === n ? ' on' : '') + '" onclick="anDias(' + n + ')">' + t + '</span>'; };
-    var f = function (k, t) { return '<span class="chip' + (_an.filtro === k ? ' on' : '') + '" onclick="anFiltro(\'' + k + '\')">' + t + '</span>'; };
+    var c = function (n, t) { return '<span class="gv-chip' + (_an.dias === n ? ' on' : '') + '" onclick="anDias(' + n + ')">' + t + '</span>'; };
+    var f = function (k, t) { return '<span class="gv-chip' + (_an.filtro === k ? ' on' : '') + '" onclick="anFiltro(\'' + k + '\')">' + t + '</span>'; };
     h += '<div class="an-bar">' + c(7, "7 d") + c(14, "14 d") + c(30, "30 d") + c(60, "60 d") +
          '<span class="an-sep"></span>' + f("todas", "Todas") + f("avisos", "Con avisos") + f("marcadas", "Marcadas") +
          '<input id="anQ" placeholder="Buscar tanda" value="' + _anEsc(_an.q) + '" oninput="anBuscar(this.value)" style="width:128px">' +
@@ -272,7 +245,7 @@ function _anRender() {
 }
 
 function _anListaHtml() {
-  if (_an.err) return '<div class="err">' + _anEsc(_an.err) + '</div>';
+  if (_an.err) return '<div class="gv-err">' + _anEsc(_an.err) + '</div>';
   if (_an.cargando || !_an.lista) return '<div class="msg">Calculando…</div>';
   var t = (_an.lista.tandas || []).filter(function (x) {
     if (_an.q && String(x.tanda).indexOf(_an.q) < 0) return false;
@@ -280,7 +253,7 @@ function _anListaHtml() {
     if (_an.filtro === "marcadas") return !!_an.marcas[x.tanda];
     return true;
   });
-  if (!t.length) return '<div class="msg">' + (_an.filtro === "marcadas" ? "Ninguna tanda marcada en el período."
+  if (!t.length) return '<div class="gv-msg">' + (_an.filtro === "marcadas" ? "Ninguna tanda marcada en el período."
     : _an.filtro === "avisos" ? "Ninguna tanda con avisos en el período."
     : "No hay tandas con picking o armado terminado en el período.") + '</div>';
   var fase = function (f, rot) {
@@ -295,7 +268,7 @@ function _anListaHtml() {
     h += '<div class="an-t" onclick="anAbrir(\'' + _anEsc(x.tanda) + '\')">' +
       '<div><div class="cod">' + _anEsc(x.tanda) + '</div>' +
       '<div class="d">' + _anDia(x.dia) + ' · ' + _anN(x.m3, 3) + ' m³</div></div>' +
-      '<div class="f">' + _anMarcaChip(x.tanda) + (al ? '<span class="al">' + al + ' avisos</span>' : '') + '</div>' +
+      '<div class="f">' + _anMarcaChip(x.tanda) + (al ? '<span class="gv-badge err">' + al + ' avisos</span>' : '') + '</div>' +
       '<div class="fases">' + (fase(x.pick, "Pick") || '') + (fase(x.arm, "Arm") || '') +
       (!x.pick && !x.arm ? '<div class="l"><span>Sin picking ni armado medidos</span></div>' : '') + '</div></div>';
   });
@@ -305,8 +278,8 @@ function _anListaHtml() {
 function _anMarcaChip(tanda) {
   var m = _an.marcas[tanda]; if (!m) return "";
   return m.estado === "anomala"
-    ? '<span class="mk mk-a" title="' + _anEsc(m.nota || "") + '">Anómala</span>'
-    : '<span class="mk mk-r" title="' + _anEsc(m.nota || "") + '">Revisada</span>';
+    ? '<span class="gv-badge err mk" title="' + _anEsc(m.nota || "") + '">Anómala</span>'
+    : '<span class="gv-badge ok mk" title="' + _anEsc(m.nota || "") + '">Revisada</span>';
 }
 
 /* El VEREDICTO en una línea: lo primero que se lee. Dice qué hacer, no repite los
@@ -327,11 +300,11 @@ function _anKpi(valor, rotulo, color) {
 
 /* El bloque grande de una fase: el rendimiento es EL dato, el resto lo acompaña. */
 function _anHeroFase(f, esPick) {
-  if (!f) return '<div class="an-fase"><div class="q">' + (esPick ? "Picking" : "Armado") +
-    '</div><div class="big" style="color:#cbd5e1">—</div><div class="who">Todavía sin terminar</div></div>';
+  if (!f) return '<div class="an-fase"><div class="gv-label">' + (esPick ? "Picking" : "Armado") +
+    '</div><div class="big gv-hero" style="color:var(--gv-muted)">—</div><div class="who">Todavía sin terminar</div></div>';
   var g = Number(f.grado) || 0;
-  return '<div class="an-fase"><div class="q">' + (esPick ? "Picking" : "Armado") + '</div>' +
-    '<div class="big" style="color:' + _anCol(f.indice) + '">' + _anPct(f.indice) + '</div>' +
+  return '<div class="an-fase"><div class="gv-label">' + (esPick ? "Picking" : "Armado") + '</div>' +
+    '<div class="big gv-hero" style="color:' + _anCol(f.indice) + '">' + _anPct(f.indice) + '</div>' +
     '<div class="cmp">' + _anMin(f.real_min) + ' · esperado ' + _anMin(f.esperado_min) + '</div>' +
     '<div class="who">' + _anEsc(f.nombre || f.legajo) + ' · ' +
       _anHora(esPick ? f.ep : f.ap) + '–' + _anHora(esPick ? f.tp : f.tap) + '</div>' +
@@ -386,7 +359,7 @@ function _anGlosarioHtml(d) {
 
 function _anTablaHtml(L) {
   var h = '<details open><summary>Código por código<span class="n">' + L.length + '</span></summary>' +
-    '<div class="an-tblwrap"><table><thead><tr>' +
+    '<div class="gv-tblwrap"><table class="gv-tbl"><thead><tr>' +
     '<th>#</th><th>Código</th><th>Descripción</th><th>Góndola</th><th>Cajas</th>' +
     '<th>Desde el<br>anterior</th><th>Normal<br>del código</th><th>Veces<br>lo normal</th>' +
     '<th>Frente a<br>la góndola</th><th>s por<br>caja</th></tr></thead><tbody>';
@@ -397,17 +370,17 @@ function _anTablaHtml(L) {
     h += '<tr' + (mala ? ' class="mala"' : '') + '><td>' + _anN(x.orden, 0) + '</td>' +
       '<td><b>' + _anEsc(x.cod) + '</b></td><td class="t">' + _anEsc(x["desc"] || "") + '</td>' +
       '<td>' + _anEsc(x.sector || "—") + (x.es_exc ? " ·EXC" : "") + '</td>' +
-      '<td>' + _anN(x.cajas, 0) + (Number(x.pedidas) > Number(x.cajas) ? ' <span style="color:#b91c1c">de ' + _anN(x.pedidas, 0) + '</span>' : '') + '</td>' +
+      '<td>' + _anN(x.cajas, 0) + (Number(x.pedidas) > Number(x.cajas) ? ' <span style="color:var(--gv-error)">de ' + _anN(x.pedidas, 0) + '</span>' : '') + '</td>' +
       '<td>' + _anSeg(x.seg) + '</td><td>' + _anSeg(x.esp_seg) + '</td>' +
-      '<td' + (Number(x.ratio) > 6 ? ' style="color:#b91c1c;font-weight:800"' : '') + '>' + (x.ratio != null ? _anN(x.ratio, 1) + "×" : "—") + '</td>' +
-      '<td' + (x.seg_vista != null && Number(x.seg_vista) < 2 ? ' style="color:#b91c1c;font-weight:800"' : '') + '>' + _anSeg(x.seg_vista) + '</td>' +
+      '<td' + (Number(x.ratio) > 6 ? ' style="color:var(--gv-error);font-weight:800"' : '') + '>' + (x.ratio != null ? _anN(x.ratio, 1) + "×" : "—") + '</td>' +
+      '<td' + (x.seg_vista != null && Number(x.seg_vista) < 2 ? ' style="color:var(--gv-error);font-weight:800"' : '') + '>' + _anSeg(x.seg_vista) + '</td>' +
       '<td>' + (x.seg_caja != null ? _anN(x.seg_caja, 1) : "—") + '</td></tr>';
   });
   return h + '</tbody></table></div></details>';
 }
 
 function _anDetalleHtml() {
-  if (_an.detErr) return '<div class="err">' + _anEsc(_an.detErr) + '</div>';
+  if (_an.detErr) return '<div class="gv-err">' + _anEsc(_an.detErr) + '</div>';
   if (_an.detCargando || !_an.det) return '<div class="msg">Calculando…</div>';
   var d = _an.det, cab = d.cabecera || {};
   var sub = [_anN(cab.m3, 3) + " m³", (cab.clientes || []).join(" · "), cab.zona,
@@ -418,10 +391,10 @@ function _anDetalleHtml() {
 
   // Estado + acciones: una sola fila. El veredicto manda; marcar está al lado.
   var v = _anVeredicto(d), mk = _an.marcas[d.tanda] || null;
-  h += '<div class="an-state ' + v.sev + '">' +
+  h += '<div class="gv-state ' + v.sev + '">' +
     '<span class="v">' + (mk ? (mk.estado === "anomala" ? "Marcada ANÓMALA" : "Marcada revisada") : v.txt) + '</span>' +
-    (mk && mk.nota ? '<span class="nota">' + _anEsc(mk.nota) + '</span>' : '') +
-    (mk ? '<span class="nota">' + v.txt + '</span>' : '') +
+    (mk && mk.nota ? '<span class="an-state-nota">' + _anEsc(mk.nota) + '</span>' : '') +
+    (mk ? '<span class="an-state-nota">' + v.txt + '</span>' : '') +
     '<button class="an-mk-b a" onclick="anMarcar(\'anomala\')">Anómala</button>' +
     '<button class="an-mk-b r" onclick="anMarcar(\'revisada\')">Revisada</button>' +
     (mk ? '<button class="an-mk-b" onclick="anMarcar(\'sin\')">Sacar marca</button>' : '') +
@@ -433,10 +406,10 @@ function _anDetalleHtml() {
   // Hallazgos: una línea cada uno, con punto de color. Sin título cuando no hay nada que decir.
   var av = (d.avisos || []).slice(0, 8);
   if (av.length) av.forEach(function (a) {
-    h += '<div class="an-av ' + _anEsc(a.sev) + '"><span class="dot"></span><span>' + _anEsc(_anTxt(a.texto)) + '</span></div>';
+    h += '<div class="gv-item ' + _anEsc(a.sev) + '"><span class="dot"></span><span>' + _anEsc(_anTxt(a.texto)) + '</span></div>';
   });
   if ((d.avisos || []).length > 8)
-    h += '<div class="an-av baja"><span class="dot"></span><span>y ' + ((d.avisos || []).length - 8) + ' más, de menor peso</span></div>';
+    h += '<div class="gv-item baja"><span class="dot"></span><span>y ' + ((d.avisos || []).length - 8) + ' más, de menor peso</span></div>';
 
   h += _anFaseHtml(d.picking, true);
   h += _anFaseHtml(d.armado, false);
