@@ -6401,7 +6401,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.49"></script>
+<script type="module" src="recepcion.js?v=29.50"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10705,7 +10705,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.49";
+const APP_VERSION = "v29.50";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30572,6 +30572,16 @@ async function cpLoadRazonSocial(nps) {
     const url = SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + uniq.map(encodeURIComponent).join(",") + ")&select=np,razon_social&limit=8000";
     const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     (r.ok ? await r.json() : []).forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !map[np]) map[np] = String(x.razon_social || "").trim(); });
+  } catch (_e) {}
+  // v29.50 — las NP web (LK 0123 / CH 0055) no están en la programación de ISIS: la razón social sale de PPP_Web_Programacion.
+  try {
+    const porEmp = { lk: [], chef: [] };
+    (nps || []).forEach(function (n) { const m = String(n || "").trim().match(/^(LK|CH)\s*0*(\d+)$/i); if (m && !map[String(n).trim()]) porEmp[m[1].toUpperCase() === "LK" ? "lk" : "chef"].push(m[2]); });
+    for (const emp of ["lk", "chef"]) {
+      const lista = Array.from(new Set(porEmp[emp])); if (!lista.length) continue;
+      const r2 = await fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?select=np,razon_social&empresa=eq." + emp + "&np=in.(" + lista.join(",") + ")", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+      (r2.ok ? await r2.json() : []).forEach(function (x) { const lbl = (emp === "lk" ? "LK " : "CH ") + String(x.np).padStart(4, "0"); if (!map[lbl] && x.razon_social) map[lbl] = String(x.razon_social).trim(); });
+    }
   } catch (_e) {}
   return map;
 }
@@ -62192,7 +62202,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.49"></script>
+<script src="importacion.js?v=29.50"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65122,13 +65132,13 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.49"></script>
-<script src="hotsale.js?v=29.49"></script>
-<script src="estadisticas.js?v=29.49"></script>
-<script src="ads.js?v=29.49"></script>
-<script src="plantel.js?v=29.49"></script>
+<script src="cobranzas.js?v=29.50"></script>
+<script src="hotsale.js?v=29.50"></script>
+<script src="estadisticas.js?v=29.50"></script>
+<script src="ads.js?v=29.50"></script>
+<script src="plantel.js?v=29.50"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.49"></script>
+<script src="ayuda.js?v=29.50"></script>
 
 </body>
 </html>
