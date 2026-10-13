@@ -6,9 +6,10 @@
    entraron 60 cajas de un código fantasma en AB03 (eran 956E y terminaron en AB10, 09:37). El 09/10 había
    pasado lo mismo con «606», que era 606E. Se prueba, corriendo la pantalla de verdad:
      A) un código que existe (956E) no avisa nada y deja seguir.
-     B) una POSICIÓN de rack (AB3 → AB03) avisa que NO es un artículo, nombra la posición y el campo
-        Sector, no se puede elegir, no ofrece el «usar igual» y DESHABILITA «Revisar carga»; forzado por
-        código (irSetCod) el candado lo frena con el cartel.
+     B) una POSICIÓN de rack (AB3 → AB03) NO se puede cargar y NO lleva cartel (Luis, v29.78: «No tiene
+        que avisar que es una posicion, simplemente no tiene que dejar»): no está en la lista, no ofrece
+        el «usar igual» y «Revisar carga» queda deshabilitado; forzada por código (irSetCod) el candado
+        la frena sin decir nada.
      C) «606» (lo que se tipeó el 09/10) sugiere el 606E, que es el que existe; y un código que no
         coincide con nada ofrece «✎ Cargar igual (código nuevo)», y ahí el candado PREGUNTA.
      D) un código dado de baja (865ED → 865E) avisa cuál va, no ofrece el «usar igual» y bloquea.
@@ -103,17 +104,16 @@ catch (_e) {
     await tipear("26");
     out.gCeroAdelante = !!(_ir && _ir.cod === "026");
 
-    // B) una POSICIÓN de rack
+    // B) una POSICIÓN de rack: no se puede cargar, y sin cartel
     await tipear("AB3");
-    const wB = warn();
-    out.bAvisa = /AB03/.test(wB) && /no es un art/i.test(wB) && /Sector/i.test(wB);
+    out.bSinCartel = !/AB03/.test(document.getElementById("irBody").innerText) && !/POSICI/i.test(document.getElementById("irBody").innerText);
     out.bNoElige = !!(_ir && !_ir.cod) && !nuevoBtn();
     out.bBoton = !!btn() && btn().disabled === true;
     alerts.length = 0; await irRevisar();
     out.bNoSigue = !(_ir && _ir.confirming) && alerts.length === 0;
     irSetCod("AB3"); await wait(10);                       // forzado por código: lo frena el candado
     alerts.length = 0; await irRevisar();
-    out.bForzadoFrena = !(_ir && _ir.confirming) && alerts.length === 1 && /AB03/.test(alerts[0]) && /POSICI/i.test(alerts[0]);
+    out.bForzadoFrena = !(_ir && _ir.confirming) && alerts.length === 0;
 
     // C) «606» (el caso del 09/10): no existe como código, pero la lista sugiere el que sí existe
     await tipear("606");
@@ -164,10 +164,10 @@ catch (_e) {
   ok(r.gClickElige, "tocar la sugerencia elige el código");
   ok(r.gPorNombre, "«cuchara»: sugiere por NOMBRE, no sólo por código");
   ok(r.gCeroAdelante, "«26» elige el 026 (el código como lo escriben los maestros)");
-  ok(r.bAvisa, "AB3: el aviso nombra la posición AB03 y el campo Sector");
+  ok(r.bSinCartel, "AB3: NO avisa que es una posición (v29.78) — ni en pantalla ni en un cartel");
   ok(r.bNoElige, "AB3: no se puede elegir ni ofrecer «usar igual» (es una posición)");
   ok(r.bBoton && r.bNoSigue, "AB3: «Revisar carga» deshabilitado y no pasa");
-  ok(r.bForzadoFrena, "AB3 forzado por código: el candado lo frena con el cartel de POSICIÓN");
+  ok(r.bForzadoFrena, "AB3 forzado por código: el candado la frena sin decir nada");
   ok(r.cSugiere606E, "«606» (el caso del 09/10): sugiere el 606E, que es el que existe");
   ok(r.cBotonSinElegir, "«606»: sin elegir nada el botón queda deshabilitado");
   ok(r.cNoEstaEnLaLista, "un código que no coincide con nada ofrece «Cargar igual (código nuevo)»");

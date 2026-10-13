@@ -8787,7 +8787,7 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
 - Lo sostiene la base: trigger `aa_gv_salida_cervantes_no_racks` → `SC_DESDE_RACKS` (centinela v29.13).
   `sql/gv_salida_cervantes_no_racks_v2913.sql`, `tests/sc-racks-unidad.cjs`.
 
-## ⚠ REGLA (Luis, 2026-10-13, v29.67 + v29.77, D2): en INGRESO A RACKS el CÓDIGO SE ELIGE — se sugiere mientras se escribe
+## ⚠ REGLA (Luis, 2026-10-13, v29.67 + v29.77 + v29.78, D2): en INGRESO A RACKS el CÓDIGO SE ELIGE — se sugiere mientras se escribe
 
 **Luis:** *"956E · va a terminar en AB10 · el operario lo puso mal · ponele candado"* y, después del candado:
 *"mas que candado, solo debería dar opciones de poner un codigo ya existente. a medida que se escribe se sugiere
@@ -8820,7 +8820,7 @@ el codigo"*. El 13/10 09:34 el legajo 104 escribió la **posición** `AB3` en el
 | lo tipeado | qué hace el módulo |
 |---|---|
 | código que existe (`gv_stock_cod_conocido`, los 7 maestros) | sigue como siempre |
-| **POSICIÓN de rack** que no es un código (`gv_rack_sector`: AB3 → AB03, W1 → W01) | **bloquea**: «Revisar carga» deshabilitado + aviso rojo *«no es un artículo: es la POSICIÓN de rack AB03 — acá va el código (ej. 956E); la posición va abajo, en Sector»* |
+| **POSICIÓN de rack** que no es un código (`gv_rack_sector`: AB3 → AB03, W1 → W01) | **no se carga, y SIN CARTEL** (Luis, v29.78: *«No tiene que avisar que es una posicion, simplemente no tiene que dejar»*): no está en la lista, no se ofrece «usar igual» y «Revisar carga» queda deshabilitado |
 | código **dado de baja** (`gv_codigo_baja_de`: 865ED → 865E) | bloquea y dice cuál va |
 | no existe y no es posición | **pregunta** (no bloquea): *«No existe el código X. ¿Lo creo y le cargo N cajas en SEC?»* |
 | no se pudo verificar | pregunta: *«no pude leer» no es «existe»* |
@@ -8834,9 +8834,10 @@ el codigo"*. El 13/10 09:34 el legajo 104 escribió la **posición** `AB3` en el
 - ✅ **El dato de AB3 se corrigió el 13/10** (D3): ajuste inverso `-60` en AB03 (mov **146068820**, `ref 'CORR IR 145833325'`,
   backup `zz_backups."GV_Backup_MovStock_AB3_20261013"`). AB3 queda en **0** y **AB03 libre** en el Mapa; las 60 reales siguen en
   **AB10** (132). El movimiento original NO se borra. Problema **758** de la auditoría, cerrado con este commit.
-- ⚠ **Con la lista puesta, `AB3` ya no puede quedar elegido tipeando** (no está en el universo): el aviso lo pinta
-  el chequeo del texto tipeado (`_irCodEfe()` = el código elegido **o** lo que se está escribiendo) y el candado
-  sólo se alcanza forzando el código (`irSetCod`). **Se prueban las dos capas.**
+- ⚠ **Con la lista puesta, `AB3` ya no puede quedar elegido tipeando** (no está en el universo): lo único que se
+  ve es el *«No hay ningún código que coincida»* **sin** el botón de «usar igual» (`_irChkMal` sigue usando
+  `gv_rack_sector` para decidirlo, pero ya no lo dice). El candado sólo se alcanza forzando el código
+  (`irSetCod`) y ahí frena sin cartel. **Se prueban las dos capas.**
 - Centinelas 403 y 404 · `sql/gv_stock_cod_lista_v2977.sql` (rollback: `drop function public.gv_stock_cod_lista();`) ·
   `tests/ir-codigo-candado.cjs` (corre la pantalla; verificado que falla con **14 chequeos en rojo** contra la v29.73
   y con 10 contra la v29.66).

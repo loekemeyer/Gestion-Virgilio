@@ -6420,7 +6420,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.77"></script>
+<script type="module" src="recepcion.js?v=29.78"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10732,7 +10732,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.77";
+const APP_VERSION = "v29.78";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30320,8 +30320,10 @@ function _irChkWarn(chk) {
   if (!chk) return "";
   if (chk.baja) return '<div class="ir-warn">⚠ El código <b>' + escapeHtml(chk.cod) + '</b> no se usa más'
     + (chk.baja !== "-" ? ': es el <b>' + escapeHtml(chk.baja) + '</b>. Cargalo como ' + escapeHtml(chk.baja) + '.' : '.') + '</div>';
-  if (chk.pos && chk.existe === false) return '<div class="ir-warn">⚠ <b>' + escapeHtml(chk.cod) + '</b> no es un artículo: es la <b>POSICIÓN de rack ' + escapeHtml(chk.pos)
-    + '</b>.<br>Acá va el <b>código del artículo</b> (ej. 956E); la posición va abajo, en <b>Sector</b>.</div>';
+  /* v29.78 (Luis, 13/10: «No tiene que avisar que es una posicion, simplemente no tiene que dejar») —
+     una posición de rack (AB3) no lleva cartel: no está en la lista, no se puede elegir y «usar igual»
+     no se ofrece (_irChkMal). El aviso que decía «es la POSICIÓN de rack AB03» se retiró. */
+  if (chk.pos && chk.existe === false) return "";
   if (chk.existe === false) return '<div class="ir-warn" style="background:#fffbeb;border-color:#fcd34d;color:#92400e">⚠ El código <b>' + escapeHtml(chk.cod) + '</b> no existe en el maestro. Revisalo antes de cargar.</div>';
   return "";
 }
@@ -30331,7 +30333,7 @@ async function _irCodGuard(codN) {
   if (_ir) { _ir.chk = chk; }
   if (chk.baja) { try { alert("El código " + codN + " no se usa más" + (chk.baja !== "-" ? ": es el " + chk.baja + ". Cargalo como " + chk.baja + "." : ".")); } catch (_e) {} irRender(); return false; }
   if (chk.existe === true) return true;
-  if (chk.pos) { try { alert("«" + codN + "» NO es un artículo: es la POSICIÓN de rack " + chk.pos + ".\n\nEn «Código» va el código del artículo (ej. 956E) y la posición va abajo, en «Sector»."); } catch (_e) {} irRender(); return false; }
+  if (chk.pos) { irRender(); return false; }   // v29.78: una posición de rack no se carga, y no lleva cartel
   irRender();
   const q = " " + cajas + " cajas en " + sec + "?";
   if (chk.existe === false) return confirm("No existe el código " + codN + ".\n\n¿Lo creo y le cargo" + q);
@@ -62557,7 +62559,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.77"></script>
+<script src="importacion.js?v=29.78"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65557,15 +65559,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.77"></script>
-<script src="hotsale.js?v=29.77"></script>
-<script src="estadisticas.js?v=29.77"></script>
-<script src="ads.js?v=29.77"></script>
-<script src="plantel.js?v=29.77"></script>
+<script src="cobranzas.js?v=29.78"></script>
+<script src="hotsale.js?v=29.78"></script>
+<script src="estadisticas.js?v=29.78"></script>
+<script src="ads.js?v=29.78"></script>
+<script src="plantel.js?v=29.78"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.77"></script>
+<script src="analisis.js?v=29.78"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.77"></script>
+<script src="ayuda.js?v=29.78"></script>
 
 </body>
 </html>

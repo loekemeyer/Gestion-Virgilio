@@ -175,9 +175,9 @@ Para subir mercadería a los racks.
      app te **sugiere los códigos que existen** (🚢 = importado): tocá el que corresponde. Después
      cargás **masters**, **cajas por master**, la **posición** de rack (te sugiere libres) y la
      empresa **LK · Loeke** o **CH · Chef**.
-     ⚠ Si lo que escribís es una **posición de rack** (AB3) te avisa que ahí va el **código** del
-     artículo y la posición va abajo, en **Sector**. Si el código no aparece en la lista, fijate que
-     no te falte una letra (606 es **606E**); si de verdad es nuevo, está el botón
+     ⚠ Acá va el **código** del artículo; la posición de rack va abajo, en **Sector** (si escribís una
+     posición no te la va a dejar cargar). Si el código no aparece en la lista, fijate que no te falte
+     una letra (606 es **606E**); si de verdad es nuevo, está el botón
      **✎ Cargar «956E» igual (código nuevo)** (con el código que escribiste) y te pregunta antes de
      crearlo.
    - **«🏠 Nacional»**: subir a racks algo que ya está en **A guardar** o en **Excedente**.
