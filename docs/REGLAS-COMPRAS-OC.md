@@ -3,6 +3,28 @@
 > Movido de `CLAUDE.md` el 2026-10-13 (poda 3ra tanda, pedido de Luis) **sin cambiar una palabra**.
 > **Leerlo ENTERO antes de tocar algo de este tema.** Las reglas siguen valiendo igual que cuando estaban en CLAUDE.md.
 
+## ⚠ REGLA (Thomas, 2026-10-13, v30.28): PISO DE STOCK DEL SUPER en el generador de OC
+
+Un artículo de **baja rotación que compra un super** quiebra stock: el super no compra todos los
+meses, pero cuando compra se lleva un pedido grande, y la Estadística Madre (promedio de ventanas
+6/12 meses) lo diluye. Caso 789 "Pisa Papas" (Chef): madre 8,83 caj/mes → máximo OC `ceil(8,83×1,5)`=14,
+y Chango Mas (Dorinka 2686) había pedido **18** → quiebre.
+
+- **NO se infla la Estadística Madre** (es cuadro único LK+Gestión, arrastra `GP2.est_madre` y el
+  semáforo de colores, y el motor vive en LK). El piso va en el **máximo de la OC**, en Virgilio.
+- **Piso** = **percentil** de los pedidos del super (no el promedio —daría 7,33, menos que hoy— ni el
+  máximo —sería la *incorporación*, siempre la compra más alta y puntual). Config en
+  `Stock_Config('piso_super_percentil', default 0,75)` y `('piso_super_meses', default 12)`.
+- **Vista `gv_piso_super`** (por `cod_canon`, cliente activo en `GV_Supers`, pedidos de `Entregas_Virgilio`
+  últimos 12 m) → `vista_generador_oc` hace `maximo = GREATEST(maximo, piso_cajas)`.
+- **Se auto-apaga en alta rotación**: si el motor ya proyecta más que un pedido del super, gana el
+  motor y el piso es invisible (cero sobrestock). Medido 13/10: 129 códigos con super, el piso solo
+  **muerde en 13** (baja rotación); 789 pasó de máximo 14 / total 8 a **17 / 11**.
+- Límite: hoy `Entregas_Virgilio` tiene ~4 meses; la ventana de 12 m recién pesa con más historia.
+  Piso por `cod_canon` sin split de empresa (un dual aplicaría el mismo piso a LK y CH; sólo muerde
+  en baja rotación). Centinela `GV_Reglas_Centinela` id 455 (patrón `gv_piso_super`).
+- `sql/gv_piso_super_oc_v3027.sql`.
+
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
 
 Al revisar por qué llegaban los WhatsApps de *"SIN OC generada"* aparecieron 14 códigos —casi
