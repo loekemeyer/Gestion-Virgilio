@@ -8718,6 +8718,9 @@ F48A 3 cajas de góndola de más (ya salieron o están en el pallet), y el factu
 - **v29.52: el PKC mueve la góndola EN EL MOMENTO.** `trg_pkc_reconciliar_rt` pasó a SECURITY DEFINER: como invoker,
   con la clave pública daba *permission denied* (tragado) y el picking recién se registraba con el cron 68 (hasta 10 min).
   Probado como `anon` y en vivo (PKC 09:04:28 → picking 09:04:28). `sql/gv_pkc_rt_definer_v2950.sql`.
+- **v29.53: CORREGIR una línea pickeada también mueve la góndola en el momento** (trigger `trg_pkc_reconciliar_rt_upd`,
+  AFTER UPDATE: el celular corrige con upsert). **No duplica**: el reconciliador escribe con upsert sobre
+  `mov_stock_pipeline_dedup` y el cron 68 recalcula el mismo total (probado: PKC, corrección, reenvío y cron → 3 filas, mismo número).
 - **Cómo se prueba un módulo de operario**: como `anon` (`set local role anon`) en transacción abortada, con una tanda de
   formato real (`Z98Z`: los guards miran `^[A-Z][0-9]{2}[A-Z]$`) y las Entregas en UN insert (el armado las manda juntas;
   de a una, el trigger separa la tanda con la primera línea sola).
