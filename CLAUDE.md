@@ -7777,9 +7777,9 @@ negativo para usos prácticos de importación"*.
   (Distribución)», Bolsas Plásticas «en Virgilio»): eso ya está en Virgilio y no se suma. `gv_gp2_inventario.parte`
   = cervantes / terceros / virgilio; `gv_gp2_stock_componente` saca `virgilio` (terceros sigue contando). Impacto al
   02/10: 0. `sql/gv_gp2_stock_solo_cervantes_v2605.sql`.
-- ⚠ **Hay DOS tablas de vínculo y NO son lo mismo:** `GV_Importados_Equiv_GP2` (GV, para SUMAR stock: varios
-  componentes y factor) y `GP2.importado_virgilio_componente` (GP2, para el AVISO de recepción: un componente por
-  código). Al 02/10 difieren en códigos (599E/599ES→GRJ32, 522E→GRJ33, 590ES→PINCEL590 sólo en la de GP2; 94xP vs
+- ⚠ **`GV_Importados_Equiv_GP2` NO es una equivalencia de códigos** (v29.74): dice qué piezas de Cervantes
+  **aportan** stock a un importado, 1→N con factor (942E ← Z47 + Z47-M505 + 942E). La equivalencia de códigos
+  vive en **`GP2.insumo_equivalencia`** y es otra pregunta: no se fusionan. Al 02/10 difieren en códigos (599E/599ES→GRJ32, 522E→GRJ33, 590ES→PINCEL590 sólo en la de GP2; 94xP vs
   94xE). Unificarlas queda para después (Luis, 02/10).
 - `gv_importados_ordenes` suma dos columnas AL FINAL: **`stock_gp2`** y **`stock_total_neto`** (sin el `greatest(…,0)`
   + GP2). `stock_total` / `stock_actual` / `stock_cajas` **no se tocaron** (los leen otros). El módulo de importación
@@ -7867,7 +7867,7 @@ el mismo molde (el mismo bloque está en el `CLAUDE.md` de `loekemeyer/Gestion-P
 | pieza | cómo |
 |---|---|
 | frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.aceptado_virgilio`, y los espejos de solo lectura `GP2.virgilio_insumo_stock` / `_ubicacion` / `virgilio_lugar` / `virgilio_insumo_categoria` |
-| códigos | GV habla en código de ARTÍCULO (323ES), GP2 en COMPONENTE (GRJ31). El vínculo vive en **`GP2.importado_virgilio_componente`** y **nunca se adivina** |
+| códigos | GV habla en código de ARTÍCULO (323ES), GP2 en COMPONENTE (GRJ31). El vínculo vive en **`GP2.insumo_equivalencia`** y **nunca se adivina** |
 | confirmar | el que recibe dice **Sí / No** donde trabaja, en la tarjeta del componente. ⚠ **Hoy avisa sólo lo que RECIBE CERVANTES** (Luis, 02/10: *"lo que recibe Cervantes avisa"*): lo que GP2 manda a Virgilio (`enviar_a_virgilio`, tablet y botón «→ Virgilio») no pide Sí/No en GV |
 | Sí | el MISMO camino que la carga manual (en GP2: `crear_recepcion_insumo` + control en kg pendiente) |
 | No | cada lado toca SÓLO su fila; la reacción la hace un trigger del otro lado y se ve **donde se cargó** |
@@ -7896,7 +7896,7 @@ de insumos de Virgilio en GP2 se rearma **desde cero y en blanco** cuando Luis l
   pierde: cruza cuando se da de alta el artículo en GP2.
 - **Alta de un importado en GP2 con su receta**: se va haciendo **a medida que haga falta, por SQL en el back, no desde el
   front** (Luis, 05/10). Pendientes al 05/10 (sin fila): 323E, 838E, 438E, 439E, 584E, 727E, 865E, 55289. Hecho: 599E.
-- **Mapeo componente ↔ artículo**: tabla **`GP2.importado_virgilio_componente`** (`cod_virgilio → componente_id`), un
+- **Mapeo componente ↔ artículo**: tabla **`GP2.insumo_equivalencia`** (`cod_virgilio → componente_id`), un
   insert por código. Es el vínculo del flujo de recepción de insumos importados; el espejo de entregas cruza por
   `GP2.articulo` directo.
 - **Chequeo:** `select count(*), min(fecha), max(fecha) from "GP2".virgilio_espejo_pend;` — lo que todavía no cruzó, con
@@ -8833,7 +8833,7 @@ ninguna pantalla de compra.
 - Corre por el disparador `zz_gv_gp2_espejo_insumos` (cada movimiento de insumos; nunca frena la carga: el error va al log)
   y por el cron `gv-gp2-espejo-insumos` (:19 y :49). Alcance: cajas, fleje, parte_procesado, partes_crudo, plastico — los
   importados NO.
-- **Qué código va con qué componente lo dice `GP2.importado_virgilio_componente`** (54 cargadas el 09/10; el resto lo asigna
+- **Qué código va con qué componente lo dice `GP2.insumo_equivalencia`** (54 cargadas el 09/10; el resto lo asigna
   Thomas en GP2 → Stock General → Virgilio, D30). Un código sin equivalencia no se copia.
 - **D16 (Thomas): el celular del operario de Virgilio NO escribe en GP2.** Lo que pasa en GP2 (envío de bolsas a un inyector,
   consumo) lo carga el admin dentro de GP2. `gv_insumo_envio_inyector` queda sin grant y sin llamador.
@@ -8855,6 +8855,53 @@ ninguna pantalla de compra.
 - ⚠ **590E (Pincel Silicona) NO se espeja**: es categoría `importados` en Virgilio y los importados están fuera del alcance a
   propósito (tienen su propio circuito, `Importados_Stock_Parte` / `gv_importados_stock_insumos`).
 - `sql/gv_gp2_espejo_insumos_v2932.sql`.
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.74): LA TABLA DE EQUIVALENCIAS DE INSUMOS ES UNA — `GP2.insumo_equivalencia`
+
+**Luis:** *"tiene que haber una tabla de insumos que muestre la equivalencia entre un insumo de virgilio, de
+cervantes y el codigo ISIS que tienen. Punto."* · *"¿cómo catzo terminamos teniendo dos?"*
+
+> **Toda equivalencia de códigos de insumos vive en `GP2.insumo_equivalencia`** (`cod_virgilio` ·
+> `componente_id` → cod de Cervantes · `isis`). Legible: **`GP2.v_insumo_equivalencia`**. Se edita en
+> GP2 → Stock general → pestaña Virgilio. **No se crea otra, ni una columna que haga lo mismo.**
+
+Había dos, y la vieja **no era una tabla: era una COLUMNA** (`GP2.componente.codigo_virgilio`, 8 filas, sólo
+bolsas, de la v14.95). Por eso nadie la encontró el 30/09 cuando hizo falta un mapeo, y se creó la tabla al
+lado. Mismo pozo que el módulo de Matricería duplicado.
+
+⚠ **Y la columna nació mal, no se desalineó:** estaba cargada con abreviaturas del lado de Cervantes (`NV`,
+`NR`, `N25`, `PP`, `PS`, `PE`) que **nunca existieron en Virgilio** — los códigos de Virgilio son `NY Virgen`,
+`PP 2630`, `NY Recup`… desde el 02/07. Coincidían sólo `ABS` y `AI`.
+
+**Lo que costó, medido el 13/10:** `GP2.movimiento` tipo `envio_inyector` tenía **0 filas en toda su
+historia**, mientras en Virgilio salieron **86 bolsas (2.150 kg)** a inyectores entre el 25/08 y el 08/10
+(Rafael 57, Manolo 29). 7 de las 9 bolsas no matcheaban, así que `enviar_material_virgilio` **no se llamaba
+nunca y encima en silencio** (`_insGp2Mat` devolvía null y la fila salía del lote sin avisar). El espejo bajaba
+la 57 igual: los kg se evaporaban.
+
+⚠ **No hay desfase de stock que ajustar** (medido): el espejo del 09/10 fijó la 57 al saldo real de Virgilio
+(la **subió de 0 a 5.525 kg**: GP2 nunca había tenido stock de bolsas), y esas salidas ya estaban netas ahí.
+Lo que no existe es el **circuito del inyector: ni las salidas ni las devoluciones** (0 movimientos con las
+ubicaciones 58-61 en toda la historia). Cargar sólo las salidas dejaría a Rafael debiendo kg que ya devolvió
+inyectado: arrancarlo pide **un conteo de lo que cada inyector tiene hoy**, no un backfill.
+
+| pieza | qué cambió |
+|---|---|
+| `GP2.componente.codigo_virgilio` | **borrada** (backup `zz_backups."GV_Backup_CodigoVirgilio_20261013"`) |
+| `enviar_material_virgilio` · `recibir_oc_virgilio` | resuelven el componente por `insumo_equivalencia`; sin fila, **fallan ruidoso** |
+| `material_virgilio_bundle` · `oc_pendientes_virgilio` | devuelven el **código REAL** de Virgilio (el front de GV matchea con `_insK()`, upper+trim: no hubo que tocarlo) |
+| `recalcular_maximo_material` | «está en Virgilio» = tiene fila en la equivalencia |
+| `public.gv_gp2_inventario` | `codigo_virgilio` sale de la equivalencia — ⚠ con `CREATE OR REPLACE`, nunca `DROP CASCADE` (cuelgan `gv_gp2_stock_componente` y `gv_importados_ordenes`: ese cascade ya dejó Importados en 404 en la v16.20 y la v16.33) |
+| front (`index.html`) | **una bolsa sin equivalencia NO pasa en silencio**: con un inyector elegido, cualquier ítem que el bundle no reconozca frena con el confirm («¿registrar igual sólo en Virgilio?»). El criterio **no usa `insCatOf`**: si el catálogo de categorías no se leyó devuelve `""` para todo y el guard no frenaría nada |
+| `isis` | cargado desde `Insumos.isis`: **29 de 79**. Las bolsas tienen el ISIS igual al código de Cervantes (2455 = ABS); ⚠ **AI no**: componente 2465, ISIS 1135 — mirar si no es un error de carga en `Insumos` |
+
+⚠ **Queda sin cruzar `EBA`** (20 bolsas, celda Q34): no existe como componente en Cervantes. Hay que darlo de
+alta en GP2 (sector Bolsas Plásticas) o decir que no va.
+⚠ **`CAJA Nº 1` y `CAJA Nº 22` tienen el mismo ISIS (`0127`)** en `Insumos`: uno de los dos está mal.
+⚠ Los centinelas de las 3 funciones de **GP2** no entran en `GV_Reglas_Centinela` (sólo alcanza `public`):
+del lado de GP2 lo sostienen sus tests. En GV quedan los ids 388 y 406.
+
+`sql/gv_insumo_equivalencia_unica_v2974.sql` (rollback en la cabecera), `tests/ins-bolsa-sin-equivalencia.cjs`.
 
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
 

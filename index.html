@@ -6420,7 +6420,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.73"></script>
+<script type="module" src="recepcion.js?v=29.74"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10732,7 +10732,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.73";
+const APP_VERSION = "v29.74";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27667,7 +27667,7 @@ function insDocCancel() {
    La materia prima plástica (PP, ABS, AI, NV, NR, N25, PE, PS: bolsas de 25 kg) la COMPRA GP2 y
    se guarda acá, en Virgilio. GP2 es el que manda (stock por inyector, OC, reposición); el ledger
    de Virgilio (Movimientos_Stock deposito='insumos') se sigue escribiendo igual que siempre.
-   Lo que se agrega, SÓLO cuando el insumo es una bolsa (su cod está en GP2.componente.codigo_virgilio):
+   Lo que se agrega, SÓLO cuando el insumo es una bolsa (su cod está en GP2.insumo_equivalencia, v29.74):
      EI (entregar): el destino es UN INYECTOR (lista cerrada que da GP2, con cuántas bolsas le
         faltan para sus OC) → rpc GP2.enviar_material_virgilio(cod_virgilio, bolsas, inyector, legajo).
      RI (recibir): se elige la OC de material de GP2 que llegó (rpc GP2.oc_pendientes_virgilio) y
@@ -27774,6 +27774,16 @@ function _insGp2Bolsas(gp2, it) {
 /* Avisa a GP2. Devuelve {ok, msg} — nunca tira: el llamador decide qué hacer con el fallo. */
 async function _insGp2Enviar(gp2, sel, legajo, remito) {
   const rows = sel.map(function (it) { const m = _insGp2Mat(gp2, it); if (!m) return null; const b = _insGp2Bolsas(gp2, it); return { it: it, cod: m.codigo_virgilio || m.cod_virgilio, bolsas: b }; }).filter(Boolean);
+  // v29.74 (Luis) — una bolsa que NO está en GP2.insumo_equivalencia no puede pasar en silencio:
+  // el kg sale de Virgilio, el espejo lo baja igual y NO queda en poder de ningún inyector (se evapora).
+  // Era el caso de las 7 bolsas que no matcheaban el mapeo viejo; hoy sólo falta EBA.
+  // El criterio NO pasa por insCatOf: si el catálogo de categorías no se pudo leer devuelve "" para
+  // todo y el guard no frenaría nada. Con un inyector elegido lo que se entrega son bolsas (v29.28),
+  // así que cualquier ítem que el bundle de GP2 no reconozca frena.
+  if (gp2.modo === "EI") {
+    const sinEq = sel.filter(function (it) { return !_insGp2Mat(gp2, it); });
+    if (sinEq.length) return { ok: false, msg: "No tiene equivalencia en Gestión Productiva: " + sinEq.map(function (it) { return it.cod; }).join(", ") + ".\nCargala en Stock general → Virgilio (código de Cervantes) antes de entregarla." };
+  }
   if (!rows.length) return { ok: true, msg: "" };
   const sinUni = rows.filter(function (r) { return r.bolsas == null || !(r.bolsas > 0); });
   if (sinUni.length) return { ok: false, msg: "GP2 sólo entiende Bolsas o Kg: " + sinUni.map(function (r) { return r.it.cod + " en " + (r.it.unidad || "?"); }).join(", ") };
@@ -62443,7 +62453,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.73"></script>
+<script src="importacion.js?v=29.74"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65443,15 +65453,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.73"></script>
-<script src="hotsale.js?v=29.73"></script>
-<script src="estadisticas.js?v=29.73"></script>
-<script src="ads.js?v=29.73"></script>
-<script src="plantel.js?v=29.73"></script>
+<script src="cobranzas.js?v=29.74"></script>
+<script src="hotsale.js?v=29.74"></script>
+<script src="estadisticas.js?v=29.74"></script>
+<script src="ads.js?v=29.74"></script>
+<script src="plantel.js?v=29.74"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.73"></script>
+<script src="analisis.js?v=29.74"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.73"></script>
+<script src="ayuda.js?v=29.74"></script>
 
 </body>
 </html>
