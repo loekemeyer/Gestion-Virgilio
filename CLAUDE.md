@@ -4564,6 +4564,24 @@ no cambie al cambiar el criterio y que el u$s/m³ guarde sólo su clave).
   cartel rojo de CORTE con los camiones a pasar de día en la PPP. Es aviso: no mueve nada.
 - `sql/gv_monitor_tanda_camion_orden_v2386.sql`, `tests/tv-meta-camion.cjs`, `tests/tandas-orden-camion.cjs`.
 
+## ⚠⚠ REGLA (Elías, 2026-10-13, v29.79): el CÓDIGO DE LA TV no se entrega a la clave pública — y se prueba de a uno cada 2 s
+
+**Elías:** *"1 hay que cambiar"* · *"no es anon, tiene que ser al enviar con el token que se obtiene de la pantalla"* ·
+*"limitar a cada 2 seg. y hacer que sólo sea aceptable el código anterior durante 5 segundos después que desaparece de la
+TV … y se le puede hacer que envíen su mac a los 6 intentos"* (Virgilio y Cervantes).
+
+| pieza | qué hace |
+|---|---|
+| **`gv_clave_chequear`** (no la llama nadie de afuera) | el limitador ÚNICO de los 4 validadores (Gestión, 3.0 Virgilio, 3.0 Cervantes, tablet GP2): un intento fallido frena esa IP/equipo **2 s** (`espera`; serializado con `pg_advisory_xact_lock`, sin eso dos intentos simultáneos no se veían) · el código del minuto anterior vale sólo los **5 s** siguientes (65 s de código activo) · desde la **6.ª falla en 10 min** pide el equipo (`gv_dispositivo` + huella + navegador; la MAC no la da el navegador) y avisa por Telegram · **10 por equipo / 40 por IP** → `bloqueo`. Log `GV_Clave_Intento` |
+| **TV de pared** | guarda un SECRETO propio (`localStorage gv_tv_secreto`) y pide el código con él (`gv_tv_clave_actual_tv`). La 1.ª vez muestra a la izquierda un código de 6 dígitos que un supervisor aprueba en **⚙️ Configuración → 📺 Vincular TV** (ahí también se desvincula) |
+| **Mon. Admin / Vista TV / header del monitor** | piden el código con la sesión del supervisor |
+| un solo helper | `monitor/tv-clave.js` (lo cargan tv.html, admin.html e index.html) |
+
+- `GP2.monitor_clave_validar` ya no se puede llamar con la clave pública.
+- ⚠ **PARTE B pendiente** (sacarle `gv_tv_clave_actual` a la clave pública): se aplica cuando Elías confirma que la TV ya
+  muestra el código vinculada. Hasta entonces el helper cae a la clave pública si la TV no está vinculada.
+- `sql/gv_tv_seguridad_v2974.sql` (parte A aplicada el 13/10, parte B comentada), `tests/tv-clave-segura.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-29, v23.87): el operario NO vuelve a la pantalla del legajo
 
 - Después de registrar una tarea (`send()`) **se queda en su botonera**; al «Resumen de hoy» se va con la ← de arriba.

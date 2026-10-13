@@ -23,7 +23,7 @@ const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "index.html"), "latin1");
 
 const SIGUEN_APP_VERSION = ["recepcion.js", "cobranzas.js", "importacion.js", "hotsale.js", "estadisticas.js", "ads.js", "ayuda.js", "plantel.js", "analisis.js"];
-const VERSION_PROPIA = ["planimetria.js", "supabase-config.js", "alerta-inactivo.js"];   // alerta-inactivo: mismo ?v= que monitor/tv.html
+const VERSION_PROPIA = ["planimetria.js", "supabase-config.js", "alerta-inactivo.js", "tv-clave.js"];   // tv-clave: mismo ?v= en index.html y monitor/tv.html   // alerta-inactivo: mismo ?v= que monitor/tv.html
 
 const mApp = html.match(/APP_VERSION\s*=\s*["']v?([0-9][0-9.]*)["']/);
 if (!mApp) { console.log("version-tokens: no encontré APP_VERSION en index.html"); process.exit(1); }

@@ -81,6 +81,8 @@ header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1.
 .clv-arco{stroke:#38bdf8;stroke-linecap:round;
   stroke-dasharray:100.53;transition:stroke-dashoffset .9s linear,stroke .3s}
 .clv-arco.poco{stroke:#fbbf24}
+.tv-vinc{justify-self:start;font-size:calc(1.9*var(--u));font-weight:800;color:#fbbf24;line-height:1.15}
+.tv-vinc b{font-size:calc(3.2*var(--u));letter-spacing:.08em;color:#fde68a}
 .clv-txt{display:flex;align-items:baseline;gap:.9vw;white-space:nowrap}
 .clv-lab{font-size:calc(2.4*var(--u));font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;line-height:1}
 .h-clave{font-size:calc(7.4*var(--u));font-weight:900;color:#f8fafc;line-height:1;
@@ -293,7 +295,7 @@ td.act-dur{font-weight:900;text-align:center;font-size:calc(2.1*var(--u))}
 <div id="app" class="hide">
   <div id="offline" class="hide"></div>
   <header>
-    <div></div>
+    <div class="tv-vinc hide" id="tvVinc"></div>
     <div class="clv">
       <svg class="clv-anillo" viewBox="0 0 36 36" aria-hidden="true">
         <circle class="clv-pista" cx="18" cy="18" r="16"></circle>
@@ -352,6 +354,7 @@ td.act-dur{font-weight:900;text-align:center;font-size:calc(2.1*var(--u))}
 
 <script src="../supabase-config.js?v=1202"></script>
 <script src="alerta-inactivo.js?v=5"></script>
+<script src="tv-clave.js?v=1"></script>
 <script>
 /* v23.70 (Luis): dentro del admin (📺 Vista TV, en un iframe) el mouse se tiene que ver.
    En la TV de pared sigue oculto. */
@@ -1857,18 +1860,34 @@ function clvAnillo() {
   a.setAttribute("stroke-dashoffset", (CLV_LARGO * (1 - f)).toFixed(1));
   a.setAttribute("class", "clv-arco" + (_clvQueda <= 10 ? " poco" : ""));
 }
+/* v29.79 (Elías): el código ya no se pide pelado con la clave pública. Adentro de Gestión va con la
+   sesión del supervisor; en la pared, con el secreto de esta TV (monitor/tv-clave.js ≡ index.html). Mientras
+   la TV no esté vinculada muestra a la izquierda el código para vincularla. */
+function tvToken() {
+  try {
+    var pa = (window.parent && window.parent !== window) ? window.parent : null;
+    if (pa && pa.sbAuth && typeof pa.sbAuth.getAccessToken === "function") return pa.sbAuth.getAccessToken();
+  } catch (_e) {}
+  return null;
+}
 function tvClave() {
   try {
-    fetch(SB_URL + "/rest/v1/rpc/gv_tv_clave_actual", { method: "POST", cache: "no-store",
-      headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" }, body: "{}" })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) {
-        if (!j || !j.clave) return;
-        var e = el("tvClave"); if (e) e.textContent = j.clave;
-        _clvQueda = Math.max(1, Math.min(CLV_CICLO, Number(j.cambia_en_s) || CLV_CICLO));
-        clvAnillo();
-      })
-      .catch(function () {});
+    if (typeof window.gvTvClaveLeer !== "function") return;
+    window.gvTvClaveLeer(SB_URL, SB_KEY, tvToken).then(function (j) {
+      var v = el("tvVinc");
+      if (v) {
+        if (j && j.vincular) {
+          v.innerHTML = "Vincular esta TV:<br><b>" + esc(j.vincular) + "</b><br>⚙️ Configuración → 📺 Vincular TV";
+          v.classList.remove("hide");
+        } else if (j && j.revocada) {
+          v.textContent = "Esta TV fue desvinculada"; v.classList.remove("hide");
+        } else if (j) { v.classList.add("hide"); }
+      }
+      if (!j || !j.clave) return;
+      var e = el("tvClave"); if (e) e.textContent = j.clave;
+      _clvQueda = Math.max(1, Math.min(CLV_CICLO, Number(j.cambia_en_s) || CLV_CICLO));
+      clvAnillo();
+    }).catch(function () {});
   } catch (_e) {}
 }
 /* Un tick por segundo: vacía la rueda y, al llegar a cero, pide el código nuevo. */

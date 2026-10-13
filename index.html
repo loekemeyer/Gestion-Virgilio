@@ -6420,7 +6420,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.78"></script>
+<script type="module" src="recepcion.js?v=29.79"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6832,6 +6832,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="sup-action-btn" onclick="cfgGo(openPrintStation)"><span class="sup-ico">🖨️</span><span>Cola de impresión</span></button>
         <!-- v26.28 (Luis, 02/10): conectar esta PC con el helper local de impresión -->
         <button class="sup-action-btn" onclick="cfgGo(openHelperImpresion)" title="Conectar esta PC con el helper local: picking, armado y facturado salen sin el cuadro de impresión"><span class="sup-ico">🖨️</span><span>Helper de impresión</span></button>
+        <!-- v29.79 (Elías): la TV de pared pide el código de ingreso con un secreto propio; acá se la aprueba -->
+        <button class="sup-action-btn" onclick="cfgGo(openVincularTv)" title="Aprobar el código de 6 dígitos que muestra una TV nueva para que pueda mostrar el código de ingreso, y desvincular las que ya no se usan"><span class="sup-ico">📺</span><span>Vincular TV</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openAyudaConfig)" title="Cargar las API keys y elegir el modelo del asistente de ayuda de los operarios (todavía sin botón en la botonera)"><span class="sup-ico">🤖</span><span>Asistente IA operarios</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openMailsEditor)"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openLugarEditor)"><span class="sup-ico">📍</span><span>Lugares del depósito</span></button>
@@ -7055,6 +7057,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <!-- Modal: Planilla Conteo Cajas -->
 
 <script src="supabase-config.js?v=1202"></script>
+<script src="monitor/tv-clave.js?v=1"></script>
 <script>
 /* v18.67 — el botón «Entrar con legajo» está arriba en el HTML y la función de verdad se define en el último
    <script> (44k líneas después): en un celular lento el tap llega antes y tiraba
@@ -10732,7 +10735,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.78";
+const APP_VERSION = "v29.79";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -12567,12 +12570,15 @@ async function monClaveRefrescar() {
   const e = document.getElementById("monClave");
   if (!e) return;
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_tv_clave_actual", {
-      method: "POST", cache: "no-store",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
-      body: "{}" });
-    if (!r.ok) return;
-    const j = await r.json();
+    /* v29.79 (Elías): con la sesión del supervisor, o con el secreto de esta pantalla si es el kiosko
+       (monitor/tv-clave.js ≡ monitor/tv.html). Ya no se pide pelado con la clave pública. */
+    if (typeof window.gvTvClaveLeer !== "function") return;
+    const j = await window.gvTvClaveLeer(SUPABASE_URL, SUPABASE_KEY, function () {
+      return (window.sbAuth && window.sbAuth.getAccessToken) ? window.sbAuth.getAccessToken() : null; });
+    const box = document.getElementById("monClaveBox");
+    if (box) box.title = (j && j.vincular)
+      ? "Esta pantalla no está vinculada. Código para vincularla: " + j.vincular + " (⚙️ Configuración → 📺 Vincular TV)"
+      : "Código para entrar desde el celular — dura un minuto";
     if (!j || !j.clave) return;
     e.textContent = j.clave;
     _monClvQueda = Math.max(1, Math.min(MON_CLV_CICLO, Number(j.cambia_en_s) || MON_CLV_CICLO));
@@ -58360,6 +58366,76 @@ function gvHelperRender(ping){
   ov.innerHTML = gvHelperHtml();
   if (ping && gvHelperActivo() && Date.now() - _gvHelper.pingTs > 3000) helperVivo().then(function (){ gvHelperRender(false); });
 }
+/* ============================================================
+   📺 VINCULAR TV (v29.78, Elías, 13/10/2026)
+   ============================================================
+   La TV de pared (monitor/tv.html) ya no pide el código de ingreso con la clave pública: guarda un secreto
+   propio y, la primera vez, muestra un código de 6 dígitos. Acá un supervisor lo aprueba (gv_tv_vincular_aprobar)
+   y desde ese momento esa TV muestra el código. También se ven las TV vinculadas y se desvinculan
+   (gv_tv_pantallas / gv_tv_revocar). Todo con la sesión del supervisor (gvWriteHdr). */
+const GV_VTV_CSS = "#gvVtvOv{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:9999}" +
+  "#gvVtvOv.show{display:flex}#gvVtvOv .vtv{background:#fff;border-radius:12px;padding:16px;width:min(560px,94vw);max-height:90vh;overflow:auto;font-size:16px}" +
+  "#gvVtvOv button{width:auto;margin-top:0;padding:8px 14px;font-size:16px}#gvVtvOv input{box-sizing:border-box;font-size:20px;padding:6px 8px}" +
+  "#gvVtvOv table{border-collapse:collapse;width:100%;margin-top:8px}#gvVtvOv td,#gvVtvOv th{border-bottom:1px solid #e5e7eb;padding:5px 6px;text-align:center;font-size:14px}" +
+  "#gvVtvOv .vtv-msg{margin-top:8px;min-height:20px;font-weight:600}";
+let _gvVtvMsg = "";
+async function openVincularTv() {
+  if (!requireSupervisor()) return;
+  if (!document.getElementById("gvVtvCss")) { const st = document.createElement("style"); st.id = "gvVtvCss"; st.textContent = GV_VTV_CSS; document.head.appendChild(st); }
+  let ov = document.getElementById("gvVtvOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "gvVtvOv";
+    ov.addEventListener("click", function (e) { if (e.target === ov) closeVincularTv(); });
+    document.body.appendChild(ov);
+  }
+  _gvVtvMsg = "";
+  ov.classList.add("show");
+  await gvVtvRender();
+}
+function closeVincularTv() { const ov = document.getElementById("gvVtvOv"); if (ov) ov.classList.remove("show"); }
+async function _gvVtvRpc(fn, body) {
+  const h = await facAuthWriteHeaders();
+  if (!h) throw new Error("Iniciá sesión con Google como supervisor.");
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, { method: "POST", cache: "no-store", headers: h, body: JSON.stringify(body || {}) });
+  const t = await r.text();
+  let j = null; try { j = t ? JSON.parse(t) : null; } catch (_e) {}
+  if (!r.ok) throw new Error((j && j.message) || ("HTTP " + r.status));
+  return j;
+}
+async function gvVtvRender() {
+  const ov = document.getElementById("gvVtvOv"); if (!ov) return;
+  let filas = null, err = "";
+  try { filas = await _gvVtvRpc("gv_tv_pantallas", {}); } catch (e) { err = String(e.message || e); }
+  const fmt = function (x) { if (!x) return "—"; try { return new Date(x).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (_e) { return "—"; } };
+  const tabla = err ? '<div style="color:#b91c1c">No pude leer las TV vinculadas: ' + escapeHtml(err) + '</div>'
+    : (!filas || !filas.length) ? '<div style="color:#64748b">Todavía no hay ninguna TV vinculada.</div>'
+    : '<table><tr><th>TV</th><th>Estado</th><th>Aprobada</th><th>Último uso</th><th></th></tr>' + filas.map(function (f) {
+        return "<tr><td>" + escapeHtml(f.nombre || ("TV " + f.id)) + "</td><td>" + escapeHtml(f.estado) + "</td><td>" + fmt(f.aprobado_en) +
+          "</td><td>" + fmt(f.ultimo_uso) + "</td><td>" + (f.estado === "activa" ? '<button onclick="gvVtvRevocar(' + Number(f.id) + ')">Desvincular</button>' : "") + "</td></tr>";
+      }).join("") + "</table>";
+  ov.innerHTML = '<div class="vtv"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:19px">📺 Vincular TV</b>' +
+    '<button onclick="closeVincularTv()">✕</button></div>' +
+    '<div style="margin-top:10px">Código de 6 dígitos que muestra la TV a la izquierda:</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><input id="gvVtvCod" inputmode="numeric" maxlength="6" placeholder="123456" style="width:130px">' +
+    '<input id="gvVtvNom" placeholder="Nombre (ej. TV depósito)" style="width:220px;font-size:16px"><button onclick="gvVtvAprobar()">✓ Vincular</button></div>' +
+    '<div class="vtv-msg" id="gvVtvMsg">' + escapeHtml(_gvVtvMsg) + '</div>' + tabla + '</div>';
+}
+async function gvVtvAprobar() {
+  const cod = String((document.getElementById("gvVtvCod") || {}).value || "").replace(/\D/g, "");
+  const nom = String((document.getElementById("gvVtvNom") || {}).value || "").trim();
+  if (cod.length !== 6) { _gvVtvMsg = "Poné los 6 números que muestra la TV."; await gvVtvRender(); return; }
+  try {
+    const j = await _gvVtvRpc("gv_tv_vincular_aprobar", { p_codigo: cod, p_nombre: nom });
+    _gvVtvMsg = (j && j.ok) ? "✓ TV vinculada: en menos de un minuto muestra el código de ingreso." : ("✗ " + ((j && j.error) || "No se pudo vincular."));
+  } catch (e) { _gvVtvMsg = "✗ " + String(e.message || e); }
+  await gvVtvRender();
+}
+async function gvVtvRevocar(id) {
+  if (!confirm("¿Desvincular esta TV? Deja de mostrar el código de ingreso hasta que se la vuelva a vincular.")) return;
+  try { const j = await _gvVtvRpc("gv_tv_revocar", { p_id: id }); _gvVtvMsg = (j && j.ok) ? "TV desvinculada." : "No se pudo desvincular."; }
+  catch (e) { _gvVtvMsg = "✗ " + String(e.message || e); }
+  await gvVtvRender();
+}
 function openHelperImpresion(){
   if (!requireSupervisor()) return;
   if (!document.getElementById("gvHelperCss")) { const st = document.createElement("style"); st.id = "gvHelperCss"; st.textContent = GV_HELPER_CSS; document.head.appendChild(st); }
@@ -62559,7 +62635,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.78"></script>
+<script src="importacion.js?v=29.79"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63334,6 +63410,23 @@ function _tvClaveVigente() { return __tvClaveOkAt && (Date.now() - __tvClaveOkAt
 function _tvPaso(cual) {
   ["tvClaveStep", "tvNombreStep", "tvLegNumStep", "tvLegajoStep", "tvCervStep"].forEach(function (id) { const e = $(id); if (e) e.classList.toggle("hidden", id !== cual); });
 }
+/* v29.79 (Elías): el servidor frena un intento fallido 2 s por equipo/IP, y desde la 6.ª falla en 10 min
+   pide el equipo (gv_dispositivo + huella + navegador; la MAC no la da el navegador) y avisa por Telegram.
+   ≡ gv_clave_chequear (sql/gv_tv_seguridad_v2974.sql). */
+function _gvHuella() {
+  try {
+    const s = [screen.width, screen.height, screen.colorDepth, new Date().getTimezoneOffset(),
+      navigator.language, navigator.platform, navigator.hardwareConcurrency || 0, navigator.maxTouchPoints || 0].join("|");
+    let h = 0; for (let i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
+    return (h >>> 0).toString(16);
+  } catch (_e) { return null; }
+}
+function _tvClaveError(e) {
+  if (e === "espera") return "Esperá 2 segundos y probá de nuevo.";
+  if (e === "bloqueo") return "Demasiados intentos fallidos desde este celular. Esperá 10 minutos o pedile ayuda a un supervisor.";
+  if (e === "dispositivo") return "Demasiados intentos: actualizá la app y probá de nuevo.";
+  return "Clave incorrecta. Mirá la TV (cambia cada minuto).";
+}
 window.loginConClaveTv = async function () {
   const errEl = $("legajoLoginError"); if (errEl) errEl.textContent = "";
   const clave = String(($("tvClaveInput") || {}).value || "").replace(/\D/g, "");
@@ -63342,11 +63435,12 @@ window.loginConClaveTv = async function () {
   try {
     const r = await fetch(SB_URL + "/rest/v1/rpc/gv_tv_clave_validar", { method: "POST",
       headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_clave: clave }) });
+      body: JSON.stringify({ p_clave: clave, p_dispositivo: gvDispositivoId(), p_huella: _gvHuella(),
+        p_navegador: String(navigator.userAgent || "").slice(0, 200) }) });
     j = r.ok ? await r.json() : null;
   } catch (_e) { j = null; }
   if (!j) { if (errEl) errEl.textContent = "Sin conexión: probá de nuevo."; return; }
-  if (!j.ok) { if (errEl) errEl.textContent = "Clave incorrecta. Mirá la TV (cambia cada minuto)."; return; }
+  if (!j.ok) { if (errEl) errEl.textContent = _tvClaveError(j.error); return; }
   __tvClaveOkAt = Date.now();
   const lista = $("tvNombreLista");
   if (lista) {
@@ -65559,15 +65653,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.78"></script>
-<script src="hotsale.js?v=29.78"></script>
-<script src="estadisticas.js?v=29.78"></script>
-<script src="ads.js?v=29.78"></script>
-<script src="plantel.js?v=29.78"></script>
+<script src="cobranzas.js?v=29.79"></script>
+<script src="hotsale.js?v=29.79"></script>
+<script src="estadisticas.js?v=29.79"></script>
+<script src="ads.js?v=29.79"></script>
+<script src="plantel.js?v=29.79"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.78"></script>
+<script src="analisis.js?v=29.79"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.78"></script>
+<script src="ayuda.js?v=29.79"></script>
 
 </body>
 </html>
