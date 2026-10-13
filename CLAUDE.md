@@ -1817,13 +1817,93 @@ Y ese día se dieron de alta **O02** y **O05** (racks LK que no existían) y **Z
 del 363E era falsa: la góndola del 363E es J04). Problema 646. Al contar en una posición que el Mapa no conoce,
 se da de alta en `GV_Lugar`, no se carga en otra.
 
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.97): EN EL DEPÓSITO HAY **TRES** CLASES DE LUGAR — Góndolas · Racks · **Sector SC y SP**
+
+**Luis, textual:** *"Vamos a entender algo. en el deposito tenes diferentes cosas: Gondolas / Racks / Sector SC
+y SP. Sector SC y SP usa un nomenclador similar al de gondolas y racks y puede que la confusion surja de ahi."*
+
+> ## **SC = Sector Crudo · SP = Sector Procesado.** Son la mesa de trabajo de **Cervantes (GP2)** dentro del
+> ## depósito, NO racks de Virgilio. Su nomenclador es la **grilla de UN DÍGITO** (`A1`…`L6`), y por eso se
+> ## confunde con la góndola `A01` y con el rack `AD05`.
+
+| clase | nomenclador | qué guarda | dónde vive el saldo |
+|---|---|---|---|
+| **Góndola** | letra + **2 dígitos**: `A01`…`Ñ60`, `P`, `Y`, `Z` | cajas de artículo para pickear | `Movimientos_Stock` dep. `terminado` |
+| **Rack** | letra(s) + **2 dígitos**, con `AD`/`AT` en los de insumo: `AD05`, `X22`, `R01AD`, `V09AT`, `AF13` | master cajas de artículo · fleje · plástico · importados | `Movimientos_Stock` dep. `racks` / `racks_ch` / `insumos` |
+| **SC y SP** | letra(s) + **UN dígito**: `A1`…`L6` (52 celdas) + `MEDIO` | **piezas de Cervantes**: `partes_crudo` (SC) y `parte_procesado` (SP) | **`GP2.inventario`** (ubicación «Sector Crudo» / «Sector Procesado»), NO Virgilio |
+
+### El mislabel que esto RETIRA
+
+⚠⚠ **El bullet de la v22.80 dice que la grilla `A1…L6` son «racks de insumos». ES FALSO y queda RETIRADO.**
+Se dieron de alta así el 25/09 —tipo `rack`, empresa `IN`— y de ahí salió la confusión. Medido el 13/10:
+
+- las **52 celdas de un dígito** de `GV_Lugar` son **exactamente** donde viven `parte_procesado` (SP: `A1`-`A6`,
+  `B1`-`B6`, `C1`, `C2`, `C5`, `C6`, `D1`, `D3`-`D6`, `E1`, `E2`, `E5`, `E6`, `F1`, `F2`, `F6`, `G5`, `G6`, `H1`,
+  `L1`-`L4`) y `partes_crudo` (SC: `G1`-`G4`, `H2`-`H7`, `I4`, `J1`-`J4`, `J6`, `L5`, `L6`);
+- **0 cajas de artículo** pasaron por ellas en toda la historia (`deposito in (racks, racks_ch)` con ubicación de
+  un dígito → vacío). No son racks: no guardan cajas.
+- `K4`, `K5` y `K6` tienen piezas de SC cargadas y **no existen en `GV_Lugar`**: el alta del 25/09 los salteó.
+
+⚠ **`gv_rack_sector('A1')` devuelve `A1` y `gv_rack_sector('A01')` devuelve NULL** (A01 es góndola). O sea que
+el resolvedor de racks **acepta una celda de SC/SP**: hoy no hizo daño porque nadie guardó una caja ahí, pero
+**Ingreso a racks la ofrece**. Es el mismo pozo que `A1 ≠ A01`, un paso más adelante.
+
+### Y en GP2 no hay celdas: SC y SP son UNA ubicación cada uno
+
+`GP2.ubicacion` tiene **12 `sector`** (`Sector Crudo`, `Sector Procesado`, `Sector Fleje`, `Sector Caja`…) y
+**ninguna celda adentro**: el saldo de una pieza es por (componente, sector), sin posición. **La celda física
+`A1`…`L6` existe SÓLO en `Insumos_Ubicaciones.sector` de Virgilio**, para que el operario sepa dónde mirar. Son
+dos niveles de detalle distintos y no se reconcilian.
+
+⚠⚠ **Y el CÓDIGO de una pieza de SC/SP también se pisa con el de una caja.** `CONOCIMIENTO_GP2.md` lo tiene
+medido del 03/09: **`A1`, `A4`, `A8` y `A9` existen DOS veces en `GP2.componente`** —una pieza de Sector
+Procesado y una Caja— y la regla de allá es *"unir por `componente.id`, y si hay que resolver desde un código,
+desambiguar por sector"*. O sea: la colisión de nomencladores **no es sólo de lugares, es también de códigos**.
+
+> **Antes de decir que una posición «no existe» o que un código «está mal cargado»: mirar si no es SC/SP.**
+> El criterio es el dígito: **un dígito = SC/SP · dos dígitos = góndola o rack.**
+
+**Chequeo:**
+
+```sql
+-- las 52 celdas de SC/SP, con qué categoría de insumo vive en cada una
+select u.sector, i.categoria, count(*)
+  from public."Insumos_Ubicaciones" u
+  join public."Insumos" i on upper(btrim(i.cod)) = upper(btrim(u.cod))
+ where upper(btrim(u.sector)) ~ '^[A-Z]{1,2}[0-9]$'
+ group by 1,2 order by 1;
+-- y que ninguna tenga cajas de artículo (tiene que dar vacío)
+select m.ubicacion, m.cod_art, sum(m.delta) from public."Movimientos_Stock" m
+ where m.deposito in ('racks','racks_ch') and upper(btrim(coalesce(m.ubicacion,''))) ~ '^[A-Z]{1,2}[0-9]$'
+ group by 1,2 having sum(m.delta) <> 0;
+```
+
+### ⚠ Lo que esto explica: las posiciones «con dos códigos» NO son racks compartidos
+
+Barrido del 13/10 sobre `Insumos_Ubicaciones`: **38 filas** no matchean ningún código de `Insumos`, **las 38 en
+cantidad 0** y **las 38 con su gemelo válido en LA MISMA celda**. No es un lugar con dos cosas: es **la misma
+cosa escrita dos veces**.
+
+| cuántas | qué son | ejemplo |
+|---:|---|---|
+| 29 | el fleje **sin el `N°`** | `63` junto a `N°63` en R11AD |
+| 4 | el fleje **con su código ISIS** | `1645` = `N°35` · `2565` = `N°36` · `2615` = `N°18` · `2745` = `N°37` |
+| 8 | la pieza de SP **con un punto de más** | `DISC.1` junto a `DISC1` · `DISC. 4` junto a `DISC4` |
+| 5 | basura de verdad | `-`, `--`, `---`, `----`, `N|24` |
+
+⚠⚠ **Queda RETIRADO lo que reporté antes** (*"basura de carga, no racks compartidos — eso se limpia en
+`Insumos_Ubicaciones`"*): de las 38, **sólo 5 son basura**; las otras 33 son el mismo insumo con una segunda
+grafía, y 4 de ellas son **su código ISIS**, que es un dato bueno escrito en el campo equivocado — el ISIS vive
+en `Insumos.isis` y en `GP2.insumo_equivalencia.isis` (regla v29.79), no en el código de una ubicación.
+
 ### ⚠ INSUMOS: dónde está cada uno sale del Mapa (Luis, 25/09, v22.80)
 
 **Luis:** *"es un mismo depósito físico … son racks de insumos. Dejalos con el nomenclador que ya existe, no inventes
 uno nuevo · AD adelante AT atrás · sí, ponelo en el mapa"*.
 
 - Los racks de insumos son `GV_Lugar` tipo `rack`, **empresa `IN`** (R01AD, K04, X20…). Se sumaron 69 que faltaban:
-  la grilla **A1…L6 con ese nombre** (A1 ≠ A01: A01 es góndola; por eso `gv_lugar_sector_fmt` acepta un dígito) y
+  ⚠⚠ **la grilla A1…L6 NO son racks de insumos: es SC/SP — ver la regla de arriba, v29.97** (A1 ≠ A01: A01 es
+  góndola; por eso `gv_lugar_sector_fmt` acepta un dígito) y
   R07AD, R10AD/AT, R12AT, R16AD, V01AD, V02AT, V05AT, V11AT, V12AT, V13AD, AF02/04/07/16/18, AE04.
 - **`gv_rack_sector(texto)`** resuelve cualquier grafía: primero el nombre exacto (A1), después con cero y AD/AT
   (`R1Ad` → R01AD, `V9 At` → V09AT, `W1` → W01). Es la misma para racks de artículos y de insumos.
