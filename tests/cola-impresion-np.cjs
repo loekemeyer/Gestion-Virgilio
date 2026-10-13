@@ -171,7 +171,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     colaImpClose();
     await openColaImpresion();
     const vb = document.getElementById("colaImpVBody").textContent;
-    const vista = /LK 0400/.test(vb) && /F11B/.test(vb) && /Imprimir todas \(2\)/.test(vb) && /Por día/.test(vb);
+    const vista = /LK 0400/.test(vb) && /F11B/.test(vb) && /Imprimir pendientes de hoy \(1\)/.test(vb) && /Imprimir todas \(2\)/.test(vb) && /Por día/.test(vb);
+    // v30.22: «de hoy» saca sólo la hoja de picking de hoy, no la NP de hace 30 h
+    window.__S.prints.length = 0; window.__S.marcas.length = 0;
+    await colaImprimirTodas(true);
+    const hoy = window.__S.prints.join() === "picking:F11B" && window.__S.marcas.length === 0;
     window.__S.prints.length = 0; window.__S.marcas.length = 0;
     await colaImprimirTodas();
     const imp = window.__S.prints.join() === "picking:F11B,armado:ARMADO-LK 0400" && window.__S.marcas.join() === "LK 0400|cola";
@@ -181,7 +185,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await new Promise(function (ok) { setTimeout(ok, 100); });
     const sub = document.getElementById("colaImpOv").style.display !== "none" && document.getElementById("colaImpVOv").style.display === "none";
     window.fetch = f0;
-    return vista && imp && badge && sub;
+    return vista && hoy && imp && badge && sub;
   });
 
   await b.close();

@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.21">
+<link rel="stylesheet" href="gv-ui.css?v=30.22">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.21"></script>
+<script type="module" src="recepcion.js?v=30.22"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10798,7 +10798,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.21";
+const APP_VERSION = "v30.22";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -40790,8 +40790,13 @@ function colaImpVRender() {
   var items = _colaImpV.items || [], pkh = _colaImpV.pkh || [];
   var venc = items.filter(function (x) { return x.vencido; }).length;
   var bs = 'background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:9px 13px;font-weight:800;cursor:pointer;width:auto;margin:0;';
+  // v30.22 (Luis, 13/10: "Imprimir todas no, ve todo el histórico") — el botón principal saca sólo lo de HOY;
+  // «Imprimir todas» queda al lado sólo si hay pendientes de días anteriores.
+  var nHoy = items.filter(function (x) { return _colaImpEsHoy(x.armado_ts); }).length + pkh.filter(function (x) { return _colaImpEsHoy(x.ts); }).length;
+  var nTot = items.length + pkh.length;
   var h = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">' +
-    '<button onclick="colaImprimirTodas()" style="background:#1e40af;color:#fff;border:none;border-radius:9px;padding:11px 18px;font-size:15px;font-weight:800;cursor:pointer;width:auto;margin:0;">🖨️ Imprimir todas (' + (items.length + pkh.length) + ')</button>' +
+    '<button onclick="colaImprimirTodas(true)" style="background:#1e40af;color:#fff;border:none;border-radius:9px;padding:11px 18px;font-size:15px;font-weight:800;cursor:pointer;width:auto;margin:0;">🖨️ Imprimir pendientes de hoy (' + nHoy + ')</button>' +
+    (nTot > nHoy ? '<button onclick="colaImprimirTodas()" style="' + bs + '">Imprimir todas (' + nTot + ')</button>' : '') +
     '<button onclick="openColaImpresion()" style="' + bs + '">↻ Actualizar</button>' +
     '<button onclick="colaImpVClose();openColaImpHistorial()" style="' + bs + '">📅 Por día · todas las hojas</button></div>';
   h += '<div id="colaImpVStatus" style="font-size:12.5px;color:#334155;margin-bottom:8px;min-height:16px;"></div>';
@@ -40817,15 +40822,20 @@ function colaImpVRender() {
   body.innerHTML = h + '</tbody></table></div>';
 }
 var _colaImpVBusy = false;
-async function colaImprimirTodas() {
+function _colaImpEsHoy(ts) {
+  if (!ts) return false;
+  try { var f = function (d) { return d.toLocaleDateString("en-CA", { timeZone: TZ_AR }); }; return f(new Date(ts)) === f(new Date()); } catch (_e) { return false; }
+}
+async function colaImprimirTodas(soloHoy) {
   if (_colaImpVBusy) { alert("Esperá, ya hay una impresión en curso."); return; }
   var items0 = ((_colaImpV && _colaImpV.items) || []).filter(function (x) {
     if (!x) return false;
+    if (soloHoy && !_colaImpEsHoy(x.armado_ts)) return false;
     if (x.resumen) return true;
     return (Array.isArray(x.arts_fallback) && x.arts_fallback.length) || (Array.isArray(x.faltantes_fallback) && x.faltantes_fallback.length);
   });
-  var pkh0 = ((_colaImpV && _colaImpV.pkh) || []).map(function (x) { return x.tanda; });
-  if (!items0.length && !pkh0.length) { alert("No hay notas de pedido ni hojas de picking para imprimir."); return; }
+  var pkh0 = ((_colaImpV && _colaImpV.pkh) || []).filter(function (x) { return !soloHoy || _colaImpEsHoy(x.ts); }).map(function (x) { return x.tanda; });
+  if (!items0.length && !pkh0.length) { alert(soloHoy ? "No hay notas de pedido ni hojas de picking de hoy para imprimir." : "No hay notas de pedido ni hojas de picking para imprimir."); return; }
   _colaImpVBusy = true;
   try {
     if (pkh0.length) { colaImpVStatus("Imprimiendo " + pkh0.length + " hoja(s) de picking…"); await pkHojaImprimir(pkh0, true, "cola"); if (items0.length && !gvHelperActivo()) await new Promise(function (r) { setTimeout(r, 2600 * pkh0.length); }); }
@@ -63553,7 +63563,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.21"></script>
+<script src="importacion.js?v=30.22"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -66859,15 +66869,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.21"></script>
-<script src="hotsale.js?v=30.21"></script>
-<script src="estadisticas.js?v=30.21"></script>
-<script src="ads.js?v=30.21"></script>
-<script src="plantel.js?v=30.21"></script>
+<script src="cobranzas.js?v=30.22"></script>
+<script src="hotsale.js?v=30.22"></script>
+<script src="estadisticas.js?v=30.22"></script>
+<script src="ads.js?v=30.22"></script>
+<script src="plantel.js?v=30.22"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.21"></script>
+<script src="analisis.js?v=30.22"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.21"></script>
+<script src="ayuda.js?v=30.22"></script>
 
 </body>
 </html>
