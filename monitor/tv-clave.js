@@ -1,4 +1,4 @@
-/* monitor/tv-clave.js — v29.79 (Elías, 13/10/2026): de dónde saca una pantalla el CÓDIGO DE INGRESO.
+/* monitor/tv-clave.js — v29.84 (Elías, 13/10/2026): de dónde saca una pantalla el CÓDIGO DE INGRESO.
    [Elías: «1 hay que cambiar» · «no es anon, tiene que ser al enviar con el token que se obtiene de la pantalla»]
 
    Lo usan la TV de pared (monitor/tv.html), el Mon. Admin (admin.html, generado de tv.html) y el header

@@ -270,12 +270,14 @@ explica (📦/📅 de «no es demora»), un estado que se lee de un vistazo, el 
 el operario ya tiene memorizado. La prueba es: si el emoji se saca y no se pierde información, se
 saca.
 
-## 🟥🟥🟥 REGLA RECTORA DE DISEÑO «GV-UI» (Luis, 2026-10-13, v29.75): UNA PANTALLA SE LEE DE UN VISTAZO
+## 🟥🟥🟥 REGLA RECTORA DE DISEÑO «GV-UI» (Luis, 2026-10-13, v29.83): UNA PANTALLA SE LEE DE UN VISTAZO
 
 **Luis, textual:** *"quiero que agarremos una filosofía de diseño visual / front / usabilidad
 moderna y que cortemos con la basura. Buscamos que sea rápidamente procesable visualmente
 cualquier pantalla de esta aplicación. Sin texto excesivo, claridad visual, directo al grano con
-la información más importante primero y bien simple."*
+la información más importante primero y bien simple."* · *"Deberíamos hacer un agente o .md o algo
+para que cuando se genere un módulo nuevo, haga un pase para dejar establecidas las normas de
+estética y diseño unificadas para el programa."*
 
 **Vale para TODOS los repos y TODA pantalla nueva o que se toque** (copiar este bloque al
 `CLAUDE.md` del repo nuevo). No reemplaza la regla de espacio del 28/09 ni la de «MENOS EMOJIS»:
@@ -284,50 +286,83 @@ las tres son la misma idea — **densidad alta, ruido cero** —. Ésta agrega l
 > ## **La pregunta de cada pantalla es: «¿qué tiene que saber el que la abre, en 2 segundos?».**
 > Eso va primero, grande y solo. Todo lo demás baja un nivel o se pliega.
 
+| pieza | qué es |
+|---|---|
+| **`gv-ui.css`** | la FUENTE: tokens (`--gv-*`) y clases (`.gv-state`, `.gv-item`, `.gv-tbl`, `.gv-hero`…). Se carga en `index.html` con el `?v=` de la app |
+| **`docs/GV-UI.md`** | de dónde sale cada número, con el contraste MEDIDO de cada color. Se lee antes de tocar el CSS |
+| **`.claude/agents/disenador-gvui`** | **el PASE**: audita un módulo contra el sistema y devuelve `archivo:línea — [severidad] → fix` |
+| **`tests/gv-ui-sistema.cjs`** | el candado del sistema (paleta, escala, tokens muertos, la pantalla de referencia) |
+| **`analisis.js`** | la **pantalla de referencia**: es el molde |
+
 ### Los 8 puntos
 
-1. **UN dato principal por pantalla, y es el texto más grande que se ve.** Si hay dos cosas
-   del mismo tamaño, no hay jerarquía: el ojo no sabe dónde parar. El título y el código de la
-   cosa (la tanda, el cliente, la OC) **no** son el dato principal: son el rótulo.
-2. **Tres niveles de tamaño y nada más**: el dato (38-46 px), lo que lo acompaña (14-19 px), lo
-   accesorio (11-13 px gris). Un cuarto tamaño es indecisión.
-3. **El veredicto antes que los números.** Arriba va UNA línea que dice qué pasa y qué hacer
-   («2 hallazgos fuertes: mirar de cerca»), no un párrafo que repite los números de abajo.
-   Máximo ~60 caracteres; si no entra en una línea, no es un veredicto.
-4. **Lo explicativo se pliega.** Glosarios, metodología, desgloses, «cómo se calcula» y la
-   letra chica van en un `<details>` cerrado. **Ningún bloque de texto largo se dibuja abierto.**
-   El que necesita el detalle lo abre; el otro no lo lee igual, sólo le tapa la pantalla.
-5. **El color significa.** Verde / rojo / ámbar sólo cuando el valor es bueno, malo o dudoso;
-   gris cuando no hay dato. Un color decorativo (fondos de marca, bordes de colores, botones
-   pintados) saca atención del que sí significa. Fondo claro, texto oscuro, una sola tinta fuerte.
+1. **UN dato principal por pantalla, y es el texto más grande que se ve.** Si hay dos cosas del
+   mismo tamaño, no hay jerarquía: el ojo no sabe dónde parar. El título y el código de la cosa
+   (la tanda, el cliente, la OC) **no** son el dato principal: son el rótulo.
+2. **Tres niveles de tamaño y nada más.** La escala es **11 · 12 · 14 · 16 · 20 · 30 px** (+ 46
+   para el dato principal), y sale de los tokens: **un módulo no escribe un `font-size` propio**.
+   **14 px es el PISO de un dato**; 11 y 12 son sólo rótulo o metadato.
+   ⚠ **Para densificar se achica el AIRE, nunca la letra** (es la regla explícita de SAP Fiori:
+   entre su modo cómodo y su modo compacto el `font-size` no cambia).
+3. **El veredicto antes que los números.** Arriba va UNA línea (≤ 60 caracteres) que dice qué pasa
+   y qué hacer («2 hallazgos fuertes: mirar de cerca»), no un párrafo que repite lo de abajo.
+4. **Lo explicativo se pliega.** Glosarios, metodología, desgloses y la letra chica van en un
+   `<details>` cerrado. **Ningún bloque de texto largo se dibuja abierto.**
+5. **El color significa, y NUNCA va solo** (WCAG 1.4.1: un lector de pantalla no anuncia el color
+   y un daltónico no lo distingue). Estado = **color + forma + palabra**. Se testea en 10 segundos
+   con `filter: grayscale(100%)`: si en gris no se distingue, falla.
 6. **Un rótulo son 1 o 2 palabras, sin la explicación al lado.** `rendimiento`, no
    `rendimiento (esperado ÷ real)`. La explicación vive en el `<details>` del punto 4.
-7. **Una lista es una línea por cosa**, con un punto de color para la severidad, y un
-   «y N más» cuando pasa de 8. Nada de tarjeta por ítem ni bordes por todos lados.
-8. **Sin emojis decorativos** (regla del 06/10) y **sin unidad repetida**: va en el rótulo, no
-   en cada celda.
+7. **Una línea por ítem**, con un punto de color para la severidad, y «y N más» pasando de 8.
+8. **Sin emojis decorativos** (regla del 06/10) y **sin unidad repetida**: va en el rótulo.
 
-### La pantalla de referencia
+### ⚠⚠ EL PASE: una pantalla nueva no está terminada hasta que lo pasa
 
-**`analisis.js` (Análisis Productivo) ES el molde.** Al escribir una pantalla nueva se mira cómo
-está hecha ésa, no cómo estaba la vieja. Las clases que sirven de base (`an-hd`, `an-state`,
-`an-hero`, `an-fase .big`, `an-av`, `details/summary`, `an-kpi`) están comentadas ahí mismo.
+**Al crear un módulo o rehacer una pantalla, antes de darla por terminada se corre el agente
+`disenador-gvui`.** Mide 10 puntos sobre la pantalla CORRIENDO (no leyendo el código: el
+`font-size` que vale es el computado, y el que manda puede venir del CSS global del index): usa el
+sistema · escala · contraste calculado · jerarquía · veredicto · nada largo sin plegar · tabla ·
+color que va solo · blanco de toque de 44 px a 430 px de ancho · emojis y rótulos.
 
-**Qué cambió, para entender la diferencia:** antes eran **7 tarjetas del mismo peso** (nada
-resaltaba), un párrafo de conclusión, **3 notas grises** de metodología siempre abiertas y los
-rótulos con la fórmula entre paréntesis adentro del tile. Hoy: rendimiento en 46 px → veredicto
-en una línea → hallazgos de a uno → todo lo demás plegado.
+Y al test del módulo se le copia el **bloque `(g)` de `tests/analisis-productivo.cjs`**, que mide
+la regla sola: *un hallazgo sin candado vuelve en la próxima pantalla*.
 
-⚠ **El texto que escribe la base no se muestra crudo.** Los avisos de `gv_analisis_tanda` vienen
-de un plpgsql sin tildes y con `codigo(s)`: el front los acentúa y los pluraliza (`_anTxt`). Es
-cosmético y no cambia ningún número, pero *«El picking dio por completo 1 codigo(s)»* en pantalla
-es exactamente la basura que esta regla viene a sacar.
+### Lo que esto cierra, medido el 13/10 antes de empezar
 
-**Chequeo:** `node tests/analisis-productivo.cjs` — el bloque **(g)** mide los puntos 1, 3, 4 y 8
-sobre la pantalla corriendo: el dato principal es el texto más grande, el veredicto entra en una
-línea, no hay texto largo sin plegar y no hay emojis decorativos. Verificado que falla al achicar
-el dato principal. **Al escribir una pantalla nueva, se le copia ese bloque al test.**
+`index.html` tenía **302 colores y 38 tamaños de letra distintos**; `importacion.js` 72 y 19;
+`cobranzas.js` 44 y 16. Cada módulo escribía su propio `<style>` con su propia escala: **no había
+una app, había nueve.** Tras el pase, `analisis.js` quedó en **0 tamaños propios y 0 hex propios**.
 
+**Tres colores que estaban mal y ahora son tokens** (contraste calculado con la fórmula WCAG 2.x,
+contra el fondo real de la app, no contra blanco):
+
+| estaba | medía | va |
+|---|---:|---|
+| ámbar `#d97706` de «para mirar» | **2,97** ✗ | `--gv-warn` `#92400e` (**6,61**) |
+| amarillo `#f1c21b` como texto | **1,57** ✗ | sólo de FONDO con texto negro (**10,75**) |
+| gris `#94a3b8` en rótulos | **2,39** ✗ | `--gv-ink-2` `#475569` (**7,07**) · el `#94a3b8` queda sólo para líneas |
+
+### Lo que está DECIDIDO y no se vuelve a discutir
+
+- **Los números de tabla van CENTRADOS**, aunque Polaris y el resto de la industria pidan
+  alinearlos a la derecha: manda la regla de espacio de Luis del 28/09 (*"todo el contenido
+  centrado"*). Lo que **sí** se aplicó, porque no choca con nada, son las **cifras tabulares**
+  (`font-variant-numeric: tabular-nums`), que arreglan el ancho sin mover la alineación.
+- **Los `<th>` van en sentence case** («Desde el anterior», no «DESDE EL ANTERIOR»): Carbon lo
+  cambió en su v10 y la lectura en mayúscula es ~10 % más lenta. **Ya es así en `.gv-tbl`**, o sea
+  en la pantalla de referencia; las tablas viejas que todavía tienen `text-transform: uppercase`
+  se arreglan cuando se las toca, no antes. **La mayúscula sí se deja en una etiqueta de 3-4
+  letras** (`PICK`, `ARM`, `PICKING`): ahí no hay palabra que reconocer.
+- **La migración es forward-facing**: `gv-ui.css` lo usa el módulo nuevo y el que se toca. **Nadie
+  reescribe `importacion.js` por esto.** Los 302 colores del index se mueren solos.
+- **`monitor/tv.html` queda AFUERA** del sistema a propósito: es una pantalla a 4 metros, con
+  fondo oscuro y su propia escala en `--u` (`min(1vh, 0,5625vw)`). Tiene su sistema y funciona.
+
+**Chequeo:** `node tests/gv-ui-sistema.cjs` (el sistema: la paleta se mide, la escala está
+completa, no hay token muerto y la pantalla de referencia no tiene un px ni un hex propio) ·
+`node tests/analisis-productivo.cjs` (el bloque **(g)**: la regla sobre la pantalla corriendo;
+verificado que falla al achicar el dato principal). Los números, las fuentes (Carbon, Fiori,
+Fluent, Material 3, Polaris, Ant, NN/g, WCAG) y las decisiones abiertas: **`docs/GV-UI.md`**.
 ## 📌 LEER PRIMERO: `docs/ESTADO-Y-PENDIENTES.md`
 
 **Foto del estado al 2026-09-13.** Qué falta de verdad está en la base
@@ -4564,7 +4599,7 @@ no cambie al cambiar el criterio y que el u$s/m³ guarde sólo su clave).
   cartel rojo de CORTE con los camiones a pasar de día en la PPP. Es aviso: no mueve nada.
 - `sql/gv_monitor_tanda_camion_orden_v2386.sql`, `tests/tv-meta-camion.cjs`, `tests/tandas-orden-camion.cjs`.
 
-## ⚠⚠ REGLA (Elías, 2026-10-13, v29.79): el CÓDIGO DE LA TV no se entrega a la clave pública — y se prueba de a uno cada 2 s
+## ⚠⚠ REGLA (Elías, 2026-10-13, v29.84): el CÓDIGO DE LA TV no se entrega a la clave pública — y se prueba de a uno cada 2 s
 
 **Elías:** *"1 hay que cambiar"* · *"no es anon, tiene que ser al enviar con el token que se obtiene de la pantalla"* ·
 *"limitar a cada 2 seg. y hacer que sólo sea aceptable el código anterior durante 5 segundos después que desaparece de la
@@ -8781,6 +8816,28 @@ front las llama con `gvWriteHdr()` (la sesión), nunca con la clave pública. El
 - Primer toque SELECCIONA, «Enviar» EMPIEZA la tarea (evento **MDI**, `texto` = MOV/INS/CP/RC) y abre el módulo; abierta, el botón queda rojo y tocarlo RE-ABRE el mismo módulo (retomar, mismo tramo). Abajo, barra con **⛔ Anular** (MDT `ANULADO` → no productivas) y **🏁 Terminé** (MDT con `ts_inicio`). IR sigue con IRI/IRT y también va por «Enviar».
 - `MOD_TAREA` en index.html; tope 12 h (`_gvModVivo`). Vista `gv_monitor_horas_operario_dia` y `gv_horas_operario_detalle_v2` (marcador `v28.93-mdt`): MDT suma a Hs MOV ≡ `fetchMonitorDayStats`; TV / Mon. Admin «En este momento». `sql/gv_modulo_tarea_mdi_mdt_v2893.sql`, `tests/modulo-tarea-enviar.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-13, v29.81): una BARRA FIJA abajo NO TAPA NADA — se le hace lugar
+
+**Luis, con la captura del celular:** *"la barra de abajo con «Anular» y «Terminé» tapa opciones y botones
+(aparece arriba de algo que esté al fondo de la lista). Ajustalo en todos los módulos para que no tape
+nada (prioriza visión de smartphone)"*.
+
+> **Una barra `position:fixed` abajo se descuenta del alto de lo que hay detrás; no se dibuja encima.**
+
+- `#modTareaBar` (⛔ Anular · 🏁 Terminé de Mover racks, Completar Pedido, Pasar a urgente e Insumos) mide
+  su alto y **`_modTareaColchon(px)`** le hace lugar: cada overlay de `MOD_TAREA[*].ovs` que está en
+  pantalla pasa a `bottom: <alto>` (termina arriba de la barra, así su scroll llega hasta el final) y el
+  `body` lleva el mismo `padding-bottom` para la botonera de atrás. Al irse la barra, todo vuelve.
+- **La lista de overlays sale de `ovs`**, que ya existía: al agregar un módulo a `MOD_TAREA`, sus overlays
+  van ahí y el colchón lo hereda solo.
+- ⚠ Un overlay **sin scroll** (los de Insumos, con la tarjeta centrada) no se arregla con el colchón: su
+  tarjeta tiene que ENTRAR arriba de la barra. Hoy entra en un 390 x 740; si alguna crece, el test se pone
+  rojo y ahí hay que darle scroll (`overflow:auto` + la tarjeta con `margin:auto`, nunca
+  `align-items:center` con overflow: eso deja el borde de arriba inalcanzable).
+- `tests/modbar-no-tapa.cjs` mide **en 390 x 740** con la pantalla corriendo: la barra pegada abajo, el
+  overlay terminando justo en ella, el último renglón de una lista larga por encima, el colchón del body y
+  que al cerrar vuelva todo (verificado: 12 chequeos en rojo contra la v29.78).
+
 ## ⚠ REGLA (Luis, 2026-10-09, v29.05): un AJUSTE de RACKS lleva la POSICIÓN — Stock → Ajustar / Fijar / Stock inicial
 
 Caso 606 (09/10): un ingreso a racks X22 se cargó como **606** siendo **606E** (pedido PI B260601), y la corrección desde
@@ -9023,13 +9080,37 @@ inyectado: arrancarlo pide **un conteo de lo que cada inyector tiene hoy**, no u
 | front (`index.html`) | **una bolsa sin equivalencia NO pasa en silencio**: con un inyector elegido, cualquier ítem que el bundle no reconozca frena con el confirm («¿registrar igual sólo en Virgilio?»). El criterio **no usa `insCatOf`**: si el catálogo de categorías no se leyó devuelve `""` para todo y el guard no frenaría nada |
 | `isis` | cargado desde `Insumos.isis`: **29 de 79**. Las bolsas tienen el ISIS igual al código de Cervantes (2455 = ABS); ⚠ **AI no**: componente 2465, ISIS 1135 — mirar si no es un error de carga en `Insumos` |
 
-⚠ **Queda sin cruzar `EBA`** (20 bolsas, celda Q34): no existe como componente en Cervantes. Hay que darlo de
-alta en GP2 (sector Bolsas Plásticas) o decir que no va.
+⚠ **`EBA` queda CERRADO** (Luis, 13/10: *"se definirá después; el admin que está creando la página tiene que
+setear el código de Cervantes"*): sus 20 bolsas (celda Q34) no cruzan al espejo porque no tiene componente en
+Cervantes. **No se da de alta desde acá y no se vuelve a sugerir.**
 ⚠ **`CAJA Nº 1` y `CAJA Nº 22` tienen el mismo ISIS (`0127`)** en `Insumos`: uno de los dos está mal.
 ⚠ Los centinelas de las 3 funciones de **GP2** no entran en `GV_Reglas_Centinela` (sólo alcanza `public`):
 del lado de GP2 lo sostienen sus tests. En GV quedan los ids 388 y 406.
 
 `sql/gv_insumo_equivalencia_unica_v2974.sql` (rollback en la cabecera), `tests/ins-bolsa-sin-equivalencia.cjs`.
+
+### ⚠ v29.79 (Luis, 13/10): GP2 es el CANÓNICO del código ISIS — se replica a `Insumos`
+
+**Luis:** *"si hay diferencias actualmente, asumi que el de GP2 es el canonico y remplazacelo a Virgilio"* ·
+*"que haya boton para confirmar que se guarda/vincula el codigo ISIS con el de Virgilio y/o con el de Cervantes
+o en cualquier permutacion de esas combinaciones"*.
+
+> El dueño del ISIS de un insumo es **`GP2.insumo_equivalencia.isis`**. Lo que se guarda ahí se escribe en
+> **`public."Insumos".isis`**, **incluido vaciarlo**. **Nunca al revés.**
+
+- Lo hace el trigger **`public.gv_insumo_isis_sync`** (de GV, sobre la tabla de GP2 — mismo patrón que
+  `gv_ingreso_virgilio_denegado`, v25.37). **No hay ciclo**: `gv_gp2_espejo_sync` copia `Insumos.isis` a
+  `GP2.virgilio_insumo_stock`, que es **otra** tabla, y el bundle del editor ya leía la equivalencia primero.
+- Pasa el bloqueo `aaa_gv_anon_bloqueo` porque es SECURITY DEFINER (`current_user` = postgres, regla v29.16).
+- Del lado de GP2 (Stock general v3.7.0): el botón **«🔗 Vincular»** tiene columna propia y guarda en
+  **cualquier permutación** (sólo Cervantes · sólo ISIS · los dos); un ISIS vacío **limpia** el dato en los
+  dos lados. El vínculo con Cervantes no se borra desde ahí, a propósito.
+- ⚠ **Para corregir el ISIS de un insumo de Virgilio se edita en GP2**, no en `Insumos`: si se toca sólo del
+  lado de Virgilio, el próximo guardado desde GP2 lo pisa.
+- Rollback: `drop trigger zz_gv_insumo_isis_sync on "GP2".insumo_equivalencia;`
+  Adenda en `gestion-productiva-2.0/db/migracion_insumo_equivalencia_unica_20261013.sql`.
+- **El Cód. Cervantes del editor sólo acepta códigos que EXISTEN** (Luis, 13/10, Stock general v3.8.0): es un
+  `datalist` con todos los componentes de GP2; uno inventado no habilita el botón y no llega a la base.
 
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
 

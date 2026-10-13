@@ -1,4 +1,4 @@
-/* tests/tv-clave-segura.cjs — v29.79 (Elías, 13/10/2026): el código de ingreso ya no se pide pelado con la
+/* tests/tv-clave-segura.cjs — v29.84 (Elías, 13/10/2026): el código de ingreso ya no se pide pelado con la
    clave pública. Corre monitor/tv-clave.js con fetch falso y mira qué llama en cada caso, y candados
    estáticos sobre tv.html / index.html. */
 const fs = require("fs"), path = require("path"), vm = require("vm");

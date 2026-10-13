@@ -1,4 +1,4 @@
-/* v29.75 — ANÁLISIS PRODUCTIVO POR TANDA (Luis, 13/10/2026). Corre la pantalla de verdad
+/* v29.83 — ANÁLISIS PRODUCTIVO POR TANDA (Luis, 13/10/2026). Corre la pantalla de verdad
    (analisis.js dentro de index.html) con las RPC mockeadas y mide:
      (a) el botón está en el panel del supervisor y abre la pantalla;
      (b) la lista: una tarjeta por tanda, con el rendimiento en color y el chip de avisos duros;
@@ -102,16 +102,16 @@ const DET = {
     const t = [...document.querySelectorAll("#anOv .an-t")];
     out.tarjetas = t.length;
     out.primera = t[0] ? t[0].querySelector(".cod").textContent : "";
-    out.alerta = t[1] ? (t[1].querySelector(".al") || {}).textContent || "" : "";
-    out.sinAlerta = t[0] ? !t[0].querySelector(".al") : false;
+    out.alerta = t[1] ? (t[1].querySelector(".gv-badge") || {}).textContent || "" : "";
+    out.sinAlerta = t[0] ? !t[0].querySelector(".gv-badge") : false;
     out.lineasTarjeta = t[1] ? [...t[1].querySelectorAll(".l")].map((x) => x.textContent.trim()) : [];
     out.rotulos = t[1] ? [...t[1].querySelectorAll(".l .q")].map((x) => x.textContent.trim()) : [];
     out.rojoBajo = t[1] ? /rgb\(185, 28, 28\)/.test(window.getComputedStyle(t[1].querySelector(".l .r")).color) : false;
 
     // (c) detalle
     t[1].click(); await espera(120);
-    out.avisos = [...document.querySelectorAll("#anOv .an-av")].map((x) => x.className.replace("an-av ", "") + "|" + x.textContent.slice(0, 22));
-    out.avisoTexto = (document.querySelector("#anOv .an-av span:last-child") || {}).textContent || "";
+    out.avisos = [...document.querySelectorAll("#anOv .gv-item")].map((x) => x.className.replace("gv-item ", "") + "|" + x.textContent.slice(0, 22));
+    out.avisoTexto = (document.querySelector("#anOv .gv-item span:last-child") || {}).textContent || "";
     out.cards = [...document.querySelectorAll("#anOv .an-kpi div span")].map((x) => x.textContent.trim());
     out.secciones = [...document.querySelectorAll("#anOv summary")].map((x) => x.textContent.trim().slice(0, 28));
     out.cols = [...document.querySelectorAll("#anOv th")].map((x) => x.innerHTML.replace(/<br>/g, " ").replace(/\s+/g, " ").trim());
@@ -120,7 +120,7 @@ const DET = {
     out.malas = filas.filter((f) => f.classList.contains("mala")).map((f) => f.cells[1].textContent);
     out.f1 = filas[0] ? [...filas[0].cells].map((c) => c.textContent.trim()) : [];
     out.volver = !!document.querySelector("#anOv .an-top button[onclick='anVolver()']");
-    out.concl = (document.querySelector("#anOv .an-state .v") || {}).textContent || "";
+    out.concl = (document.querySelector("#anOv .gv-state .v") || {}).textContent || "";
     out.mkBotones = document.querySelectorAll("#anOv .an-mk-b").length;
 
     // (g) SISTEMA DE DISEÑO «GV-UI» — lo que esta pantalla tiene que sostener
@@ -151,7 +151,7 @@ const DET = {
     window.prompt = () => "no contó";
     await window.anMarcar("anomala"); await espera(60);
     out.marcado = out.pedidos.filter((x) => /gv_analisis_marcar/.test(x))[0] || "";
-    out.chipTrasMarcar = /ANÓMALA/.test((document.querySelector("#anOv .an-state") || {}).textContent || "");
+    out.chipTrasMarcar = /ANÓMALA/.test((document.querySelector("#anOv .gv-state") || {}).textContent || "");
 
     // (h) los filtros de la lista
     window.anVolver(); await espera(60);
@@ -169,7 +169,7 @@ const DET = {
 
     // (d) lectura rota
     window.anVolver(); modo = "roto"; window._anCargar(); await espera(120);
-    out.rota = (document.querySelector("#anOv .err") || {}).textContent || "";
+    out.rota = (document.querySelector("#anOv .gv-err") || {}).textContent || "";
     out.rotaNoVacio = !/No hay tandas/.test(document.querySelector("#anOv .an-body").textContent);
     modo = "ok";
     window.anCerrar();

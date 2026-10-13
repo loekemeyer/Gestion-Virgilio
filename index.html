@@ -10,6 +10,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
+<link rel="stylesheet" href="gv-ui.css?v=29.84">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6420,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.79"></script>
+<script type="module" src="recepcion.js?v=29.84"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6832,7 +6834,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="sup-action-btn" onclick="cfgGo(openPrintStation)"><span class="sup-ico">🖨️</span><span>Cola de impresión</span></button>
         <!-- v26.28 (Luis, 02/10): conectar esta PC con el helper local de impresión -->
         <button class="sup-action-btn" onclick="cfgGo(openHelperImpresion)" title="Conectar esta PC con el helper local: picking, armado y facturado salen sin el cuadro de impresión"><span class="sup-ico">🖨️</span><span>Helper de impresión</span></button>
-        <!-- v29.79 (Elías): la TV de pared pide el código de ingreso con un secreto propio; acá se la aprueba -->
+        <!-- v29.84 (Elías): la TV de pared pide el código de ingreso con un secreto propio; acá se la aprueba -->
         <button class="sup-action-btn" onclick="cfgGo(openVincularTv)" title="Aprobar el código de 6 dígitos que muestra una TV nueva para que pueda mostrar el código de ingreso, y desvincular las que ya no se usan"><span class="sup-ico">📺</span><span>Vincular TV</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openAyudaConfig)" title="Cargar las API keys y elegir el modelo del asistente de ayuda de los operarios (todavía sin botón en la botonera)"><span class="sup-ico">🤖</span><span>Asistente IA operarios</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openMailsEditor)"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
@@ -10735,7 +10737,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.79";
+const APP_VERSION = "v29.84";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -12570,7 +12572,7 @@ async function monClaveRefrescar() {
   const e = document.getElementById("monClave");
   if (!e) return;
   try {
-    /* v29.79 (Elías): con la sesión del supervisor, o con el secreto de esta pantalla si es el kiosko
+    /* v29.84 (Elías): con la sesión del supervisor, o con el secreto de esta pantalla si es el kiosko
        (monitor/tv-clave.js ≡ monitor/tv.html). Ya no se pide pelado con la clave pública. */
     if (typeof window.gvTvClaveLeer !== "function") return;
     const j = await window.gvTvClaveLeer(SUPABASE_URL, SUPABASE_KEY, function () {
@@ -29360,6 +29362,24 @@ function _modTareaVisible(m) {
   return m.ovs.some(function (id) { var e = document.getElementById(id); return !!e && getComputedStyle(e).display !== "none"; });
 }
 /* La barra (Anular / Terminé) se ve mientras el módulo de una tarea abierta está en pantalla. */
+/* v29.81 (Luis, 13/10: «la barra de abajo con Anular y Terminé tapa opciones y botones … que no tape
+   nada, priorizá la visión de smartphone») — la barra es fixed y se comía el último renglón de la lista
+   (caso: Completar Pedido en el celular). Mientras se ve, los overlays de esos módulos TERMINAN arriba
+   de la barra (`bottom: <alto>`), así su scroll llega hasta el final, y el body lleva el mismo colchón
+   para la botonera de atrás. Al irse la barra se devuelve todo. Al agregar un módulo a MOD_TAREA, sus
+   overlays van en `ovs` — de ahí sale esta lista. */
+var _MODBAR_OVS = (function () { var a = []; Object.keys(MOD_TAREA).forEach(function (c) { a = a.concat(MOD_TAREA[c].ovs || []); }); return a; })();
+function _modTareaColchon(px) {
+  px = Number(px) || 0;
+  try { document.documentElement.style.setProperty("--gv-modbar", px + "px"); } catch (_e) {}
+  var pb = px ? px + "px" : "";
+  try { if (document.body.style.paddingBottom !== pb) document.body.style.paddingBottom = pb; } catch (_e) {}
+  _MODBAR_OVS.forEach(function (id) {
+    var e = document.getElementById(id); if (!e) return;
+    var val = (px && getComputedStyle(e).display !== "none") ? px + "px" : "";
+    if (e.style.bottom !== val) e.style.bottom = val;
+  });
+}
 var _modTareaTimer = null;
 function _modTareaVigilar() {
   var leg = String((typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim();
@@ -29368,6 +29388,7 @@ function _modTareaVigilar() {
   var bar = document.getElementById("modTareaBar");
   if (!cod) {
     if (bar) bar.style.display = "none";
+    _modTareaColchon(0);
     var algun = leg && Object.keys(MOD_TAREA).some(function (c) { return modTareaActiva(leg, c); });
     if (!algun && _modTareaTimer) { clearInterval(_modTareaTimer); _modTareaTimer = null; }
     return;
@@ -29390,6 +29411,7 @@ function _modTareaVigilar() {
       '<button type="button" onclick="modTareaBoton(\'' + cod + '\',false)" style="' + bs + 'background:#16a34a;color:#fff;">🏁 Terminé</button>';
   }
   bar.style.display = "flex";
+  _modTareaColchon(bar.offsetHeight || 56);
 }
 function modTareaBoton(code, anular) {
   var m = MOD_TAREA[code]; if (!m) return;
@@ -58373,11 +58395,13 @@ function gvHelperRender(ping){
    propio y, la primera vez, muestra un código de 6 dígitos. Acá un supervisor lo aprueba (gv_tv_vincular_aprobar)
    y desde ese momento esa TV muestra el código. También se ven las TV vinculadas y se desvinculan
    (gv_tv_pantallas / gv_tv_revocar). Todo con la sesión del supervisor (gvWriteHdr). */
-const GV_VTV_CSS = "#gvVtvOv{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:9999}" +
-  "#gvVtvOv.show{display:flex}#gvVtvOv .vtv{background:#fff;border-radius:12px;padding:16px;width:min(560px,94vw);max-height:90vh;overflow:auto;font-size:16px}" +
-  "#gvVtvOv button{width:auto;margin-top:0;padding:8px 14px;font-size:16px}#gvVtvOv input{box-sizing:border-box;font-size:20px;padding:6px 8px}" +
-  "#gvVtvOv table{border-collapse:collapse;width:100%;margin-top:8px}#gvVtvOv td,#gvVtvOv th{border-bottom:1px solid #e5e7eb;padding:5px 6px;text-align:center;font-size:14px}" +
-  "#gvVtvOv .vtv-msg{margin-top:8px;min-height:20px;font-weight:600}";
+/* GV-UI (v29.83): el pop-up usa los tokens y clases de gv-ui.css; acá sólo va el layout. */
+const GV_VTV_CSS = "#gvVtvOv{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:9999}" +
+  "#gvVtvOv.show{display:flex}#gvVtvOv .vtv{width:min(560px,94vw);max-height:90vh;overflow:auto;display:flex;flex-direction:column;gap:var(--gv-sp-4)}" +
+  "#gvVtvOv .vtv-cab{display:flex;justify-content:space-between;align-items:center;gap:var(--gv-sp-3)}" +
+  "#gvVtvOv .vtv-cab b{font-size:var(--gv-fs-lg)}#gvVtvOv .vtv-form{display:flex;gap:var(--gv-sp-3);flex-wrap:wrap;align-items:center}" +
+  "#gvVtvOv #gvVtvCod{width:9ch;font-size:var(--gv-fs-xl);letter-spacing:.1em;text-align:center}#gvVtvOv #gvVtvNom{flex:1;min-width:160px}" +
+  "#gvVtvOv button{min-height:var(--gv-tap)}";
 let _gvVtvMsg = "";
 async function openVincularTv() {
   if (!requireSupervisor()) return;
@@ -58407,18 +58431,18 @@ async function gvVtvRender() {
   let filas = null, err = "";
   try { filas = await _gvVtvRpc("gv_tv_pantallas", {}); } catch (e) { err = String(e.message || e); }
   const fmt = function (x) { if (!x) return "—"; try { return new Date(x).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (_e) { return "—"; } };
-  const tabla = err ? '<div style="color:#b91c1c">No pude leer las TV vinculadas: ' + escapeHtml(err) + '</div>'
-    : (!filas || !filas.length) ? '<div style="color:#64748b">Todavía no hay ninguna TV vinculada.</div>'
-    : '<table><tr><th>TV</th><th>Estado</th><th>Aprobada</th><th>Último uso</th><th></th></tr>' + filas.map(function (f) {
-        return "<tr><td>" + escapeHtml(f.nombre || ("TV " + f.id)) + "</td><td>" + escapeHtml(f.estado) + "</td><td>" + fmt(f.aprobado_en) +
+  const activas = (filas || []).filter(function (f) { return f.estado === "activa"; }).length;
+  const estado = err ? '<div class="gv-err">No pude leer las TV vinculadas: ' + escapeHtml(err) + '</div>'
+    : '<div class="gv-state ' + (activas ? "ok" : "media") + '"><span class="v">' + (activas ? activas + (activas === 1 ? " TV vinculada" : " TV vinculadas") : "Ninguna TV vinculada") + '</span></div>';
+  const tabla = (err || !filas || !filas.length) ? ""
+    : '<div class="gv-tblwrap"><table class="gv-tbl compact"><tr><th>TV</th><th>Estado</th><th>Aprobada</th><th>Último uso</th><th></th></tr>' + filas.map(function (f) {
+        return '<tr><td class="t">' + escapeHtml(f.nombre || ("TV " + f.id)) + '</td><td><span class="gv-badge ' + (f.estado === "activa" ? "ok" : "err") + '">' + escapeHtml(f.estado) + '</span></td><td>' + fmt(f.aprobado_en) +
           "</td><td>" + fmt(f.ultimo_uso) + "</td><td>" + (f.estado === "activa" ? '<button onclick="gvVtvRevocar(' + Number(f.id) + ')">Desvincular</button>' : "") + "</td></tr>";
-      }).join("") + "</table>";
-  ov.innerHTML = '<div class="vtv"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:19px">📺 Vincular TV</b>' +
-    '<button onclick="closeVincularTv()">✕</button></div>' +
-    '<div style="margin-top:10px">Código de 6 dígitos que muestra la TV a la izquierda:</div>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><input id="gvVtvCod" inputmode="numeric" maxlength="6" placeholder="123456" style="width:130px">' +
-    '<input id="gvVtvNom" placeholder="Nombre (ej. TV depósito)" style="width:220px;font-size:16px"><button onclick="gvVtvAprobar()">✓ Vincular</button></div>' +
-    '<div class="vtv-msg" id="gvVtvMsg">' + escapeHtml(_gvVtvMsg) + '</div>' + tabla + '</div>';
+      }).join("") + "</table></div>";
+  ov.innerHTML = '<div class="vtv gv gv-card"><div class="vtv-cab"><b>Vincular TV</b><button onclick="closeVincularTv()" aria-label="Cerrar">✕</button></div>' + estado +
+    '<div class="vtv-form"><input id="gvVtvCod" inputmode="numeric" maxlength="6" placeholder="código" aria-label="Código de 6 dígitos de la TV">' +
+    '<input id="gvVtvNom" placeholder="Nombre (TV depósito)" aria-label="Nombre de la TV"><button onclick="gvVtvAprobar()">Vincular</button></div>' +
+    (_gvVtvMsg ? '<div class="gv-sub" id="gvVtvMsg">' + escapeHtml(_gvVtvMsg) + '</div>' : "") + tabla + '</div>';
 }
 async function gvVtvAprobar() {
   const cod = String((document.getElementById("gvVtvCod") || {}).value || "").replace(/\D/g, "");
@@ -58426,14 +58450,14 @@ async function gvVtvAprobar() {
   if (cod.length !== 6) { _gvVtvMsg = "Poné los 6 números que muestra la TV."; await gvVtvRender(); return; }
   try {
     const j = await _gvVtvRpc("gv_tv_vincular_aprobar", { p_codigo: cod, p_nombre: nom });
-    _gvVtvMsg = (j && j.ok) ? "✓ TV vinculada: en menos de un minuto muestra el código de ingreso." : ("✗ " + ((j && j.error) || "No se pudo vincular."));
-  } catch (e) { _gvVtvMsg = "✗ " + String(e.message || e); }
+    _gvVtvMsg = (j && j.ok) ? "TV vinculada: en menos de un minuto muestra el código de ingreso." : ("No se pudo vincular: " + ((j && j.error) || "probá de nuevo."));
+  } catch (e) { _gvVtvMsg = "No se pudo vincular: " + String(e.message || e); }
   await gvVtvRender();
 }
 async function gvVtvRevocar(id) {
   if (!confirm("¿Desvincular esta TV? Deja de mostrar el código de ingreso hasta que se la vuelva a vincular.")) return;
   try { const j = await _gvVtvRpc("gv_tv_revocar", { p_id: id }); _gvVtvMsg = (j && j.ok) ? "TV desvinculada." : "No se pudo desvincular."; }
-  catch (e) { _gvVtvMsg = "✗ " + String(e.message || e); }
+  catch (e) { _gvVtvMsg = "No se pudo desvincular: " + String(e.message || e); }
   await gvVtvRender();
 }
 function openHelperImpresion(){
@@ -62635,7 +62659,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.79"></script>
+<script src="importacion.js?v=29.84"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63410,7 +63434,7 @@ function _tvClaveVigente() { return __tvClaveOkAt && (Date.now() - __tvClaveOkAt
 function _tvPaso(cual) {
   ["tvClaveStep", "tvNombreStep", "tvLegNumStep", "tvLegajoStep", "tvCervStep"].forEach(function (id) { const e = $(id); if (e) e.classList.toggle("hidden", id !== cual); });
 }
-/* v29.79 (Elías): el servidor frena un intento fallido 2 s por equipo/IP, y desde la 6.ª falla en 10 min
+/* v29.84 (Elías): el servidor frena un intento fallido 2 s por equipo/IP, y desde la 6.ª falla en 10 min
    pide el equipo (gv_dispositivo + huella + navegador; la MAC no la da el navegador) y avisa por Telegram.
    ≡ gv_clave_chequear (sql/gv_tv_seguridad_v2974.sql). */
 function _gvHuella() {
@@ -65653,15 +65677,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.79"></script>
-<script src="hotsale.js?v=29.79"></script>
-<script src="estadisticas.js?v=29.79"></script>
-<script src="ads.js?v=29.79"></script>
-<script src="plantel.js?v=29.79"></script>
+<script src="cobranzas.js?v=29.84"></script>
+<script src="hotsale.js?v=29.84"></script>
+<script src="estadisticas.js?v=29.84"></script>
+<script src="ads.js?v=29.84"></script>
+<script src="plantel.js?v=29.84"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.79"></script>
+<script src="analisis.js?v=29.84"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.79"></script>
+<script src="ayuda.js?v=29.84"></script>
 
 </body>
 </html>

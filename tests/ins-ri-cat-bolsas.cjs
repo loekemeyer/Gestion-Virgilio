@@ -36,8 +36,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.stockFetchSaldos = async function () { return {}; };
     window.insFetchSaldosXUni = async function () { return {}; };
     const out = {};
+    /* 13/10: se espera la CONDICION, no el reloj. insRecibirCat() es async (dibuja
+       "Cargando..." y recien despues los botones) y insChooserGo no devuelve su promesa:
+       con un sleep fijo de 50 ms, en un runner lento (CI) el chequeo (a) corria con el
+       cartel de carga puesto y la suite quedaba roja 1 de 485 sin que nada estuviera mal. */
+    const _hasta = async function (fn) {
+      for (let i = 0; i < 200; i++) { if (fn()) return true; await new Promise(function (r) { setTimeout(r, 20); }); }
+      return !!fn();
+    };
     insChooserGo("RI");
-    await new Promise(function (res) { setTimeout(res, 50); });
+    await _hasta(function () { return document.querySelectorAll("#insChooserModal .ins-ri-cat").length > 0; });
     const btns = Array.from(document.querySelectorAll("#insChooserModal .ins-ri-cat")).map(function (x) { return x.textContent; });
     out.a = btns.length === 6 && !btns.some(function (t) { return /Importados/.test(t); });
     insRecibirCatGo("fleje");
