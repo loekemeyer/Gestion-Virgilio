@@ -5519,6 +5519,53 @@ preguntarse si ahí no falta Retira.**
 **Chequeo:** `select * from public.gv_ppp_web_forzado_sin_tanda();` — lo que el armador tiene que
 tomar sí o sí · `select * from public.gv_reglas_perdidas;`.
 
+## ⚠⚠ REGLA (Luis, 2026-10-13, v30.03): LA GÓNDOLA DE UN CÓDIGO DISCONTINUADO SE LIBERA
+
+**Luis, con el A64 en la mano:** *"figura en el mapa de gondolas que esta asignado al 548 pero ese es un
+código discontinuo. ahora tiene un cartel de que va 565 pero tambien esta discontinuo. La idea es muy
+simple: si una gondola esta asignada a un codigo discontinuo (o mejor dicho, cuando se dictamina que un
+codigo esta discontinuo…), esa gondola se tiene que liberar"* · *"hay algunos articulos que conviven en
+una misma gondola (dos codigos diferentes, una gondola). Revisa que esto no rompa nada."*
+
+> ## **La celda NO se borra: se le saca EL CÓDIGO.** `GV_Lugar_Item` es (sector, cod), así que una celda
+> ## compartida pierde sólo al discontinuado y los otros siguen; sale **«libre»** cuando no le queda ninguno.
+
+| pieza | qué hace |
+|---|---|
+| **`gv_cod_discontinuado(cod)`** | la ÚNICA fuente del dictamen: `a_mano` (`Articulos_Discontinuados`) · `baja` (`GV_Codigo_Baja`) · `sin_compra` (`OC_Maximos.activo = false`) · null. Es el mismo criterio del chip «Ocultar discontinuos» de Stocks, que lo sigue duplicando en el front |
+| **`gv_gondola_discontinuada`** | una fila por (celda, código) con el motivo, el stock, la demanda y la **acción**: `liberar_ya` · `liquidar_primero` · `tiene_demanda` · `secundario_revisar` |
+| **`gv_gondola_liberar(sector, cod, clase, por, forzar)`** | saca ese código de esa celda con backup en **`GV_Lugar_Liberado`**; **sin `forzar` frena** (`NO_VACIA`) si hay cajas o demanda. Llama a `gv_lugar_item_sacar`, que ya existía |
+| **`gv_gondola_reponer(id)`** | deshace una liberación (vuelve el código **y su capacidad**) |
+| **`gv_gondola_liberar_auto(simular, cod)`** | el automático: libera SÓLO lo que está en cero absoluto. Lo disparan el **trigger `zz_gv_disc_liberar_gondolas`** del alta en `Articulos_Discontinuados` (el dictamen) y el cron **158 `gv-gondola-liberar`** (05:23 ART), que es la red para lo que se vacía después |
+| `gv_planimetria_celda` | +3 columnas AL FINAL: `discontinuado`, `disc_accion`, `celda_liberable`. El **Mapa** marca la celda (código **tachado** + borde rojo + la leyenda con palabras), el modal dice el motivo y tiene **🧹 Liberar**, y arriba va el aviso con **«Liberar las N que están en cero»** |
+
+### ⚠ Las tres cosas que esto NO rompe, y por qué
+
+1. **Una celda con cajas adentro NO se libera sola.** Decir «libre» con las 81 cajas del 587T adentro manda
+   al pickeador a una celda que el mapa no reconoce y dispara `gv_mapa_stock_sin_lugar`. Queda marcada
+   **«liquidar primero»** y se libera cuando queda en cero (o a mano, con el aviso de cuántas hay).
+2. **Convivir ya estaba estructurado**: no hizo falta ningún modelo nuevo. Medido el 13/10: **41 celdas
+   tienen 2+ códigos** (hasta 5 en M35 y M36), o sea que en la góndola M de Chef convivir es la norma.
+   Probado: dictaminar el 337 dejó E15 con **sólo el 312**.
+3. ⚠⚠ **`OC_Maximos.activo = false` NO siempre es «discontinuado»: en un SECUNDARIO significa «no se
+   compra»**, porque su proyección se vuelca al principal (regla v22.72) y por eso su E.M. es 0 **por
+   construcción** — mirar «E.M. 0» no prueba que no se venda. El **574** está `activo=false` con proveedor
+   Lucho y es el que VENDE de su familia (regla v22.68). Un secundario que no está marcado a mano queda en
+   `secundario_revisar` y **no se libera solo**: son 3 de los 43 (338, 574, 809).
+
+**Medido el 13/10, antes de escribir:** 689 items de góndola en 636 celdas (49 vacías) · **43 ocupados por
+un código discontinuado** (24 a mano, 19 sólo por OC) · **21 con cajas** (587T 81, 755 70, 759 57+57, 332 33,
+335 30, 502T 24, 717 24…) · **23 con demanda viva** (591 con 8 pedidas y 27 de E.M., 396, 332, 338, 809…) ·
+**12 en cero absoluto**, que son las que el automático libera, y **4 celdas** quedan enteras libres
+(A64, J40, J41, L59). A64/548 es el caso puro: `activo=false`, sin stock, sin E.M., sin pedidos.
+
+**Chequeo:** `select accion, count(*) from public.gv_gondola_discontinuada group by 1;` ·
+`select * from public.gv_gondola_liberar_auto(true);` (qué liberaría, sin tocar nada) ·
+`select * from public."GV_Lugar_Liberado" order by id desc;` (lo liberado, con su `reponer`) ·
+`select * from public.gv_reglas_perdidas;` · `node tests/pmap-discontinuado.cjs` (corre la pantalla;
+verificado que falla contra el index anterior). `sql/gv_gondola_discontinuado_v3003.sql` (rollback al pie),
+centinelas 447-451.
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.69): el código SIN GÓNDOLA en el Mapa se lo PREGUNTA AL OPERARIO
 
 **Luis:** *"si el modulo de pickeo los promptea a pickear un codigo para el que no tiene registro de

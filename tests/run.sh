@@ -843,6 +843,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pmap-racks (v22.67: 📦 pestaña Racks del Mapa — solo lectura, vista gv_rack_celda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-racks.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-punto-unico.cjs
+echo "== pmap-discontinuado (v30.03: la celda con un codigo discontinuado se libera; la compartida pierde solo a ese) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-discontinuado.cjs
 echo "== imp-escritura-login (v22.81: el maestro de importados se escribe sólo con la sesión de supervisor) =="
 node tests/imp-escritura-login.cjs
 echo "== impo-comex-web (v23.19: IMPO COMEX web dentro de Importación, sin token ni datos personales) =="

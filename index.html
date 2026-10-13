@@ -3135,6 +3135,21 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
 .pmap-libre .pmap-cod{ color:#64748b; font-size:13px; font-weight:800; letter-spacing:.5px; }
 .pmap-smapa{ border:2px solid #f59e0b; border-left-width:8px; background:#fef3c7; }
 .pmap-scap{ border:2px solid #7c3aed; border-left-width:8px; background:#ede9fe; }
+/* v30.03 — la celda que tiene un código DISCONTINUADO. El color no va solo: el código
+   va tachado (forma) y la leyenda lo dice con palabras (GV-UI 5). */
+.pmap-disc{ border:2px solid #b91c1c; border-left-width:8px; background:#fef2f2; }
+.pmap-disc-ok{ border-style:dashed; }
+.pmap-cod.disc{ text-decoration:line-through; color:#b91c1c; }
+.pmap-leg .pmap-disc{ background:#fef2f2; border:2px solid #b91c1c; border-left-width:9px; }
+.pmap-leg .leg-disc{ background:#fef2f2; border-color:#fca5a5; color:#991b1b; }
+.pmap-leg .leg-disc b{ color:#991b1b; }
+.pmap-disc-box{ background:#fef2f2; border:2px solid #fca5a5; border-radius:12px; padding:11px 13px; margin-bottom:10px; font-size:14px; color:#991b1b; }
+.pmap-disc-box b{ color:#7f1d1d; }
+.pmap-disc-box summary{ cursor:pointer; font-weight:800; }
+.pmap-disc-box ul{ margin:8px 0 0; padding-left:18px; }
+.pmap-disc-box button{ width:auto; margin:8px 6px 0 0; padding:7px 12px; font-size:13.5px; border-radius:8px; background:#fff; border:1px solid #b91c1c; color:#991b1b; font-weight:800; }
+.pmap-it-disc{ flex:1 1 100%; font-size:12.5px; font-weight:700; color:#991b1b; }
+.pmap-bt-lib{ background:#b91c1c; color:#fff; border:none; font-weight:800; }
 .pmap-hit{ outline:4px solid #facc15; outline-offset:2px; }
 .pmap-leg{ display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
 .pmap-leg > span{ display:inline-flex; align-items:center; gap:9px; font-size:15px; font-weight:700; color:#334155;
@@ -6771,6 +6786,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="planim-btn-save" onclick="closePlanimMapa();openLugarEditor()">✏️ Editar lugares</button>
       </div>
       <div id="pmapAlerta" class="pmap-vieja pmap-alerta" hidden></div>
+      <div id="pmapDisc" class="pmap-disc-box" hidden></div>
       <div id="pmapTabs" class="pmap-tabs"></div>
       <div id="pmapVieja" class="pmap-vieja" hidden></div>
       <div id="prkDesfase" class="pmap-vieja" hidden></div>
@@ -48624,7 +48640,8 @@ async function lugDelItem(sector, cod, clase) {
 const PMAP_ALTO_DEF = 4;
 const PMAP_ALTO_X = { "A": 5, "P": 5 };
 function pmapAlto(g) { return PMAP_ALTO_X[String(g || "").toUpperCase()] || PMAP_ALTO_DEF; }
-const PMAP_SELECT = "select=sector,gondola,celda,empresa,orden,cod,descripcion,cajas_max,max_fuente,estado" +
+const PMAP_SELECT = "select=sector,gondola,celda,empresa,orden,cod,descripcion,cajas_max,max_fuente,estado," +
+                    "discontinuado,disc_accion,celda_liberable" +
                     "&order=gondola.asc,celda.asc";
 let _pmap = null, _pmapG = "", _pmapQ = "";
 let _pmapModo = "gondola", _prk = null, _prkR = "";   // v22.67 — pestaña Racks
@@ -48711,6 +48728,88 @@ function closePlanimMapa() {
   const ov = document.getElementById("planimMapaOverlay");
   if (ov) ov.classList.remove("show");
 }
+/* ═══ v30.03 — CÓDIGO DISCONTINUADO EN UNA CELDA DE GÓNDOLA ═══════════════════
+   Luis, 2026-10-13: «si una góndola está asignada a un código discontinuo, esa
+   góndola se tiene que liberar». La celda NO se borra: se le saca EL CÓDIGO
+   (GV_Lugar_Item es (sector, cod)), así que una celda compartida pierde sólo al
+   discontinuado y los otros siguen; la celda sale «libre» cuando no le queda
+   ninguno. Quién está discontinuado y si se puede liberar lo dice la base
+   (gv_gondola_discontinuada, pegada en gv_planimetria_celda): el front no
+   decide nada — sólo lo muestra y ofrece el botón.
+   ⚠ Una celda CON CAJAS adentro no se libera sola (ver la regla en CLAUDE.md). */
+function _pmapDiscTxt(m) {
+  return m === "a_mano" ? "marcado a mano" : m === "baja" ? "dado de baja" : m === "sin_compra" ? "no se compra" : String(m || "");
+}
+function _pmapAccionTxt(a) {
+  return a === "liberar_ya" ? "está en cero: se libera"
+       : a === "liquidar_primero" ? "todavía tiene cajas en la góndola: primero se liquida"
+       : a === "tiene_demanda" ? "tiene pedidos o venta viva"
+       : a === "secundario_revisar" ? "es secundario: su proyección va al principal, no está discontinuado"
+       : String(a || "");
+}
+function pmapDiscRender() {
+  const box = document.getElementById("pmapDisc");
+  if (!box) return;
+  const its = (_pmap || []).filter(function (r) { return r.discontinuado; });
+  box.hidden = !its.length;
+  if (!its.length) return;
+  const cel = {}; its.forEach(function (r) { cel[String(r.sector || "").toUpperCase()] = 1; });
+  const ya = its.filter(function (r) { return r.disc_accion === "liberar_ya"; });
+  const resto = its.filter(function (r) { return r.disc_accion !== "liberar_ya"; });
+  let h = '<b>' + Object.keys(cel).length + ' celda(s) de góndola con un código discontinuado</b>' +
+          (ya.length ? ' · <b>' + ya.length + '</b> se liberan ya' : '') +
+          (resto.length ? ' · ' + resto.length + ' no todavía' : '');
+  if (ya.length) h += '<br><button onclick="pmapLiberarTodas()">🧹 Liberar las ' + ya.length + ' que están en cero</button>';
+  h += '<details><summary>Ver el detalle</summary><ul>' +
+    its.sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); })
+       .map(function (r) {
+      return '<li><b>' + escapeHtml(String(r.sector)) + '</b> · ' + escapeHtml(_padCod(String(r.cod || ""))) +
+             ' (' + escapeHtml(_pmapDiscTxt(r.discontinuado)) + ') — ' + escapeHtml(_pmapAccionTxt(r.disc_accion)) +
+             ' · <a href="#" onclick="pmapAbrirCelda(' + JSON.stringify(String(r.sector)).replace(/"/g, "&quot;") + ');return false;">abrir</a></li>';
+    }).join("") + '</ul></details>';
+  box.innerHTML = h;
+}
+/* Liberar = sacar ESE código de ESA celda, con backup en GV_Lugar_Liberado (se puede
+   reponer). Sin `forzar` la base frena si la celda tiene cajas o demanda. */
+async function pmapLiberar(sector, cod, forzar) {
+  const r = await pmapRpc("gv_gondola_liberar", {
+    p_sector: sector, p_cod: cod, p_clase: "articulo",
+    p_por: (typeof gvLegajoSupervisor === "function" ? gvLegajoSupervisor() : "supervisor"),
+    p_forzar: !!forzar
+  });
+  if (!r.ok) {
+    const msg = String(r.err || "");
+    if (/NO_VACIA/.test(msg) && !forzar) {
+      if (confirm(msg.replace(/^.*NO_VACIA:\s*/, "⚠ ") + "\n\n¿Liberarla igual? La mercadería que haya queda sin lugar en el mapa.")) {
+        return pmapLiberar(sector, cod, true);
+      }
+      return false;
+    }
+    pmapCeldaStatus(msg, false); pmapSetStatus(msg, false); return false;
+  }
+  await pmapRefrescar();
+  const dd = (r.data && r.data[0]) || {};
+  const txt = "✓ " + cod + " sacado de " + sector + (dd.celda_libre ? ": la celda quedó LIBRE." : " · quedan " + (dd.quedan_en_celda || 0) + " código(s).");
+  pmapCeldaStatus(txt, true); pmapSetStatus(txt, true);
+  return true;
+}
+async function pmapLiberarTodas() {
+  const ya = (_pmap || []).filter(function (r) { return r.disc_accion === "liberar_ya"; });
+  if (!ya.length) return;
+  if (!confirm("¿Liberar " + ya.length + " celda(s) de góndola ocupadas por códigos discontinuados que están en cero?\n\n" +
+               "Se saca el código del mapa y de la capacidad. Queda registrado y se puede reponer.")) return;
+  pmapSetStatus("Liberando…", true);
+  let n = 0;
+  for (let i = 0; i < ya.length; i++) {
+    const r = await pmapRpc("gv_gondola_liberar", {
+      p_sector: ya[i].sector, p_cod: ya[i].cod, p_clase: "articulo",
+      p_por: (typeof gvLegajoSupervisor === "function" ? gvLegajoSupervisor() : "supervisor"), p_forzar: false
+    });
+    if (r.ok) n++;
+  }
+  await pmapRefrescar();
+  pmapSetStatus("✓ " + n + " de " + ya.length + " liberadas.", true);
+}
 function pmapGondolas() {
   const seen = {}, out = [];
   (_pmap || []).forEach(function (r) {
@@ -48751,7 +48850,13 @@ function pmapRender() {
   if (!tabs || !box) return;
   const vj = document.getElementById("pmapVieja");
   pmapAlertaRender();
-  if (_pmapModo === "rack") { if (vj) vj.style.display = "none"; prkRender(); prkDesfaseRender(); return; }
+  const dzb = document.getElementById("pmapDisc");
+  if (_pmapModo === "rack") {
+    if (vj) vj.style.display = "none";
+    if (dzb) dzb.hidden = true;                                 // v30.03: es de góndolas
+    prkRender(); prkDesfaseRender(); return;
+  }
+  pmapDiscRender();
   if (vj) vj.style.display = "";
   const dz = document.getElementById("prkDesfase"); if (dz) dz.hidden = true;
   if (!_pmap) { box.innerHTML = '<div class="planim-empty">Cargando…</div>'; return; }
@@ -48800,9 +48905,12 @@ function pmapLegRender(g) {
     const k = String(r.sector || "").toUpperCase();
     (celdas[k] || (celdas[k] = [])).push(r.estado);
   });
-  const n = { ok: 0, libre: 0, solo_mapa: 0, solo_capacidad: 0 };
+  const discCel = {};
+  rows.forEach(function (r) { if (r.discontinuado) discCel[String(r.sector || "").toUpperCase()] = 1; });
+  const n = { ok: 0, libre: 0, solo_mapa: 0, solo_capacidad: 0, disc: Object.keys(discCel).length };
   Object.keys(celdas).forEach(function (k) {
     const es = celdas[k];
+    if (discCel[k]) return;                                   // v30.03: cuenta como discontinuada
     if (es.indexOf("solo_capacidad") >= 0) n.solo_capacidad++;
     else if (es.indexOf("solo_mapa") >= 0) n.solo_mapa++;
     else if (es.length === 1 && es[0] === "libre") n.libre++;
@@ -48815,7 +48923,8 @@ function pmapLegRender(g) {
     item("", "", "con código y capacidad", n.ok) +
     item("pmap-libre", "leg-libre", "celda libre", n.libre) +
     item("pmap-smapa", "leg-smapa", "sin capacidad cargada", n.solo_mapa) +
-    item("pmap-scap", "leg-scap", "capacidad sin el artículo en el mapa", n.solo_capacidad);
+    item("pmap-scap", "leg-scap", "capacidad sin el artículo en el mapa", n.solo_capacidad) +
+    (n.disc ? item("pmap-disc", "leg-disc", "código discontinuado: se libera", n.disc) : "");
 }
 function pmapGondolaHtml(g) {
   const rows = (_pmap || []).filter(function (r) { return String(r.gondola || "").toUpperCase() === g; });
@@ -48855,7 +48964,11 @@ function pmapCellHtml(g, n, porCelda) {
   if (!its || !its.length) return '<div class="pmap-cell pmap-libre" style="visibility:hidden"></div>';
   const sec = String(its[0].sector || (g + (n < 10 ? "0" + n : n)));
   const estados = its.map(function (r) { return r.estado; });
-  const cls = (estados.indexOf("solo_capacidad") >= 0 ? "pmap-scap"
+  // v30.03 — el DISCONTINUADO manda sobre los otros avisos de la celda: lo que importa
+  // de A64 no es que le falte capacidad, es que su código ya no se vende.
+  const disc = its.filter(function (r) { return r.discontinuado; });
+  const cls = (disc.length ? ("pmap-disc" + (its[0].celda_liberable ? " pmap-disc-ok" : ""))
+            : estados.indexOf("solo_capacidad") >= 0 ? "pmap-scap"
             : estados.indexOf("solo_mapa") >= 0 ? "pmap-smapa"
             : (its.length === 1 && estados[0] === "libre") ? "pmap-libre" : "") +
             (its.length > 1 ? " pmap-cell-multi" : "");
@@ -48872,11 +48985,12 @@ function pmapCellHtml(g, n, porCelda) {
     const vis = its.slice(0, 2), multi = its.length > 1;
     cuerpo = vis.map(function (r) {
       const n = (r.cajas_max != null) ? pmapNum(r.cajas_max) : null;
+      const dc = r.discontinuado ? " disc" : "";
       if (multi) {
-        return '<span class="pmap-cod">' + escapeHtml(_padCod(r.cod || "—")) +
+        return '<span class="pmap-cod' + dc + '">' + escapeHtml(_padCod(r.cod || "—")) +
                (n != null ? '<i>' + n + '</i>' : '<i class="pmap-nocap">s/cap</i>') + '</span>';
       }
-      return '<span class="pmap-cod">' + escapeHtml(_padCod(r.cod || "—")) + '</span>' +
+      return '<span class="pmap-cod' + dc + '">' + escapeHtml(_padCod(r.cod || "—")) + '</span>' +
              (n != null ? '<span class="pmap-cap"><b>' + n + '</b> caj</span>'
                         : '<span class="pmap-cap pmap-nocap">s/cap</span>');
     }).join("");
@@ -48885,6 +48999,7 @@ function pmapCellHtml(g, n, porCelda) {
       const d = pmapDesc(r);
       return sec + " · " + String(r.cod || "") + (d ? " — " + d : "") +
         " · " + (r.cajas_max != null ? r.cajas_max + " cajas" : "sin capacidad cargada") +
+        (r.discontinuado ? " · 🚫 DISCONTINUADO (" + _pmapDiscTxt(r.discontinuado) + ") — " + _pmapAccionTxt(r.disc_accion) : "") +
         (r.estado === "solo_mapa" ? " · ⚠ el mapa lo pone acá pero no tiene capacidad cargada"
          : r.estado === "solo_capacidad" ? " · ⚠ hay capacidad cargada acá pero el mapa no pone el artículo"
          : "");
@@ -49372,14 +49487,19 @@ function pmapCeldaRender() {
         const c = String(r.cod), cJ = JSON.stringify(c).replace(/"/g, "&quot;");
         const cl = String(r.clase || "articulo"), clJ = JSON.stringify(cl).replace(/"/g, "&quot;");
         const d = pmapDesc(r);
-        return '<div class="pmap-it">' +
-          '<span class="pmap-it-cod">' + escapeHtml(cl === "insumo" ? c : _padCod(c)) + '</span>' +
+        const dsc = r.discontinuado;
+        const puede = r.disc_accion === "liberar_ya";
+        return '<div class="pmap-it"' + (dsc ? ' style="background:#fef2f2;border-color:#fca5a5"' : '') + '>' +
+          '<span class="pmap-it-cod"' + (dsc ? ' style="text-decoration:line-through;color:#b91c1c"' : '') + '>' + escapeHtml(cl === "insumo" ? c : _padCod(c)) + '</span>' +
           '<span class="pmap-it-desc">' + escapeHtml(d || (cl === "insumo" ? "insumo" : "")) + '</span>' +
           '<input class="planim-inp planim-inp-num" id="pmapCap_' + escapeHtml(c) + '" type="number" inputmode="numeric" ' +
             'placeholder="cajas" value="' + (r.cajas_max != null ? Number(r.cajas_max) : "") + '">' +
           '<button class="pmap-bt" onclick="pmapGuardarItem(' + cJ + ',' + clJ + ')">Guardar</button>' +
           '<button class="pmap-bt-del" onclick="pmapSacarItem(' + cJ + ',' + clJ + ')">Sacar</button>' +
           '<button onclick="pmapCerrarCelda();pmapBuscar(' + cJ + ')" style="width:auto;margin:0;padding:7px 10px;font-size:13px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a">📍 sus lugares</button>' +
+          // v30.03 — discontinuado: el motivo con palabras y el botón para liberar la celda
+          (dsc ? '<span class="pmap-it-disc">🚫 DISCONTINUADO (' + escapeHtml(_pmapDiscTxt(dsc)) + ') — ' + escapeHtml(_pmapAccionTxt(r.disc_accion)) + '</span>' +
+                 '<button class="pmap-bt-lib" onclick="pmapLiberar(' + secJ + ',' + cJ + ',false)">🧹 Liberar' + (puede ? '' : ' igual') + '</button>' : '') +
         '</div>';
       }).join("")
     : '<div class="pmap-sub">Celda <b>libre</b>: no tiene ningún código asignado.</div>';
