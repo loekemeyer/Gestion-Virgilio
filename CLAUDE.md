@@ -8723,7 +8723,9 @@ escribió la **posición** `AB3` en el campo del **código** y entraron **60 caj
   (y su clave trae el sufijo de empresa, `438E LK`, que `gv_stock_cod_conocido` no conoce: daría falso rojo).
 - ⚠ **La posición bloquea sólo si ADEMÁS el código no existe**: `A1` es rack de insumos **y** código de verdad
   (medido 13/10: `gv_rack_sector('A1')` = A1 y `gv_stock_cod_conocido('A1')` = true).
-- ⚠ **El dato de AB3 (60 cajas en AB03) NO se corrigió**: es una corrección de datos y pide el «sí».
+- ✅ **El dato de AB3 se corrigió el 13/10** (D3): ajuste inverso `-60` en AB03 (mov **146068820**, `ref 'CORR IR 145833325'`,
+  backup `zz_backups."GV_Backup_MovStock_AB3_20261013"`). AB3 queda en **0** y **AB03 libre** en el Mapa; las 60 reales siguen en
+  **AB10** (132). El movimiento original NO se borra. Problema **758** de la auditoría, cerrado con este commit.
 - `tests/ir-codigo-candado.cjs` (corre la pantalla; verificado que falla con 10 chequeos en rojo contra la v29.66).
 
 ## ⚠ REGLA (Luis, 2026-10-09, v29.17): ❓ AYUDA — el asistente del operario SÓLO sabe el manual
@@ -9031,3 +9033,39 @@ select m.cod_art, m.creado, m.legajo, m.delta
 
 Al 13/10 queda **1 fila y es de antes del módulo actual**: 542, 22/07/2026, `legajo` y `client_id` en NULL (una
 carga de panel, no del celular). **No se tocó**: corregirla es otra decisión de datos y pide el «sí».
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.69): una BAJA DE RACKS que no se guarda queda colgada — y el reconteo del rack la DUPLICA
+
+Caso **606E**: el 09/10 15:55 el legajo 104 bajó **10 cajas de X22** a «A guardar» y nunca las guardó (entre esa fecha
+y el 13/10 no hay un solo MG del 606E). El 13/10 10:00 se recontó X22 (**130 cajas**, +10 de ingreso) y se bajaron las
+130, que se guardaron enteras a las 10:36. Resultado: A guardar quedó con **10 cajas que ya estaban contadas adentro de
+las 130**. Luis, 13/10: *"las 130 eran lo único que había, no hay 10 cajas sueltas en ningún lado (a guardar, góndolas,
+racks, nada)"*.
+
+> **Una baja de racks (BR) sin su guardado (MG) deja saldo vivo en «A guardar». Si después se recuenta ese rack, ese
+> saldo pasa a contar dos veces.** El conteo del rack no sabe que esas cajas ya habían salido en la base.
+
+✅ Corregido el 13/10 (Luis: *"corregilas"*): ajuste **`a_guardar −10`** con `ref = 'CORR BR 132730592'` (mov
+146068819). No va a `terminado`: las cajas no existen aparte, estaban dentro de las 130 ya guardadas. A guardar del
+606E = **0** en movimientos y en el caché; `gv_stock_negativos` sin el 606E. El `baja_racks` original NO se borra.
+
+**Cómo encontrar otro caso igual** — código con saldo vivo en «A guardar» cuyo último movimiento es un `baja_racks`
+(no un guardado), sin su ajuste de corrección:
+
+```sql
+select m.cod_art, m.empresa, sum(m.delta) a_guardar,
+       (array_agg(m.tipo order by m.creado desc))[1] ultimo_tipo,
+       max(m.creado)::date desde
+  from public."Movimientos_Stock" m
+ where m.deposito = 'a_guardar'
+ group by 1,2 having sum(m.delta) > 0
+ order by 3 desc;
+```
+
+⚠ **Un saldo en «A guardar» no es un error por sí mismo**: es mercadería bajada o recibida esperando guardarse. Lo que
+hay que mirar es si ese rack se recontó después de la baja. **La corrección va con el «sí» del dueño**, porque la
+pregunta («¿esas cajas están físicamente?») sólo la puede contestar el depósito.
+
+⚠⚠ **NO se avisa cuando una baja queda sin guardar: Luis dijo que NO** (13/10, D16: *"no lo armes"*). Se le ofreció un
+aviso (Telegram o cartel) para el BR que al día siguiente sigue sin su MG, y lo bajó. **No volver a proponerlo.** El
+caso se encuentra con la consulta de arriba, a mano.
