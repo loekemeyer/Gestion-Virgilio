@@ -64,9 +64,14 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const genOv = await p.evaluate(() => {
     const falta = []; let n = 0;
     document.querySelectorAll("#rolPickerOv [onclick]").forEach(function (el) {
-      const m = /([A-Za-z_$][\w$]*)\s*[([]/.exec(el.getAttribute("onclick") || "");
-      if (!m) return; n++;
-      if (typeof window[m[1]] === "undefined") falta.push(m[1]);
+      const code = el.getAttribute("onclick") || "";
+      const RES = { event: 1, window: 1, this: 1, document: 1, "return": 1, "if": 1, "typeof": 1 };
+      let mm; const re = /(\.?)\s*([A-Za-z_$][\w$]*)\s*[([]/g;
+      while ((mm = re.exec(code))) {
+        if (mm[1] === "." || RES[mm[2]]) continue;   // método de un objeto o palabra del lenguaje
+        n++;
+        if (typeof window[mm[2]] === "undefined") falta.push(mm[2]);
+      }
     });
     return { n: n, falta: Array.from(new Set(falta)) };
   });
@@ -93,6 +98,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       ovVisible: !!(ov && ov.style.display !== "none"),
       panelVisible: !!(pa && pa.style.display !== "none" && pa.offsetHeight > 0),
       txt: pa ? (pa.textContent || "").trim() : "",
+      barra: (function () { const b = document.querySelector("#rolPanel .rolp-quien"); return b ? (b.textContent || "").trim() : ""; })(),
       guardado: guardado
     };
   });
@@ -100,8 +106,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   else ok("el cuadro se cierra al elegir");
   if (!est.panelVisible) fallas.push("#rolPanel no se dibujó: apretar Luis NO entra");
   else ok("el panel del rol se dibuja");
-  if (!/Hola, Luis/.test(est.txt)) fallas.push("el panel no saluda a Luis: «" + est.txt.slice(0, 80) + "»");
-  else ok("el panel dice «Hola, Luis»");
+  if (!/Luis/.test(est.barra)) fallas.push("la barra no dice quién es: «" + est.barra + "»");
+  else ok("la barra dice el nombre y el área");
   if (est.guardado !== "luis") fallas.push("no quedó guardada la elección (gv_sup_quien = «" + est.guardado + "»)");
   else ok("la elección queda guardada por dispositivo");
 
@@ -109,9 +115,14 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const genPan = await p.evaluate(() => {
     const falta = []; let n = 0;
     document.querySelectorAll("#rolPanel [onclick]").forEach(function (el) {
-      const m = /([A-Za-z_$][\w$]*)\s*[([]/.exec(el.getAttribute("onclick") || "");
-      if (!m) return; n++;
-      if (typeof window[m[1]] === "undefined") falta.push(m[1]);
+      const code = el.getAttribute("onclick") || "";
+      const RES = { event: 1, window: 1, this: 1, document: 1, "return": 1, "if": 1, "typeof": 1 };
+      let mm; const re = /(\.?)\s*([A-Za-z_$][\w$]*)\s*[([]/g;
+      while ((mm = re.exec(code))) {
+        if (mm[1] === "." || RES[mm[2]]) continue;   // método de un objeto o palabra del lenguaje
+        n++;
+        if (typeof window[mm[2]] === "undefined") falta.push(mm[2]);
+      }
     });
     return { n: n, falta: Array.from(new Set(falta)) };
   });
@@ -132,6 +143,57 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     if (!reabrio) fallas.push("«cambiar» no re-abre el cuadro");
     else ok("«cambiar» re-abre el cuadro");
   }
+
+  // (f) v29.98: PLEGADO por defecto, una sola línea, badge con PALABRA y «cambiar» angosto.
+  //     Y vale para LOS CINCO roles, no sólo para Luis (Luis, 13/10: "que el arreglo sea
+  //     general y no solo para luis").
+  for (const k of ["luis", "thomas", "marianela", "tomas", "viviana"]) {
+    const m = await p.evaluate(async (rol) => {
+      try { localStorage.setItem("gv_sup_quien", rol); localStorage.removeItem("gv_rol_abierto"); } catch (_e) {}
+      const ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none";
+      window.rolElegir(rol);
+      await new Promise((r) => setTimeout(r, 250));
+      const sp = document.getElementById("supervisorPanel");
+      if (sp) { sp.classList.remove("hidden"); sp.style.display = ""; }
+      const c = document.getElementById("rolPanel");
+      const bg = document.getElementById("rolpBadge");
+      const cb = document.querySelector("#rolPanel .rolp-cambiar");
+      const bar = document.querySelector("#rolPanel .rolp-bar");
+      const filas = document.querySelectorAll("#rolPanel .rolp-row").length;
+      return {
+        alto: Math.round(c.getBoundingClientRect().height),
+        abierto: c.classList.contains("abierto"),
+        badge: bg ? (bg.textContent || "").trim() : "",
+        cambiarW: cb ? Math.round(cb.getBoundingClientRect().width) : 0,
+        anchoBarra: bar ? Math.round(bar.getBoundingClientRect().width) : 0,
+        quien: (document.querySelector("#rolPanel .rolp-quien") || {}).textContent || "",
+        filas: filas
+      };
+    }, k);
+    if (m.abierto) fallas.push(k + ": el panel arranca desplegado (tiene que arrancar plegado)");
+    if (m.alto > 60) fallas.push(k + ": plegado mide " + m.alto + " px — tiene que ser UNA línea (≤ 60)");
+    if (!/[a-zñáéíóú]/i.test(m.badge)) fallas.push(k + ": el badge no lleva palabra, sólo color/número («" + m.badge + "»)");
+    if (!m.cambiarW || m.cambiarW > 140) fallas.push(k + ": «cambiar» mide " + m.cambiarW + " px (el button{width:100%} global se lo comió)");
+    if (!m.filas) fallas.push(k + ": el checklist quedó vacío");
+    if (!m.quien.trim()) fallas.push(k + ": la barra no dice quién es");
+  }
+  ok("los 5 roles: una línea plegada, badge con palabra, «cambiar» angosto");
+
+  // y al desplegar muestra el checklist
+  await p.evaluate(() => { try { localStorage.setItem("gv_sup_quien", "luis"); } catch (_e) {} window.rolElegir("luis"); });
+  await p.waitForTimeout(200);
+  await p.evaluate(() => { const sp = document.getElementById("supervisorPanel"); if (sp) { sp.classList.remove("hidden"); sp.style.display = ""; } });
+  const antes = await p.evaluate(() => Math.round(document.getElementById("rolPanel").getBoundingClientRect().height));
+  await p.click("#rolPanel .rolp-bar");
+  await p.waitForTimeout(200);
+  const desp = await p.evaluate(() => ({
+    alto: Math.round(document.getElementById("rolPanel").getBoundingClientRect().height),
+    abierto: document.getElementById("rolPanel").classList.contains("abierto"),
+    guardado: (function () { try { return localStorage.getItem("gv_rol_abierto"); } catch (_e) { return ""; } })()
+  }));
+  if (!desp.abierto || desp.alto <= antes) fallas.push("tocar la barra no despliega el checklist (" + antes + " → " + desp.alto + " px)");
+  else ok("la barra despliega el checklist (" + antes + " → " + desp.alto + " px)");
+  if (desp.guardado !== "1") fallas.push("el estado abierto/cerrado no se guarda por dispositivo");
 
   // (c) ningún error de página
   const malos = errs.filter((m) => /rol|GV_ROL|GV_SUP/i.test(m));

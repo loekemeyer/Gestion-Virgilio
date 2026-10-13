@@ -140,6 +140,19 @@ catch (_e) {
     alerts.length = 0; siNo = true; await irRevisar();
     out.dNoSigue = !(_ir && _ir.confirming) && alerts.length === 1 && /865E/.test(alerts[0]);
 
+    // H) v29.100: en «Ingreso directo», un código que YA tiene cajas en A guardar avisa y ofrece el camino bueno
+    irVolver();
+    await tipear("502");
+    const bodyTxt = () => document.getElementById("irBody").innerText;
+    out.hAvisa = /A guardar/.test(bodyTxt()) && /dos veces/i.test(bodyTxt());
+    const bMover = document.querySelector("#irBody button[onclick^='irDesdeAGuardar']");
+    out.hBoton = !!bMover;
+    out.hNoFrena = !!btn() && btn().disabled === false;
+    if (bMover) bMover.click(); await wait(10);
+    out.hCambia = !!(_ir && _ir.modo === "nacional" && _ir.origen === "a_guardar" && String(_ir.cod) === "502");
+    out.hRotulos = /Ingreso directo/.test(bodyTxt()) && /Desde A guardar/.test(bodyTxt());
+    irVolver();
+
     // E) en nacional no hay candado (el código sale de la lista de stock real)
     irSetModo("nacional"); irSetOrigen("a_guardar"); irPickCod(encodeURIComponent("502")); irSetSec("AD05"); irSetI(10);
     await wait(10);
@@ -173,6 +186,11 @@ catch (_e) {
   ok(r.cNoEstaEnLaLista, "un código que no coincide con nada ofrece «Cargar igual (código nuevo)»");
   ok(r.cUsarIgual && r.cAvisa, "con «usar igual»: queda como código nuevo y avisa que no existe");
   ok(r.cNoSinConfirmar, "«usar igual»: si dice «no», no carga");
+  ok(r.hAvisa && r.hBoton, "502 con 40 cajas en A guardar: en «Ingreso directo» avisa que se contarían dos veces y ofrece moverlas");
+  ok(r.hNoFrena, "ese aviso NO frena: el botón de revisar sigue habilitado (es decisión del operario)");
+  ok(r.hCambia, "«Moverlas desde A guardar» pasa al otro modo con el código y el origen puestos");
+  ok(r.hRotulos, "los dos modos se llaman «Ingreso directo» y «Desde A guardar» (Luis, 13/10)");
+
   ok(r.cSiConConfirmar, "«usar igual»: si dice «sí», sigue");
   ok(r.dAvisa && r.dNoOfrece, "865ED: el aviso dice que va el 865E y no se ofrece cargarlo");
   ok(r.dBoton && r.dNoSigue, "865ED: bloqueado y avisado");

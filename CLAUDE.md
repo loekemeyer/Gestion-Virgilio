@@ -5428,6 +5428,25 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
 
+## ⚠ REGLA (v29.99): `dead-handlers` mira TODOS los módulos que carga el index, no sólo dos
+
+Un `onclick="fn(...)"` llama a `window.fn`: una función que queda **dentro de una closure** deja el
+botón **muerto** y la página no tira ningún error. `tests/dead-handlers.cjs` cubría `index.html` +
+`importacion.js`; hoy cubre también cobranzas, hotsale, estadisticas, ads, plantel, analisis, ayuda,
+recepcion, planimetria y los dos de talleristas (**1.104 handlers**). **Al sacar un módulo nuevo del
+index, agregarlo a `ARCHIVOS`** — si el archivo no existe, el test falla y lo dice.
+
+Lo que destapó: la v29.92 puso `rolPickerAbrir` y `rolElegir` adentro de la closure donde ya viven
+`gsLoad` / `gsResolver` (que se exponen a mano con `window.x = x`), así que los dos botones del panel
+por rol no hacían nada. **Ese bloque de `index.html` (~63000) NO es top-level**: toda función que se
+llame desde un `onclick` va expuesta.
+
+**Barrido del 13/10, 0 muertos fuera de esos dos:** `monitor/tv.html`, `monitor/admin.html`, el
+selector y Cervantes no usan `onclick="..."` de texto (asignan la función o usan `addEventListener`,
+que no se puede romper por nombre); `admin/` (el espejo de LK) tiene 88 handlers y los 88 resuelven;
+`impocomex/` tiene 49 y los 4 que un escaneo estático marca (`onBlur`, `onBorrar`, `onInput`,
+`repinta`) son **métodos de objeto y callbacks de `IC.on(...)`**, no globales: falsos positivos.
+
 ## ⚠⚠ REGLA (Luis, 2026-10-13, v29.96): EN EL MONITOR SÓLO VAN LOS LEGAJOS QUE SE LOGUEARON
 
 **Luis, textual:** *"se habrá hecho como una prueba para ver visuales desde el admin, no deberían
@@ -5514,6 +5533,39 @@ la apertura la descartó el gate y el cierre salió igual.
 interna y **no tiene candado**: quien la use directo se lo pone él. Hoy son tres llamadores y los
 tres filtran el legajo de prueba. Lo sostiene el bloque **(d)** de `tests/legajo1-confirma.cjs`,
 que lo mide sobre la cola de verdad (verificado que falla sin el guard).
+
+## ⚠ REGLA (Luis, 2026-10-13, v30.02): el UMBRAL DEL INTRADÍA no frena lo que tiene DÍA FORZADO
+
+**Luis:** *"lk 1670, por que no se programo solo?"*. Era un **Retira con día pactado** (16/10) que
+entró 13:31 y seguía sin tanda.
+
+> El intradía (cron 73, cada 5 min) llama al armador **sólo** si lo pendiente de las **zonas
+> automáticas** (1, 2 y 3) llega al umbral, o si hay algo de zona manual con camión a su zona.
+> **Retira, Súper y el resto no suman ahí** (`pendienteAutomatico` de la Edge Function lo dice
+> textual, y el conteo manual exige zona `^Zona N`), así que un pendiente que un pase programa
+> **sí o sí hoy** no llegaba NUNCA al armador: la corrida salía por `intradia_sin_umbral` sin
+> llamarlo y el pedido esperaba el job de las 00:01 — hasta **11 h** parado.
+
+Mismo agujero que la regla v19.52 ya marca para `'^\s*Zona\s*[0-9]+'`: **al tocar el armado,
+preguntarse si ahí no falta Retira.**
+
+| pieza | qué hace |
+|---|---|
+| **`gv_ppp_web_forzado_sin_tanda()`** | los pedidos SIN TANDA que un pase programa hoy sí o sí: **(a4)** Retira con día elegido (`gv_web_retiro_pactado`) · **(b2)** diferido con su piso cumplido · **(a0e)** cliente nuevo aprobado. Lee `lk_pedidos_match` (el FDW ya está en la base): no necesita el feed |
+| cron **156 `gv-ppp-web-forzado`** | minutos 7,17,37,47, anti-solape: si esa función devuelve algo, llama a la Edge Function en modo **diario** (el de las 00:01, que no mira el umbral) y el armador corre. Si no, no hace nada |
+
+- **No hizo falta redeploy** de `gv-ppp-web-tandas-diarias`. Queda además
+  **`gv_ppp_web_pendiente_forzado(text,jsonb)`** —el mismo criterio recibiendo los pendientes por
+  jsonb— **sin llamador**: es la mitad del fix para el día que esa función se re-deploye y el
+  umbral se arregle adentro (sumar su conteo a `npManual`).
+- Sobrar una fila no cuesta nada (decide el armador); faltar una deja el pedido sin programar.
+- Probado: con LK 1670 pendiente la función devolvía 1 fila y la corrida lo programó como
+  **LK 0414, tanda F89A, Retira, 16/10**.
+- Los objetos y el centinela de la base dicen **v29.82** (la versión con que se aplicaron): es la
+  llave, no cambiarla. `sql/gv_ppp_web_forzado_sin_tanda_v3002.sql` (rollback en la cabecera).
+
+**Chequeo:** `select * from public.gv_ppp_web_forzado_sin_tanda();` — lo que el armador tiene que
+tomar sí o sí · `select * from public.gv_reglas_perdidas;`.
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.69): el código SIN GÓNDOLA en el Mapa se lo PREGUNTA AL OPERARIO
 
@@ -9139,6 +9191,48 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
 - Lo sostiene la base: trigger `aa_gv_salida_cervantes_no_racks` → `SC_DESDE_RACKS` (centinela v29.13).
   `sql/gv_salida_cervantes_no_racks_v2913.sql`, `tests/sc-racks-unidad.cjs`.
 
+## ⚠⚠ REGLA (Luis, 2026-10-13, v30.01): los modos de INGRESO A RACKS son «Ingreso directo» y «Desde A guardar»
+
+**Luis:** *"el problema es que no hay una forma clara para mandar mercadería de A guardar a Racks"* ·
+*"Importado y nacional se tiene que renombrar a «Ingreso directo» o «Desde A guardar»"*.
+
+> ## **El modo se llama por lo que HACE, no por el origen de la mercadería.**
+> **📦 Ingreso directo** = entra al depósito ahora, **crea stock nuevo**. · **📥 Desde A guardar** =
+> ya está en el depósito, **lo mueve** (descuenta de A guardar o de Excedente).
+
+| | antes | ahora |
+|---|---|---|
+| botones | 📦 Importación · 🏠 Nacional | **📦 Ingreso directo · 📥 Desde A guardar** |
+| valor interno | `import` / `nacional` | **igual** (lo usan `racks_plani_ingreso` y `racks_plani_ingreso_nacional`): no se toca |
+
+- **Y avisa**: en «Ingreso directo», un código que YA tiene cajas en A guardar (o en Excedente) saca
+  *«⚠ Este código ya tiene N cajas en A guardar. Si son esas mismas cajas, esto NO es un ingreso
+  directo: se contarían dos veces»* con el botón **📥 Moverlas desde A guardar**, que pasa al otro
+  modo con el código y el origen puestos. **No frena**: lo decide el operario (`_irAvisoAGuardar`,
+  `irDesdeAGuardar`; el saldo sale de `_ir.saldos`, que ya se carga al abrir el módulo).
+
+**Lo que costó, el 13/10:** el **934E** (1 master, 12 cajas, Y07, 14:40) y el **606E** (10 cajas,
+X22, 10:00) se cargaron por Importación cuando esas cajas ya estaban en A guardar: racks sumó y
+A guardar quedó igual, o sea **el stock contado dos veces**, y nada avisó — lo vio Luis en Stocks.
+Corregido con un ajuste (`CORR IR 146592538`, A guardar 934E −12 → 0; racks queda en 180, que es lo
+que hay). El movimiento de racks NO se toca: la mercadería está en Y07.
+
+**Cómo se encuentra otro igual** — un IR que no descontó nada y dejó saldo vivo en A guardar:
+
+```sql
+select m.id, m.creado, m.cod_art, m.delta, m.ref, m.legajo
+  from public."Movimientos_Stock" m
+ where m.deposito = 'racks' and m.tipo = 'ingreso' and m.ref like 'ingreso a racks %'
+   and m.creado >= now() - interval '30 days'
+   and exists (select 1 from public."Movimientos_Stock" x
+                where x.deposito = 'a_guardar' and upper(btrim(x.cod_art)) = upper(btrim(m.cod_art))
+                group by 1 having sum(x.delta) > 0)
+ order by m.creado desc;
+```
+
+**Chequeo:** `node tests/ir-codigo-candado.cjs` (bloque **H**: el aviso, que no frena, que el botón
+cambia de modo con el código puesto, y los dos rótulos nuevos; verificado que falla contra la v30.00).
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.67 + v29.77 + v29.78, D2): en INGRESO A RACKS el CÓDIGO SE ELIGE — se sugiere mientras se escribe
 
 **Luis:** *"956E · va a terminar en AB10 · el operario lo puso mal · ponele candado"* y, después del candado:
@@ -9326,6 +9420,41 @@ public.gv_insumo_origenes('plastico');` · `select * from public.gv_insumo_confi
 (el que quedó viejo: exigía JL Matriceria entre los inyectores, y de paso le pegaba a la base de verdad).
 `sql/gv_insumo_origenes_v2982.sql`, centinelas 416-418.
 
+## ⚠ REGLA (Luis, 2026-10-13, v30.00): el SEPARADOR DECIMAL no decide una búsqueda — y un TMP no se da de alta sobre un código que ya existe
+
+**Luis, con los 144 Kg del `TMP-0037`:** *"¿cómo es que se aceptó sin lugar? ¿se permite eso? ¿cómo es que se
+guardó sin código?"*.
+
+> ## **`stkMatchBusq` normaliza el decimal de los DOS lados: buscar `13.6` encuentra `13,6`.**
+> En los flejes la MEDIDA es el nombre, y **39 de 48 tienen decimal** (27 con coma, 12 con punto).
+
+Lo que costó no normalizarlo: el 13/10 09:09 el legajo 104 recibió 144 Kg de un fleje `13.6 x 0.8`, no lo encontró
+en la lista — se llama **`N°19`**, *«13,6 x 0,8 · Fleje N° 19»*, con **coma** — y lo dio de alta como insumo nuevo.
+El servidor lo numeró `TMP-0037` y los 144 Kg quedaron en un código que no existe para nadie. El arreglo sólo
+**agrega** matches (`(\d),(\d)` → `$1.$2`), no saca ninguno, y vale para TODO buscador que use esa función.
+
+**Tres cosas del circuito que la pregunta destapó, y conviene tener a mano:**
+
+1. **La recepción de un insumo NUNCA pregunta el lugar.** Pide categoría → origen → documentación (remito /
+   factura) → el insumo de la lista → cantidad + unidad + **marca** (v29.57). El lugar de un insumo vive en el
+   **Mapa** y lo pone un supervisor; la red es la alarma **`gv_mapa_stock_sin_lugar`** (*"hay N en stock y el insumo
+   no está en ninguna posición del Mapa"*). ⚠ **Al 13/10 esa alarma tiene 19 insumos**, 7 de ellos cajas: existe,
+   pero nadie la mira.
+2. **«Aceptar» es del ADMIN, no de la recepción** (Stock y Compras → Insumos): es el paso que le pone el código real,
+   el nombre y la ubicación inicial. `TMP-0037` **nunca se aceptó**: quedó pendiente desde las 09:09. Y no se podía
+   — `insumo_identificar` **frena** un TMP contra un código en uso (*"una sugerencia del operario no se puede
+   fusionar contra un insumo en uso"*), que es correcto: fusionar dos stocks lo decide una persona, no un botón.
+3. **La puerta ya está cerrada**: la **v29.56** (13/10 09:35, 26 minutos después) sacó el alta de un insumo nuevo
+   por el operario (`insNuevoOpen` arranca con un `alert` y un `return`). `TMP-0037` fue el último que entró por ahí
+   y el único TMP que quedaba vivo. **Lo que sigue abierto no es el código: es el LUGAR** — un código del catálogo
+   de GP2 (`gv_insumo_desde_gp2`) también se recibe sin posición, y queda en esa alarma.
+
+Los 144 Kg se fusionaron en `N°19` con el mecanismo de la casa (se renombra el `cod_art` del movimiento, el TMP
+sale del catálogo y queda en `Insumos_Historial`), **sin tocar la ubicación** (Luis: *"hay que ver dónde está"*).
+⚠ Ojo con el efecto: `N°19` ya tenía R06AT, así que **el Mapa ahora dice R06AT y la alarma se apagó** — si no
+están ahí, lo corrige el conteo, no un aviso. Detalle, verificación y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
+§3.v3000. Lo sostiene `tests/stk-busca-decimal.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.57): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
 
 (los comentarios del código, el `.sql` y la vista dicen **v29.56**: otra sesión se llevó ese número mientras se escribía esto.)
@@ -9348,16 +9477,20 @@ nada (mismo insumo físicamente, mismo lugar físico) pero debería quedar regis
 
 ### ⚠ Y los saldos de insumos en unidad VIEJA (MC) son de antes de la v24.69
 
-`gv_insumo_unidad_base` convierte a la unidad base, pero es **BEFORE INSERT solamente**: las 18 líneas cargadas en
-MC antes de esa versión (546P 10 · H201Part 5 · 439E 1 · 505C 1 · 590E 1; la última del **25/08**) quedaron así, y
+`gv_insumo_unidad_base` convierte a la unidad base, pero es **BEFORE INSERT solamente**: las líneas cargadas en MC
+antes de esa versión quedaron así, y
 `vista_saldos_insumos_x_unidad` **agrupa por unidad** → esos códigos muestran dos saldos (Uni positivo + MC negativo).
 **No es un bug vivo**: `gv_importados_stock_insumos` los convierte con el factor y da el número correcto (505C
-**98.000** · 439E **312** · 590E **0**, `sin_factor` en 0). Los 5 saldos negativos de insumos son exactamente esas
-unidades viejas, todos de categoría `importados`: **cero negativos en las categorías del operario**.
+**98.000** · 439E **312** · 590E **0**, `sin_factor` en 0). Los saldos negativos de insumos son exactamente esas
+unidades viejas, todos de categoría `importados`: **cero negativos en las categorías del operario**. Al 13/10, tras
+el conteo del 546P, son **3**: 439E −5 · 590E −4 · 505C −3, los tres en MC (eran 5 con los dos grupos del 546P).
 
-⚠⚠ **NO se normalizan: quedan así** (Luis, 13/10, D9: *"dejalo"*). El UPDATE que las reexpresaría está escrito en
+⚠⚠ **NO se normalizan: quedan así** (Luis, 13/10, D9: *"dejalo"*). **Hoy son 10 filas en 5 códigos**, medido el
+13/10 después del conteo del 546P: `H201Part` 5 (saldo 0) · **`N°7` 2 (saldo 0, que la lista vieja de «18» se
+olvidaba)** · `439E` 1 (−5) · `505C` 1 (−3) · `590E` 1 (−4), la última del **25/08**. Las 10 de `546P` salieron de
+acá con su conteo (arriba). Las que molestan —el código que muestra dos saldos— son **3**, las de saldo ≠ 0. El UPDATE que las reexpresaría está escrito en
 `sql/gv_insumo_marca_empresa_v2956.sql` y **no se aplicó**: es cosmético (que cada código muestre un solo número) y
-no cambia ninguna cuenta, así que no vale pisar 18 filas de `Movimientos_Stock`. **No volver a proponerlo.** Y si
+no cambia ninguna cuenta, así que no vale pisar esas filas de `Movimientos_Stock`. **No volver a proponerlo.** Y si
 alguien lo intenta: un INSERT compensatorio NO sirve — la línea nueva con unidad `MC` la convierte el trigger y el
 saldo MC sigue ahí; el único camino es el UPDATE de las filas viejas, que no dispara ese trigger.
 
@@ -9367,9 +9500,12 @@ marca**; lo único que queda es **a quién se le dio** (`ref`: Cervantes 42 · R
 destino del 30/06 al 07/08, de antes de que el campo fuera obligatorio). O sea el circuito es **asimétrico a
 propósito**: la entrada dice de qué empresa vino y la salida no dice para cuál se usó. **No proponer pedir la marca
 al entregar ni «cerrar el círculo» por empresa.**
-⚠ **Las 45 «Cajas» de 546P no se tocan** (Luis, 13/10, D8: *"dejalo"*): esa unidad no tiene factor en
-`Insumos_Factores` y no se inventa. Y 546P no está mapeado a ningún importado, así que su stock hoy no lo lee
-ninguna pantalla de compra.
+⚠⚠ **RETIRADA la D8 («las 45 Cajas de 546P no se tocan»): el 546P SE CONTÓ EN EL DEPÓSITO y se unificó**
+(Luis, 13/10, mismo día y después de la D8: *"fui yo. está ok, se hizo el conteo en el depo"*). A las 13:59 pasó a
+**una sola unidad, `Uni`** —sus grupos «Cajas» (−45) y «MC» (−60) se reexpresaron, refs `unificación: pasa 222 MC a
+Uni (bruto 1:1)` y `fix_recatalog_bastidor`— más el ajuste del conteo (`CONTEO 546P X13`, −8.640): **30.528 → 6.768
+Uni**. **No se perdió ningún movimiento**: las líneas se reexpresaron, no se borraron. Hoy el 546P tiene **0 filas en
+«Cajas» y 0 en «MC»**. Lo que vale es esto, no la D8.
 
 ## ⚠ REGLA (v29.24, 09/10): el REPLAY de Terminar Día no re-manda los items SÓLO de Historial (`h_*`)
 
@@ -9923,3 +10059,37 @@ vuelve a nacer muerto). ⚠ Ese barrido lleva un guard de *"¿encontré al menos
 
 **Barrido del 13/10 sobre toda la IIFE** (funciones declaradas ahí y usadas en un handler
 inline sin exponer): **0 casos más**. El panel por rol era el único.
+
+### ⚠ v29.98 (Luis, 13/10): el panel por rol es UNA LÍNEA con BADGE — el checklist se despliega
+
+**Luis, con la captura:** *"esa visual es horrible … ajusta eso en un menu colapsable con un
+badge. que el arreglo sea general y no solo para luis"*.
+
+El panel se dibujaba abierto: ~560 px de alto empujando el panel de administración entero, con
+«Hola, Luis» partido en dos renglones, el veredicto en prosa y un «cambiar» de una pantalla de
+ancho. Es la regla de espacio del 28/09 y el punto 4 de GV-UI (*lo explicativo se pliega; ningún
+bloque largo se dibuja abierto*).
+
+| | |
+|---|---|
+| plegado (lo que se ve al entrar) | **44 px**: `▶ Luis · Administración general` + badge + `cambiar` |
+| badge | **`3 para mirar`** (rojo) · **`✓ al día`** (verde) · **`sin contadores`** (gris). El color NUNCA va solo: lleva palabra (GV-UI 5) |
+| desplegado | el checklist de siempre, 474 px |
+| abierto/cerrado | `localStorage gv_rol_abierto`, por dispositivo. **Arranca plegado**: el dato es el badge |
+
+⚠ **Vale para los CINCO roles y las tres áreas**, que es lo que pidió Luis: es el mismo render
+(`rolPanelRender`), no hay nada propio de Luis. Lo mide el test sobre los 5.
+
+⚠ **El `button{width:100%;padding:16px;font-size:22px}` global de la línea 26 también muerde acá**
+(mismo pozo que el pop-up de Importados, v23.93): sin `#rolPanel button{width:auto}` el «cambiar»
+sale de una pantalla de ancho. Y el reset se lleva puesto el ancho de la BARRA y de las FILAS, así
+que las dos vuelven con `#rolPanel .rolp-bar, #rolPanel .rolp-row{width:100%}`.
+
+⚠ **«cambiar» vive DENTRO de la barra que despliega**: se le pasa el evento
+(`rolPickerAbrir(event)`, que corta la propagación). **No se escribe `event.stopPropagation()` en
+el `onclick`**: ahí el identificador que se llama es un método, y el barrido genérico del test
+—que exige que todo `onclick` resuelva contra `window`— lo marcaría como función faltante.
+
+**Chequeo:** `node tests/rol-panel-click.cjs` — mide, con la pantalla corriendo y para los 5
+roles, que arranque plegado en una línea, que el badge lleve palabra, que «cambiar» sea angosto y
+que tocar la barra despliegue el checklist.

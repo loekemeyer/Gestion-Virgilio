@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=29.97">
+<link rel="stylesheet" href="gv-ui.css?v=30.02">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6422,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.97"></script>
+<script type="module" src="recepcion.js?v=30.02"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6541,20 +6541,37 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <h1 class="sup-title">Administración</h1>
     <!-- v29.85 (Thomas, 13/10): panel por ROL. Según quién sos (área), checklist de qué mirar. -->
     <style>
-      #rolPanel{max-width:560px;margin:4px auto 16px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px 14px;box-shadow:0 6px 18px rgba(15,23,42,.06);}
-      .rolp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
-      .rolp-hola{display:block;font-size:17px;font-weight:800;color:#0f172a;line-height:1.1;}
-      .rolp-area{display:block;font-size:11.5px;font-weight:600;color:#475569;margin-top:2px;}
+      /* v29.97 (Luis, 13/10: *"esa visual es horrible … ajusta eso en un menu colapsable
+         con un badge. que el arreglo sea general y no solo para luis"*): el panel por rol es
+         UNA LÍNEA con su badge; el checklist se despliega. Regla de espacio del 28/09 y
+         GV-UI (v29.83): lo explicativo se pliega y nada largo se dibuja abierto.
+         ⚠ El `button{width:100%;padding:16px;font-size:22px}` global de la línea 26 también
+         muerde acá: sin el reset, «cambiar» salía de una pantalla de ancho. */
+      #rolPanel{max-width:620px;margin:4px auto 12px;}
+      #rolPanel button{width:auto;margin:0;font-size:inherit;}
+      #rolPanel .rolp-bar, #rolPanel .rolp-row{width:100%;}   /* el reset de arriba les comía el ancho */
+      .rolp-bar{display:flex;align-items:center;gap:10px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:8px 12px;min-height:44px;cursor:pointer;text-align:left;box-shadow:0 2px 8px rgba(15,23,42,.05);}
+      .rolp-bar:hover{background:#f8fafc;}
+      .rolp-car{flex:0 0 auto;font-size:12px;color:#64748b;width:12px;transition:transform .12s;}
+      #rolPanel.abierto .rolp-car{transform:rotate(90deg);}
+      .rolp-quien{flex:1 1 auto;font-size:14px;font-weight:800;color:#0f172a;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .rolp-area{font-weight:600;color:#64748b;font-size:11.5px;}
+      .rolp-badge{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:800;line-height:1.3;}
+      .rolp-b-rojo{background:#fee2e2;color:#991b1b;}
+      .rolp-b-verde{background:#dcfce7;color:#166534;}
+      .rolp-b-gris{background:#f1f5f9;color:#475569;}
       .rolp-cambiar{flex:0 0 auto;background:transparent;border:1px solid #cbd5e1;border-radius:8px;color:#475569;font-size:11.5px;font-weight:700;padding:4px 10px;cursor:pointer;}
-      .rolp-vered{font-size:12.5px;color:#334155;margin:8px 0 6px;font-weight:600;}
+      .rolp-body{display:none;background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;margin:-6px 0 0;padding:10px 12px 10px;}
+      #rolPanel.abierto .rolp-body{display:block;}
+      #rolPanel.abierto .rolp-bar{border-radius:12px 12px 0 0;}
       .rolp-list{display:flex;flex-direction:column;gap:4px;}
-      .rolp-row{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:9px 11px;cursor:pointer;min-height:44px;}
+      .rolp-row{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:8px 11px;cursor:pointer;min-height:44px;}
       .rolp-row:hover{background:#eff6ff;}
       .rolp-dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;}
       .rolp-lbl{flex:1 1 auto;font-size:13.5px;font-weight:700;color:#0f172a;line-height:1.2;}
       .rolp-hint{display:block;font-size:11px;font-weight:500;color:#64748b;margin-top:1px;}
       .rolp-sub{font-size:11px;font-weight:600;color:#92400e;}
-      .rolp-num{flex:0 0 auto;font-size:18px;font-weight:800;min-width:26px;text-align:right;font-variant-numeric:tabular-nums;}
+      .rolp-num{flex:0 0 auto;font-size:17px;font-weight:800;min-width:26px;text-align:right;font-variant-numeric:tabular-nums;}
     </style>
     <div id="rolPanel" style="display:none;"></div>
     <div id="cgAside" style="display:none;"></div>
@@ -10756,7 +10773,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.97";
+const APP_VERSION = "v30.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16875,8 +16892,14 @@ function codEmpiezaCon(cod, term) {
 function stkMatchBusq(term, cod, libre, numLibre) {
   var t = String(term == null ? "" : term).trim().toLowerCase();
   if (!t) return true;
-  if (/^\d/.test(t)) return codEmpiezaCon(cod, t) || (numLibre ? String(libre || "").toLowerCase().indexOf(t) >= 0 : false);
-  return String(libre || "").toLowerCase().indexOf(t) >= 0 || codEmpiezaCon(cod, t);
+  // v30.00: el SEPARADOR DECIMAL no decide un match. En los flejes la MEDIDA es el nombre
+  // ("13,6 x 0,8 · Fleje N° 19") y el operario escribe "13.6": buscar con punto no
+  // encontraba la coma, así que el 13/10 dio de alta un TMP de un fleje que YA existía
+  // (N°19, 144 Kg al código equivocado). Se normalizan los dos lados: sólo AGREGA matches.
+  var _dec = function (x) { return String(x == null ? "" : x).toLowerCase().replace(/(\d),(\d)/g, "$1.$2"); };
+  var tl = _dec(t), lib = _dec(libre);
+  if (/^\d/.test(t)) return codEmpiezaCon(cod, t) || (numLibre ? lib.indexOf(tl) >= 0 : false);
+  return lib.indexOf(tl) >= 0 || codEmpiezaCon(cod, t);
 }
 async function loadCodCanon() {
   if (_codCanon) return _codCanon;
@@ -30760,13 +30783,16 @@ function irRender() {
   const codMal = !nac && _irChkMal(chk);
   const origTxt = _ir.origen === "excedente" ? "excedente" : "a guardar";
   const disp = nac ? _irDisp(_ir.cod, _ir.origen) : 0;
-  // v6.28: toggle Importación (stock nuevo) / Nacional (mover stock existente a racks)
+  /* v6.28: dos modos. v29.100 (Luis, 13/10: «no hay una forma clara para mandar mercadería de A
+     guardar a Racks … Importado y nacional se tiene que renombrar a "Ingreso directo" o "Desde A
+     guardar"»): los botones se llaman por lo que HACEN, no por el origen de la mercadería. Los
+     valores internos (import/nacional) NO cambian: los usan racks_plani_ingreso y _nacional. */
   let h = '<div class="ir-fld"><div class="ir-seg">'
-    + '<button class="ir-segb' + (!nac ? " on" : "") + '" onclick="irSetModo(\'import\')">📦 Importación</button>'
-    + '<button class="ir-segb' + (nac ? " on" : "") + '" onclick="irSetModo(\'nacional\')">🏠 Nacional</button>'
+    + '<button class="ir-segb' + (!nac ? " on" : "") + '" onclick="irSetModo(\'import\')">📦 Ingreso directo</button>'
+    + '<button class="ir-segb' + (nac ? " on" : "") + '" onclick="irSetModo(\'nacional\')">📥 Desde A guardar</button>'
     + '</div></div>';
   if (nac) {
-    h += '<div class="ir-hint">Mové a racks stock que <b>YA tenés</b> (no crea stock nuevo): elegí <b>origen</b>, <b>código</b> con stock, <b>cajas</b> y el <b>sector</b>. Descuenta del origen y ocupa la celda.</div>';
+    h += '<div class="ir-hint"><b>Mercadería que ya está en el depósito</b> y la ponés en un rack. Mové a racks stock que <b>YA tenés</b> (no crea stock nuevo): elegí <b>origen</b>, <b>código</b> con stock, <b>cajas</b> y el <b>sector</b>. Descuenta del origen y ocupa la celda.</div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Origen del stock</div><div class="ir-seg">'
       + '<button class="ir-segb' + (_ir.origen === "a_guardar" ? " on" : "") + '" onclick="irSetOrigen(\'a_guardar\')">A guardar</button>'
       + '<button class="ir-segb' + (_ir.origen === "excedente" ? " on" : "") + '" onclick="irSetOrigen(\'excedente\')">Excedente</button>'
@@ -30777,11 +30803,12 @@ function irRender() {
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas a mover' + (_ir.cod ? ' (máx ' + Math.round(disp) + ')' : '') + '</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div>';
     if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(codCanonSuf(_ir.cod)) + ' en ' + origTxt + '.</div>';
   } else {
-    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: elegí el <b>código</b> de la lista (escribí el código o el nombre y te lo sugiero), cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
+    h += '<div class="ir-hint"><b>Mercadería que entra al depósito ahora</b> (crea stock nuevo). Si las cajas YA están en <b>A guardar</b>, usá «📥 Desde A guardar» o las contás dos veces. Cargá lo que llegó, <b>un palet por vez</b>: elegí el <b>código</b> de la lista (escribí el código o el nombre y te lo sugiero), cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
     // v29.77: el campo BUSCA entre los códigos que existen; el código se elige de la lista (o se escribe entero)
     h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="🔎 código o nombre (ej. 956E)" value="' + escapeHtml(_ir.codPick || "") + '" oninput="irSetPick(this.value)"></div>';
     if (_ir.cod) h += '<div class="ir-desc">Elegido: <b>' + escapeHtml(codBase(_ir.cod)) + '</b> ' + escapeHtml(nombre || (_ir.codNuevo ? "(código nuevo, sin nombre)" : "")) + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
     if (chk) h += _irChkWarn(chk);
+    h += _irAvisoAGuardar();   // v29.100: si esas cajas YA están en A guardar, no es un ingreso directo
     h += _irListaImp();
     h += '<div class="ir-row2"><div class="ir-fld"><div class="ir-lbl">Masters</div><div class="ir-stp"><button class="ir-sb" onclick="irChgM(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.masters) || 0) + '" oninput="irSetM(this.value)"><button class="ir-sb" onclick="irChgM(1)">+</button></div></div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas (inner)</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div></div>';
@@ -30906,6 +30933,47 @@ async function irPartir(n) {
 function irSetSec(v) { if (!_ir) return; _ir.sector = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9-]/g, ""); irRender(); }   // v29.78: el guión de la parte (Y25-2)
 function irSetEmp(e) { if (!_ir) return; _ir.emp = (e === "CH") ? "CH" : "LK"; irRender(); }
 /* v6.28 — Ingreso a racks NACIONAL: mover stock existente (a_guardar/excedente) a racks. */
+/* v29.100 (Luis, 13/10) — EL ERROR QUE ESTO VIENE A EVITAR: el 13/10 el 934E (1 master, 12 cajas)
+   y el 606E (10) entraron por «Ingreso directo» cuando esas cajas ya estaban en A guardar, así que
+   el stock quedó contado DOS veces (A guardar 12 + racks 12) y nadie se enteró hasta que Luis lo vio
+   en Stocks. El aviso no frena: ofrece el camino correcto con un toque. */
+function _irSaldoAGuardar(cod) {
+  if (!_ir || !_ir.saldos || !cod) return null;
+  const k = _ocgNorm(cod);
+  let ag = 0, ex = 0, hit = false;
+  Object.keys(_ir.saldos).forEach(function (key) {
+    if (_ocgNorm(String(key).replace(/\s+(LK|CH)$/i, "")) !== k) return;
+    const e = _ir.saldos[key] || {};
+    ag += Number(e.a_guardar) || 0; ex += Number(e.excedente) || 0; hit = true;
+  });
+  if (!hit) return null;
+  return { a_guardar: Math.max(0, ag), excedente: Math.max(0, ex) };
+}
+function _irAvisoAGuardar() {
+  if (!_ir || _ir.modo === "nacional" || !_ir.cod) return "";
+  const s = _irSaldoAGuardar(_ir.cod); if (!s) return "";
+  const ag = Math.round(s.a_guardar), ex = Math.round(s.excedente);
+  if (ag < 1 && ex < 1) return "";
+  const org = ag >= 1 ? "a_guardar" : "excedente";
+  const txt = ag >= 1 ? ag + " caja" + (ag === 1 ? "" : "s") + " en <b>A guardar</b>"
+                      : ex + " caja" + (ex === 1 ? "" : "s") + " en <b>Excedente</b>";
+  return '<div class="ir-warn">⚠ Este código ya tiene ' + txt + '.<br>'
+    + 'Si <b>son esas mismas cajas</b>, esto NO es un ingreso directo: se contarían dos veces.'
+    + '<button class="ir-chip on" style="display:block;margin-top:8px" onclick="irDesdeAGuardar()">📥 Moverlas desde ' + (org === "excedente" ? "Excedente" : "A guardar") + '</button></div>';
+}
+function irDesdeAGuardar() {
+  if (!_ir) return;
+  const cod = _ir.cod, s = _irSaldoAGuardar(cod);
+  const org = (s && Math.round(s.a_guardar) >= 1) ? "a_guardar" : "excedente";
+  const sec = _ir.sector;
+  irSetModo("nacional"); _ir.origen = org; _ir.sector = sec;
+  const k = _ocgNorm(cod);
+  const key = Object.keys(_ir.saldos || {}).filter(function (x) {
+    return _ocgNorm(String(x).replace(/\s+(LK|CH)$/i, "")) === k && (Number((_ir.saldos[x] || {})[org]) || 0) > 0;
+  })[0];
+  if (key) { _ir.cod = key; _ir.codPick = key; }
+  irRender();
+}
 function _irDisp(cod, origen) { if (!_ir || !_ir.saldos || !cod) return 0; const e = _ir.saldos[String(cod)]; if (!e) return 0; return Math.max(0, Number(e[origen === "excedente" ? "excedente" : "a_guardar"]) || 0); }
 function irSetModo(m) { if (!_ir) return; _ir.modo = (m === "nacional" ? "nacional" : "import"); _ir.cod = ""; _ir.codPick = ""; _ir.codNuevo = false; _ir.masters = 0; _ir.inner = 0; _ir.chk = null; irRender(); }
 function irSetOrigen(o) { if (!_ir) return; _ir.origen = (o === "excedente" ? "excedente" : "a_guardar"); _ir.cod = ""; _ir.inner = 0; irRender(); }
@@ -63283,7 +63351,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.97"></script>
+<script src="importacion.js?v=30.02"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63687,7 +63755,10 @@ function rolPanelInit() {
   rolPanelRender(k);
 }
 
-function rolPickerAbrir() {
+function rolPickerAbrir(ev) {
+  /* v29.97: «cambiar» vive DENTRO de la barra que despliega: sin cortar la propagación,
+     tocarlo abriría el cuadro y de paso plegaría el panel. */
+  try { if (ev && ev.stopPropagation) ev.stopPropagation(); } catch (_e) {}
   var ov = document.getElementById("rolPickerOv");
   if (!ov) {
     ov = document.createElement("div"); ov.id = "rolPickerOv";
@@ -63702,7 +63773,7 @@ function rolPickerAbrir() {
   ov.style.display = "flex";
 }
 function rolElegir(k) { _rolSet(k); var ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none"; rolPanelRender(k); }
-/* v29.96: este bloque vive dentro de una CLOSURE (como gsLoad/gsResolver), asi que una funcion
+/* v29.97: este bloque vive dentro de una CLOSURE (como gsLoad/gsResolver), asi que una funcion
    llamada desde un onclick hay que exponerla o el boton queda MUERTO (tests/dead-handlers.cjs). */
 window.rolPickerAbrir = rolPickerAbrir; window.rolElegir = rolElegir;
 
@@ -63713,24 +63784,38 @@ window.rolPickerAbrir = rolPickerAbrir; window.rolElegir = rolElegir;
 window.rolElegir = rolElegir;
 window.rolPickerAbrir = rolPickerAbrir;
 window.GV_ROL_ITEMS = GV_ROL_ITEMS;
+window.rolPanelToggle = rolPanelToggle;
 
 function rolPanelRender(k) {
   var cont = document.getElementById("rolPanel"); if (!cont) return;
   var r = GV_SUP_ROLES[k]; if (!r) { rolPickerAbrir(); return; }
   window.__gvRol = r.area;
   cont.style.display = "block";
+  cont.className = _rolAbierto() ? "abierto" : "";
   cont.innerHTML =
-    '<div class="rolp-head"><div><span class="rolp-hola">Hola, ' + r.nombre + '</span><span class="rolp-area">' + GV_AREA_NOMBRE[r.area] + '</span></div>' +
-    '<button class="rolp-cambiar" onclick="rolPickerAbrir()">cambiar</button></div>' +
-    '<div class="rolp-vered" id="rolpVered">Cargando…</div>' +
-    '<div class="rolp-list" id="rolpList"></div>';
+    '<button class="rolp-bar" onclick="rolPanelToggle()">' +
+      '<span class="rolp-car">\u25B6</span>' +
+      '<span class="rolp-quien">' + r.nombre + ' <span class="rolp-area">\u00B7 ' + GV_AREA_NOMBRE[r.area] + '</span></span>' +
+      '<span class="rolp-badge rolp-b-gris" id="rolpBadge">\u2026</span>' +
+      '<span class="rolp-cambiar" onclick="rolPickerAbrir(event)">cambiar</span>' +
+    '</button>' +
+    '<div class="rolp-body"><div class="rolp-list" id="rolpList"></div></div>';
   rolPanelCargar();
+}
+
+/* v29.97: abierto/cerrado por dispositivo. Arranca CERRADO: el dato es el badge. */
+function _rolAbierto() { try { return localStorage.getItem("gv_rol_abierto") === "1"; } catch (_e) { return false; } }
+function rolPanelToggle() {
+  var cont = document.getElementById("rolPanel"); if (!cont) return;
+  var ab = !cont.classList.contains("abierto");
+  cont.className = ab ? "abierto" : "";
+  try { localStorage.setItem("gv_rol_abierto", ab ? "1" : "0"); } catch (_e) {}
 }
 
 function rolPanelCargar() {
   var area = window.__gvRol || "admin";
   var items = GV_ROL_ITEMS.filter(function (it) { return it.areas.indexOf(area) >= 0; });
-  var listEl = document.getElementById("rolpList"); var verEl = document.getElementById("rolpVered");
+  var listEl = document.getElementById("rolpList"); var bgEl = document.getElementById("rolpBadge");
   function paint(data) {
     if (!listEl) return;
     var alerts = 0;
@@ -63739,18 +63824,19 @@ function rolPanelCargar() {
       var n = data ? (it.cnt(data) || 0) : null;
       if (n > 0) alerts++;
       var dot = (n === null) ? "#94a3b8" : (n > 0 ? "#dc2626" : "#16a34a");
-      var num = (n === null) ? "—" : (n > 0 ? String(n) : "✓");
+      var num = (n === null) ? "\u2014" : (n > 0 ? String(n) : "\u2713");
       var tall = (it.tall && data) ? it.tall(data) : 0;
-      var extra = (it.id === "ads" && tall > 0) ? ' · <span class="rolp-sub">' + tall + ' talleristas flojos</span>' : '';
+      var extra = (it.id === "ads" && tall > 0) ? ' \u00B7 <span class="rolp-sub">' + tall + ' talleristas flojos</span>' : '';
       return '<button class="rolp-row" onclick="GV_ROL_ITEMS[' + idx + '].open()">' +
         '<span class="rolp-dot" style="background:' + dot + '"></span>' +
         '<span class="rolp-lbl">' + it.label + extra + '<span class="rolp-hint">' + it.hint + '</span></span>' +
         '<span class="rolp-num" style="color:' + dot + '">' + num + '</span></button>';
     }).join("");
-    if (verEl) {
-      if (data === null) verEl.innerHTML = '<span style="color:#92400e">No pude leer los contadores · tocá un ítem igual</span>';
-      else if (alerts === 0) verEl.innerHTML = '<span style="color:#166534">✓ Nada pendiente en tu área</span>';
-      else verEl.innerHTML = '<b>' + alerts + '</b> cosa' + (alerts === 1 ? '' : 's') + ' para mirar';
+    /* el BADGE es el dato de la barra: el color NUNCA va solo (GV-UI 5), lleva palabra. */
+    if (bgEl) {
+      if (data === null) { bgEl.className = "rolp-badge rolp-b-gris"; bgEl.textContent = "sin contadores"; bgEl.title = "No se pudieron leer los contadores \u00B7 tocá un ítem igual"; }
+      else if (alerts === 0) { bgEl.className = "rolp-badge rolp-b-verde"; bgEl.textContent = "\u2713 al día"; bgEl.title = "Nada pendiente en tu área"; }
+      else { bgEl.className = "rolp-badge rolp-b-rojo"; bgEl.textContent = alerts + (alerts === 1 ? " para mirar" : " para mirar"); bgEl.title = "Tocá para ver el detalle"; }
     }
   }
   paint(null);
@@ -66411,15 +66497,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.97"></script>
-<script src="hotsale.js?v=29.97"></script>
-<script src="estadisticas.js?v=29.97"></script>
-<script src="ads.js?v=29.97"></script>
-<script src="plantel.js?v=29.97"></script>
+<script src="cobranzas.js?v=30.02"></script>
+<script src="hotsale.js?v=30.02"></script>
+<script src="estadisticas.js?v=30.02"></script>
+<script src="ads.js?v=30.02"></script>
+<script src="plantel.js?v=30.02"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.97"></script>
+<script src="analisis.js?v=30.02"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.97"></script>
+<script src="ayuda.js?v=30.02"></script>
 
 </body>
 </html>
