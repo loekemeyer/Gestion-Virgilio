@@ -26,8 +26,8 @@
    APP_VERSION. Candado: tests/analisis-productivo.cjs.
    ============================================================================ */
 
-var _an = { dias: 14, q: "", lista: null, err: "", cargando: false,
-            tanda: null, det: null, detErr: "", detCargando: false, legajo: null };
+var _an = { dias: 14, q: "", lista: null, err: "", cargando: false, filtro: "todas",
+            tanda: null, det: null, detErr: "", detCargando: false, legajo: null, marcas: {} };
 
 function _anEsc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -112,6 +112,15 @@ function _anCss() {
     "#anOv td.t{text-align:left;max-width:170px;overflow:hidden;text-overflow:ellipsis;}",
     "#anOv tr.mala td{background:#fef2f2;}",
     "#anOv .nota{font-size:12.5px;color:#64748b;margin:6px 0;line-height:1.35;}",
+    "#anOv .an-bar .an-sep{width:10px;}",
+    "#anOv .mk{display:inline-block;border-radius:11px;padding:1px 8px;font-size:12px;font-weight:800;margin-right:5px;}",
+    "#anOv .mk-a{background:#fee2e2;color:#991b1b;} #anOv .mk-r{background:#dcfce7;color:#166534;}",
+    "#anOv .an-mk{display:flex;align-items:center;gap:7px;flex-wrap:wrap;background:#fff;border:1px solid #e2e8f0;border-radius:11px;padding:7px 10px;margin-bottom:8px;}",
+    "#anOv .an-mk-t{flex:1;font-size:13.5px;color:#334155;font-weight:700;min-width:150px;}",
+    "#anOv .an-mk-b{font-size:13px;padding:5px 11px;}",
+    "#anOv .an-mk-b.a{background:#fef2f2;border-color:#fca5a5;color:#991b1b;}",
+    "#anOv .an-mk-b.r{background:#f0fdf4;border-color:#86efac;color:#166534;}",
+    "#anOv .an-concl{background:#ecfeff;border:1px solid #a5f3fc;border-radius:11px;padding:9px 12px;margin-bottom:9px;font-size:15px;line-height:1.35;color:#155e75;font-weight:600;}",
     "#anOv .msg{text-align:center;padding:26px;color:#64748b;}",
     "#anOv .err{text-align:center;padding:16px;color:#b91c1c;font-weight:700;}"
   ].join("\n");
@@ -147,6 +156,28 @@ function _anCargar() {
     } else _an.lista = r.data;
     _an.cargando = false; _anRender();
   });
+  // Las marcas van en su propia lectura: si falla, la lista se ve igual (sin los banderines).
+  _anRpc("gv_analisis_marcas", { p_dias: _an.dias, p_legajo: _an.legajo }).then(function (r) {
+    if (r && !r.error && r.data && typeof r.data === "object") { _an.marcas = r.data; _anRender(); }
+  });
+}
+function anFiltro(f) { _an.filtro = f; _anRender(); }
+function anMarcar(estado) {
+  if (!_an.tanda) return;
+  var nota = null;
+  if (estado === "anomala" || estado === "revisada") {
+    nota = prompt(estado === "anomala"
+      ? "¿Qué tiene de raro esta tanda? (queda anotado; se puede dejar vacío)"
+      : "¿Alguna nota? (se puede dejar vacío)", (_an.marcas[_an.tanda] || {}).nota || "");
+    if (nota === null) return;
+  }
+  _anRpc("gv_analisis_marcar", { p_tanda: _an.tanda, p_estado: estado, p_nota: nota, p_legajo: _an.legajo })
+    .then(function (r) {
+      if (r && r.error) { alert("No se pudo marcar: " + (r.error.message || r.error)); return; }
+      if (estado === "sin") delete _an.marcas[_an.tanda];
+      else _an.marcas[_an.tanda] = { estado: estado, nota: nota, por: _an.legajo || "", at: new Date().toISOString() };
+      _anRender();
+    });
 }
 
 function anAbrir(tanda) {
@@ -166,8 +197,10 @@ function _anRender() {
           '<span class="sp"></span><button onclick="anCerrar()">✕ Cerrar</button></div>';
   if (!_an.tanda) {
     var c = function (n, t) { return '<span class="chip' + (_an.dias === n ? ' on' : '') + '" onclick="anDias(' + n + ')">' + t + '</span>'; };
+    var f = function (k, t) { return '<span class="chip' + (_an.filtro === k ? ' on' : '') + '" onclick="anFiltro(\'' + k + '\')">' + t + '</span>'; };
     h += '<div class="an-bar">' + c(7, "7 días") + c(14, "14 días") + c(30, "30 días") + c(60, "60 días") +
-         '<input id="anQ" placeholder="Buscar tanda…" value="' + _anEsc(_an.q) + '" oninput="anBuscar(this.value)" style="width:150px">' +
+         '<span class="an-sep"></span>' + f("todas", "Todas") + f("avisos", "Con avisos") + f("marcadas", "🚩 Marcadas") +
+         '<input id="anQ" placeholder="Buscar tanda…" value="' + _anEsc(_an.q) + '" oninput="anBuscar(this.value)" style="width:120px">' +
          '<button onclick="_anCargar()">Actualizar</button></div>';
   }
   h += '<div class="an-body"><div class="an-wrap">' + (_an.tanda ? _anDetalleHtml() : _anListaHtml()) + '</div></div>';
@@ -177,15 +210,22 @@ function _anRender() {
 function _anListaHtml() {
   if (_an.err) return '<div class="err">' + _anEsc(_an.err) + '</div>';
   if (_an.cargando || !_an.lista) return '<div class="msg">Calculando…</div>';
-  var t = (_an.lista.tandas || []).filter(function (x) { return !_an.q || String(x.tanda).indexOf(_an.q) >= 0; });
-  if (!t.length) return '<div class="msg">No hay tandas con picking o armado terminado en el período.</div>';
+  var t = (_an.lista.tandas || []).filter(function (x) {
+    if (_an.q && String(x.tanda).indexOf(_an.q) < 0) return false;
+    if (_an.filtro === "avisos") return (Number(x.alerta) || 0) > 0;
+    if (_an.filtro === "marcadas") return !!_an.marcas[x.tanda];
+    return true;
+  });
+  if (!t.length) return '<div class="msg">' + (_an.filtro === "marcadas" ? "Ninguna tanda marcada en el período."
+    : _an.filtro === "avisos" ? "Ninguna tanda con avisos en el período."
+    : "No hay tandas con picking o armado terminado en el período.") + '</div>';
   var h = '';
   t.forEach(function (x) {
     var al = Number(x.alerta) || 0;
     h += '<div class="an-t" onclick="anAbrir(\'' + _anEsc(x.tanda) + '\')">' +
       '<div class="h"><span class="cod">' + _anEsc(x.tanda) + '</span>' +
       '<span class="d">' + _anDia(x.dia) + ' · ' + _anN(x.m3, 3) + ' m³</span>' +
-      '<span class="f">' + (al ? '<span class="al">⚠ ' + al + '</span>' : '') + '</span></div>';
+      '<span class="f">' + _anMarcaChip(x.tanda) + (al ? '<span class="al">⚠ ' + al + '</span>' : '') + '</span></div>';
     if (x.pick) h += '<div class="l">🛒 <b>' + _anEsc(x.pick.nombre || x.pick.legajo) + '</b> · ' +
       '<b style="color:' + _anCol(x.pick.indice) + '">' + _anPct(x.pick.indice) + '</b> · ' +
       _anEsc(x.pick.nivel || "") + ' · ' + _anMin(x.pick.real_min) + ' de ' + _anMin(x.pick.esperado_min) + '</div>';
@@ -197,6 +237,38 @@ function _anListaHtml() {
   return h + '<div class="nota"><b>Rendimiento</b> = lo que tendría que haber tardado por su dificultad ÷ lo que tardó de verdad. ' +
     '100 % o más = llegó al ritmo. El ⚠ cuenta los avisos fuertes: un código que el picking dio completo y el armado ' +
     'declaró faltante, y los códigos confirmados sin tiempo de verdad frente a la góndola.</div>';
+}
+
+function _anMarcaChip(tanda) {
+  var m = _an.marcas[tanda]; if (!m) return "";
+  return m.estado === "anomala"
+    ? '<span class="mk mk-a" title="' + _anEsc(m.nota || "") + '">🚩 anómala</span>'
+    : '<span class="mk mk-r" title="' + _anEsc(m.nota || "") + '">✓ revisada</span>';
+}
+
+/* La CONCLUSIÓN en una frase: lo primero que se lee, antes de los números.
+   Se arma con lo que ya devolvió la base; no hay una segunda cuenta acá. */
+function _anConclusion(d) {
+  var p = d.picking, a = d.armado, av = d.avisos || [], out = [];
+  var altas = av.filter(function (x) { return x.sev === "alta"; }).length;
+  if (p) {
+    var i = Number(p.indice), pct = isFinite(i) && i > 0 ? Math.round(100 / i) : null;
+    out.push("El picking lo hizo " + _anEsc(p.nombre || p.legajo) + " en " + _anMin(p.real_min) +
+      (pct != null ? (pct > 110 ? ", un " + (pct - 100) + " % MÁS de lo esperado"
+                    : pct < 90 ? ", un " + (100 - pct) + " % MENOS de lo esperado"
+                    : ", prácticamente lo esperado") : "") +
+      " para una tanda de dificultad " + _anEsc(String(p.nivel || "").toLowerCase()) + ".");
+  }
+  if (a) {
+    var j = Number(a.indice), pj = isFinite(j) && j > 0 ? Math.round(100 / j) : null;
+    out.push("El armado lo hizo " + _anEsc(a.nombre || a.legajo) + " en " + _anMin(a.real_min) +
+      (pj != null ? (pj > 110 ? ", un " + (pj - 100) + " % más de lo esperado"
+                   : pj < 90 ? ", un " + (100 - pj) + " % menos" : ", en lo esperado") : "") + ".");
+  }
+  out.push(altas ? ("Hay " + altas + " cosa(s) para mirar de cerca.")
+                 : av.length ? "Nada grave: los avisos son para mirar, no para alarmarse."
+                             : "No se encontró nada raro.");
+  return out.join(" ");
 }
 
 function _anCard(valor, rotulo, color) {
@@ -241,6 +313,17 @@ function _anDetalleHtml() {
     '<div class="m">NP: ' + _anEsc((cab.nps || []).join(" · ") || "—") +
     (cab.fecha_entrega ? ' · entrega ' + _anDia(cab.fecha_entrega) : '') + '</div></div>';
 
+  var mk = _an.marcas[d.tanda] || null;
+  h += '<div class="an-mk">' +
+    '<span class="an-mk-t">' + (mk ? (mk.estado === "anomala" ? '🚩 Marcada como ANÓMALA' : '✓ Marcada como revisada') +
+        (mk.nota ? ' — ' + _anEsc(mk.nota) : '') + (mk.por ? ' <small>(' + _anEsc(mk.por) + ')</small>' : '')
+      : 'Sin marcar') + '</span>' +
+    '<button class="an-mk-b a" onclick="anMarcar(\'anomala\')">🚩 Anómala</button>' +
+    '<button class="an-mk-b r" onclick="anMarcar(\'revisada\')">✓ Revisada</button>' +
+    (mk ? '<button class="an-mk-b" onclick="anMarcar(\'sin\')">✕ Sacar marca</button>' : '') +
+    '</div>';
+  h += '<div class="an-concl">' + _anConclusion(d) + '</div>';
+  h += '<div class="an-sec">Qué se encontró</div>';
   (d.avisos || []).forEach(function (a) {
     h += '<div class="an-av ' + _anEsc(a.sev) + '">' +
       (a.sev === "alta" ? "🔴 " : a.sev === "media" ? "🟠 " : "⚪ ") + _anEsc(a.texto) + '</div>';

@@ -65,7 +65,11 @@ Un botón con **borde rojo** es una tarea abierta.
 4. Si el artículo tiene excedente, aparece **«📦 Tiene Excedente — anotar ubicación»**.
 5. A veces te pide **contar** lo que quedó en una celda después de pickear: contá lo que ves y
    cargalo, sin adivinar.
-6. Al terminar tocás **«✓ Terminé el picking»**: queda registrado el **TP**.
+6. Si un código **no tiene góndola cargada en el Mapa**, el paso te lo avisa y, cuando lo
+   confirmás, te pregunta **«¿De qué góndola lo sacaste?»**. Escribí la celda (por ejemplo
+   **F9**) y **«✓ Anotar»**: el supervisor la da de alta. Si no sabés, **«No sé / seguir sin
+   anotar»** — no frena nada y lo que pickeaste ya quedó registrado.
+7. Al terminar tocás **«✓ Terminé el picking»**: queda registrado el **TP**.
 
 Si la tanda la está pickeando otro, sale **«⛔ La tanda X ya la está pickeando…»** y no se abre.
 
