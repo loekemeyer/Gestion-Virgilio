@@ -192,10 +192,20 @@ Tocá **📦** y **Enviar**. Hay **3 opciones**:
 
 - **📥 Recibir insumos**: entra stock de insumos. Primero **«¿Qué recibís?»**: elegís la categoría
   (plásticos, flejes, cajas, partes…; los importados no se reciben acá). Después **de dónde recibís** y
-  la **documentación** (Remito, Factura o los dos) y tocás **Enviar**. Adentro cargás las cantidades
-  (**«+ Agregar insumo nuevo»** si no está) y **«✓ Registrar entrada»**.
+  la **documentación** (Remito, Factura o los dos) y tocás **Enviar**. Adentro aparecen **todos los
+  insumos del rubro con el nombre de GP2**, también los que nunca se recibieron en Virgilio: buscá el
+  tuyo por nombre o código, cargá la cantidad y **«✓ Registrar entrada»**. **Sólo recibís lo que ya
+  está en la lista**: no se puede agregar un insumo nuevo. Si llegó algo que no figura, avisá a Stock
+  y Compras para que lo carguen. En **plásticos**, al entregar aparecen sólo las bolsas que
+  se usan (con lugar en el Mapa); al recibir aparecen además las bolsas de GP2.
+  Las bolsas se cargan sólo en **Bolsas** (abajo se ve cuántos kg son). En **cajas** aparecen las 11
+  cajas (Caja Nº 1 … Nº 29); se cargan en **Cajas** o en **Paquetes** (cada paquete = 25 cajas).
+  Al **recibir** cualquier insumo hay que elegir la **Marca**: de qué empresa viene. En cajas es
+  **Loeke** o **Chef**; en el resto está además **Mixto** (sirve para las dos). Es el mismo insumo
+  en el mismo lugar — la marca sólo queda anotada, no parte el stock. Sin marca no se registra.
 - **📤 Entregar insumos**: sale stock de insumos. Primero **«¿Qué envío es?»**: **🏭 Envío a
-  inyectores** (elegís el inyector y aparecen sólo las bolsas plásticas) o **📦 Envío a otros**;
+  inyectores** (elegís el inyector y aparecen sólo las bolsas plásticas; es la única forma de sacar
+  bolsas) o **📦 Envío a otros** (todo lo demás, sin bolsas plásticas);
   después el destino, **Enviar**, las cantidades y
   **«✓ Registrar salida»**. Un insumo que viene en caja master (MC) **sale siempre en MC
   enteras**.

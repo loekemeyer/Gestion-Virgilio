@@ -67,6 +67,8 @@
         }
         // preview=false default -> inserta en DB
         const j = await IC.api.postForm('/verify-multi-doc', fd);
+        // Otro despacho → la cabecera se monta de cero (React); el mismo id queda montado.
+        if (j && j.despacho_id && j.despacho_id !== result.despacho_id) IC.cab.olvidar(j.despacho_id);
         S.result = j;
       } catch (e) { S.error = e.message || String(e); }
       finally { S.saving = false; render(); }
@@ -115,6 +117,7 @@
       const requiredOk = Object.keys(S.files).length >= 1;
       if (!requiredOk) return;
       const files = S.files, nroCarga = S.nroCarga;
+      if (S.result && S.result.despacho_id) IC.cab.olvidar(S.result.despacho_id);   // sin resultado la cabecera se desmonta
       S.loading = true; S.error = null; S.result = null; S.progress = 'Iniciando...'; render();
       const setProgress = (p) => { S.progress = p; render(); };
       try {
@@ -299,8 +302,7 @@
               </div>
               <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">${IC.esc(slot.hint)}</div>
               ${file ? `<div class="f" style="font-size:11px">
-                  <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${IC.esc(file.name)}</span>
-                  <button onclick="${IC.on(() => removeSlot(slot.key))}" title="Quitar">✕</button>
+                  <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${IC.esc(file.name)}</span><button onclick="${IC.on(() => removeSlot(slot.key))}" title="Quitar">✕</button>
                 </div>`
                 : IC.dz.html(`multi-${slot.key}`, { label: '', icon: '', files: [], single: true,
                     accept: slot.key === 'despacho' ? 'application/pdf' : '.pdf,.xlsx,.xls,.csv,image/*',

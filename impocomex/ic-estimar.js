@@ -34,6 +34,16 @@
     return fobUsd * 0.005; // ~0.5% del FOB (estimado)
   }
 
+  // Lo que muestra un <input type=number> controlado de React (ReactDOMInput): escribe el estado en el campo
+  // sólo si (estado 0 y campo vacío) o si el texto no es == al estado. Por eso borrar la cotización deja "0"
+  // y tipear después da "01000" (vale 1000). Se copia tal cual para que el campo se vea igual que en el original.
+  const numTxt = (txt, val) => ((val === 0 && txt === '') || txt != val) ? String(val) : txt; // eslint-disable-line eqeqeq
+  function numInput(e, set) {
+    const v = e.target.value; const n = Number(v); set(n);
+    const t = numTxt(v, n); if (e.target.value !== t) e.target.value = t;
+    return t;
+  }
+
   IC.modo('estimar', function (el) {
     const api = IC.api;
     const S = {
@@ -41,6 +51,7 @@
       items: [], // [{ codigo, descripcion, cantidad, precio_unitario, fob, ncm, ncm_confidence, ncm_capa }]
       loading: false, progress: '', error: null,
       cotiz: 1450, iibbInsc: 'S', modo: 'LCL', cbmTotal: 0,
+      cotizTxt: '1450', cbmTxt: '0',   // texto que muestra cada campo (ver numTxt)
     };
     const vivo = () => el.isConnected;
     // Arriba (archivo + parámetros) y abajo (resultado) se pintan por separado: así tipear la cotización o el
@@ -143,7 +154,7 @@
 
         <div style="display:flex;gap:10px;align-items:flex-end;margin-top:10px">
           <label style="font-size:11px">Cotiz USD/ARS<br>
-            <input data-k="est-cotiz" type="number" value="${IC.esc(S.cotiz)}" oninput="${IC.on((e) => { S.cotiz = Number(e.target.value); renderRes(); })}" style="padding:4px;font-size:11px;width:90px">
+            <input data-k="est-cotiz" type="number" value="${IC.esc(S.cotizTxt = numTxt(S.cotizTxt, S.cotiz))}" oninput="${IC.on((e) => { S.cotizTxt = numInput(e, (n) => { S.cotiz = n; }); renderRes(); })}" style="padding:4px;font-size:11px;width:90px">
           </label>
           <label style="font-size:11px">IIBB<br>
             <select data-k="est-iibb" onchange="${IC.on((e) => { S.iibbInsc = e.target.value; renderRes(); })}" style="padding:4px;font-size:11px">
@@ -156,7 +167,7 @@
             </select>
           </label>
           <label style="font-size:11px">CBM total<br>
-            <input data-k="est-cbm" type="number" step="0.1" value="${IC.esc(S.cbmTotal)}" oninput="${IC.on((e) => { S.cbmTotal = Number(e.target.value); renderRes(); })}" style="padding:4px;font-size:11px;width:80px">
+            <input data-k="est-cbm" type="number" step="0.1" value="${IC.esc(S.cbmTxt = numTxt(S.cbmTxt, S.cbmTotal))}" oninput="${IC.on((e) => { S.cbmTxt = numInput(e, (n) => { S.cbmTotal = n; }); renderRes(); })}" style="padding:4px;font-size:11px;width:80px">
           </label>
         </div>
 

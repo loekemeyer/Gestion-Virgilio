@@ -117,6 +117,9 @@
       return;
     }
     if (!el.isConnected) return;
+    // Las zonas de subida arrancan limpias cada vez que se entra al modo (en React se desmontaban con él:
+    // sin esto quedaba el aviso "se tomó ci.zip › …" de la vez anterior).
+    ['cajas-pl', 'cajas-ci', 'cajas-fotos'].forEach((id) => IC.dz.olvidar(id));
     const { CAMPOS, CARA, cajaDe, pctTxt } = ET;
     const { interpretarFoto } = FOT;
     const api = IC.api;

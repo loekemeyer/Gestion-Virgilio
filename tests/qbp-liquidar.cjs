@@ -1,6 +1,10 @@
 /* v24.52 (Thomas) — ¿Qué bajar primero?: un artículo en Articulos_Discontinuados con motivo
    «no se vende» / «liquidar» (396) NO se manda a guardar: sale de la lista, del SOS y de las horas.
-   Uno que sólo «no se repone más» (634) SÍ sigue. Corre la pantalla. Sale 1 si falla. */
+   Uno que sólo «no se repone más» (634) SÍ sigue. Corre la pantalla.
+   v29.64 (Luis, 13/10, D5) — y el DUAL no se saca de la lista: su capacidad es por EMPRESA
+   («437E LK» → 120, no los 168 pegados) y con el lookup pelado quedaba en cap = 0, así que el
+   `if (cap <= 0) return null` de los URGENTES lo borraba de la pantalla y del badge. Se mockean
+   las DOS lecturas: contra el código viejo sólo falla el dual. Sale 1 si falla. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -19,9 +23,13 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   const r = await p.evaluate(async () => {
     const sal = { "396": { cod: "396", a_guardar: 4, excedente: 0, racks: 0, terminado: 0 },
                   "634": { cod: "634", a_guardar: 12, excedente: 0, racks: 0, terminado: 0 },
-                  "505": { cod: "505", a_guardar: 50, excedente: 0, racks: 0, terminado: 10 } };
+                  "505": { cod: "505", a_guardar: 50, excedente: 0, racks: 0, terminado: 10 },
+                  // v29.64 — DUAL con 225 cajas en racks y la góndola de LK (120) a 72: tiene que verse.
+                  "437E LK": { cod: "437E LK", a_guardar: 0, excedente: 0, racks: 225, terminado: 10 } };
     window.stockFetchSaldos = async () => sal;
-    window.ocgFetchCapacidad = async () => ({ "396": 20, "634": 30, "505": 100 });
+    window.ocgFetchCapacidad = async () => ({ "396": 20, "634": 30, "505": 100, "437E": 168 });
+    window.rkbFetchCapacidad = async () => ({ pelada: { "396": 20, "634": 30, "505": 100, "437E": 168 },
+                                              porEmp: { "437E LK": 120, "437E CH": 48 } });
     window.rkbFetchCxM = async () => ({ cxm: {} });
     window.stockFetchArtFactors = async () => ({});
     window.loadArtNombres = async () => ({});
@@ -29,13 +37,18 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     const txt = (document.getElementById("gordenModal") || {}).textContent || "";
     let badge = null; window.supSetBadge = (id, n) => { if (id === "qbpBadge") badge = n; };
     await qbpLoadBadge();
-    return { txt, badge, urg: (_gorden.urgentes || []).map((x) => x.cod), items: (_gorden.items || []).map((x) => x.cod) };
+    const dual = (_gorden.items || []).filter((x) => x.cod === "437E LK")[0] || {};
+    return { txt, badge, urg: (_gorden.urgentes || []).map((x) => x.cod), items: (_gorden.items || []).map((x) => x.cod),
+             capDual: dual.cap };
   });
   if (r.items.includes("396")) fail("396 (no se vende) no tiene que estar en la lista: " + r.items);
   if (r.urg.includes("396")) fail("396 no tiene que contar como SOS: " + r.urg);
   if (!r.items.includes("634")) fail("634 (no se repone más) SÍ se sigue guardando: " + r.items);
   if (!r.items.includes("505")) fail("505 común tiene que estar: " + r.items);
-  if (r.badge !== 2) fail("badge SOS: 634 y 505 → 2, dio " + r.badge);
+  if (!r.items.includes("437E LK")) fail("el DUAL no se saca de la lista: " + r.items);
+  if (r.capDual !== 120) fail("cap del dual = la de LK (120), no 168: " + r.capDual);
+  if (!r.urg.includes("437E LK")) fail("el dual con góndola 10/120 es SOS: " + r.urg);
+  if (r.badge !== 3) fail("badge SOS: 634, 505 y 437E LK → 3, dio " + r.badge);
   if (errs.length) fail("errores JS: " + errs.join(" | "));
   await b.close();
   if (!process.exitCode) console.log("✓ qbp-liquidar: lo que no se vende no se manda a guardar");

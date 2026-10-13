@@ -1,0 +1,1470 @@
+{
+ "grabado": "viejo impo-comex/ (React)",
+ "lakout": [
+  {
+   "paso": "abrir",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 📎 Arrastrá archivos, carpetas, .zip o .rar, o hacé click 📄 Analizar Despacho",
+   "reqs": [],
+   "extra": {
+    "dis": true
+   },
+   "dlg": null
+  },
+  {
+   "paso": "nro sin archivo",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 📎 Arrastrá archivos, carpetas, .zip o .rar, o hacé click 📄 Analizar Despacho",
+   "reqs": [],
+   "extra": {
+    "dis": true
+   },
+   "dlg": null
+  },
+  {
+   "paso": "con archivo",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF",
+   "reqs": [],
+   "extra": {
+    "dis": false
+   },
+   "dlg": null
+  },
+  {
+   "paso": "nro en blanco",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF",
+   "reqs": [],
+   "extra": {
+    "dis": true
+   },
+   "dlg": null
+  },
+  {
+   "paso": "ver pdf",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho ▼ Ocultar PDF 📄 Despacho subido (1 archivo) lakout china 48.pdf · 2 KB",
+   "reqs": [],
+   "extra": {
+    "visor": 1,
+    "iframes": true
+   },
+   "dlg": null
+  },
+  {
+   "paso": "ocultar pdf",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF",
+   "reqs": [],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "error json",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF Proveedor no reconocido en el PDF",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "DESPACHO 26001IC04 ITEM 0 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 1 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 2 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 3 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 4 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 5 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 6 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 7 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 8 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 9 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 10 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 11 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 12 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 13 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 14 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50"
+      ],
+      [
+       "filename",
+       "lakout china 48.pdf"
+      ],
+      [
+       "preview",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "error 502 texto",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 502 Bad gateway <html>",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "DESPACHO 26001IC04 ITEM 0 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 1 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 2 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 3 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 4 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 5 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 6 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 7 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 8 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 9 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 10 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 11 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 12 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 13 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 14 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50"
+      ],
+      [
+       "filename",
+       "lakout china 48.pdf"
+      ],
+      [
+       "preview",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "cargando",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ Procesando... (15-30 seg) 👁 Ver PDF 📊 OCR + extracción estructurada...",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "DESPACHO 26001IC04 ITEM 0 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 1 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 2 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 3 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 4 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 5 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 6 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 7 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 8 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 9 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 10 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 11 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 12 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 13 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 14 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50"
+      ],
+      [
+       "filename",
+       "lakout china 48.pdf"
+      ],
+      [
+       "preview",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    }
+   ],
+   "extra": {
+    "modo": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ Procesando... (15-30 seg) 👁 Ver PDF 📊 OCR + extracción estructurada...",
+    "txt": "Procesando... (15-30 seg)",
+    "dis": true
+   },
+   "dlg": null
+  },
+  {
+   "paso": "preview",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "nro botones corregir",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [],
+   "extra": {
+    "n": 3
+   },
+   "dlg": null
+  },
+  {
+   "paso": "modal abierto",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [],
+   "extra": {
+    "m": "📝 Corregir Relevamiento ✕ Alerta: Codigo 437E (LK) no está en el relevamiento 🔍 Buscar en relevamiento ¿Qué corregir? ➕ Agregar nuevo código al relevamiento ➕ Agregar variante CHEF/LK del código existente ✏️ Actualizar marca del producto existente ⚡ Toggle INAL=SI/NO del producto existente cod_lk (LOEKEMEYER) cod_ch (CHEF) marca principal LK CH proveedor nombre_producto INAL - (no aplica) SI (requiere Libre Circ) Cancelar 💾 Guardar y volver"
+   },
+   "dlg": null
+  },
+  {
+   "paso": "modal buscar",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "productos_buscar",
+      "codigo": "437E"
+     },
+     "auth": "si"
+    }
+   ],
+   "extra": {
+    "m": "📝 Corregir Relevamiento ✕ Alerta: Codigo 437E (LK) no está en el relevamiento 🔍 Buscar en relevamiento 1 match(es) encontrado(s): cod_lk=437E / cod_ch=029 | marca=LK | \"Colador\" | INAL=SI ¿Qué corregir? ➕ Agregar nuevo código al relevamiento ➕ Agregar variante CHEF/LK del código existente ✏️ Actualizar marca del producto existente ⚡ Toggle INAL=SI/NO del producto existente cod_lk (LOEKEMEYER) cod_ch (CHEF) marca principal LK CH proveedor nombre_producto INAL - (no aplica) SI (requiere Libre Circ) Cancelar 💾 Guardar y volver"
+   },
+   "dlg": null
+  },
+  {
+   "paso": "modal toggle",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [],
+   "extra": {
+    "m": "📝 Corregir Relevamiento ✕ Alerta: Codigo 437E (LK) no está en el relevamiento 🔍 Buscar en relevamiento 1 match(es) encontrado(s): cod_lk=437E / cod_ch=029 | marca=LK | \"Colador\" | INAL=SI ¿Qué corregir? ➕ Agregar nuevo código al relevamiento ➕ Agregar variante CHEF/LK del código existente ✏️ Actualizar marca del producto existente ⚡ Toggle INAL=SI/NO del producto existente Cancelar 💾 Guardar y volver"
+   },
+   "dlg": null
+  },
+  {
+   "paso": "modal guardado",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "producto_update",
+      "id": 31,
+      "campo": "inal",
+      "valor": null
+     },
+     "auth": "si"
+    }
+   ],
+   "extra": {
+    "av": "✓ Relevamiento actualizado. Las próximas cargas usarán este dato. Aceptar",
+    "modal": 0
+   },
+   "dlg": null
+  },
+  {
+   "paso": "modal 2",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [],
+   "extra": {
+    "m": "📝 Corregir Relevamiento ✕ Alerta: Item 580: pre split 🔍 Buscar en relevamiento ¿Qué corregir? ➕ Agregar nuevo código al relevamiento ➕ Agregar variante CHEF/LK del código existente ✏️ Actualizar marca del producto existente ⚡ Toggle INAL=SI/NO del producto existente cod_lk (LOEKEMEYER) cod_ch (CHEF) marca principal LK CH proveedor nombre_producto INAL - (no aplica) SI (requiere Libre Circ) Cancelar 💾 Guardar y volver",
+    "sel": "agregar_variante"
+   },
+   "dlg": null
+  },
+  {
+   "paso": "modal 2 guardado",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "producto_insert",
+      "producto": {
+       "cod_lk": "580",
+       "cod_ch": null,
+       "marca": "CH",
+       "nombre_producto": "Item 580: pre split",
+       "proveedor": "KANGLI",
+       "inal": "SI"
+      }
+     },
+     "auth": "si"
+    }
+   ],
+   "extra": {
+    "av": "✓ Relevamiento actualizado. Las próximas cargas usarán este dato. Aceptar"
+   },
+   "dlg": null
+  },
+  {
+   "paso": "modal 3 sin match",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [],
+   "extra": {
+    "av": "Sin match: buscá primero en el relevamiento. Aceptar",
+    "sigue": 1
+   },
+   "dlg": null
+  },
+  {
+   "paso": "modal 3 cancelado",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [],
+   "extra": {
+    "modal": 0
+   },
+   "dlg": null
+  },
+  {
+   "paso": "modal cruz",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [],
+   "extra": {
+    "modal": 0
+   },
+   "dlg": null
+  },
+  {
+   "paso": "guardar error",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF Proveedor no reconocido en el PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "{\"proveedor\":\"OWNLAND\",\"items\":[{\"nro_item\":1,\"subitem_nro\":2,\"codigo\":\"437E\",\"ncm\":\"8205.51.00.900A\",\"descripcion\":\"Colador <acero> & co\",\"cantidad\":1200,\"valor_fob\":1450.5,\"nro_certificado\":\"INAL 123\"},{\"nro\":7,\"codigo\":null,\"ncm\":null,\"descripcion\":null,\"cantidad\":true,\"valor_fob\":\"12\"},{\"cantidad\":0}]}"
+      ],
+      [
+       "filename",
+       "lakout china 48.pdf"
+      ],
+      [
+       "pre_merged",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    }
+   ],
+   "extra": {
+    "dis": false
+   },
+   "dlg": null
+  },
+  {
+   "paso": "guardando",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 ⏳ Guardando... 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "{\"proveedor\":\"OWNLAND\",\"items\":[{\"nro_item\":1,\"subitem_nro\":2,\"codigo\":\"437E\",\"ncm\":\"8205.51.00.900A\",\"descripcion\":\"Colador <acero> & co\",\"cantidad\":1200,\"valor_fob\":1450.5,\"nro_certificado\":\"INAL 123\"},{\"nro\":7,\"codigo\":null,\"ncm\":null,\"descripcion\":null,\"cantidad\":true,\"valor_fob\":\"12\"},{\"cantidad\":0}]}"
+      ],
+      [
+       "filename",
+       "lakout china 48.pdf"
+      ],
+      [
+       "pre_merged",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    }
+   ],
+   "extra": {
+    "txt": "⏳ Guardando...",
+    "dis": true
+   },
+   "dlg": null
+  },
+  {
+   "paso": "guardado",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▶ Mostrar/editar campos ✏️ Items del despacho (editable): 2 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 Vista enriquecida (2 artículos) — cruzada con Pedido Damián: Código Descripción LK FOB USD Cant Obs CIF Nota 437E Colador acero inoxidable $1450.50 1200 — $12.00 — 580 — n/d 0 ok $3.33 x",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/export-excel",
+     "q": "?carga_id=77&format=json",
+     "form": null,
+     "auth": "si"
+    },
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "items_list",
+      "tabla": "despacho_items",
+      "filtro_id": 55
+     },
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "cabecera",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▼ Ocultar editor ✏️ Editá cualquier campo (guarda al salir). Útil para corregir lo que el LLM no extrajo bien. Cabecera Nº Despacho Fecha Oficializ ⚠ Aduana ⚠ Canal ⚠ - VERDE NARANJA ROJO Modo ⚠ - LCL FCL AVION IIBB ⚠ - S N E Partes Importador ⚠ CUIT Importador ⚠ Despachante ⚠ CUIT Despachante ⚠ Agente Transporte ⚠ CUIT Agente ⚠ Vendedor/Exportador ⚠ Transporte Vapor ⚠ Vto Embarque ⚠ Fecha Arribo ⚠ Depósito ⚠ Cargas Bultos ⚠ Peso Bruto (kg) ⚠ CBM (m³) ⚠ TN total ⚠ Valores USD FOB Flete Seguro ⚠ CIF ⚠ Cotiz USD/ARS ⚠ Liquidación Derechos ⚠ Tasa Estad ⚠ IVA 21% ⚠ IVA Adic 20% ⚠ Ganancias 6% ⚠ IIBB ⚠ ✏️ Items del despacho (editable): 2 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 Vista enriquecida (2 artículos) — cruzada con Pedido Damián: Código Descripción LK FOB USD Cant Obs CIF Nota 437E Colador acero inoxidable $1450.50 1200 — $12.00 — 580 — n/d 0 ok $3.33 x",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "despacho_get",
+      "id": 55
+     },
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "cabecera editada",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▼ Ocultar editor ✏️ Editá cualquier campo (guarda al salir). Útil para corregir lo que el LLM no extrajo bien. Cabecera Nº Despacho Fecha Oficializ ⚠ Aduana ⚠ Canal ⚠ - VERDE NARANJA ROJO Modo ⚠ - LCL FCL AVION IIBB ⚠ - S N E Partes Importador ⚠ CUIT Importador ⚠ Despachante ⚠ CUIT Despachante ⚠ Agente Transporte ⚠ CUIT Agente ⚠ Vendedor/Exportador ⚠ Transporte Vapor ⚠ Vto Embarque ⚠ Fecha Arribo ⚠ Depósito ⚠ Cargas Bultos ⚠ Peso Bruto (kg) ⚠ CBM (m³) ⚠ TN total ⚠ Valores USD FOB Flete Seguro ✓ CIF ⚠ Cotiz USD/ARS ⚠ Liquidación Derechos ⚠ Tasa Estad ⚠ IVA 21% ⚠ IVA Adic 20% ⚠ Ganancias 6% ⚠ IIBB ⚠ ✏️ Items del despacho (editable): 2 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 Vista enriquecida (2 artículos) — cruzada con Pedido Damián: Código Descripción LK FOB USD Cant Obs CIF Nota 437E Colador acero inoxidable $1450.50 1200 — $12.00 — 580 — n/d 0 ok $3.33 x",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "despacho_update",
+      "id": 55,
+      "campo": "seguro_total",
+      "valor": 45.5
+     },
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "cabecera ✓ se va",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▼ Ocultar editor ✏️ Editá cualquier campo (guarda al salir). Útil para corregir lo que el LLM no extrajo bien. Cabecera Nº Despacho Fecha Oficializ ⚠ Aduana ⚠ Canal ⚠ - VERDE NARANJA ROJO Modo ⚠ - LCL FCL AVION IIBB ⚠ - S N E Partes Importador ⚠ CUIT Importador ⚠ Despachante ⚠ CUIT Despachante ⚠ Agente Transporte ⚠ CUIT Agente ⚠ Vendedor/Exportador ⚠ Transporte Vapor ⚠ Vto Embarque ⚠ Fecha Arribo ⚠ Depósito ⚠ Cargas Bultos ⚠ Peso Bruto (kg) ⚠ CBM (m³) ⚠ TN total ⚠ Valores USD FOB Flete Seguro CIF ⚠ Cotiz USD/ARS ⚠ Liquidación Derechos ⚠ Tasa Estad ⚠ IVA 21% ⚠ IVA Adic 20% ⚠ Ganancias 6% ⚠ IIBB ⚠ ✏️ Items del despacho (editable): 2 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 Vista enriquecida (2 artículos) — cruzada con Pedido Damián: Código Descripción LK FOB USD Cant Obs CIF Nota 437E Colador acero inoxidable $1450.50 1200 — $12.00 — 580 — n/d 0 ok $3.33 x",
+   "reqs": [],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "cabecera reabierta",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▼ Ocultar editor ✏️ Editá cualquier campo (guarda al salir). Útil para corregir lo que el LLM no extrajo bien. Cabecera Nº Despacho Fecha Oficializ ⚠ Aduana ⚠ Canal ⚠ - VERDE NARANJA ROJO Modo ⚠ - LCL FCL AVION IIBB ⚠ - S N E Partes Importador ⚠ CUIT Importador ⚠ Despachante ⚠ CUIT Despachante ⚠ Agente Transporte ⚠ CUIT Agente ⚠ Vendedor/Exportador ⚠ Transporte Vapor ⚠ Vto Embarque ⚠ Fecha Arribo ⚠ Depósito ⚠ Cargas Bultos ⚠ Peso Bruto (kg) ⚠ CBM (m³) ⚠ TN total ⚠ Valores USD FOB Flete Seguro ⚠ CIF ⚠ Cotiz USD/ARS ⚠ Liquidación Derechos ⚠ Tasa Estad ⚠ IVA 21% ⚠ IVA Adic 20% ⚠ Ganancias 6% ⚠ IIBB ⚠ ✏️ Items del despacho (editable): 2 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 Vista enriquecida (2 artículos) — cruzada con Pedido Damián: Código Descripción LK FOB USD Cant Obs CIF Nota 437E Colador acero inoxidable $1450.50 1200 — $12.00 — 580 — n/d 0 ok $3.33 x",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "despacho_get",
+      "id": 55
+     },
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "cabecera error",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▼ Ocultar editor ✏️ Editá cualquier campo (guarda al salir). Útil para corregir lo que el LLM no extrajo bien. Cabecera Nº Despacho Fecha Oficializ ⚠ Aduana ⚠ Canal ⚠ - VERDE NARANJA ROJO Modo ⚠ - LCL FCL AVION IIBB ⚠ - S N E Partes Importador ⚠ CUIT Importador ⚠ Despachante ⚠ CUIT Despachante ⚠ Agente Transporte ⚠ CUIT Agente ⚠ Vendedor/Exportador ⚠ Transporte Vapor ⚠ Vto Embarque ⚠ Fecha Arribo ⚠ Depósito ⚠ Cargas Bultos ⚠ Peso Bruto (kg) ⚠ CBM (m³) ⚠ TN total ⚠ Valores USD FOB Flete Seguro ⚠ CIF ⚠ Cotiz USD/ARS ⚠ Liquidación Derechos ⚠ Tasa Estad ⚠ IVA 21% ⚠ IVA Adic 20% ⚠ Ganancias 6% ⚠ IIBB ⚠ ✏️ Items del despacho (editable): 2 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 Vista enriquecida (2 artículos) — cruzada con Pedido Damián: Código Descripción LK FOB USD Cant Obs CIF Nota 437E Colador acero inoxidable $1450.50 1200 — $12.00 — 580 — n/d 0 ok $3.33 x",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "despacho_get",
+      "id": 55
+     },
+     "auth": "si"
+    },
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "despacho_update",
+      "id": 55,
+      "campo": "flete_total",
+      "valor": 1600
+     },
+     "auth": "si"
+    }
+   ],
+   "extra": {
+    "av": "Error: No se pudo guardar el campo Aceptar"
+   },
+   "dlg": null
+  },
+  {
+   "paso": "item error",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▶ Mostrar/editar campos ✏️ Items del despacho (editable): 2 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 Vista enriquecida (2 artículos) — cruzada con Pedido Damián: Código Descripción LK FOB USD Cant Obs CIF Nota 437E Colador acero inoxidable $1450.50 1200 — $12.00 — 580 — n/d 0 ok $3.33 x",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "item_update",
+      "tabla": "despacho_items",
+      "id": 501,
+      "campo": "descripcion",
+      "valor": "Colador X"
+     },
+     "auth": "si"
+    }
+   ],
+   "extra": {
+    "av": "Error guardando: Item bloqueado Aceptar"
+   },
+   "dlg": null
+  },
+  {
+   "paso": "item editado",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▶ Mostrar/editar campos ✏️ Items del despacho (editable): 2 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 Vista enriquecida (2 artículos) — cruzada con Pedido Damián: Código Descripción LK FOB USD Cant Obs CIF Nota 437E Colador acero inoxidable $1450.50 1200 — $12.00 — 580 — n/d 0 ok $3.33 x",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "item_update",
+      "tabla": "despacho_items",
+      "id": 502,
+      "campo": "descripcion",
+      "valor": "Espátula silicona"
+     },
+     "auth": "si"
+    },
+    {
+     "m": "GET",
+     "p": "/export-excel",
+     "q": "?carga_id=77&format=json",
+     "form": null,
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "item agregado",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▶ Mostrar/editar campos ✏️ Items del despacho (editable): 3 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 3 🗑 Vista enriquecida (2 artículos) — cruzada con Pedido Damián: Código Descripción LK FOB USD Cant Obs CIF Nota 437E Colador acero inoxidable $1450.50 1200 — $12.00 — 580 — n/d 0 ok $3.33 x",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "item_insert",
+      "tabla": "despacho_items",
+      "filtro_id": 55
+     },
+     "auth": "si"
+    },
+    {
+     "m": "GET",
+     "p": "/export-excel",
+     "q": "?carga_id=77&format=json",
+     "form": null,
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "confirmar borrar",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▶ Mostrar/editar campos ✏️ Items del despacho (editable): 3 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 3 🗑 Vista enriquecida (2 artículos) — cruzada con Pedido Damián: Código Descripción LK FOB USD Cant Obs CIF Nota 437E Colador acero inoxidable $1450.50 1200 — $12.00 — 580 — n/d 0 ok $3.33 x",
+   "reqs": [],
+   "extra": {
+    "d": "¿Eliminar este artículo? Cancelar Sí, borrar"
+   },
+   "dlg": null
+  },
+  {
+   "paso": "confirmar borrar 2",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▶ Mostrar/editar campos ✏️ Items del despacho (editable): 2 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 Vista enriquecida (2 artículos) — cruzada con Pedido Damián: Código Descripción LK FOB USD Cant Obs CIF Nota 437E Colador acero inoxidable $1450.50 1200 — $12.00 — 580 — n/d 0 ok $3.33 x",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "item_delete",
+      "tabla": "despacho_items",
+      "id": 502
+     },
+     "auth": "si"
+    },
+    {
+     "m": "GET",
+     "p": "/export-excel",
+     "q": "?carga_id=77&format=json",
+     "form": null,
+     "auth": "si"
+    }
+   ],
+   "extra": {
+    "d": "¿Eliminar este artículo? Cancelar Sí, borrar"
+   },
+   "dlg": null
+  },
+  {
+   "paso": "item borrado",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▶ Mostrar/editar campos ✏️ Items del despacho (editable): 2 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 Vista enriquecida (2 artículos) — cruzada con Pedido Damián: Código Descripción LK FOB USD Cant Obs CIF Nota 437E Colador acero inoxidable $1450.50 1200 — $12.00 — 580 — n/d 0 ok $3.33 x",
+   "reqs": [],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "excel",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▶ Mostrar/editar campos ✏️ Items del despacho (editable): 2 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 Vista enriquecida (2 artículos) — cruzada con Pedido Damián: Código Descripción LK FOB USD Cant Obs CIF Nota 437E Colador acero inoxidable $1450.50 1200 — $12.00 — 580 — n/d 0 ok $3.33 x",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/export-excel",
+     "q": "?carga_id=77",
+     "form": null,
+     "auth": "si"
+    }
+   ],
+   "extra": {
+    "nombre": "verificacion_carga_77.xlsx",
+    "igual": true
+   },
+   "dlg": null
+  },
+  {
+   "paso": "duplicado",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ⚠️ Duplicado — con cambios 📥 Descargar Excel ⚠️ Ya existe la carga China 48 Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 Diferencias vs registro anterior (2) Campo Antes (en DB) Ahora (PDF nuevo) flete_total 100 null proveedor null OWN<b> Los datos NO se actualizaron. Si querés reemplazar el registro anterior, tendrás que borrarlo primero (futuro: botón \"Actualizar\"). 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "DESPACHO 26001IC04 ITEM 0 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 1 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 2 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 3 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 4 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 5 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 6 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 7 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 8 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 9 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 10 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 11 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 12 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 13 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 14 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50"
+      ],
+      [
+       "filename",
+       "lakout china 48.pdf"
+      ],
+      [
+       "preview",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "duplicado igual",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 🔁 Duplicado — sin cambios 📥 Descargar Excel 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. ✅ Sin cambios Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "DESPACHO 26001IC04 ITEM 0 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 1 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 2 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 3 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 4 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 5 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 6 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 7 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 8 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 9 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 10 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 11 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 12 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 13 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 14 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50"
+      ],
+      [
+       "filename",
+       "lakout china 48.pdf"
+      ],
+      [
+       "preview",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "sin costo",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo lakout china 48.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor - N° Despacho - Items Costo $ Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "DESPACHO 26001IC04 ITEM 0 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 1 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 2 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 3 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 4 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 5 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 6 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 7 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 8 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 9 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 10 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 11 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 12 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 13 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50 DESPACHO 26001IC04 ITEM 14 CODIGO 437E NCM 8205.51.00.900A FOB 1450.50"
+      ],
+      [
+       "filename",
+       "lakout china 48.pdf"
+      ],
+      [
+       "preview",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "reemplazo archivo",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo chico.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor - N° Despacho - Items Costo $ Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL",
+   "reqs": [],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "chico",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo chico.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "LINEA 0 CODIGO 580 PINZA CHICA CANTIDAD 20 FOB 10.25 LINEA 1 CODIGO 580 PINZA CHICA CANTIDAD 20 FOB 10.25 LINEA 2 CODIGO 580 PINZA CHICA CANTIDAD 20 FOB 10.25 LINEA 3 CODIGO 580 PINZA CHICA CANTIDAD 20 FOB 10.25 LINEA 4 CODIGO 580 PINZA CHICA CANTIDAD 20 FOB 10.25"
+      ],
+      [
+       "file",
+       {
+        "archivo": "chico.pdf",
+        "tipo": "application/pdf",
+        "bytes": 1500
+       }
+      ],
+      [
+       "filename",
+       "chico.pdf"
+      ],
+      [
+       "preview",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "scan",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo scan 7p.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.2544 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "chunk_index",
+       "0"
+      ],
+      [
+       "chunk_total",
+       "2"
+      ],
+      [
+       "chunk_pages_desc",
+       "paginas 1-5"
+      ],
+      [
+       "file",
+       {
+        "archivo": "scan 7p.pdf-chunk1.pdf",
+        "tipo": "application/pdf",
+        "bytes": 1355
+       }
+      ]
+     ],
+     "auth": "si"
+    },
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "chunk_index",
+       "1"
+      ],
+      [
+       "chunk_total",
+       "2"
+      ],
+      [
+       "chunk_pages_desc",
+       "paginas 6-7"
+      ],
+      [
+       "file",
+       {
+        "archivo": "scan 7p.pdf-chunk2.pdf",
+        "tipo": "application/pdf",
+        "bytes": 907
+       }
+      ]
+     ],
+     "auth": "si"
+    },
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "chunk_index",
+       "0"
+      ],
+      [
+       "chunk_total",
+       "2"
+      ],
+      [
+       "chunk_pages_desc",
+       "paginas 1-5 (re-extract cabecera)"
+      ],
+      [
+       "file",
+       {
+        "archivo": "scan 7p.pdf-rex.pdf",
+        "tipo": "application/pdf",
+        "bytes": 1355
+       }
+      ]
+     ],
+     "auth": "si"
+    },
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "{\"proveedor\":\"OWNLAND\",\"nro_despacho\":\"26001IC0400\",\"flete_total\":900,\"bl\":{\"numero\":\"BL1\"},\"items\":[{\"codigo\":\"437E\",\"ncm\":\"8205.51.00.900A\",\"descripcion\":\"Colador\",\"cantidad\":100,\"valor_fob\":50},{\"codigo\":\"580\",\"ncm\":\"3924.10.00.100K\",\"descripcion\":\"Pinza\",\"cantidad\":20,\"valor_fob\":10.25}],\"seguro_total\":45,\"cotiz_dolar\":0}"
+      ],
+      [
+       "filename",
+       "scan 7p.pdf"
+      ],
+      [
+       "pre_merged",
+       "true"
+      ],
+      [
+       "preview",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "scan rex falla",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo scan 7p.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.2434 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "chunk_index",
+       "0"
+      ],
+      [
+       "chunk_total",
+       "2"
+      ],
+      [
+       "chunk_pages_desc",
+       "paginas 1-5"
+      ],
+      [
+       "file",
+       {
+        "archivo": "scan 7p.pdf-chunk1.pdf",
+        "tipo": "application/pdf",
+        "bytes": 1355
+       }
+      ]
+     ],
+     "auth": "si"
+    },
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "chunk_index",
+       "1"
+      ],
+      [
+       "chunk_total",
+       "2"
+      ],
+      [
+       "chunk_pages_desc",
+       "paginas 6-7"
+      ],
+      [
+       "file",
+       {
+        "archivo": "scan 7p.pdf-chunk2.pdf",
+        "tipo": "application/pdf",
+        "bytes": 907
+       }
+      ]
+     ],
+     "auth": "si"
+    },
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "chunk_index",
+       "0"
+      ],
+      [
+       "chunk_total",
+       "2"
+      ],
+      [
+       "chunk_pages_desc",
+       "paginas 1-5 (re-extract cabecera)"
+      ],
+      [
+       "file",
+       {
+        "archivo": "scan 7p.pdf-rex.pdf",
+        "tipo": "application/pdf",
+        "bytes": 1355
+       }
+      ]
+     ],
+     "auth": "si"
+    },
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "{\"proveedor\":\"OWNLAND\",\"nro_despacho\":\"26001IC0400\",\"flete_total\":0,\"bl\":{\"numero\":\"BL1\"},\"items\":[{\"codigo\":\"437E\",\"ncm\":\"8205.51.00.900A\",\"descripcion\":\"Colador\",\"cantidad\":100,\"valor_fob\":50},{\"codigo\":\"580\",\"ncm\":\"3924.10.00.100K\",\"descripcion\":\"Pinza\",\"cantidad\":20,\"valor_fob\":10.25}]}"
+      ],
+      [
+       "filename",
+       "scan 7p.pdf"
+      ],
+      [
+       "pre_merged",
+       "true"
+      ],
+      [
+       "preview",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "scan sin rex",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo scan 7p.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.2134 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (1) — revisar manualmente ⚠️ Revisar la página 3 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "chunk_index",
+       "0"
+      ],
+      [
+       "chunk_total",
+       "2"
+      ],
+      [
+       "chunk_pages_desc",
+       "paginas 1-5"
+      ],
+      [
+       "file",
+       {
+        "archivo": "scan 7p.pdf-chunk1.pdf",
+        "tipo": "application/pdf",
+        "bytes": 1355
+       }
+      ]
+     ],
+     "auth": "si"
+    },
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "chunk_index",
+       "1"
+      ],
+      [
+       "chunk_total",
+       "2"
+      ],
+      [
+       "chunk_pages_desc",
+       "paginas 6-7"
+      ],
+      [
+       "file",
+       {
+        "archivo": "scan 7p.pdf-chunk2.pdf",
+        "tipo": "application/pdf",
+        "bytes": 907
+       }
+      ]
+     ],
+     "auth": "si"
+    },
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "{\"proveedor\":\"KANGLI\",\"flete_total\":10,\"seguro_total\":2,\"valor_cif_total\":99,\"bl\":{\"numero\":\"BL1\"},\"items\":[{\"codigo\":\"580\",\"ncm\":\"3924.10.00.100K\",\"descripcion\":\"Pinza\",\"cantidad\":20,\"valor_fob\":10.25}]}"
+      ],
+      [
+       "filename",
+       "scan 7p.pdf"
+      ],
+      [
+       "pre_merged",
+       "true"
+      ],
+      [
+       "preview",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "guardado sin tabla rica",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo scan 7p.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF ✅ Guardado — Carga China 48 📥 Descargar Excel Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 ⚠️ Extracción incompleta: solo 2 item(s) detectados pero el FOB total es alto. Considerá reintentar. ✏️ Cabecera Despacho: ▶ Mostrar/editar campos ✏️ Items del despacho (editable): 2 filas · Editá cualquier celda (se guarda al salir) · Clic en 🗑 para borrar + Agregar fila # N° NCM Descripción Cantidad Unidad FOB USD CIF USD Derecho USD Tasa Est. USD IVA USD INAL / Cert 1 🗑 2 🗑 Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "{\"proveedor\":\"OWNLAND\",\"items\":[{\"nro_item\":1,\"subitem_nro\":2,\"codigo\":\"437E\",\"ncm\":\"8205.51.00.900A\",\"descripcion\":\"Colador <acero> & co\",\"cantidad\":1200,\"valor_fob\":1450.5,\"nro_certificado\":\"INAL 123\"},{\"nro\":7,\"codigo\":null,\"ncm\":null,\"descripcion\":null,\"cantidad\":true,\"valor_fob\":\"12\"},{\"cantidad\":0}]}"
+      ],
+      [
+       "filename",
+       "scan 7p.pdf"
+      ],
+      [
+       "pre_merged",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    },
+    {
+     "m": "GET",
+     "p": "/export-excel",
+     "q": "?carga_id=77&format=json",
+     "form": null,
+     "auth": "si"
+    },
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "items_list",
+      "tabla": "despacho_items",
+      "filtro_id": 55
+     },
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "grande",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo grande.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF 👁 Vista Previa — Carga China 48 💾 Guardar en DB 👁 Vista previa: El despacho NO se guardó en la base de datos. Revisa los datos abajo y aprieta 💾 Guardar en DB si esta todo OK. Proveedor OWNLAND N° Despacho 26001IC04000123X Items 2 Costo $0.1234 🚨 Alertas detectadas (4) 🔴 critica: Codigo 437E (LK) no está en el relevamiento 📝 Corregir Relevamiento 🟡 importante: Item 580: pre split 📝 Corregir Relevamiento 🟢 menor: Flete <alto> ℹ️ info: \"809E\" (CHEF) marca distinta 📝 Corregir Relevamiento ⚠️ Advertencias de proceso (2) — revisar manualmente ⚠️ Revisar la página 3 ⚠️ El PDF tiene 164.782 caracteres de texto y se leyeron los primeros 150.000: las últimas páginas pueden haber quedado afuera. Separá el lakout en dos PDF. Items extraídos (basico): N° Código NCM Descripción Cant FOB USD INAL 1.2 437E 8205.51.00.900A Colador <acero> & co 1200 $1450.50 INAL 123 7 - - - - - 3 - - - 0 - -",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/verify-lakout",
+     "q": "",
+     "form": [
+      [
+       "nro_carga",
+       "China 48"
+      ],
+      [
+       "pdf_text",
+       "md5:8b42879809b970f4ce5ad47322101f72:150128"
+      ],
+      [
+       "filename",
+       "grande.pdf"
+      ],
+      [
+       "preview",
+       "true"
+      ]
+     ],
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "roto",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 1 ✓ 1 archivo roto.pdf ✕ 📄 Analizar Despacho 👁 Ver PDF No se pudo procesar el PDF: Invalid PDF structure.",
+   "reqs": [],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "quitado",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 📎 Arrastrá archivos, carpetas, .zip o .rar, o hacé click 📄 Analizar Despacho No se pudo procesar el PDF: Invalid PDF structure.",
+   "reqs": [],
+   "extra": {
+    "dis": true
+   },
+   "dlg": null
+  },
+  {
+   "paso": "reentrada",
+   "texto": "🏛️ Modo Lakout — 1 PDF N° Carga * El proveedor se autodetecta del contenido del PDF. 🏛️ Despacho PDF 📎 Arrastrá archivos, carpetas, .zip o .rar, o hacé click 📄 Analizar Despacho",
+   "reqs": [],
+   "extra": {
+    "nro": ""
+   },
+   "dlg": null
+  }
+ ],
+ "history": [
+  {
+   "paso": "abrir",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar 📋 Últimas cargas procesadas 3 cargas ID N° Carga Proveedor Modo Fecha 12 China 48 OWNLAND lakout 2026-10-01 📥 Excel 13 China <b>49</b> - multidoc 2026-09-30 📥 Excel 14 Kangli 7 KANGLI full 📥 Excel",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "cargas_lista",
+      "limite": 50
+     },
+     "auth": "si"
+    }
+   ],
+   "extra": {
+    "dis": true
+   },
+   "dlg": null
+  },
+  {
+   "paso": "solo prov",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar 📋 Últimas cargas procesadas 3 cargas ID N° Carga Proveedor Modo Fecha 12 China 48 OWNLAND lakout 2026-10-01 📥 Excel 13 China <b>49</b> - multidoc 2026-09-30 📥 Excel 14 Kangli 7 KANGLI full 📥 Excel",
+   "reqs": [],
+   "extra": {
+    "dis": true
+   },
+   "dlg": null
+  },
+  {
+   "paso": "prov+cod",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar 📋 Últimas cargas procesadas 3 cargas ID N° Carga Proveedor Modo Fecha 12 China 48 OWNLAND lakout 2026-10-01 📥 Excel 13 China <b>49</b> - multidoc 2026-09-30 📥 Excel 14 Kangli 7 KANGLI full 📥 Excel",
+   "reqs": [],
+   "extra": {
+    "dis": false
+   },
+   "dlg": null
+  },
+  {
+   "paso": "comparar",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar Apariciones 2 Precio Prom. $1.23 Precio Min/Max $1.00 / $1.47 Uni/Master 48 Carga Fecha Precio Cant Uni/Master CBM/Caja China 48 2026-09-01 $1.00 1200 48 0.05 China <49> $ 📋 Últimas cargas procesadas 3 cargas ID N° Carga Proveedor Modo Fecha 12 China 48 OWNLAND lakout 2026-10-01 📥 Excel 13 China <b>49</b> - multidoc 2026-09-30 📥 Excel 14 Kangli 7 KANGLI full 📥 Excel",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/compare-historical",
+     "q": "?proveedor=OWNLAND&codigo=574E",
+     "form": null,
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "sin historico",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar Sin histórico para ese artículo. 📋 Últimas cargas procesadas 3 cargas ID N° Carga Proveedor Modo Fecha 12 China 48 OWNLAND lakout 2026-10-01 📥 Excel 13 China <b>49</b> - multidoc 2026-09-30 📥 Excel 14 Kangli 7 KANGLI full 📥 Excel",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/compare-historical",
+     "q": "?proveedor=OWNLAND&codigo=NADA",
+     "form": null,
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "respuesta vacía",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar 📋 Últimas cargas procesadas 3 cargas ID N° Carga Proveedor Modo Fecha 12 China 48 OWNLAND lakout 2026-10-01 📥 Excel 13 China <b>49</b> - multidoc 2026-09-30 📥 Excel 14 Kangli 7 KANGLI full 📥 Excel",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/compare-historical",
+     "q": "?proveedor=OWNLAND&codigo=VACIO",
+     "form": null,
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "sin cargas",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar Apariciones 1 Precio Prom. $2.00 Precio Min/Max $ / $3.00 Uni/Master Carga Fecha Precio Cant Uni/Master CBM/Caja 📋 Últimas cargas procesadas 3 cargas ID N° Carga Proveedor Modo Fecha 12 China 48 OWNLAND lakout 2026-10-01 📥 Excel 13 China <b>49</b> - multidoc 2026-09-30 📥 Excel 14 Kangli 7 KANGLI full 📥 Excel",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/compare-historical",
+     "q": "?proveedor=OWNLAND&codigo=SINCARGAS",
+     "form": null,
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "error",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar Falló la comparación 📋 Últimas cargas procesadas 3 cargas ID N° Carga Proveedor Modo Fecha 12 China 48 OWNLAND lakout 2026-10-01 📥 Excel 13 China <b>49</b> - multidoc 2026-09-30 📥 Excel 14 Kangli 7 KANGLI full 📥 Excel",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/compare-historical",
+     "q": "?proveedor=OWNLAND&codigo=ERR",
+     "form": null,
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "encode",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar Apariciones 2 Precio Prom. $1.23 Precio Min/Max $1.00 / $1.47 Uni/Master 48 Carga Fecha Precio Cant Uni/Master CBM/Caja China 48 2026-09-01 $1.00 1200 48 0.05 China <49> $ 📋 Últimas cargas procesadas 3 cargas ID N° Carga Proveedor Modo Fecha 12 China 48 OWNLAND lakout 2026-10-01 📥 Excel 13 China <b>49</b> - multidoc 2026-09-30 📥 Excel 14 Kangli 7 KANGLI full 📥 Excel",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/compare-historical",
+     "q": "?proveedor=OWN%20LAND%2B&codigo=5%207%2F4%26E",
+     "form": null,
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "prov vacío",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar Apariciones 2 Precio Prom. $1.23 Precio Min/Max $1.00 / $1.47 Uni/Master 48 Carga Fecha Precio Cant Uni/Master CBM/Caja China 48 2026-09-01 $1.00 1200 48 0.05 China <49> $ 📋 Últimas cargas procesadas 3 cargas ID N° Carga Proveedor Modo Fecha 12 China 48 OWNLAND lakout 2026-10-01 📥 Excel 13 China <b>49</b> - multidoc 2026-09-30 📥 Excel 14 Kangli 7 KANGLI full 📥 Excel",
+   "reqs": [],
+   "extra": {
+    "dis": true
+   },
+   "dlg": null
+  },
+  {
+   "paso": "excel",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar Apariciones 2 Precio Prom. $1.23 Precio Min/Max $1.00 / $1.47 Uni/Master 48 Carga Fecha Precio Cant Uni/Master CBM/Caja China 48 2026-09-01 $1.00 1200 48 0.05 China <49> $ 📋 Últimas cargas procesadas 3 cargas ID N° Carga Proveedor Modo Fecha 12 China 48 OWNLAND lakout 2026-10-01 📥 Excel 13 China <b>49</b> - multidoc 2026-09-30 📥 Excel 14 Kangli 7 KANGLI full 📥 Excel",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/export-excel",
+     "q": "?carga_id=12",
+     "form": null,
+     "auth": "si"
+    }
+   ],
+   "extra": {
+    "nombre": "verificacion_carga_12.xlsx",
+    "igual": true
+   },
+   "dlg": null
+  },
+  {
+   "paso": "excel error",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar Apariciones 2 Precio Prom. $1.23 Precio Min/Max $1.00 / $1.47 Uni/Master 48 Carga Fecha Precio Cant Uni/Master CBM/Caja China 48 2026-09-01 $1.00 1200 48 0.05 China <49> $ 📋 Últimas cargas procesadas 3 cargas ID N° Carga Proveedor Modo Fecha 12 China 48 OWNLAND lakout 2026-10-01 📥 Excel 13 China <b>49</b> - multidoc 2026-09-30 📥 Excel 14 Kangli 7 KANGLI full 📥 Excel",
+   "reqs": [
+    {
+     "m": "GET",
+     "p": "/export-excel",
+     "q": "?carga_id=13",
+     "form": null,
+     "auth": "si"
+    }
+   ],
+   "extra": {
+    "av": "No se pudo descargar el Excel: No hay despacho para esa carga Aceptar"
+   },
+   "dlg": null
+  },
+  {
+   "paso": "vacia",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar 📋 Últimas cargas procesadas 0 cargas Todavía no hay cargas procesadas.",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "cargas_lista",
+      "limite": 50
+     },
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  },
+  {
+   "paso": "lista error",
+   "texto": "📊 Comparador de artículo Proveedor Código Buscar 📋 Últimas cargas procesadas 0 cargas Todavía no hay cargas procesadas.",
+   "reqs": [
+    {
+     "m": "POST",
+     "p": "/editar",
+     "q": "",
+     "form": null,
+     "json": {
+      "accion": "cargas_lista",
+      "limite": 50
+     },
+     "auth": "si"
+    }
+   ],
+   "extra": null,
+   "dlg": null
+  }
+ ]
+}

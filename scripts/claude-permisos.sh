@@ -70,6 +70,14 @@ perms = d.setdefault("permissions", {})
 allow = perms.setdefault("allow", [])
 nuevos = [x for x in BASE if x not in allow]
 allow.extend(nuevos)
+# git push NO pregunta (Luis 30/09, Thomas 13/10). El setup script del entorno
+# (copia vieja en claude.ai) lo sigue poniendo en "ask", y un ask le gana a todo
+# allow: se saca aca, en cada arranque. El push forzado sigue en deny.
+ask = perms.get("ask", [])
+SACAR_ASK = ["Bash(git push:*)", "Bash(git push *)"]
+sacados = [x for x in ask if x in SACAR_ASK]
+if sacados:
+    perms["ask"] = [x for x in ask if x not in SACAR_ASK]
 escribir(us, d)
 
 # --- 2) trust del workspace (habilita el .claude/settings.json del repo) -----
@@ -80,6 +88,7 @@ ya = p.get("hasTrustDialogAccepted") is True
 p["hasTrustDialogAccepted"] = True
 escribir(cj, d)
 
-print("permisos usuario: +%d nuevos (%d en total) | trust %s: %s"
-      % (len(nuevos), len(allow), "ya estaba" if ya else "marcado", proj))
+print("permisos usuario: +%d nuevos (%d en total) | git push sin preguntar%s | trust %s: %s"
+      % (len(nuevos), len(allow), " (sacado de ask)" if sacados else "",
+         "ya estaba" if ya else "marcado", proj))
 ' "$HOME_DIR" "$DIR"

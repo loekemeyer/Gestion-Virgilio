@@ -395,16 +395,12 @@ catch (_e) {
     out.opVeInsumoDeLaCat = /Etiqueta chica/.test(document.getElementById("insBody").innerHTML);
     // la unidad permitida de la categoría es la que se preselecciona
     out.opUniDeLaCat = (_ins.items.filter(function (i) { return i.cod === "ET1"; })[0] || {}).unidad;   // "Rollos"
-    // y al sugerir un insumo nuevo ve esas mismas categorías y unidades
+    // v29.56 (Luis, 13/10): el operario ya NO da de alta un insumo al recibir — insNuevoOpen se planta
+    let altaAlerta = ""; const _alOp = window.alert; window.alert = function (m) { altaAlerta = String(m); };
     insNuevoOpen("");
-    const uniAlta = Array.prototype.map.call(document.querySelectorAll("#insBody .ins-uchip"), function (e) { return e.textContent.trim(); });
-    // sin categoría elegida ofrece TODAS las activas; al elegir una con unidad fija,
-    // sólo la de ella
-    out.opAltaUnidades = uniAlta.filter(function (u) { return u !== "+"; }).join(",");   // "Rollos,Kg"
-    insNuevoPick("cat", "etiquetas");
-    out.opAltaUniDeLaCat = Array.prototype.map.call(document.querySelectorAll("#insBody .ins-uchip"), function (e) { return e.textContent.trim(); })
-      .filter(function (u) { return u !== "+"; }).join(",");                              // "Rollos"
-    out.opAltaCats = Array.prototype.map.call(document.querySelectorAll("#insBody .ins-cchip"), function (e) { return e.textContent.trim(); }).join("|");
+    out.opSinAltaRI = _ins.nuevo === null && /no se puede agregar un insumo/i.test(altaAlerta) &&
+      !document.querySelector("#insBody .ins-catbtn.add") && !document.querySelector("#insBody .ins-itbtn.add");
+    window.alert = _alOp;
     return out;
   });
 
@@ -437,8 +433,7 @@ catch (_e) {
     r.totalHayFiltros === true && r.totalFiltraCod === 1 &&
     r.totalFiltraSinCat >= 1 && r.totalSeActualiza === true && r.uniProhibidaBloquea === true &&
     r.opVeCatNueva === true && r.opVeRenombrada === true && r.opVeInsumoDeLaCat === true &&
-    r.opUniDeLaCat === "Rollos" && r.opAltaUnidades === "Rollos,Kg" && r.opAltaUniDeLaCat === "Rollos" &&
-    /Etiquetas y sunchos/.test(r.opAltaCats || "") && /Flejes RENOMBRADO/.test(r.opAltaCats || "") &&
+    r.opUniDeLaCat === "Rollos" && r.opSinAltaRI === true &&
     errs.length === 0;
   console.log("ins-admin:", JSON.stringify(r));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");

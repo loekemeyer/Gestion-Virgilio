@@ -3977,6 +3977,9 @@ privado `loekemeyer/Impo-Comex`**; acá va sólo el build web (`client/dist-web`
 - Al cambiar una pantalla en `Impo-Comex`, se porta a mano al `ic-<modo>.js`; un cambio de lógica es copiar el archivo a `logica/`.
 - `tests/impo-comex-nuevo.cjs` (abre los 11 modos sin errores y corre la lógica original: PDF, Excel, zip, rar, EAN-13, Word,
   DDJJ) · `tests/impo-comex-web.cjs` (bloque e: sin token, sin datos personales, sin `import.meta.env`).
+- **v29.23: PARIDAD con el viejo, flujo por flujo** (subir, verificar, editar, corregir, guardar, descargar): `tests/impo-comex-paridad-{lakout,multidoc,marks,cajas,inal}.cjs`
+  comparan pedidos a la puerta, pantalla y descargas contra lo que hizo el viejo (`impo-comex/`), grabado en el test o en
+  `tests/tools/`. Mientras exista `impo-comex/` se regraban desde el viejo (ver la cabecera de cada test). **Al borrar el viejo, los tests siguen andando.**
 
 ## ⚠ REGLA (Luis, 2026-09-28, v23.45): la importación se RECIBE desde el panel — 📥 RECIBIR
 
@@ -5102,6 +5105,26 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   esperando un «sí» que nadie contesta, no Postgres (ni `lock_timeout` ni `statement_timeout` saltan porque la sentencia
   nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.50): los INSTRUCTIVOS de pared se GENERAN, no se dibujan
+
+Hoja de **40 × 50 cm** con el paso a paso de un módulo, pantalla por pantalla, para colgar en el
+depósito. El primero: **recepción de mercadería de un tallerista**
+(`docs/instructivos/recepcion-tallerista.pdf`).
+
+> **Las capturas salen de correr la app con Playwright, nunca de un dibujo ni de una foto de
+> pantalla.** Si cambia una pantalla, se rehace el instructivo y vuelve a quedar igual a lo que ve
+> el operario: `docs/instructivos/caps-recepcion/_generar-capturas*.cjs` →
+> `node scripts/instructivo-recepcion.cjs` (imprime cuántas páginas salieron: **tiene que decir 1**).
+
+- Los pasos viven en la lista `PASOS` del generador; el reparto en 5 columnas y el ancho de cada
+  columna se calculan solos para que no quede hoja en blanco al pie (regla de espacio del dueño).
+- Los datos son de ejemplo (Lucho, remito 40873, códigos 505/518/586 con su OC): salen del mock,
+  no de la base.
+- ⚠ El `input type=date` de Chromium headless pinta `MM/DD/AAAA` y el celular `DD/MM/AAAA`: el
+  script lo reemplaza antes de la captura.
+- Al cambiar un módulo del operario se actualizan **el manual** (`ayuda/manual-operario.md`, regla
+  v29.19) **y el instructivo del módulo** si existe. `docs/instructivos/LEEME.md`.
 
 ## Git
 
@@ -7720,6 +7743,14 @@ chinos y para avisar en la página que no tenemos stock"*.
   con `aceptado` = ya tiene código real (no `TMP-`). La escribe `gv_gp2_aceptado_sync()` (cron `gv-gp2-aceptado-sync`,
   cada 10 min, poda lo que desaparece). Al 30/09: 24 filas, 7 aceptadas, 17 con TMP. **323ES quedó Mixto.**
   `sql/gv_gp2_aceptado_virgilio_v2515.sql`.
+- **v29.60 (Luis, 13/10): y VE LAS CATEGORÍAS DE INSUMOS** — cuarta tabla espejo, **`GP2.virgilio_insumo_categoria`**
+  (clave, nombre, emoji, orden, activa), bloque 4 de `gv_gp2_espejo_sync`. Con eso GP2 → Stock general → pestaña
+  **Virgilio** filtra «Insumos de Virgilio sin asignar» por **las mismas categorías de acá**, con sus nombres
+  (`virgilio_insumos_sin_match_bundle` devuelve `categorias` y cada fila su `cat_nombre`). ⚠ **El nombre de una
+  categoría no se escribe en el front de GP2**: su mapa a mano (`VINS_RUBRO`) estaba desfasado en **4 de 6** —
+  decía «Plásticos» por «Bolsas plásticas», «Flejes» por «Flejes y alambres», y no conocía «Sector Crudo» ni
+  «Sector Procesado». Al agregar una categoría en `Insumos_Categorias`, GP2 la ve sola en ≤ 10 min.
+  `sql/gv_gp2_espejo_categorias_v2960.sql` · GP2 `db/migracion_virgilio_categorias_20261013.sql`, CONOCIMIENTO 4kn.
 - **v25.17 (Luis, 30/09, D5): GP2 ve el stock de insumos y el Mapa de Virgilio**, en tres tablas de **solo lectura** del
   schema GP2 (así no rompe su Regla 0): `virgilio_insumo_stock`, `virgilio_insumo_ubicacion` y `virgilio_lugar`. Las
   llena `gv_gp2_espejo_sync()` (cron `gv-gp2-espejo-sync`, c/10 min, reescribe sólo si cambió el md5). Luis: *"que los
@@ -7733,7 +7764,7 @@ el mismo molde (el mismo bloque está en el `CLAUDE.md` de `loekemeyer/Gestion-P
 
 | pieza | cómo |
 |---|---|
-| frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.aceptado_virgilio`, y los espejos de solo lectura `GP2.virgilio_insumo_stock` / `_ubicacion` / `virgilio_lugar` |
+| frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.aceptado_virgilio`, y los espejos de solo lectura `GP2.virgilio_insumo_stock` / `_ubicacion` / `virgilio_lugar` / `virgilio_insumo_categoria` |
 | códigos | GV habla en código de ARTÍCULO (323ES), GP2 en COMPONENTE (GRJ31). El vínculo vive en **`GP2.importado_virgilio_componente`** y **nunca se adivina** |
 | confirmar | el que recibe dice **Sí / No** donde trabaja, en la tarjeta del componente. ⚠ **Hoy avisa sólo lo que RECIBE CERVANTES** (Luis, 02/10: *"lo que recibe Cervantes avisa"*): lo que GP2 manda a Virgilio (`enviar_a_virgilio`, tablet y botón «→ Virgilio») no pide Sí/No en GV |
 | Sí | el MISMO camino que la carga manual (en GP2: `crear_recepcion_insumo` + control en kg pendiente) |
@@ -8183,6 +8214,38 @@ tv.html / admin.html (`actividadActual`, fichadas, `popFaseCiclos` en `build-adm
 (`fetchMonitorDayStats`, `showDayBreakdown`, `_monActividadActual`, `_monEnSilencio`, `fetchMonitorEvents`). Todo
 filtro de «legajo de prueba» en un monitor lleva también `/^sup:/`. `tests/mon-sup-no-operario.cjs`.
 
+## ⚠ REGLA (2026-10-10, v29.38): 809E de Chef = SÓLO Corta Queso · 809E de Loeke = SÓLO Corta Pizza — y el corta pizza nuevo es 820E
+
+- En todos lados el 809E CH se llama Corta Queso y el 809E LK, Corta Pizza. `artNombre` (index.html) e `_impNombre`
+  (importacion.js) resuelven el nombre de un dual por empresa; el padrón (`vista_nombres_articulos`) tiene un solo nombre por
+  código pelado y no sirve para los duales. `tests/pedimp-dual-nombre.cjs`.
+- **La importación PI OL-10139 del corta pizza de LK llega como 820E** (Importados 175): el bache 86 (1.632 u, 18/12) se pasó
+  del 809E LK al 820E. El 809E de Chef sigue con su pedido (7.200 u).
+- ⚠ **No usar `Equivalencias_Familia` para 809E LK → 820E**: no distingue empresa y le pasaría al 820E la Est. Madre del corta queso.
+- Consumos medidos el 10/10 (facturas ISIS, abr-sep): Chef 809E 840–2.316 u/mes · LK 809E 108–636 u/mes: no están cruzados.
+- `sql/gv_820e_alta_v2938.sql`, `sql/gv_nombre_dual_v2937.sql` (el refresco de Stocks usa `gv_nombre_dual` desde la v29.43, con el sí de Thomas).
+- **Las 336 cajas de AD05 (ingreso 23/07, 28 MC) son de CHEF** (confirmado 10/10): ajuste racks LK −336 / CH +336 en AD05
+  (`client_id corr_809e_ad05_*`) y `GV_Lugar` AD05 → CH (backup `zz_backups."GV_Backup_Lugar_AD05_20261010"`). Retira lo del
+  conteo del 17/09 («son de Loekemeyer») y el «AD05 pasó a LK» de la v19.33. Queda 809E LK = 5 cajas en góndola.
+- **SÓLO en Importaciones el 809E LK se ve como 820E** (v29.41, *"ya mirá todo como 820, no como 809"*): la fila 809E LK
+  se pliega dentro de la 820E (stock, Est. Madre, pedidos y en camino; chip «incluye 809E LK»; la proyección abre la del
+  809E LK). El vínculo es la tabla `GV_Importados_EnCurso_Suma` (destino_cod/marca = el VIEJO, origen_cod = el NUEVO; el
+  nombre quedó del primer intento: el ALTER de renombre se cuelga en el MCP). El 809E de Chef no se toca. **Cuando entren los
+  pedidos del 820E se da de baja el 809E LK** (GV_Codigo_Baja no sirve: es por código y el 809E de Chef sigue).
+  `tests/pedimp-encurso-suma.cjs`.
+
+## ⚠ REGLA (Thomas, 2026-10-10, v29.44): el 119 pasa a SECUNDARIO del 119E — recién CUANDO LLEGA
+
+- 119E (Corta queso Loke, Ownland, PI OL-10139: 1.872 u, llega 18/12) se dio de alta en Stocks en 0 y su pedido quedó en
+  🚢 En curso. El 119 (góndola Ñ26, OC a Lucho) sigue como está hasta que llegue.
+- **Familia diferida**: `GV_Familia_Al_Llegar` (secundario, principal). El cron **`gv-familia-al-llegar`** (`39 * * * *`,
+  anti-solape) → `gv_familia_al_llegar_tick()`: cuando el principal tiene stock (> 0) o unidades recibidas, escribe la fila en
+  `Equivalencias_Familia` y marca `aplicado_en`. Otro caso igual = un `insert`.
+- **v29.45 (Luis, D10): al llegar, además la góndola del secundario pasa al principal** (`pasar_gondola`: Ñ26 → 119E, por
+  `gv_lugar_item_guardar` / `_sacar`) **y la OC del secundario se apaga** (`apagar_oc`: `OC_Maximos` 119 `activo = false`; el 119E
+  queda con fila activa). Todo queda en `aplicado_motivo`. `sql/gv_familia_al_llegar_v2945.sql`.
+- Lectura: `select * from public.gv_familia_al_llegar_tick(true);` (qué haría). `sql/gv_familia_al_llegar_v2944.sql`.
+
 ## ⚠ REGLA (Luis, 2026-10-07, v27.74): 865ED NO EXISTE MÁS — es el 865E de 12 u
 
 El 865E (antes caja de 24 u) pasó a ser el Rallador Plano A/I 3 Usos **de 12 u**, y el 865ED se unificó ahí: UxB,
@@ -8577,3 +8640,258 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
   plástico, código real, con ubicación en el Mapa, sin TMP-), sin «‹ Atrás» ni buscador (`_ins.soloBolsas`). Al 09/10 son 9
   (ABS, AI, EBA, NY c/Carga 25%, NY Recup, NY Virgen, PE Polie, PP 2630, PS PE). Una bolsa nueva aparece cuando se le da ubicación.
 - `tests/ins-ri-cat-bolsas.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.57): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
+
+(los comentarios del código, el `.sql` y la vista dicen **v29.56**: otra sesión se llevó ese número mientras se escribía esto.)
+
+**Luis:** *"se pide que se marque la empresa (LK o CH) cuando un operario recibe insumos. esto no debería afectar
+nada (mismo insumo físicamente, mismo lugar físico) pero debería quedar registro"*. Antes se pedía **sólo en cajas**
+(v29.31, Thomas D26).
+
+- El pop-up de cantidad de **Recibir insumos** pide la **Marca** en TODA categoría, obligatoria (el botón «Listo»
+  queda deshabilitado y `insEnviar` frena). **Cajas**: Loeke / Chef. **El resto**: Loeke / Chef / **Mixto** (las dos).
+  Al **entregar** (EI) no se pide. `INS_MARCAS`, `_insMarcasDe`, `_insMarcaHtml`.
+- **La marca NO parte el stock**: el movimiento sigue siendo el mismo insumo en el mismo lugar y con
+  **`empresa = 'Mixto'`** (lo fuerza `gv_insumo_unidad_base`, regla v24.89 — medido: 446 de 446 movimientos). Queda
+  escrita en la **descripción** (`· marca Loeke`), como ya hacía cajas.
+- Consultable en **`gv_insumo_recepcion_marca`** (una fila por recepción, con `marca`, categoría, unidad y origen):
+  si el dato sólo vive en un string de la descripción no se puede agrupar.
+- ⚠ **Al agregar un dato que acompaña un movimiento de insumos sin cambiar el saldo, va en la descripción, nunca en
+  `empresa`**: esa columna la pisa el trigger y la leen el espejo a GP2 y los lectores de stock.
+- `sql/gv_insumo_marca_empresa_v2956.sql`, `tests/ins-marca-empresa.cjs` (verificado que falla contra la v29.55).
+
+### ⚠ Y los saldos de insumos en unidad VIEJA (MC) son de antes de la v24.69
+
+`gv_insumo_unidad_base` convierte a la unidad base, pero es **BEFORE INSERT solamente**: las 18 líneas cargadas en
+MC antes de esa versión (546P 10 · H201Part 5 · 439E 1 · 505C 1 · 590E 1; la última del **25/08**) quedaron así, y
+`vista_saldos_insumos_x_unidad` **agrupa por unidad** → esos códigos muestran dos saldos (Uni positivo + MC negativo).
+**No es un bug vivo**: `gv_importados_stock_insumos` los convierte con el factor y da el número correcto (505C
+**98.000** · 439E **312** · 590E **0**, `sin_factor` en 0). Los 5 saldos negativos de insumos son exactamente esas
+unidades viejas, todos de categoría `importados`: **cero negativos en las categorías del operario**.
+
+⚠⚠ **NO se normalizan: quedan así** (Luis, 13/10, D9: *"dejalo"*). El UPDATE que las reexpresaría está escrito en
+`sql/gv_insumo_marca_empresa_v2956.sql` y **no se aplicó**: es cosmético (que cada código muestre un solo número) y
+no cambia ninguna cuenta, así que no vale pisar 18 filas de `Movimientos_Stock`. **No volver a proponerlo.** Y si
+alguien lo intenta: un INSERT compensatorio NO sirve — la línea nueva con unidad `MC` la convierte el trigger y el
+saldo MC sigue ahí; el único camino es el UPDATE de las filas viejas, que no dispara ese trigger.
+
+⚠⚠ **La SALIDA de insumos NO lleva empresa, y no se le agrega** (Luis, 13/10, D10: *"no, solo el registro de la
+entrada es importante"*). Medido sobre las 92 entregas (30/06 al 08/10): **92 de 92 con `empresa = 'Mixto'` y 0 con
+marca**; lo único que queda es **a quién se le dio** (`ref`: Cervantes 42 · Rafael 8 · Manolo 3 · Bryan 1, más 33 sin
+destino del 30/06 al 07/08, de antes de que el campo fuera obligatorio). O sea el circuito es **asimétrico a
+propósito**: la entrada dice de qué empresa vino y la salida no dice para cuál se usó. **No proponer pedir la marca
+al entregar ni «cerrar el círculo» por empresa.**
+⚠ **Las 45 «Cajas» de 546P no se tocan** (Luis, 13/10, D8: *"dejalo"*): esa unidad no tiene factor en
+`Insumos_Factores` y no se inventa. Y 546P no está mapeado a ningún importado, así que su stock hoy no lo lee
+ninguna pantalla de compra.
+
+## ⚠ REGLA (v29.24, 09/10): el REPLAY de Terminar Día no re-manda los items SÓLO de Historial (`h_*`)
+
+- `bulkSendDayReplay` re-manda el Historial del día con `client_id = item.id`. Las tareas de módulo (guardado MG, bajar/ingreso
+  a racks RKB/IRT, Mover racks / Insumos / CP / RC por MDT) dejan un item de Historial con id `h_*` y su evento real sale con
+  OTRO id (`rkb_`, `irt_`, `mdt_`…): el replay los DUPLICABA en el servidor (09/10: 104 y 277, con `h_mg` de opcion MG y el
+  tramo entero del módulo, y `h_mdt` con opcion INS). Hoy esos items llevan `noReplay: true` y el replay saltea todo `h_*`.
+- Al agregar un item de Historial que no es el evento enviado: `noReplay: true`. `tests/historial-no-replay.cjs`.
+
+
+## ⚠ REGLA (Thomas, 2026-10-09, v29.32, D32): el stock de insumos de VIRGILIO se COPIA EN VIVO a GP2
+
+*"Cuando hago un relevamiento tengo que ver online en GP2 el stock de Cervantes y el de Virgilio: el máximo necesita las dos plantas."*
+
+- El stock sigue viviendo en `Movimientos_Stock` (deposito `insumos`, D28 a). **`gv_gp2_espejo_insumos(cod, simular)`** deja en
+  GP2, en el depósito «<sector> en Virgilio» (virgilio_sector con `ref_id` = sector; bolsas → 57), EXACTAMENTE el saldo de
+  Virgilio pasado a la unidad de GP2 (Cajones × uni_x_cajon · Bolsas × 25 kg · Kg · Uni · Paquetes × 25). Reconcilia
+  (objetivo − lo que hay) con un movimiento `ajuste` de GP2 con nota «Espejo Virgilio (…)»; si cuadra no escribe.
+- Corre por el disparador `zz_gv_gp2_espejo_insumos` (cada movimiento de insumos; nunca frena la carga: el error va al log)
+  y por el cron `gv-gp2-espejo-insumos` (:19 y :49). Alcance: cajas, fleje, parte_procesado, partes_crudo, plastico — los
+  importados NO.
+- **Qué código va con qué componente lo dice `GP2.importado_virgilio_componente`** (54 cargadas el 09/10; el resto lo asigna
+  Thomas en GP2 → Stock General → Virgilio, D30). Un código sin equivalencia no se copia.
+- **D16 (Thomas): el celular del operario de Virgilio NO escribe en GP2.** Lo que pasa en GP2 (envío de bolsas a un inyector,
+  consumo) lo carga el admin dentro de GP2. `gv_insumo_envio_inyector` queda sin grant y sin llamador.
+- Lectura: `select * from public.gv_gp2_espejo_insumos(null, true);` (qué haría) · `select * from public."GV_GP2_Espejo_Log" order by id desc;`
+- Rollback: `select cron.unschedule('gv-gp2-espejo-insumos');` + `alter table public."Movimientos_Stock" disable trigger zz_gv_gp2_espejo_insumos;`
+- `sql/gv_gp2_espejo_insumos_v2932.sql`.
+
+## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
+
+- **Nombres**: un insumo de Virgilio vinculado a GP2 lleva el nombre de GP2 (v29.34: cajas, bolsas, C15, C6, A15, G11, G13).
+  Un **fleje** se llama «<medida de GP2> · <nombre de GP2>» (`84 x 1,75 · Fleje N° 13`): la medida adelante sigue
+  ordenando la lista del operario (`_insMedida`). Lo arma `gv_gp2_nombre_insumo(comp)`.
+- **Recibir insumos** (`showInsumoModal` RI): además de los insumos de Virgilio aparecen TODOS los componentes de GP2 del
+  rubro (`gv_gp2_componentes_ri`, anon; rubro → sector: crudo 1 · procesado 2 · fleje 5 · partes plásticas 6 · cajas 11 ·
+  bolsas 14). Elegir uno que falta lo da de alta en Virgilio con el código y el nombre de GP2 y lo vincula
+  (`gv_insumo_desde_gp2`, idempotente); mismo código y mismo rubro sin vincular → sólo se vincula (no se duplica); código de
+  GP2 ya usado por otra cosa en Virgilio → código + sufijo de sector (`A9 CJ`). Así nadie carga como «insumo nuevo» algo
+  que ya tiene nombre. La bolsa ya vinculada se ve al recibir aunque no tenga lugar en el Mapa. Sin respuesta de GP2, la
+  pantalla queda como antes. Lo recibido se copia a GP2 por el espejo de la v29.32.
+- El conteo de insumos del martes 13/10 corrige el stock. `sql/gv_insumos_nombre_gp2_v2934.sql`,
+  `sql/gv_ri_catalogo_gp2_v2935.sql` (respaldo de nombres adentro), centinela 388, `tests/ins-ri-gp2-catalogo.cjs`.
+
+## ⚠ REGLA (2026-10-12, v29.46): PPP → «Plantel» — horas de picking, armado y tareas fijas → personas de la semana
+
+Solapa **Plantel** de la PPP (`plantel.js`, `plantelHtml` / `plantelCalc`). Todo lo calcula **`gv_ppp_plantel(semana, semanas_hist, meta, dias_antes)`** (anon, ~1,4 s):
+
+| pieza | de dónde |
+|---|---|
+| m³ de la semana | el MAYOR entre **no vencer** (programado sin pickear / sin armar cuyo límite de armado = fecha del pedido + meta hábiles − 2 hábiles cae antes del viernes; para una semana futura se descuenta lo que se hace antes al ritmo de hoy) y **no acumular** (m³ que entra por semana, por fecha del pedido) |
+| m³/h | medido: m³ de las tandas con su 1.er TP / TAP ÷ horas reales de picking / armado (`gv_monitor_horas_operario_dia`) de las últimas N semanas |
+| tareas fijas | promedio por día hábil de **carga + remitos** (hs_prod − pick − arm = CC/CR/RR) y **movimiento** (guardado, recepción, racks, insumos) × hábiles de la semana |
+| personas | horas ÷ (horas útiles por persona por día × hábiles), para ARRIBA. Útiles = medido (pick+arm+carga+mov por persona-día, 6:58 al 12/10, jornada 8:25); se puede pisar en pantalla (por navegador) |
+
+- La historia vive en **`GV_Plantel_Dia`** (caché por día: 28 días de la vista tardan 3,3 s); la llena `gv_plantel_dia_refrescar` con el cron **154 `gv-plantel-dia`** (04:50 ART, últimos 3 días, anti-solape).
+- Feriados: `gv_es_dia_habil` (planify.feriados + GV_Dias_No_Habiles). La meta por defecto es **10 hábiles** del pedido a la salida (editable en pantalla).
+- **No cuenta** lo que está en A Programar ni en Cuarentena (no tiene tanda ni fecha).
+- Medido 12/10: entra 32,2 m³/sem y se procesan 5,0 m³/día (≈ 25/sem) con 3,5 personas/día; 13 NP ya pasaron los 10 hábiles. Próxima semana: 143:10 h → 5 personas.
+- `sql/gv_ppp_plantel_v2946.sql` (rollback en la cabecera), `tests/ppp-plantel.cjs`.
+
+## ⚠ REGLA (Thomas, 2026-10-12, v29.47, D4): RITMO DE PICKING — estimado por DIFICULTAD antes de pickear vs real
+
+**Thomas:** *"si es un metro cúbico de un picking ultra difícil, el ritmo va a ser peor … que figure cuántas son las horas y qué rendimiento tuvieron en horas reales, acorde al esperado que habíamos estimado de manera inicial. Todo en el back."*
+
+| pieza | qué hace |
+|---|---|
+| **`gv_picking_estimar(tandas[])`** | el tamaño D17 (min) de una tanda SIN pickear: líneas del pedido (`PPP_Web_Base` / `gv_ppp_base_pedidos`), góndola del Mapa y stock de ahora (`stocks_carga_rapida`) para la altura. Misma fórmula y coeficientes que `gv_picking_tanda_calc` (`GV_Picking_Esquema`). Validado sobre 98 tandas ya pickeadas: correlación 0,98 con el D17 post-picking, +5 % (cuenta líneas que después salen en 0) |
+| **`GV_Picking_Estimado`** | la foto por tanda: `tamano_inicial` (la PRIMERA estimación, no se pisa) y `tamano` (la última antes del TP). Cron **155 `gv-picking-estimar`** (`8-58/10 9-23`). Las 182 tandas pickeadas antes del 12/10 están `reconstruido = true` (estimadas después, con el stock de hoy) |
+| **`GV_Plantel_Operario_Dia`** | horas del monitor por operario y día (la llena `gv_plantel_dia_refrescar`, cron 154; `GV_Plantel_Dia` sale de esa foto) |
+| **`gv_ritmo_picking(desde, hasta)`** | **sólo supervisor**. Por día, por operario y total: estimado inicial, esperado (D17 con lo pickeado), real neto (sin pausas ni huecos > 5 min, cola ≤ 30), horas del monitor (hoy en vivo), rendimiento = esperado ÷ real (≥ 100 % llegó), pérdida = monitor − real |
+| Monitor → pestaña **Ritmo** | `ritmoCargar` / `ritmoRender` en `plantel.js`. Dentro de `monTabSwitch`: el kiosko de pared no la muestra |
+| **Plantel** | la hora de picking sale de la base (`semana.horas_pick`): lo que vence = minutos estimados de SUS tandas × F (F = horas reales del monitor ÷ estimado de las tandas pickeadas en la historia, 1,22 al 12/10); lo que entra, al promedio; el mayor |
+
+- ~~El modelo topea cada línea en 30 cajas~~ → desde la **v29.48** la caja por encima de 30 suma `caja_extra` (E85A 6 → 18 min, E84A 6 → 30 contra 32 reales).
+- Al 12/10, 28 días: 144 tandas, esperado 62:44 h, real 56:35 h (111 %), monitor 80:32 h (la diferencia son pausas, huecos y cola).
+- ~~Armado no tiene modelo de dificultad todavía~~ → **hecho en la v29.48** (ver la regla de abajo).
+- `sql/gv_ritmo_picking_v2947.sql`, `tests/monitor-ritmo.cjs`, `tests/ppp-plantel.cjs` (f).
+
+## ⚠ REGLA (Thomas, 2026-10-12, v29.48, D5 · D6 · D7): ARMADO por dificultad, Plantel con A Programar/Cuarentena y pallets en el picking
+
+- **Armado (D5)**: tamaño esperado en min = **5,06 × NP + 0,607 × línea + 0,352 × caja (hasta 30 por línea) + 0,076 × caja de 30 a 330 por línea + 30,4 si es súper** (`gv_armado_tamano`; coeficientes `arm_*` en `GV_Picking_Esquema`, NNLS sobre 426 tandas: corr 0,85, error medio 17,5 min sobre una mediana de 50). Real = AP→TAP − pausas + cola ≤ 30 min (`gv_armado_tanda_calc`, caché **`GV_Armado_Tanda`**). Una tanda **frenada en armado (APF) no se mide** (la armaron dos personas). No hay huecos medibles: TAL y ENT llegan al terminar.
+  - Antes de armar: **`gv_armado_estimar`** con las líneas del pedido (corr 0,85 con el real, ×1,02) → foto **`GV_Armado_Estimado`** (`tamano_inicial` no se pisa; `reconstruido = true` lo armado antes del 12/10). Lo refresca el cron **155** junto con el picking.
+  - Monitor → **Ritmo** tiene **Picking | Armado** (`gv_ritmo_armado`, la misma cuenta que `gv_ritmo_picking` sobre las tablas de armado; sólo supervisor).
+  - **Plantel**: `semana.horas_arm` = lo que vence (estimado × F, F = horas de armado del monitor ÷ estimado de las tandas con su 1.er TAP en la historia, 1,14 al 12/10) o lo que entra al promedio, el mayor.
+- **Plantel (D6)**: cuenta también lo que espera en **A Programar y Cuarentena** (`gv_ppp_sin_programar()`: el universo de A Programar sin lo que `gv_pedidos_web_excluidos` saca, m³ por `items_string` × `vista_volumen_articulo_resuelto`). Su plazo corre desde la fecha del pedido. Al 12/10: 11 pedidos, 6,80 m³, 7 ya vencidos.
+- **Picking (D7)**: la caja por encima de 30 por línea suma **`caja_extra` = 0,0061 min** (pallet entero; E84A 6 → 30 min contra 32 reales). El caché se ajustó una vez (llave `GV_Picking_Esquema.caja_extra_aplicado`): no volver a sumar.
+- Centinelas v29.48 (5 filas). `sql/gv_armado_dificultad_v2948.sql`, `sql/gv_plantel_ritmo_v2948_defs.sql` (definiciones vivas), `docs/armado-dificultad/fit_armado.py`, `tests/ppp-plantel.cjs` (g, h), `tests/monitor-ritmo.cjs` (g).
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.49): el ARMADO cruza Entregas con el picking por el CÓDIGO DE PICKING
+
+Auditoría del módulo de operarios (13/10). `reconciliar_pipeline_stock_etapa2` (el `separado` del TAP) cruzaba
+`Entregas_Virgilio` contra el picking sin pelar la **L** ni aplicar `Correcciones_Pedido`: en un pedido de Chef con
+artículos de Loeke (031L, 102EL…) o con secundario corregido (809 → 809E) no encontraba lo entregado y mandaba lo
+pickeado **de vuelta a góndola** en vez de a «a facturar». Medido: E29G 36 · E18B 43 · F58A 185 · D58A 32 · F13C 5 ·
+F48A 3 cajas de góndola de más (ya salieron o están en el pallet), y el facturado no las drenaba.
+
+- La normalización vive en **una vista, `gv_entregas_norm`** (tanda viva, `artn` sin L / sufijo / ceros, corrección
+  aplicada, `emp_l = 'LK'` si la línea tiene L). La usan los dos bloques de la etapa 2.
+- **El «de menos» del armado no descuenta dos veces**: trigger `aa_gv_npd_tope_picking` → `gv_npd_tope_faltante_picking`
+  topa el ajuste `npd_…` de Pickeados con el faltante que el PKC ya registró (F58A/102E quedaba en −5).
+- Lo pasado NO se corrige solo (los pares ya separados están balanceados): la corrección de datos pide el «sí».
+- Centinelas 394-396. `sql/gv_etapa2_codigo_l_correccion_v2949.sql`, `sql/gv_npd_tope_faltante_picking_v2949.sql`.
+- **v29.52: el PKC mueve la góndola EN EL MOMENTO.** `trg_pkc_reconciliar_rt` pasó a SECURITY DEFINER: como invoker,
+  con la clave pública daba *permission denied* (tragado) y el picking recién se registraba con el cron 68 (hasta 10 min).
+  Probado como `anon` y en vivo (PKC 09:04:28 → picking 09:04:28). `sql/gv_pkc_rt_definer_v2950.sql`.
+- **v29.53: CORREGIR una línea pickeada también mueve la góndola en el momento** (trigger `trg_pkc_reconciliar_rt_upd`,
+  AFTER UPDATE: el celular corrige con upsert). **No duplica**: el reconciliador escribe con upsert sobre
+  `mov_stock_pipeline_dedup` y el cron 68 recalcula el mismo total (probado: PKC, corrección, reenvío y cron → 3 filas, mismo número).
+- **Cómo se prueba un módulo de operario**: como `anon` (`set local role anon`) en transacción abortada, con una tanda de
+  formato real (`Z98Z`: los guards miran `^[A-Z][0-9]{2}[A-Z]$`) y las Entregas en UN insert (el armado las manda juntas;
+  de a una, el trigger separa la tanda con la primera línea sola).
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.53, D3): el SERVIDOR reconoce un EVENTO DUPLICADO aunque llegue con OTRO client_id
+
+Luis: *"no habría problema con que los mande de vuelta. el punto es que el server debería procesarlo correctamente e
+identificar cuando son eventos duplicados"*. Trigger **`ab_gv_evento_duplicado`** (BEFORE INSERT en
+`Registros_Produccion_Virgilio`, después de `aa_gv_registro_entrevista_a_empleado`) → `gv_evento_duplicado()`:
+
+- **R1 mismo tramo**: mismo legajo, `ts_inicio` y `ts_cliente` a menos de 2 s de un evento vivo (no termina en X) con otro
+  `client_id` → es el mismo cierre de tarea. Medido 60 días: 3 pares entre eventos «buenos» y los 3 eran duplicados.
+- **R2 copia del Historial**: `client_id` h_* con un evento vivo del mismo legajo a menos de 2 s (el guardado cierra con
+  MGC, sin `ts_inicio`). Sin gemelo ENTRA: es el único dato.
+- Lo descartado queda entero en **`GV_Evento_Duplicado`** (motivo + gemelo): `select * from public."GV_Evento_Duplicado" order by id desc;`
+- Los 55 h_* del 02/10 al 09/10 se anularon (RKBX/MDTX/INSX/IRTX y **MGXX**: `MGX` ya es «guardado fuera de lista» y lo
+  cuenta `generar_reporte_agentes`, así que al anular un MG se usa MGXX). Backups `zz_backups."GV_Backup_RegH_Replay_*"`.
+- Probado como anon en transacción abortada: copias h_rkb / h_mg y R1 con otro id descartadas (3 al log), uno legítimo entra.
+- Rollback: `alter table public."Registros_Produccion_Virgilio" disable trigger ab_gv_evento_duplicado;`
+  El marcador interno dice `v29.25-evdup` (llave). Centinela `gv_evento_duplicado`. `sql/gv_evento_duplicado_v2950.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.58): en BAJAR DE RACKS la capacidad del DUAL es POR EMPRESA — y sin capacidad se ordena por E.M.
+
+El orden por urgencia de Bajar de racks (v25.89, `(góndola + A guardar − pedido) ÷ capacidad`, menor primero)
+tenía dos agujeros, medidos el 13/10 sobre los 57 códigos con stock en racks:
+
+1. **El dual iba último.** `vista_saldos_stock` emite la clave CON sufijo (`437E LK`) y `ocgFetchCapacidad` indexa
+   el código **pelado** (`437E`): no matcheaba, `prio = Infinity`. Eran 3 filas vivas (437E LK con **225 cajas en
+   racks**, 438E LK 78, 809E CH 336) con la góndola a medio llenar. La capacidad por empresa **ya estaba** en
+   `Capacidad_Sector` (437E: LK 120 / CH 48): faltaba cruzar **(cod, empresa)**. Lo hacen `rkbFetchCapacidad()`
+   (devuelve `pelada` y `porEmp`, nunca pegadas) y **`_rkbCapDe(cod, capObj)`**. Para un código no dual da
+   exactamente lo mismo que antes.
+2. **Sin `cajas_max` cargada van al final, y entre ésos manda la ESTADÍSTICA MADRE** (`gv_proyeccion_articulo`,
+   mayor a menor): sin capacidad no hay hueco que medir, así que primero lo que más se vende. Al 13/10 son 3
+   (**505I con 1.475 cajas en racks** y la góndola en 0 — su celda del Mapa no tiene capacidad —, 938E 228 sin
+   celda, AB3 60) y **ninguno está en `gv_proyeccion_articulo`**, así que hoy la E.M. de los tres es 0 y
+   desempata el código: el orden entre ellos sólo cambia cuando alguno tenga venta.
+
+⚠ **El ratio mide «qué tan vacía está la celda», no cuántas cajas entran.** El 606E queda 6.º con prio 0,00
+teniendo **218 de hueco** y 120 en racks, detrás del 361E (hueco 41, cap 32). **Luis lo decidió así el 13/10** (*"está bien que pese un pedido de esa forma, dejalo así"*): el
+objetivo es que ninguna celda se quede sin mercadería para el picking, y el pedido pesa sobre el tamaño de SU
+celda. **No volver a proponer el orden por hueco en cajas** (`min(cap − góndola − A guardar + pedido, racks)`),
+que es la otra lectura y quedó descartada.
+
+⚠⚠ **v29.64 (D5, Luis 13/10: *"que no lo saque, que pueda evaluar individualmente a cada uno"*): el mismo
+`_rkbCapDe` en GUARDADO A GÓNDOLA, en «¿QUÉ BAJAR PRIMERO?» y en su BADGE.** Los tres cruzaban la capacidad
+con `capMap[_ocgNorm(a.cod)]`, o sea el código **pelado** contra una clave de saldo que para los duales trae
+el sufijo: el dual quedaba con `cap = 0` y, en «¿Qué bajar primero?», el `if (cap <= 0) return null` de los
+urgentes **lo borraba de la pantalla y del badge** (el 437E LK con 225 cajas en racks y la góndola de LK a 72
+no aparecía nunca). Hoy los tres llaman a `rkbFetchCapacidad()` + `_rkbCapDe(a.cod, capObj)`, así que **cada
+empresa del dual se evalúa por separado** y para un código no dual el número es idéntico al de antes.
+En MG, además, las **cajas × MC y las celdas de góndola** se buscan con sufijo y se caen al pelado (son del
+ARTÍCULO, iguales en las dos empresas): sin eso el dual no mostraba el hint de MC ni sus celdas. **La DEMANDA
+no cae al pelado**: `ocgDemanda(true)` ya la emite por empresa (`pkCodEmpresa`) y el fallback le daría a cada
+empresa los pedidos de las dos.
+
+⚠ **Capacidad en más de una empresa son SÓLO 5 códigos** (medido 13/10): los 4 duales y el **606E** (LK + IN),
+que por eso sigue midiéndose con la suma pelada (218) — `porEmp` guarda únicamente LK y CH.
+
+⚠ **D6 (Luis, 13/10): el 505I queda al final y la capacidad la carga Luis a mano** (*"cerralo así después se
+la asigno manualmente"*). Tiene **1.475 cajas en racks** con la góndola en 0 porque su celda del Mapa no tiene
+`cajas_max`. No cargarla desde una sesión.
+
+**Chequeo:** `node tests/rkb-orden-urgencia.cjs` · `node tests/mg-prioridad.cjs` · `node tests/qbp-liquidar.cjs`
+— los tres corren la pantalla y miden que el 437E LK tome **120** (el de LK), no los 168 de las dos empresas
+sumadas, y que no se caiga de la lista. Verificado que los tres fallan contra el index anterior.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.64, D11): el GUARDADO A GÓNDOLA puede entrar A MEDIAS — y queda así
+
+**Luis, textual:** *"d11 no, dejalo así"*. Medido en la auditoría del módulo de operarios: un guardado (MG)
+son **dos filas sueltas** (`a_guardar −N` / `terminado +N`, cada una con su `client_id`, el mismo `creado`) y la
+cola del celular las manda **fila por fila** (v25.20). El guard `trg_guardado_no_negativo` rechaza con
+`raise exception` (23514) **sólo la pata de `a_guardar`** cuando el saldo quedaría negativo; la cola la descarta
+como «400 de datos» y **la pata de góndola entra igual**, así que la góndola queda inflada y nada avisa.
+
+**Riesgo asumido:** puede volver a pasar y el saldo del código queda por encima de lo físico hasta el próximo
+conteo. **Cuánto pasó en toda la historia: 1 vez, 1 caja** — 599E, 30/09/2026 15:51:29, legajo 104, movimiento
+id 104074491, `terminado +1` sin su `a_guardar −1` (góndola 599E = 40, físico 39). El guard está bien: lo que
+falla es que las dos patas viajan por separado. **No volver a proponer el arreglo sin que Luis lo pida.**
+
+✅ **La caja del 599E se corrigió el 13/10** (D12, Luis: *"d12 si, corregila"*): ajuste `terminado −1` con
+`ref = 'CORR MG 104074491'` (mov 145964321). Góndola 599E 40 → **39**, igual al caché `stocks_carga_rapida`. El
+movimiento original NO se borra: la corrección va como ajuste aparte.
+
+Cómo se ve si vuelve a pasar: un `guardado` de `terminado` sin su par de `a_guardar` con el mismo `creado`, sin
+su ajuste de corrección:
+
+```sql
+select m.cod_art, m.creado, m.legajo, m.delta
+  from public."Movimientos_Stock" m
+ where m.tipo = 'guardado' and m.delta > 0
+   and not exists (select 1 from public."Movimientos_Stock" x
+                    where x.tipo = 'guardado' and x.deposito = 'a_guardar'
+                      and x.cod_art = m.cod_art and x.creado = m.creado and x.legajo = m.legajo)
+   and not exists (select 1 from public."Movimientos_Stock" c
+                    where c.ref = 'CORR MG ' || m.id::text)
+ order by m.creado desc;
+```
+
+Al 13/10 queda **1 fila y es de antes del módulo actual**: 542, 22/07/2026, `legajo` y `client_id` en NULL (una
+carga de panel, no del celular). **No se tocó**: corregirla es otra decisión de datos y pide el «sí».

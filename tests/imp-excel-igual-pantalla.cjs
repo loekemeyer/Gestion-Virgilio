@@ -14,7 +14,9 @@ const ctx = {
   _stkPop: null, _IMPORTADOR_DE: {}, console,
   // v24.55 — _pedImpMcOf aplica la regla del 80 % del MOQ: acá el MOQ va en 0 (no toca las cantidades del test).
   _NAC_TASAS: { moq: 0, moq_meses_max: 12, moq_pct: 0.8 }, _impProvNum: (p, k, d) => d,
-  codCanon: (c) => c, artNombre: (c, d) => d || c, pedImpQTerms: () => [], pedImpMatch: () => true,
+  codCanon: (c) => c, artNombre: (c, d) => d || c,
+  // v29.38: el nombre de un dual sale por empresa (_impNombre); acá alcanza con la descripción del ítem.
+  _impNombre: (c, e, fb) => fb || c, pedImpQTerms: () => [], pedImpMatch: () => true,
   alert: () => {}, Blob: function (p) { html = p.join(""); }, URL: { createObjectURL: () => "u", revokeObjectURL: () => {} },
   document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } }, setTimeout: () => {},
 };

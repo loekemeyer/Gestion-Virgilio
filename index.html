@@ -5960,6 +5960,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
           <button class="mod-tab on" id="monTabTv" onclick="setMonitorTab('tv')" title="El tablero de planta, el mismo que ve la TV">📺 Monitor</button>
           <button class="mod-tab" id="monTabAdm" onclick="setMonitorTab('admin')" title="El mismo tablero de la TV pero clickeable: cada celda abre su desglose">🛠️ Mon. Admin</button>
           <button class="mod-tab" id="monTabAn" onclick="setMonitorTab('incons')" title="Productividad e inconsistencias">📊 Análisis</button>
+          <button class="mod-tab" id="monTabRitmo" onclick="setMonitorTab('ritmo')" title="Picking: horas estimadas por dificultad contra las reales, por día y operario (sólo supervisores)">Ritmo</button>
         </div>
         <!-- El título, la meta, la barra de avance y el buscador eran del monitor viejo, que ya
              no tiene puerta (sus funciones siguen en el archivo y le siguen escribiendo acá).
@@ -6010,6 +6011,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <!-- v25.77 (Luis): Mon. Admin — el MISMO tablero (monitor/admin.html, generado desde tv.html)
          pero clickeable: cada celda abre el desglose en un pop-up. Iframe aparte para que la pared
          (tv.html) siga liviana y de solo lectura. -->
+    <!-- v29.47 (Thomas, D4): Ritmo de picking — estimado por dificultad vs real (plantel.js, gv_ritmo_picking) -->
+    <div id="ritmoContent" class="hidden" style="flex:1;min-height:0;max-height:84vh;overflow:auto"></div>
     <div id="admContent" class="hidden" style="flex:1;min-height:0">
       <iframe id="monAdmFrame" title="Mon. Admin" style="flex:1;width:100%;min-height:78vh;border:0;border-radius:8px;background:#0b1220"></iframe>
     </div>
@@ -6398,7 +6401,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.23"></script>
+<script type="module" src="recepcion.js?v=29.65"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -7543,6 +7546,7 @@ function pppFitPantalla() {
   // v18.12 — Modificar Pedidos: es una pantalla de trabajo propia, no una PPP que tenga que
   // entrar entera. Se exime desde ahora para que el módulo se escriba sin pelearse con el zoom.
   if (typeof _pppTab !== "undefined" && _pppTab === "modif") { body.style.zoom = "1"; body.style.overflowY = "auto"; return; }
+  if (typeof _pppTab !== "undefined" && _pppTab === "plantel") { body.style.zoom = "1"; body.style.overflowY = "auto"; return; }   // v29.46
   // v17.95 (Luis, con capturas del día y la tanda abiertos: "sigue colapsando para adentro y se hacen
   // más chiquitas las filas a medida que se abren"). NO era el CSS: era ESTE zoom. La tabla de
   // Programación crece al abrir un nivel, el zoom la comprime para que entre, y cada nivel que se
@@ -8256,8 +8260,11 @@ function closeTerminarDia() {
    generar duplicados de lo que ya estaba.
    Filtra items sin id (legacy) que no podríamos dedup-ear. */
 async function bulkSendDayReplay(legajoStr, historySnapshot) {
+  /* v29.24 — un item marcado noReplay es SÓLO del Historial del celular (las tareas de módulo: guardado,
+     bajar/ingreso a racks, Mover racks / Insumos / CP / RC). Su evento real ya salió con otro client_id
+     (rkb_/irt_/mdt_…), así que re-mandarlo con el id h_* lo DUPLICABA en el servidor al Terminar Día. */
   const bulkPayload = (historySnapshot || [])
-    .filter(item => item && item.id)
+    .filter(item => item && item.id && !item.noReplay && !/^h_/.test(item.id))
     .map(item => ({
       client_id:   item.id,
       legajo:      legajoStr,
@@ -9338,7 +9345,7 @@ function showInstructivo() {
     { t: "🏭 Recepción", c: "RT · RR", x: "RT = recibí mercadería (entra a <b>“a guardar”</b>). RR = controlar los remitos cargados al camión." },
     { t: "🚚 Carga y control", c: "CC · CR", x: "CC = inicio/fin de la carga del camión. CR = control de remitos." },
     { t: "📥 Guardar a góndola", c: "MG", x: "Lo que está en <b>“a guardar”</b> lo pasás a góndola. Si la góndola está llena, marcás <b>Excedente</b> y su ubicación." },
-    { t: "📦 Insumos y Productos Movimiento", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. ¿El insumo no está? Entrás por Recibir y usás <b>“+ Agregar insumo nuevo”</b>." },
+    { t: "📦 Insumos y Productos Movimiento", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. Recibís sólo lo que ya está en la lista: si llegó algo que no figura, avisá a Stock y Compras." },
     { t: "⏱ Pausas y otros", c: "AT · PB · Limp · Perm · PC · CT", x: "Marcá cuándo: atendés el timbre (AT), vas al baño (PB), limpiás (Limp), pedís permiso (Perm), parás a comer (PC) o hacés conteo (CT). Tocás al <b>empezar</b> y otra vez al <b>terminar</b>." }
   ];
   ov.innerHTML = '<div class="instr-card"><div class="instr-head"><span class="instr-title">❓ ¿Cómo se usa?</span><button class="instr-close" onclick="closeInstructivo()">Cerrar</button></div><div class="instr-body">' +
@@ -10698,7 +10705,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.23";
+const APP_VERSION = "v29.65";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16562,7 +16569,15 @@ async function loadArtNombres() {
   if (Object.keys(m).length) _artNombres = m;
   return m;
 }
-function artNombre(cod, fb) { const n = _artNombres && _artNombres[_ocgNorm(cod)]; return n || fb || ""; }
+/* v29.37 (10/10: "el 809E de Chef en todos lados es SOLO el Corta Queso; el de Loeke, SOLO el Corta Pizza") -
+   un DUAL con empresa ("809E CH") toma el nombre de SU empresa; pelado y con fallback de la fila, el de la fila:
+   el padron (vista_nombres_articulos) tiene UN nombre por codigo pelado y es el de Loeke. */
+function artNombre(cod, fb) {
+  const sx = String(cod == null ? "" : cod).match(/^(.*?)\s+(LK|CH)$/i);
+  let dual = null; try { dual = NOMBRE_POR_EMPRESA[_ocgNorm(sx ? sx[1] : cod)] || null; } catch (_e) {}
+  if (dual) { if (sx && dual[sx[2].toUpperCase()]) return dual[sx[2].toUpperCase()]; if (fb) return fb; }
+  const n = _artNombres && _artNombres[_ocgNorm(cod)]; return n || fb || "";
+}
 // v22.32: el padrón se precarga al abrir la app, así toda pantalla que dibuja una descripción
 // (artNombre) la saca del mismo lado aunque no haya llamado a loadArtNombres antes.
 setTimeout(function () { try { loadArtNombres(); } catch (_e) {} }, 1500);
@@ -18467,6 +18482,26 @@ async function ocgFetchImportados() {
       if (Number(r.pedido_manual) > 0) { primerPed[c] = Number(r.pedido_manual); primerPed[pl] = Number(r.pedido_manual); }
     });
   } catch (_e) {}
+  // v29.41 (10/10: "solo en el módulo de importaciones ya mirá todo como 820, no como 809") — el corta pizza de LK
+  // pasa a 820E y el 809E se da de baja cuando entren sus pedidos. GV_Importados_EnCurso_Suma dice qué fila VIEJA
+  // (destino_cod + destino_marca: 809E LK) se ve DENTRO de la NUEVA (origen_cod: 820E): stock, Est. Madre, pedidos y en
+  // camino suman a la nueva y la vieja no se dibuja. El 809E de Chef no se toca. Sin lectura, como antes.
+  try {
+    const es = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Importados_EnCurso_Suma", "select=destino_cod,destino_marca,origen_cod");
+    (es || []).forEach(function (r) {
+      const vc = String(r.destino_cod || "").toUpperCase().trim(), nc = String(r.origen_cod || "").toUpperCase().trim();
+      const vk = vc + (_impDosPlantas[vc] ? "|" + _impPlanta(r.destino_marca) : "");
+      const nk = Object.keys(by).find(function (k) { return k === nc || k.indexOf(nc + "|") === 0; });
+      const v = by[vk], n = nk ? by[nk] : null;
+      if (!v || !n || v === n) return;
+      ["proyUni", "stockUni", "stockIns", "stockGp2", "stockConv", "uniPed", "enCurso"].forEach(function (f) { n[f] = (Number(n[f]) || 0) + (Number(v[f]) || 0); });
+      if (!n.fob && v.fob) n.fob = v.fob;
+      if (v.uxc > n.uxc) n.uxc = v.uxc;
+      if (v.mesesArt > n.mesesArt) n.mesesArt = v.mesesArt;
+      n.verComo = (n.verComo ? n.verComo + ", " : "") + v.cod + (v.planta ? " " + v.planta : "");
+      delete by[vk];
+    });
+  } catch (_e) {}
   // v23.30 — si existe la línea de Loeke con L (437EL), la de Chef del mismo número (437E) lleva la chapa CH
   Object.keys(by).forEach(function (k) {
     const m = /^(.*[0-9E])L$/.exec(k);
@@ -18508,7 +18543,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), stockGp2U: Math.round(o.stockGp2), stockConvU: Math.round(o.stockConv || 0), piezasShare: o.piezasShare, piezasReparto: o.piezasReparto, piezasGrupo: o.piezasGrupo, uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, uniInner: (vm && vm.ui > 0) ? vm.ui : 0, innerSuelto: !!(vm && vm.uiSuelto), cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, esInsumo: esInsumo, mesesProv: mesesProv, stockPropioModulo: Math.round(o.stockUni - o.stockIns - o.stockGp2 - (o.stockConv || 0)), parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), moqArt: (moqArt[o.key] || moqArt[kk] || 0), primerPedidoU: (primerPed[o.key] || primerPed[kk] || 0), det: o.det || [] });
+    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), stockGp2U: Math.round(o.stockGp2), stockConvU: Math.round(o.stockConv || 0), piezasShare: o.piezasShare, piezasReparto: o.piezasReparto, piezasGrupo: o.piezasGrupo, uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), verComo: o.verComo || "", aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, uniInner: (vm && vm.ui > 0) ? vm.ui : 0, innerSuelto: !!(vm && vm.uiSuelto), cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, esInsumo: esInsumo, mesesProv: mesesProv, stockPropioModulo: Math.round(o.stockUni - o.stockIns - o.stockGp2 - (o.stockConv || 0)), parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), moqArt: (moqArt[o.key] || moqArt[kk] || 0), primerPedidoU: (primerPed[o.key] || primerPed[kk] || 0), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -27258,6 +27293,14 @@ function insCatOf(it) { const k = String((it && it.cat) || "").trim(); return in
 /* Sin categoría = sin clasificar = pendiente de una decisión del admin. En la botonera
    del operario tiene su propia tarjeta ❓ y no se cuenta entre los "en uso". */
 function insSinCat(it) { return insCatOf(it) === ""; }
+/* v29.35 (Thomas, D43): catálogo de GP2 para Recibir insumos. Lo válido es GP2: el operario ve TODOS los
+   componentes del rubro, así no carga como «insumo nuevo» algo que ya tiene nombre. null = no se pudo leer. */
+async function insFetchGp2Ri() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_gp2_componentes_ri", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" });
+    return r.ok ? await r.json() : null;
+  } catch (_e) { return null; }
+}
 async function insFetchCatalogo() {
   try {
     // v22.80: la ubicación que ve el operario es la del módulo de Insumos resuelta contra el Mapa (vista_insumos).
@@ -27302,6 +27345,25 @@ function insChooserGo(which) {
 /* v29.22 (Luis, 09/10): "lo primero que sale cuando aprietan la recepción es elegir qué
    quieren recibir con las categorías que tenemos en insumos (sin contar importados)". */
 const INS_RI_SIN = ["importados"];
+/* v29.25/29.30 (Thomas): categorías con lista CERRADA — el operario no da de alta nada nuevo ahí. */
+const INS_CAT_CERRADA = ["plastico", "cajas"];
+const INS_CAJA_X_PAQ = 25;   // v29.30 (Thomas, D22): cada paquete trae 25 cajas
+const INS_CAJA_MARCAS = ["Loeke", "Chef"];   // v29.31 (Thomas, D26): sólo se anota, no parte el stock
+/* v29.56 (Luis, 13/10): la marca se pide al RECIBIR CUALQUIER insumo, no sólo cajas.
+   Es el mismo insumo en el mismo lugar físico y el movimiento sigue siendo empresa
+   `Mixto` (lo fuerza el trigger gv_insumo_unidad_base): la marca NO parte el stock, sólo
+   queda escrita en la descripción del movimiento y se consulta por gv_insumo_recepcion_marca.
+   Las cajas siguen con Loeke/Chef (Thomas, D26); el resto suma «Mixto» (las dos). */
+const INS_MARCAS = ["Loeke", "Chef", "Mixto"];
+function _insMarcasDe(k) { return k === "cajas" ? INS_CAJA_MARCAS : INS_MARCAS; }
+function _insMarcaHtml(it, i, isIn) {
+  if (!isIn || !it) return "";
+  const k = insCatOf(it), ms = _insMarcasDe(k);
+  return '<div class="ins-uni" style="justify-content:center;"><span class="ins-uni-l' + (it.marca ? "" : " falta") + '">Marca:</span> ' +
+    ms.map(function (m) { return '<button class="ins-uchip' + (it.marca === m ? " on" : "") + '" onclick="insSetCajaMarca(' + i + ',\'' + m + '\')">' + m + '</button>'; }).join("") + '</div>' +
+    (it.qty > 0 && !it.marca ? '<div class="ins-warn">⚠ elegí ' + (k === "cajas" ? "si las cajas son de Loeke o de Chef" : "de qué empresa viene") + '</div>' : '');
+}
+function insSetCajaMarca(i, m) { if (!_ins || !_ins.items[i]) return; _ins.items[i].marca = (_ins.items[i].marca === m) ? "" : m; insRender(); }
 async function insRecibirCat() {
   let ov = document.getElementById("insChooserModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
@@ -27317,6 +27379,7 @@ async function insRecibirCat() {
     '<button onclick="closeInsumoChooser()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>');
 }
 function insRecibirCatGo(k) {
+  window._insEnvioSub = null;
   closeInsumoChooser();
   window._insRiCat = k;
   askInsUbicacion("RI");
@@ -27338,6 +27401,7 @@ function insEnvioTipo() {
   ov.style.display = "flex";
 }
 function insEnvioTipoGo(sub) {
+  window._insEnvioSub = (sub === "iny") ? "iny" : "otros";   // v29.28 (D9): las bolsas sólo salen a un inyector
   closeInsumoChooser();
   askInsUbicacion("EI", sub === "iny" ? "iny" : "otros");
 }
@@ -27546,12 +27610,8 @@ async function _insGp2Opciones(mode, soloIny) {
       if (!mv || !mv.inyectores || !mv.inyectores.length) { if (soloIny) _insUbicSinIny(box); return; }
       box.innerHTML = (soloIny ? '' : '<div style="font-size:12.5px;font-weight:800;color:#115e59;margin-bottom:6px;">🧪 Bolsas plásticas — ¿van a un inyector?</div>') +
         mv.inyectores.map(function (nom, i) {
-          const falta = (mv.materiales || []).map(function (m) {
-            const x = (m.inyectores || []).filter(function (y) { return y.proveedor === nom; })[0];
-            return (x && Number(x.bolsas_a_enviar) > 0) ? (m.codigo_virgilio || m.codigo) + " " + x.bolsas_a_enviar : "";
-          }).filter(Boolean).join(" · ");
-          return '<button onclick="insUbicGp2Ok(\'EI\',' + i + ')" style="' + btn + '">🏭 ' + escapeHtml(nom) +
-            '<span style="' + sub + '">' + (falta ? "le faltan: " + escapeHtml(falta) : "al día con sus OC") + '</span></button>';
+          const apodo = INS_INY_APODO[nom];   // v29.27 (Thomas, D12): el nombre con que lo conoce el operario
+          return '<button onclick="insUbicGp2Ok(\'EI\',' + i + ')" style="' + btn + '">🏭 ' + escapeHtml(nom) + (apodo ? ' <span style="font-weight:700;color:#475569;">(' + escapeHtml(apodo) + ')</span>' : '') + '</button>';   // v29.26 (Thomas): sin «le faltan / al día con sus OC»
         }).join("") +
         (soloIny ? '' : '<div style="font-size:12px;color:#64748b;margin:2px 0 10px;">— o escribí a dónde lo enviás (otro destino) —</div>');
     }
@@ -27573,6 +27633,8 @@ function insUbicGp2Ok(mode, i) {
     insUbicOk("EI", { modo: "EI", inyector: nom, mv: mv });
   }
 }
+/* v29.27 (Thomas, D12): apodo del inyector de GP2 en el botón («Manolo es Pat Bet Plast»). */
+const INS_INY_APODO = { "Pat Bet Plast": "Manolo" };
 /* v29.22 — bolsa plástica que se manda a un inyector: plástico, con código real y ubicación. */
 function _insEsBolsaIny(it) {
   return !!it && insCatOf(it) === "plastico" && !_insEsTmp(it) && !it.noCode && String(it.ubic || "").trim() !== "";
@@ -27593,7 +27655,7 @@ function _insGp2Falta(it) {
   return Number(m.pendiente_bolsas) || 0;
 }
 function _insGp2Banner() {
-  const gp2 = _ins && _ins.gp2; if (!gp2) return "";
+  const gp2 = _ins && _ins.gp2; if (!gp2 || gp2.modo === "EI") return "";   // v29.26 (Thomas): sin cartel en la entrega a un inyector
   return '<div class="ins-depw" style="background:#f0fdfa;border-color:#5eead4;color:#115e59;">' +
     (gp2.modo === "EI" ? '🏭 Entrega a <b>' + escapeHtml(gp2.inyector) + '</b>: las bolsas plásticas se descuentan también en Gestión Productiva.'
                         : '📦 Recepción de la <b>OC N° ' + escapeHtml(String(gp2.oc.numero)) + '</b> (' + escapeHtml(gp2.oc.proveedor || "") + '): las bolsas se reciben contra esa OC en Gestión Productiva.') +
@@ -27648,7 +27710,7 @@ async function showInsumoModal(mode, legajo, _resume) {
     // force: si el admin cambió una categoría o una unidad, el operario la ve en la
     // próxima apertura de RI/EI sin tener que recargar la app.
     await insLoadMeta(true);
-    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni()]);
+    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni(), mode === "RI" ? insFetchGp2Ri() : Promise.resolve(null)]);
     const saldos = res[1] || {};
     const xUni = res[2] || {};
     // idea 7382: default de unidad = la unidad real del saldo si el insumo tiene UNA sola
@@ -27673,12 +27735,33 @@ async function showInsumoModal(mode, legajo, _resume) {
     const riCat = (mode === "RI") ? (window._insRiCat || "") : ""; window._insRiCat = null;
     let lista = items;
     if (mode === "RI") lista = lista.filter(function (x) { return INS_RI_SIN.indexOf(insCatOf(x)) < 0; });
+    // v29.25 (09/10): de PLÁSTICOS se tocan sólo las 9 bolsas reales (con lugar en el Mapa), en RI y EI.
+    // Ni los TMP- ni los códigos viejos (1262500, 1266500, 1445): no se reciben ni se entregan.
+    // v29.35 (D43): en RECEPCIÓN aparecen además todos los componentes de GP2 del rubro. Un insumo ya vinculado a
+    // GP2 se ve aunque no tenga lugar en el Mapa; el que falta en Virgilio se da de alta al elegirlo (gv_insumo_desde_gp2).
+    const gp2Ri = (mode === "RI" && Array.isArray(res[3])) ? res[3] : [];
+    const gp2Vinc = {};
+    gp2Ri.forEach(function (g) { if (g.cod_virgilio) gp2Vinc[_insK(g.cod_virgilio)] = true; });
+    lista = lista.filter(function (x) { return insCatOf(x) !== "plastico" || _insEsBolsaIny(x) || (mode === "RI" && gp2Vinc[_insK(x.cod)]); });
+    gp2Ri.forEach(function (g) {
+      if (g.cod_virgilio || INS_RI_SIN.indexOf(g.categoria) >= 0) return;
+      // mismo código y mismo rubro ya en Virgilio sin vincular: es ese insumo; se vincula al elegirlo
+      const igual = lista.filter(function (x) { return _insK(x.cod) === _insK(g.codigo) && insCatOf(x) === g.categoria; })[0];
+      if (igual) { igual.gp2Comp = g.comp_id; return; }
+      lista.push({ cod: "", gp2Comp: g.comp_id, gp2Cod: g.codigo, nombre: g.nombre || "", sector: "", ubic: "", cat: g.categoria, orden: null, noCode: false, stock: 0, stockByUni: null, qty: 0, unidad: _defUni(null, g.categoria) });
+    });
+    // v29.30 (Thomas): de CAJAS se tocan sólo las 11 cajas reales (Caja Nº 1 … Nº 29), ningún TMP-.
+    lista = lista.filter(function (x) { return insCatOf(x) !== "cajas" || (!_insEsTmp(x) && !x.noCode); });
     // v29.22 (Luis): envío a un INYECTOR = sólo las bolsas plásticas reales (las que tienen
     // ubicación en el Mapa; ni los TMP- ni los códigos viejos), nada más.
     const gp2Ei = (mode === "EI" && window._insGp2 && window._insGp2.modo === "EI");
-    if (gp2Ei) lista = lista.filter(_insEsBolsaIny);
+    // v29.28 (Thomas, D9): las bolsas plásticas SÓLO salen a un inyector; «Envío a otros» no las ofrece.
+    const envIny = gp2Ei || (mode === "EI" && window._insEnvioSub === "iny");
+    if (envIny) lista = lista.filter(_insEsBolsaIny);
+    else if (mode === "EI") lista = lista.filter(function (x) { return insCatOf(x) !== "plastico"; });
+    window._insEnvioSub = null;
     _ins = { mode: mode, legajo: String(legajo || "").trim(), items: lista, filtro: "", cat: (riCat && insCatDef(riCat)) ? riCat : "", qty: null, nuevo: null };
-    if (gp2Ei) { _ins.soloBolsas = true; _ins.cat = "plastico"; }
+    if (envIny) { _ins.soloBolsas = true; _ins.cat = "plastico"; }
     // v14.95 — bolsas ↔ GP2: si en la ubicación se eligió un inyector / una OC de GP2, queda en la
     // sesión (viaja con el borrador). RI con OC: precarga las bolsas pendientes de cada material.
     const gp2 = window._insGp2 || null; window._insGp2 = null;
@@ -27686,13 +27769,13 @@ async function showInsumoModal(mode, legajo, _resume) {
       _ins.gp2 = gp2;
       if (gp2.modo === "RI" && gp2.oc) {
         (gp2.oc.items || []).forEach(function (oi) {
-          const it = items.filter(function (x) { return _insK(x.cod) === _insK(oi.cod_virgilio); })[0];
+          const it = lista.filter(function (x) { return _insK(x.cod) === _insK(oi.cod_virgilio); })[0];
           if (!it) return;
           const b = Math.round(Number(oi.pendiente_bolsas) || 0);
           if (b > 0) { it.qty = b; it.unidad = "Bolsas"; }
         });
       }
-      if (items.some(function (x) { return insCatOf(x) === "plastico"; })) _ins.cat = "plastico";
+      if (lista.some(function (x) { return insCatOf(x) === "plastico"; })) _ins.cat = "plastico";
     }
     insRender();
   } catch (e) { const b = document.getElementById("insBody"); if (b) b.innerHTML = '<div class="ins-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -27753,10 +27836,15 @@ function _insMedida(nombre) {
 function _insSortCat(cat) {
   // El ORDEN que fijó el admin en Stock y Compras → Insumos manda sobre el automático
   // (idea 5572). Los que no tienen orden van después, con el criterio de siempre.
+  // v29.33 (Thomas): orden >= 1000 = va AL FINAL, después de los que no tienen orden (EBA, discontinua).
   const auto = _insSortAuto(cat);
+  const _fin = function (x) { return x.orden !== null && x.orden !== undefined && x.orden >= 1000; };
   return function (a, b) {
-    const oa = (a.orden === null || a.orden === undefined) ? null : a.orden;
-    const ob = (b.orden === null || b.orden === undefined) ? null : b.orden;
+    const fa = _fin(a), fb = _fin(b);
+    if (fa !== fb) return fa ? 1 : -1;
+    if (fa && fb && a.orden !== b.orden) return a.orden - b.orden;
+    const oa = (fa || a.orden === null || a.orden === undefined) ? null : a.orden;
+    const ob = (fb || b.orden === null || b.orden === undefined) ? null : b.orden;
     if (oa !== null && ob === null) return -1;
     if (oa === null && ob !== null) return 1;
     if (oa !== null && ob !== null && oa !== ob) return oa - ob;
@@ -27822,6 +27910,7 @@ function _insNum(n) { return Math.round(n * 1000) / 1000; }
    sector con 📍 si es de los viejos (sector + descripción). */
 function _insEsTmp(it) { return !!(it && (it.tmp || /^TMP-/.test(String(it.cod || "")))); }
 function _insBtnCod(it) {
+  if (it && it.gp2Comp && !it.cod) return it.gp2Cod || "GP2";
   if (_insEsTmp(it)) return it.cod ? ("🆕 " + it.cod) : "🆕 …";
   return it.noCode ? ("📍 " + (it.sector || String(it.cod).split("·")[0] || "")) : it.cod;
 }
@@ -27865,10 +27954,9 @@ function insRender() {
         '</button>';
     }).join("") +
       (cnt[""] ? '<button class="ins-catbtn' + (cntQ[""] ? " hasq" : "") + '" onclick="insSetCat(\'?\')"><span class="ins-catem">❓</span><span class="ins-catnm">Sin categoría</span><span class="ins-catn">' + cnt[""] + '</span></button>' : "") +
-      // "+" junto a las categorías: llegó algo que no está en ninguna lista. Sólo en
-      // RECEPCIÓN: en una entrega no se puede sacar algo que no existe, y si existe
-      // tiene que estar registrado.
-      (isIn ? '<button class="ins-catbtn add" onclick="insNuevoOpen(\'\')"><span class="ins-catem">+</span><span class="ins-catnm">Agregar insumo</span><span class="ins-catn">nuevo</span></button>' : "") +
+      // v29.56 (Luis, 13/10): el operario NO da de alta un insumo al recibir. Sólo recibe
+      // lo que ya está en la lista (o un componente del catálogo de GP2). El "+ Agregar
+      // insumo nuevo" se sacó: un código distinto lo define Stock y Compras, no el operario.
       '</div>';
     h += '<div class="ins-cbadge" style="margin-top:10px;">' + nOper + ' insumos en uso' + (cnt[""] ? ' · ' + cnt[""] + ' sin clasificar' : "") + '</div>';
   } else {
@@ -27878,7 +27966,7 @@ function insRender() {
     const base = f
       ? (cat ? _ins.items.filter(function (it) { return insCatOf(it) === (cat === "?" ? "" : cat); }) : _ins.items)
       : _ins.items.filter(function (it) { const k = insCatOf(it); return cat === "?" ? k === "" : k === cat; });
-    const shown = (f ? base.filter(function (it) { return stkMatchBusq(f, it.cod, (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || ""), true); }) : base)   // v21.43
+    const shown = (f ? base.filter(function (it) { return stkMatchBusq(f, it.cod || it.gp2Cod || "", (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || ""), true); }) : base)   // v21.43
       .slice().sort(_insSortCat(cat));
     if (_ins.soloBolsas) h += '<div class="ins-bar"><span class="ins-bar-t">🧪 Bolsas plásticas</span></div>';
     else h += '<div class="ins-bar"><button class="ins-back" onclick="insBack()">‹ Atrás</button>' +
@@ -27895,11 +27983,11 @@ function insRender() {
           '<span class="ins-itcod">' + escapeHtml(_insBtnCod(it)) + '</span>' +
           (it.nombre ? '<span class="ins-itnom">' + escapeHtml(it.nombre) + '</span>' : "") +
           (it.ubic ? '<span class="ins-itubi">📍 ' + escapeHtml(it.ubic) + '</span>' : "") +
-          (function () { const f = _insGp2Falta(it); return f == null ? "" : '<span class="ins-itubi" style="color:#b45309;">' + (isIn ? "📦 pendiente " : "🏭 faltan ") + _insNum(f) + ' bolsas</span>'; })() +
+          (function () { const f = isIn ? _insGp2Falta(it) : null; return f == null ? "" : '<span class="ins-itubi" style="color:#b45309;">' + (isIn ? "📦 pendiente " : "🏭 faltan ") + _insNum(f) + ' bolsas</span>'; })() +
           (it.qty > 0 ? '<span class="ins-itq' + (it.unidad ? "" : " falta") + '">' + it.qty + " " + escapeHtml(it.unidad || "¿unidad?") + '</span>' : "") +
           '</button>';
       }).join("") +
-        (cat && isIn ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
+        // v29.56 (Luis, 13/10): sin "+ Agregar insumo" dentro de la categoría al recibir.
         '</div>';
     }
   }
@@ -27921,9 +28009,11 @@ function insRender() {
    admin desde Stock y Compras → Insumos (idea 5572). */
 function insNuevoOpen(cat) {
   if (!_ins) return;
-  // Guarda dura: dar de alta un insumo sólo tiene sentido recibiendo. En una entrega
-  // el insumo tiene que existir de antes.
-  if (_ins.mode !== "RI") { try { alert("En una entrega no se puede dar de alta un insumo.\n\nSi lo estás sacando es porque ya está: buscalo en su categoría. Si no aparece, se carga al recibirlo."); } catch (_e) {} return; }
+  // v29.56 (Luis, 13/10): el operario NO da de alta insumos. Recibe sólo lo que ya está
+  // en la lista; un código distinto lo define Stock y Compras. Guarda dura, por si algún
+  // camino viejo (una sesión guardada, un botón cacheado) todavía llama acá.
+  try { alert("No se puede agregar un insumo nuevo acá.\n\nRecibí lo que ya está en la lista. Si llegó algo que no figura, avisá a Stock y Compras para que lo carguen."); } catch (_e) {}
+  return;
   _ins.nuevo = { cat: insCatDef(cat) ? cat : "", qty: "", uni: "", det: "" };
   _ins.qty = null;
   insRender();
@@ -27957,7 +28047,7 @@ function _insNuevoHtml(isIn) {
   h += '<div class="ins-nvl">Detalle <span class="ins-cbadge">— qué es, en tus palabras</span></div>' +
     '<textarea id="insNvDet" class="ins-nvt" rows="3" placeholder="Ej: alambre finito que trajo Pérez, bolsa gris sin etiqueta…" oninput="insNuevoSet(\'det\',this.value)">' + escapeHtml(n.det) + '</textarea>';
   h += '<div class="ins-nvl">Elegí la categoría</div><div class="ins-cats">' +
-    INS_CATS.filter(function (c) { return INS_RI_SIN.indexOf(c.k) < 0; }).map(function (c) {
+    INS_CATS.filter(function (c) { return INS_RI_SIN.indexOf(c.k) < 0 && INS_CAT_CERRADA.indexOf(c.k) < 0; }).map(function (c) {   // v29.25/30: bolsas y cajas no las da de alta el operario
       return '<button class="ins-cchip' + (n.cat === c.k ? " on" : "") + '" onclick="insNuevoPick(\'cat\',\'' + c.k + '\')">' + c.lbl + '</button>';
     }).join("") +
     '<button class="ins-cchip' + (n.cat === "" ? " on" : "") + '" onclick="insNuevoPick(\'cat\',\'\')">❓ Sin categoría clara</button>' +
@@ -28055,6 +28145,45 @@ function _insQtyHtml(it, i, isIn) {
       : (it.unidad ? ('stock: ' + _insNum(stk) + ' ' + escapeHtml(it.unidad)) : 'stock: ' + _insNum(it.stock));
   const _k = insCatOf(it);
   const _mcSolo = _insSaleMC(it);   // v24.69: sale sólo en MC
+  // v29.30 (Thomas, D24): las CAJAS se cargan en cajas o en paquetes (25 cajas c/u); el stock va en cajas.
+  if (_k === "cajas") {
+    const _paq = _insUEq(it.unidad, "Paquetes");
+    const _ch = function (u, lbl) { return '<button class="ins-uchip' + (_insUEq(it.unidad, u) ? " on" : "") + '" onclick="insSetUnidad(' + i + ',\'' + u + '\')">' + lbl + '</button>'; };
+    return '<div class="ins-qov" onclick="if(event.target===this)insCloseQty()"><div class="ins-qc">' +
+      '<div class="ins-qh"><div><div class="ins-qcod">' + escapeHtml(_insBtnCod(it)) + '</div>' +
+      '<div class="ins-stk">stock: ' + _insNum(_insStockForUnit(Object.assign({}, it, { unidad: "Uni" }))) + ' cajas</div></div>' +
+      '<button class="ins-close" style="background:#e2e8f0;color:#475569;" onclick="insCloseQty()">✕</button></div>' +
+      '<div class="ins-qrow"><button class="ins-qb" onclick="insChg(' + i + ',-1)">–</button>' +
+      '<input class="ins-qi" type="number" min="0" inputmode="numeric" value="' + it.qty + '" oninput="insSet(' + i + ',this.value)">' +
+      '<button class="ins-qb" onclick="insChg(' + i + ',1)">+</button></div>' +
+      '<div class="ins-uni" style="justify-content:center;">' + _ch("Uni", "Cajas") + _ch("Paquetes", "Paquetes (" + INS_CAJA_X_PAQ + ")") +
+      (_paq && it.qty > 0 ? ' <span style="font-size:13px;color:#475569;font-weight:800;">= ' + _insNum(it.qty * INS_CAJA_X_PAQ) + ' cajas</span>' : '') + '</div>' +
+      (function () { const _stC = _insStockForUnit(Object.assign({}, it, { unidad: "Uni" })), _q = it.qty * (_paq ? INS_CAJA_X_PAQ : 1);
+        return (!isIn && _q > _stC) ? '<div class="ins-warn">⚠ el stock quedaría en ' + _insNum(_stC - _q) + ' cajas</div>' : ''; })() +
+      // v29.31 (Thomas, D26) · v29.56: al RECIBIR se anota de qué marca vienen; es la misma caja (mismo stock)
+      _insMarcaHtml(it, i, isIn) +
+      '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + (isIn && it.qty > 0 && !it.marca ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
+      '</div></div>';
+  }
+  // v29.29 (Thomas): las bolsas plásticas van SÓLO en Bolsas (sin otras unidades) y se ven en kg.
+  if (_k === "plastico") {
+    const _kg = _insKgBolsas(it.qty);
+    const _bol = '<b>Bolsas</b>' + (it.qty > 0 ? ' <span style="font-size:13px;color:#475569;font-weight:800;">= ' + _insNum(_kg) + ' kg</span>' : '') +
+      ' <span style="font-size:11.5px;color:#64748b;">(' + _insNum(_insKgXBolsa()) + ' kg por bolsa)</span>';
+    return '<div class="ins-qov" onclick="if(event.target===this)insCloseQty()"><div class="ins-qc">' +
+      '<div class="ins-qh"><div><div class="ins-qcod">' + escapeHtml(_insBtnCod(it)) + '</div>' +
+      (it.nombre ? '<div class="ins-qnom">' + escapeHtml(it.nombre) + '</div>' : "") +
+      '<div class="ins-stk">stock: ' + _insNum(stk) + ' Bolsas</div></div>' +
+      '<button class="ins-close" style="background:#e2e8f0;color:#475569;" onclick="insCloseQty()">✕</button></div>' +
+      '<div class="ins-qrow"><button class="ins-qb" onclick="insChg(' + i + ',-1)">–</button>' +
+      '<input class="ins-qi" type="number" min="0" inputmode="numeric" value="' + it.qty + '" oninput="insSet(' + i + ',this.value)">' +
+      '<button class="ins-qb" onclick="insChg(' + i + ',1)">+</button></div>' +
+      '<div class="ins-uni" style="justify-content:center;">' + _bol + '</div>' +
+      (neg ? '<div class="ins-warn">⚠ el stock de Bolsas quedaría en ' + _insNum(stk - it.qty) + '</div>' : "") +
+      _insMarcaHtml(it, i, isIn) +
+      '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + (isIn && it.qty > 0 && !it.marca ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
+      '</div></div>';
+  }
   let chips = _mcSolo ? ('<button class="ins-uchip on">' + escapeHtml(_mcSolo) + '</button> <span style="font-size:12px;color:#64748b;">sale siempre en MC enteras</span>') : _insUnitsFor(it, insLoadUnits()).map(function (u) {
     const ok = insUniPermitida(_k, u);
     return '<button class="ins-uchip' + (it.unidad === u ? " on" : "") + (ok ? "" : " no") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')"' +
@@ -28073,10 +28202,39 @@ function _insQtyHtml(it, i, isIn) {
     (!it.unidad ? '<div class="ins-warn">⚠ elegí en qué se mide (esta categoría no tiene una fija)</div>' : "") +
     (it.unidad && !insUniPermitida(_k, it.unidad) ? '<div class="ins-warn">⛔ «' + escapeHtml(it.unidad) + '» no está permitida en ' + escapeHtml(insCatLbl(_k)) + ' (se carga en ' + escapeHtml(insCatUnis(_k).join(" / ")) + ')</div>' : "") +
     (neg ? '<div class="ins-warn">⚠ el stock de ' + escapeHtml(it.unidad) + ' quedaría en ' + _insNum(stk - it.qty) + '</div>' : "") +
-    '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + (it.qty > 0 && (!it.unidad || !insUniPermitida(_k, it.unidad)) ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
+    _insMarcaHtml(it, i, isIn) +
+    '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + ((it.qty > 0 && (!it.unidad || !insUniPermitida(_k, it.unidad))) || (isIn && it.qty > 0 && !it.marca) ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
     '</div></div>';
 }
-function insOpenQty(i) { if (!_ins || !_ins.items[i]) return; const _mc = _insSaleMC(_ins.items[i]); if (_mc) _ins.items[i].unidad = _mc; _ins.qty = i; insRender(); }
+/* v29.35 (D43): un componente de GP2 que Virgilio no tiene se da de alta (código y nombre de GP2) antes de cargar
+   la cantidad; uno con el mismo código se vincula. Sin red no se da de alta (no hay código que inventar). */
+async function _insGp2Alta(it) {
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_desde_gp2", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: JSON.stringify({ p_comp_id: it.gp2Comp, p_legajo: _ins ? _ins.legajo : null }) });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const cod = String(await r.json() || "").trim();
+  if (!cod) throw new Error("sin código");
+  return cod;
+}
+function insOpenQty(i) {
+  const it0 = _ins && _ins.items[i];
+  if (it0 && it0.gp2Comp && !it0.gp2Ok) {
+    if (!it0.cod) {
+      if (it0._gp2Busy) return;
+      it0._gp2Busy = true;
+      _insGp2Alta(it0).then(function (cod) { it0.cod = cod; it0.gp2Ok = true; it0._gp2Busy = false; if (_ins && _ins.items[i] === it0) _insOpenQtyYa(i); })
+        .catch(function (e) { it0._gp2Busy = false; try { alert("No se pudo dar de alta " + (it0.gp2Cod || "") + " desde GP2 (" + (e && e.message || e) + ").\n\nRevisá la conexión y probá de nuevo."); } catch (_e) {} });
+      return;
+    }
+    it0.gp2Ok = true;
+    _insGp2Alta(it0).catch(function () { it0.gp2Ok = false; });   // vincula el mismo código; no frena la carga
+  }
+  _insOpenQtyYa(i);
+}
+function _insOpenQtyYa(i) { if (!_ins || !_ins.items[i]) return; const _mc = _insSaleMC(_ins.items[i]); if (_mc) _ins.items[i].unidad = _mc; if (insCatOf(_ins.items[i]) === "plastico") _ins.items[i].unidad = "Bolsas"; if (insCatOf(_ins.items[i]) === "cajas" && !_insUEq(_ins.items[i].unidad, "Paquetes")) _ins.items[i].unidad = "Uni"; _ins.qty = i; insRender(); }
+/* v29.29 (Thomas, 09/10): kg de las bolsas plásticas. El kg por bolsa es el de GP2
+   (GP2.parametro material_plastico_kg_x_bolsa, viene en el bundle); sin dato, 25. */
+function _insKgXBolsa() { const g = _ins && _ins.gp2 && _ins.gp2.mv; const k = Number(g && g.kg_x_bolsa); return k > 0 ? k : 25; }
+function _insKgBolsas(n) { return Math.round((Number(n) || 0) * _insKgXBolsa() * 100) / 100; }
 /* v24.69 (Thomas, 30/09, D11): un insumo que tiene MC (Insumos_Factores) SALE siempre en MC
    enteras — a Cervantes o bajado de racks: *"lo mínimo que se le manda es 1 MC… no bajan uni
    sueltas, siempre por MC"*. El stock queda en su unidad base y el movimiento dice las MC. */
@@ -28113,6 +28271,13 @@ async function insConfirmar() {
   }
   // v24.69: lo que tiene MC sale en MC — si quedó otra unidad (cargada antes), se corrige acá
   if (!isIn) sel.forEach(function (it) { const mc = _insSaleMC(it); if (mc) it.unidad = mc; });
+  // v29.31 (Thomas, D26) · v29.56 (Luis, 13/10): insumo recibido sin marca no se registra
+  const sinMarca = isIn ? sel.filter(function (it) { return !it.marca; }) : [];
+  if (sinMarca.length) {
+    try { alert("Falta la marca (de qué empresa viene) de:\n\n  " + sinMarca.map(function (it) { return _insBtnCod(it) + (it.nombre ? " · " + it.nombre : ""); }).join("\n  ")); } catch (_e) {}
+    _ins.cat = insCatOf(sinMarca[0]) || _ins.cat; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = _ins.items.indexOf(sinMarca[0]);
+    insRender(); return;
+  }
   const sinUni = sel.filter(function (it) { return !it.unidad; });
   if (sinUni.length) {
     try { alert("Falta la unidad de:\n\n  " + sinUni.map(function (it) { return _insBtnCod(it) + (it.nombre ? " · " + it.nombre : ""); }).join("\n  ") + "\n\nTe abro el primero para que la elijas."); } catch (_e) {}
@@ -28133,6 +28298,12 @@ async function insConfirmar() {
       var fa = insFactorDe(it.cod, uni);
       if (fa != null) { nota = " · cargado " + it.qty + " " + uni + " × " + fa; qty = qty * fa; uni = fDef.base; }   // v24.69: queda escrito lo que se cargó
     }
+    // v29.29 (Thomas): bolsa plástica = siempre Bolsas, y queda escrito cuántos kg son
+    if (insCatOf(it) === "plastico") { uni = "Bolsas"; nota = " · " + _insNum(qty) + " bolsas = " + _insNum(_insKgBolsas(qty)) + " kg"; }
+    // v29.30 (Thomas, D24): caja cargada en paquetes → se guarda en cajas (× 25), con lo cargado anotado
+    if (insCatOf(it) === "cajas") { if (_insUEq(uni, "Paquetes")) { nota = " · cargado " + _insNum(qty) + " paquetes × " + INS_CAJA_X_PAQ; qty = qty * INS_CAJA_X_PAQ; } uni = "Uni"; }
+    // v29.56 (Luis, 13/10): de qué empresa vino, en toda recepción. No parte el stock (sigue Mixto).
+    if (isIn && it.marca) nota += " · marca " + it.marca;
     return { cod_art: it.cod, descripcion: ((it.nombre || "") + nota).trim() || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: it.ubic || it.sector || null };
   });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
@@ -28391,13 +28562,17 @@ async function showMGModal(legajo, _resume) {
     mgRender(); return;
   }
   try {
-    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), ocgFetchCapacidad(), ocgFetchCeldas(),
+    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCapacidad(), ocgFetchCeldas(),
       // v12.14 (idea 4926) — demanda del día y cajas×MC, best-effort: si fallan no bloquean el guardado.
       (async function () { try { return await ocgDemanda(true); } catch (_e) { return {}; } })(),
       (async function () { try { return (await rkbFetchCxM()).cxm || {}; } catch (_e) { return {}; } })(),
       (async function () { try { return await gvFetchLugares(); } catch (_e) { return null; } })()]);
     const saldos = res[0] || {};
-    const capMap = res[2] || {};
+    /* v29.64 (Luis, 13/10, D5) - la capacidad del DUAL es POR EMPRESA: `stockFetchSaldos` emite
+       la clave con sufijo ("437E LK") y `ocgFetchCapacidad` indexa el codigo PELADO, asi que el
+       dual quedaba con cap = 0 (sin maximo, sin maxMC y al final del orden). `_rkbCapDe` resuelve
+       por (cod, empresa) y para un codigo no dual devuelve la misma suma pelada que antes. */
+    const capObj = res[2] || { pelada: {}, porEmp: {} };
     const celdasMap = res[3] || {};   // v10.08 — cod → [celdas de góndola]
     const demMap = res[4] || {};      // v12.14 — demanda (cajas pedidas) del día por código
     const cxmMap = res[5] || {};      // v12.14 — cajas por master caja (planimetría)
@@ -28437,14 +28612,20 @@ async function showMGModal(legajo, _resume) {
     });
     const items = _filas.map(function (a) {
       const kk = _ocgNorm(a.cod);
-      const cap = capMap[kk] || 0;
+      /* v29.64 (D5) - en un DUAL la clave trae el sufijo ("437E LK"): las cajas x MC y las celdas
+         de gondola se indexan por el codigo PELADO (son del ARTICULO, iguales en las dos empresas),
+         asi que se busca con sufijo y se cae al pelado. La DEMANDA no: `ocgDemanda(true)` ya la
+         emite por empresa (`pkCodEmpresa`) y caer al pelado le daria a cada empresa los pedidos
+         de las dos. Las celdas se siguen filtrando por `a.emp` dos lineas mas abajo. */
+      const kb = kk.replace(/\s+(LK|CH)$/, "");
+      const cap = _rkbCapDe(a.cod, capObj);
       const gond = Number(a.terminado) || 0;
       const ped = Number(demMap[kk]) || 0;
-      const cxm = Number(cxmMap[kk]) || 0;
+      const cxm = Number(cxmMap[kk]) || Number(cxmMap[kb]) || 0;
       // v15.40 — si la fila tiene empresa, sólo muestra las celdas DE ESA empresa:
       // un 809E de LK va a J13/J14 y uno de CH a M13/M15; mostrarle las cuatro al
       // operario es justo el error que se quiere evitar.
-      let celdas = celdasMap[kk] || [];   // v10.08 — dónde va en góndola
+      let celdas = celdasMap[kk] || celdasMap[kb] || [];   // v10.08 — dónde va en góndola · v29.64: el dual, por el pelado
       if (a.emp && _gvLugares && _gvLugares.emp) {
         const _f = celdas.filter(function (c) { const e = _gvLugares.emp[gvNormSector(c)]; return !e || e === a.emp; });
         if (_f.length) celdas = _f;
@@ -28986,7 +29167,7 @@ function gvModTareaFin(leg, k, op, descr, texto) {
     st[k] = { active: false }; setLegajoState(leg, st);
     // v26.56: una vencida se cierra sin entrar al Historial (duraría días)
     if (vivo) pushHistoryForLegajo(leg, { ts: nowMs, opcion: op, descripcion: descr, texto: String(texto || ""),
-      id: "h_" + op.toLowerCase() + "_" + nowMs.toString(36), status: "queued", ts_inicio_iso: new Date(ini).toISOString() });
+      id: "h_" + op.toLowerCase() + "_" + nowMs.toString(36), status: "queued", noReplay: true, ts_inicio_iso: new Date(ini).toISOString() });
     tmMarcarEvento(leg, nowMs);
     if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
     if (typeof renderLegajoHistory === "function") renderLegajoHistory(leg);
@@ -29049,7 +29230,7 @@ function modTareaFin(leg, code, anulada) {
     if (vivo) {
       _modTareaEmit("MDT", leg, ini, anulada ? "ANULADO" : code, m.desc);
       pushHistoryForLegajo(leg, { ts: nowMs, opcion: anulada ? "MDT" : code, descripcion: m.desc + (anulada ? " (anulada)" : ""),
-        texto: anulada ? "ANULADO" : "", id: "h_mdt_" + nowMs.toString(36), status: "queued", ts_inicio_iso: new Date(ini).toISOString() });
+        texto: anulada ? "ANULADO" : "", id: "h_mdt_" + nowMs.toString(36), status: "queued", noReplay: true, ts_inicio_iso: new Date(ini).toISOString() });
     }
     tmMarcarEvento(leg, nowMs);
     if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
@@ -29138,9 +29319,12 @@ async function showGuardarOrden(legajo) {
     + '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;"><b style="font-size:17px;">📋 ¿Qué bajar primero?</b><button onclick="closeGuardarOrden()" style="width:auto;background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;">Cerrar</button></div>'
     + '<div id="gordenBody" style="padding:13px 14px;"><div style="text-align:center;color:#64748b;padding:24px;">Calculando prioridades…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
+    const res = await Promise.all([stockFetchSaldos(), rkbFetchCapacidad(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.guardado_cajas_por_hora&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })]);
-    const saldos = res[0] || {}, capMap = res[1] || {}, cxmMap = (res[3] && res[3].cxm) || {}, _facG = res[4] || {}, _noG = res[5] || {};
+    /* v29.64 (Luis, 13/10, D5) - capacidad del dual por EMPRESA (`_rkbCapDe`): con el lookup
+       pelado el dual daba cap = 0, y el `if (cap <= 0) return null` de los URGENTES lo SACABA de
+       la lista (el 437E LK con 225 cajas en racks no aparecia nunca). */
+    const saldos = res[0] || {}, capObj = res[1] || { pelada: {}, porEmp: {} }, cxmMap = (res[3] && res[3].cxm) || {}, _facG = res[4] || {}, _noG = res[5] || {};
     // v8.91 — ratio de guardado (cajas/h) directo de Stock_Config; si no hay, 380. Para la tarjeta de horas.
     var _rateRow = (res[6] && res[6][0]) || null; var _gRateVal = _rateRow ? parseFloat(_rateRow.valor) : 380; if (!(_gRateVal > 0)) _gRateVal = 380;
     const items = Object.keys(saldos).map(function (k) {
@@ -29148,7 +29332,7 @@ async function showGuardarOrden(legajo) {
       if (_noG[_ocgNorm(a.cod)]) return null;   // v24.52 — a liquidar: no se manda a guardar
       const aGuardar = Math.round(Number(a.a_guardar) || 0), exc = Math.round(Number(a.excedente) || 0), racks = Math.round(Number(a.racks) || 0);
       if (aGuardar + exc + racks <= 0) return null;   // nada esperando para bajar
-      const cap = Math.round(capMap[_ocgNorm(a.cod)] || 0), gond = Math.round(Number(a.terminado) || 0);
+      const cap = Math.round(_rkbCapDe(a.cod, capObj)), gond = Math.round(Number(a.terminado) || 0);
       // v8.90: cxm de planimetría; si no hay, fallback a Cajas_x_Master de la tabla de artículos
       var _cxmVal = cxmMap[_cpNorm(a.cod)] || 0;
       if (!_cxmVal) { var _fG = _facG[String(a.cod).toUpperCase()]; if (_fG && _fG.cajasXMaster > 0) _cxmVal = _fG.cajasXMaster; }
@@ -29160,7 +29344,7 @@ async function showGuardarOrden(legajo) {
     var urgentes = Object.keys(saldos).map(function (k) {
       var a = saldos[k];
       if (_noG[_ocgNorm(a.cod)]) return null;   // v24.52
-      var cap = Math.round(capMap[_ocgNorm(a.cod)] || 0); if (cap <= 0) return null;
+      var cap = Math.round(_rkbCapDe(a.cod, capObj)); if (cap <= 0) return null;
       var gond = Math.round(Number(a.terminado) || 0);
       var ratio = gond / cap; if (ratio >= _URG) return null;
       var back = Math.round((Number(a.a_guardar) || 0) + (Number(a.excedente) || 0) + (Number(a.racks) || 0));
@@ -29326,6 +29510,34 @@ async function rkbFetchCxM() {
     return { cxm: map, locs: locs };
   } catch (_e) { return { cxm: {}, locs: {} }; }
 }
+/* v29.58 (Luis, 13/10) — capacidad de góndola POR EMPRESA, para que el orden de urgencia de
+   Bajar de racks no mande los DUALES al final. `vista_saldos_stock` emite la clave CON sufijo
+   ("437E LK") y `ocgFetchCapacidad` indexa el código PELADO ("437E"), así que el dual nunca
+   encontraba su capacidad: prio = Infinity y último de la lista, con 225 cajas en racks y la
+   góndola a medio llenar (medido el 13/10: 437E LK 225 · 438E LK 78 · 809E CH 336). La capacidad
+   por empresa YA estaba en Capacidad_Sector (437E: LK 120 / CH 48): faltaba cruzar (cod, empresa).
+   Devuelve las DOS claves y NUNCA las pega — regla de la «438E LK»: son dos datos. */
+async function rkbFetchCapacidad() {
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=cod,empresa,cajas_max");
+    const pelada = {}, porEmp = {};
+    rows.forEach(function (x) {
+      const k = _ocgNorm(x.cod); if (!k || k === "LIBRE") return;
+      const n = Number(x.cajas_max) || 0, e = String(x.empresa || "").trim().toUpperCase();
+      pelada[k] = (pelada[k] || 0) + n;
+      if (e === "LK" || e === "CH") porEmp[k + " " + e] = (porEmp[k + " " + e] || 0) + n;
+    });
+    return { pelada: pelada, porEmp: porEmp };
+  } catch (_e) { return { pelada: {}, porEmp: {} }; }
+}
+/* La capacidad de una clave de saldo: con sufijo de empresa ("437E LK") va por (cod, empresa);
+   pelada, la suma de todas sus celdas (identico a ocgFetchCapacidad para los no duales). */
+function _rkbCapDe(cod, capObj) {
+  if (!capObj) return 0;
+  const k = _ocgNorm(cod), mm = /^(.*?)\s+(LK|CH)$/.exec(k);
+  if (mm) return Number((capObj.porEmp || {})[_ocgNorm(mm[1]) + " " + mm[2]]) || 0;
+  return Number((capObj.pelada || {})[k]) || 0;
+}
 async function showRacksBajarModal(legajo, _resume) {
   if (!document.getElementById("rkbCss")) {
     const s = document.createElement("style"); s.id = "rkbCss";
@@ -29344,11 +29556,13 @@ async function showRacksBajarModal(legajo, _resume) {
   const _rkIni = _gvTramoVivo(legajo, "racks");
   if (_resume) { _rkb = _resume; _rkb._cerrado = false; _rkb.tsInicio = _rkIni || Date.now(); if (!_rkIni) { try { gvRacksTramo("RKI", _rkb.legajo, _rkb.tsInicio); } catch (_e) {} } rkbRender(); return; }   // v23.66: tramo nuevo · v26.83: o el que sigue abierto
   try {
-    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), ocgFetchCapacidad().catch(function () { return {}; }),
-      (async function () { try { return await ocgDemanda(true); } catch (_e) { return {}; } })()]);   // v25.89: demanda, para la prioridad
+    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), rkbFetchCapacidad(),
+      (async function () { try { return await ocgDemanda(true); } catch (_e) { return {}; } })(),
+      (async function () { try { return await ocgFetchProyeccion(); } catch (_e) { return {}; } })()]);   // v25.89: demanda · v29.58: Est. Madre, para los que no tienen capacidad
     const saldos = res[0] || {};
     const plani = res[2] || {};
-    const cxmMap = plani.cxm || {}, locsMap = plani.locs || {}, _facRkb = res[3] || {}, capMap = res[4] || {}, demRkb = res[5] || {};
+    const cxmMap = plani.cxm || {}, locsMap = plani.locs || {}, _facRkb = res[3] || {};
+    const capObj = res[4] || { pelada: {}, porEmp: {} }, capMap = capObj.pelada || {}, demRkb = res[5] || {}, emRkb = res[6] || {};
     const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
     const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; })
       .sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); })
@@ -29360,13 +29574,18 @@ async function showRacksBajarModal(legajo, _resume) {
         // sec preseleccionada = la ubicación con más stock (planimetría viva, v5.22)
         /* v25.89 (Luis, 01/10): primero lo más URGENTE — la góndola que, contando lo que ya está
            en A guardar y restando lo pedido, queda más vacía (≡ prioridad de Guardado a Góndola). */
-        const _capR = Number(capMap[_ocgNorm(a.cod)]) || 0, _gonR = Math.round(Number(a.terminado) || 0);
+        const _capR = _rkbCapDe(a.cod, capObj), _gonR = Math.round(Number(a.terminado) || 0);
         const _agR = Math.max(0, Number(a.a_guardar) || 0), _pedR = Number(demRkb[_ocgNorm(a.cod)]) || 0;
+        const _emR = Number(emRkb[_ocgNorm(a.cod)]) || Number(emRkb[_ocgNorm(String(a.cod).replace(/\s+(LK|CH)$/i, ""))]) || 0;   // v29.58: Est. Madre (caj/mes)
         return { cod: a.cod, desc: artNombre(a.cod, a.desc), racks: Math.round(a.racks), cxm: _cxmR, locs: locs, sec: (locs[0] ? locs[0].sector : ""), baja: 0, manual: false,
-                 cap: _capR, gon: _gonR, aGuardar: _agR, ped: _pedR,
+                 cap: _capR, gon: _gonR, aGuardar: _agR, ped: _pedR, em: _emR,
                  prio: _capR > 0 ? (_gonR + _agR - _pedR) / _capR : Infinity };   // v24.68: capacidad y lo que hay en góndola
       }).sort(function (x, y) {
         if (x.prio !== y.prio) return x.prio - y.prio;
+        /* v29.58 (Luis, 13/10): el que NO tiene capacidad cargada va al final — sin capacidad no
+           hay hueco que medir — y entre ésos manda la ESTADÍSTICA MADRE, de mayor a menor: lo
+           que más se vende primero. Sin E.M. (no está en gv_proyeccion_articulo) desempata el código. */
+        if (!isFinite(x.prio) && (x.em || 0) !== (y.em || 0)) return (y.em || 0) - (x.em || 0);
         return (parseInt(x.cod, 10) || 0) - (parseInt(y.cod, 10) || 0);
       });
     _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, cxmMap: cxmMap, locsMap: locsMap, capMap: capMap, filtro: "", tsInicio: _rkIni || Date.now() };
@@ -29376,7 +29595,7 @@ async function showRacksBajarModal(legajo, _resume) {
 }
 function rkbRender() {
   if (!_rkb) return; const body = document.getElementById("rkbBody"); if (!body) return;
-  let h = '<div class="rkb-hint">Bajás en <b>master cajas</b> (lo que físicamente movés del rack). Aparece <b>ordenado por urgencia</b>: primero la góndola más vacía contando lo que ya está en A guardar y lo pedido. Los que dicen <b>“cajas”</b> todavía no tienen el master cargado. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram). Al registrar, <b>el stock pasa a A guardar al instante</b>: después se guarda en góndola con «Guardado a Góndola».</div>';
+  let h = '<div class="rkb-hint">Bajás en <b>master cajas</b> (lo que físicamente movés del rack). Aparece <b>ordenado por urgencia</b>: primero la góndola más vacía contando lo que ya está en A guardar y lo pedido; los que no tienen capacidad cargada van al final, de mayor a menor venta. Los que dicen <b>“cajas”</b> todavía no tienen el master cargado. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram). Al registrar, <b>el stock pasa a A guardar al instante</b>: después se guarda en góndola con «Guardado a Góndola».</div>';
   h += '<input id="rkbSearch" class="rkb-search" type="search" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_rkb.filtro || "") + '" oninput="rkbSearchInput(this.value)">';
   const fq = String(_rkb.filtro || "").trim(), fUp = fq.toUpperCase();
   const shown = fq ? _rkb.items.filter(function (it) { return codEmpiezaCon(it.cod, fq); }) : _rkb.items;   // v21.43
@@ -29617,7 +29836,7 @@ function gvRacksTramo(op, legajo, iniMs, texto) {
     else {
       const ini = (st[k] && st[k].ts) || iniMs || nowMs; st[k] = { active: false };
       pushHistoryForLegajo(leg, { ts: nowMs, opcion: op, descripcion: DESC[op] || op, texto: String(texto || ""),
-        id: "h_" + op.toLowerCase() + "_" + nowMs.toString(36), status: "queued", ts_inicio_iso: new Date(ini).toISOString() });
+        id: "h_" + op.toLowerCase() + "_" + nowMs.toString(36), status: "queued", noReplay: true, ts_inicio_iso: new Date(ini).toISOString() });
     }
     setLegajoState(leg, st);
     tmMarcarEvento(leg, nowMs);
@@ -30418,6 +30637,16 @@ async function cpLoadRazonSocial(nps) {
     const url = SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + uniq.map(encodeURIComponent).join(",") + ")&select=np,razon_social&limit=8000";
     const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     (r.ok ? await r.json() : []).forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !map[np]) map[np] = String(x.razon_social || "").trim(); });
+  } catch (_e) {}
+  // v29.50 — las NP web (LK 0123 / CH 0055) no están en la programación de ISIS: la razón social sale de PPP_Web_Programacion.
+  try {
+    const porEmp = { lk: [], chef: [] };
+    (nps || []).forEach(function (n) { const m = String(n || "").trim().match(/^(LK|CH)\s*0*(\d+)$/i); if (m && !map[String(n).trim()]) porEmp[m[1].toUpperCase() === "LK" ? "lk" : "chef"].push(m[2]); });
+    for (const emp of ["lk", "chef"]) {
+      const lista = Array.from(new Set(porEmp[emp])); if (!lista.length) continue;
+      const r2 = await fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?select=np,razon_social&empresa=eq." + emp + "&np=in.(" + lista.join(",") + ")", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+      (r2.ok ? await r2.json() : []).forEach(function (x) { const lbl = (emp === "lk" ? "LK " : "CH ") + String(x.np).padStart(4, "0"); if (!map[lbl] && x.razon_social) map[lbl] = String(x.razon_social).trim(); });
+    }
   } catch (_e) {}
   return map;
 }
@@ -45183,6 +45412,7 @@ function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
     b("resumen", "🚚 Resumen") +
     b("ent",     "✅ Pedidos Entregados (" + n(cEnt) + ")") +
     b("ocup",    "📦 Ocupación") +
+    b("plantel", "Plantel") +                          // v29.46: horas y personas de la semana (plantel.js)
     b("modif",   "✏️ Modificar Pedidos") +          // v18.14 (Luis): entre Ocupación y Config. Cuarentena
     b("cuarcfg", "🚧 Config. Cuarentena") +
   '</div>';
@@ -45250,6 +45480,12 @@ function pppRenderProg() {
   }
   // v18.12 — Modificar Pedidos. Pantalla propia, interceptada acá arriba por lo mismo que
   // Config. Cuarentena: no depende de que se haya importado una PPP.
+  // v29.46 — Plantel de la semana (plantel.js): horas de picking, armado y tareas fijas → personas.
+  if (_pppTab === "plantel") {
+    pppPaintTabs();
+    _renderKeepFocus(box, (typeof plantelHtml === "function") ? plantelHtml() : '<div style="padding:20px;text-align:center;">No se cargó plantel.js: recargá la página.</div>');
+    return;
+  }
   if (_pppTab === "modif") {
     pppPaintTabs();
     /* Las dos fuentes son las que ya cargan otras solapas: `_pgaRows` (Programación) y
@@ -46474,14 +46710,15 @@ async function qbpLoadBadge() {
     // v22.39 — además del badge de SOS, la tarjeta de HORAS DE GUARDADO PENDIENTES en el
     // propio botón (mismo cálculo que ¿Qué bajar primero?: cajas que ENTRAN ahora a góndola
     // ÷ cajas/h). Se traen cxm y ratio para que coincida con la pantalla, no una cuenta aparte.
-    var res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
+    var res = await Promise.all([stockFetchSaldos(), rkbFetchCapacidad(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.guardado_cajas_por_hora&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })]);
-    var saldos = res[0] || {}, capMap = res[1] || {}, cxmMap = (res[2] && res[2].cxm) || {}, _facG = res[3] || {}, _noG = res[4] || {}, n = 0, totCajas = 0;
+    // v29.64 (D5) - la misma capacidad por empresa que la pantalla, o el badge y la lista no coinciden.
+    var saldos = res[0] || {}, capObj = res[1] || { pelada: {}, porEmp: {} }, cxmMap = (res[2] && res[2].cxm) || {}, _facG = res[3] || {}, _noG = res[4] || {}, n = 0, totCajas = 0;
     var _rateRow = (res[5] && res[5][0]) || null; var rate = _rateRow ? parseFloat(_rateRow.valor) : 380; if (!(rate > 0)) rate = 380;
     Object.keys(saldos).forEach(function (k) {
       var a = saldos[k];
       if (_noG[_ocgNorm(a.cod)]) return;   // v24.52 — a liquidar: ni SOS ni horas de guardado
-      var cap = Math.round(capMap[_ocgNorm(a.cod)] || 0); if (cap <= 0) return;
+      var cap = Math.round(_rkbCapDe(a.cod, capObj)); if (cap <= 0) return;
       var back = Math.round((Number(a.a_guardar) || 0) + (Number(a.excedente) || 0) + (Number(a.racks) || 0));
       if (back > 0 && (Math.round(Number(a.terminado) || 0)) / cap < 0.20) n++;   // SOS: góndola < 20% con stock atrás
       if (back <= 0) return;
@@ -56579,7 +56816,12 @@ function setMonitorTab(tab) {
   _inconsActive = (tab === "incons");
   const tvOn = (tab === "tv");   // v23.64: la vista del monitor de pared
   const admOn = (tab === "admin");   // v25.77: Mon. Admin (el mismo tablero, clickeable)
-  if (cont) cont.classList.toggle("hidden", _inconsActive || tvOn || admOn);
+  const rtOn = (tab === "ritmo");    // v29.47: Ritmo de picking (plantel.js)
+  const rtc = document.getElementById("ritmoContent");
+  if (rtc) rtc.classList.toggle("hidden", !rtOn);
+  const swRt = document.getElementById("monTabRitmo"); if (swRt) swRt.classList.toggle("on", rtOn);
+  if (rtOn && typeof ritmoCargar === "function") ritmoCargar();
+  if (cont) cont.classList.toggle("hidden", _inconsActive || tvOn || admOn || rtOn);
   if (inc)  inc.classList.toggle("hidden", !_inconsActive);
   if (tvc)  tvc.classList.toggle("hidden", !tvOn);
   if (admc) admc.classList.toggle("hidden", !admOn);
@@ -56602,7 +56844,7 @@ function setMonitorTab(tab) {
   const subBar = document.getElementById("anSubBar");
   if (subBar) subBar.classList.toggle("hidden", !_inconsActive);
   const titleEl = document.getElementById("monitorTitleText");
-  if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : (admOn ? "Mon. Admin" : (tvOn ? "Vista TV" : "Monitor Virgilio"));
+  if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : (admOn ? "Mon. Admin" : (tvOn ? "Vista TV" : (rtOn ? "Ritmo" : "Monitor Virgilio")));
   if (_inconsActive) refreshInconsistencias();
 }
 
@@ -57307,6 +57549,11 @@ function pkHojaArmar(tanda, tp, pkc, lug, nps, otras, nombre, base){
     cajas: lineas.reduce(function (s, x){ return s + x.esp; }, 0), falt: lineas.reduce(function (s, x){ return s + (x.real == null ? 0 : Math.max(0, x.esp - x.real)); }, 0) };
 }
 function pkHojaHtml(d){
+  // ⚠ v29.65 (Luis, 13/10) — la diagonal del parcial y el tachado de la fila sin pickear NO van
+  // con linear-gradient + calc(): html2canvas (el PDF que arma el helper de impresión) no parsea el
+  // calc() de los color stops y pinta el gradiente SOLIDO — la nota salió con un CUADRADO NEGRO
+  // encima del total de cajas y la fila sin pickear toda gris, ilegible. Van con una barra de fondo
+  // sólido (::after, sin calc), que el navegador y html2canvas dibujan igual. tests/pk-hoja-picking.cjs.
   var css = '<style>.pkh{font-family:Arial,Helvetica,sans-serif;color:#111;}' +
     '.pkh-top{display:flex;justify-content:space-between;align-items:flex-start;gap:1em;border-bottom:.12em solid #111;padding-bottom:.35em;margin-bottom:.4em;}' +
     '.pkh-t{font-size:1.55em;font-weight:800;line-height:1.15;}.pkh-s{font-size:1.25em;}.pkh-r{font-size:1.1em;text-align:right;line-height:1.35;}' +
@@ -57317,9 +57564,9 @@ function pkHojaHtml(d){
     '.pkh-tot{font-size:1.15em;font-weight:800;margin-top:.35em;text-align:center;}.pkh-m3h{font-size:1.3em;font-weight:800;margin-top:.25em;text-align:center;}' +
     '.pkh-ok{font-weight:800;font-size:1.15em;}' +
     '.pkh-diag{position:relative;display:inline-block;padding:0 .18em;}' +
-    '.pkh-diag::after{content:"";position:absolute;left:0;right:0;top:0;bottom:0;background:linear-gradient(to top right,transparent calc(50% - .55px),#111 calc(50% - .55px),#111 calc(50% + .55px),transparent calc(50% + .55px));-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.pkh-diag::after{content:"";position:absolute;left:-.02em;right:-.02em;top:50%;height:.09em;margin-top:-.045em;background:#111;transform:rotate(-20deg);-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
     '.pkh-got{font-weight:800;margin-left:.35em;}' +
-    '.pkh-no td{color:#777;background:linear-gradient(to bottom,transparent calc(50% - .6px),#777 calc(50% - .6px),#777 calc(50% + .6px),transparent calc(50% + .6px));-webkit-print-color-adjust:exact;print-color-adjust:exact;}.pkh-no .pkh-cod{color:#777;}</style>';
+    '.pkh-no td{color:#777;position:relative;}.pkh-no td::after{content:"";position:absolute;left:0;right:0;top:50%;height:.075em;margin-top:-.037em;background:#777;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.pkh-no .pkh-cod{color:#777;}</style>';
   var mitad = Math.ceil(d.lineas.length / 2);
   // v25.71 (Luis): la columna «Pickeo» desaparece; el resultado va en «Total cajas».
   //  · se pickeó todo → el número + ✓   · a medias → total tachado (diagonal fina) + lo pickeado al lado
@@ -62026,7 +62273,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.23"></script>
+<script src="importacion.js?v=29.65"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64956,12 +65203,13 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.23"></script>
-<script src="hotsale.js?v=29.23"></script>
-<script src="estadisticas.js?v=29.23"></script>
-<script src="ads.js?v=29.23"></script>
+<script src="cobranzas.js?v=29.65"></script>
+<script src="hotsale.js?v=29.65"></script>
+<script src="estadisticas.js?v=29.65"></script>
+<script src="ads.js?v=29.65"></script>
+<script src="plantel.js?v=29.65"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.23"></script>
+<script src="ayuda.js?v=29.65"></script>
 
 </body>
 </html>

@@ -225,6 +225,12 @@ echo "== ins-sale-mc (v24.69: insumo con MC sale sólo en MC, stock en base) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-sale-mc.cjs
 echo "== ins-ri-cat-bolsas (v29.22: RI elige categoría sin importados; inyector = sólo bolsas) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-ri-cat-bolsas.cjs
+echo "== ins-ri-gp2-catalogo (v29.35: Recibir insumos muestra el catálogo de GP2 y da de alta al elegir) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-ri-gp2-catalogo.cjs
+echo "== ins-marca-empresa (v29.56: al recibir insumos se marca de qué empresa vienen, en toda categoría) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-marca-empresa.cjs
+echo "== historial-no-replay (v29.24: el replay de Terminar Día no re-manda los items h_* del Historial) =="
+node tests/historial-no-replay.cjs
 
 echo "== ssg-switch (regresión: switch admin del aviso 'picking sin stock') =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ssg-switch.cjs
@@ -702,6 +708,8 @@ echo "== remito-np-web (v15.46: el remito impreso trae cliente y fecha también 
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/remito-np-web.cjs
 echo "== pk-hoja-picking (v25.51: hoja de picking por tanda al terminar el picking) =="
 node tests/pk-hoja-picking.cjs
+echo "== pk-hoja-pdf (v29.65: la hoja como sale por el helper — sin bloques negros en Total cajas) =="
+node tests/pk-hoja-pdf.cjs
 
 echo "== proy-entregadas (v15.52: popup Proyección — cajas ENTREGADAS por el proveedor entre el mes y la barra; s/d si ese mes no había registro) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/proy-entregadas.cjs
@@ -739,6 +747,12 @@ echo "== pedimp-pdf-inner (v24.40: el PDF del pedido lleva Inner Cajas) =="
 node tests/pedimp-pdf-inner.cjs
 echo "== pedimp-prioridad-damian (v24.42: orden por meses de stock · alerta < 4 · PDF para Damián) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-prioridad-damian.cjs
+echo "== pedimp-dual-nombre (v29.36: el 809E de Chef no sale con el nombre del de Loeke) =="
+node tests/pedimp-dual-nombre.cjs
+echo "== pedimp-encurso-suma (v29.41: en Importaciones el 809E LK se ve dentro del 820E) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-encurso-suma.cjs
+echo "== pedimp-stock-deposito (v29.42: el stock de un importado por depósito, como Stocks, + Cervantes) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-stock-deposito.cjs
 echo "== imp-discontinuos (v24.49: solapa 🚫 Discontinuos de Importación) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-discontinuos.cjs
 echo "== rr-super-cajas (v24.51: súper sin líos → cajas) =="
@@ -822,6 +836,16 @@ echo "== impo-comex-web (v23.19: IMPO COMEX web dentro de Importación, sin toke
 node tests/impo-comex-web.cjs
 echo "== impo-comex-nuevo (v29.18: IMPO COMEX sin build, 11 modos y la lógica original en el navegador) =="
 node tests/impo-comex-nuevo.cjs
+echo "== impo-comex-paridad-lakout (v29.20: IMPO COMEX nuevo se comporta igual que el viejo, flujos de punta a punta) =="
+node tests/impo-comex-paridad-lakout.cjs
+echo "== impo-comex-paridad-multidoc (v29.20: IMPO COMEX nuevo se comporta igual que el viejo, flujos de punta a punta) =="
+node tests/impo-comex-paridad-multidoc.cjs
+echo "== impo-comex-paridad-marks (v29.20: IMPO COMEX nuevo se comporta igual que el viejo, flujos de punta a punta) =="
+node tests/impo-comex-paridad-marks.cjs
+echo "== impo-comex-paridad-cajas (v29.20: IMPO COMEX nuevo se comporta igual que el viejo, flujos de punta a punta) =="
+node tests/impo-comex-paridad-cajas.cjs
+echo "== impo-comex-paridad-inal (v29.20: IMPO COMEX nuevo se comporta igual que el viejo, flujos de punta a punta) =="
+node tests/impo-comex-paridad-inal.cjs
 
 echo "== fn-duplicadas (v22.96: ninguna función de nivel superior declarada dos veces — la ccRender de Cobranzas pisó la de Carga Camión) =="
 node tests/fn-duplicadas.cjs
@@ -1194,6 +1218,10 @@ echo "== est-madre-unica (v25.78: la Est. Madre es UN cuadro — est-madre.js, m
 node tests/est-madre-unica.cjs
 echo "== ads-alertas (v27.21: ADS — Alertas Damián Stock, talleristas + quiebres; ads.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ads-alertas.cjs
+echo "== ppp-plantel (v29.46: PPP → Plantel de la semana, horas de picking/armado/fijas → personas; plantel.js) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-plantel.cjs
+echo "== monitor-ritmo (v29.47: Monitor → Ritmo de picking, estimado por dificultad vs real; plantel.js) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/monitor-ritmo.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ads-xlsx-orden.cjs
 node tests/ads-entrega-proy.cjs
 node tests/ads-em-plazo.cjs
