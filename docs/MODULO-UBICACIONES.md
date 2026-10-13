@@ -44,8 +44,7 @@ y, por el `IN-F6` que ya tenía una pieza: *"creale la IN-F6 y listo"*.
 | **H · I · J · K · L** | 1 a **7** | 35 |
 | | | **77** |
 
-⚠ **Se RETIRA el «F es del 1 al 5»** de la primera versión del padrón (v30.09): **F va de 1 a 6**, como
-A-G. Lo decidió Luis el mismo día al ver que `IN-F6` existía con el `D14` (Resorte 520 Niq.) anotado.
+⚠ **F va de 1 a 6**, como A-G (Luis, 13/10: `IN-F6` existe con el `D14` anotado).
 
 Las **22 que faltaban** se dieron de alta el 13/10 (A4, C3, C4, D2, E3, E4, F3, F4, F5, I1, I2, I3, I5,
 I6, I7, J5, J7, K1, K2, K3, K7, **L7**), todas vacías. Al 13/10 el padrón está **completo**: 77 celdas,
@@ -244,3 +243,11 @@ cuenta (Stock → Capacidad «Importar» y «Borrar todo», y Despiece «Guardar
 los 12 dependientes quedaron en `zz_backups."GV_Backup_CapSector_defs_20260925"`. Lo sostiene
 `tests/cap-sector-vista.cjs`.
 
+## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
+
+> Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
+> **No leer esta sección en el trabajo normal**: sólo cuando alguien pregunta por un comportamiento viejo
+> y no aparece en las reglas vigentes de arriba. Nada de acá se vuelve a aplicar sin un pedido explícito.
+
+⚠ **Se RETIRA el «F es del 1 al 5»** de la primera versión del padrón (v30.09): **F va de 1 a 6**, como
+A-G. Lo decidió Luis el mismo día al ver que `IN-F6` existía con el `D14` (Resorte 520 Niq.) anotado.
