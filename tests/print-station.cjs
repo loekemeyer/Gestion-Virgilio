@@ -41,7 +41,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.remitoPrintDoc = function () { out.usoCuadro = true; };   // lo automático NUNCA pasa por acá
     window.armadoRemitoInnerHtml = function (d) { return "REMITO-" + d.np; };
     // el enriquecido real pega a PPP/Entregas/TP; acá alcanza con un passthrough
-    window._armadoRemitoDataForItems = async function (items) { return items.map(function (x) { return { np: x.np, rs: "Test", total: 1, nLios: 1 }; }); };
+    window._armadoRemitoDataForItems = async function (items) { return items.map(function (x) { return { np: x.np, rs: "Test", total: 1, nLios: x.resumen ? 1 : 0, faltantes: x.np === "98012" ? [{ cod: "1", cajas: 2 }] : [] }; }); };
     window.colaImpLoadBadge = function () {};   // el badge real pega a la base
     const espera = function (ms) { return new Promise(function (res) { setTimeout(res, ms); }); };
 
@@ -64,18 +64,19 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     talRows = [
       { texto: "98001|1|D10B|A=1X1|L1", ts_cliente: "2026-01-01T12:00:00-03:00", legajo: "122" },  // ya impreso (seed)
       { texto: "98010|3|D12B|C=3X2|L2", ts_cliente: "2026-01-01T12:01:00-03:00", legajo: "122" },  // nuevo → imprime
-      { texto: "98011|4|D12B||L1",      ts_cliente: "2026-01-01T12:02:00-03:00", legajo: "122" }   // sin resumen → marca, no imprime
+      { texto: "98011|4|D12B||L1",      ts_cliente: "2026-01-01T12:02:00-03:00", legajo: "122" },  // sin resumen ni faltantes → marca, no imprime
+      { texto: "98012|0|D12B||L1",      ts_cliente: "2026-01-01T12:02:00-03:00", legajo: "122" }   // v30.18: 0 cajas, todo faltó → imprime el remito de faltantes
     ];
     await psPoll(true); await espera(50);
-    out.poll_imprimeNuevo = printed.length === 1 && printed[0] === "REMITO-98010" && out.ultAuto === true && !out.usoCuadro;
+    out.poll_imprimeNuevo = printed.length === 2 && printed[0] === "REMITO-98010" && printed[1] === "REMITO-98012" && out.ultAuto === true && !out.usoCuadro;
     out.poll_marcaNuevo = psGetPrinted().has("98010");
     out.poll_sinResumenMarca = psGetPrinted().has("98011");
     out.poll_lastSeenAvanza = String(_ps.lastSeen) === "2026-01-01T12:02:00-03:00";
     // v12.08: lo impreso por la estación también se marca en Impresion_NP (server)
-    out.poll_marcaImpresionNP = impresionPosts.indexOf("98010") >= 0 && impresionPosts.indexOf("98011") < 0;
+    out.poll_marcaImpresionNP = impresionPosts.indexOf("98010") >= 0 && impresionPosts.indexOf("98012") >= 0 && impresionPosts.indexOf("98011") < 0;
     // re-poll con las mismas filas: nada nuevo que imprimir
     await psPoll(true);
-    out.poll_dedup = printed.length === 1;
+    out.poll_dedup = printed.length === 2;
 
     // ---- el helper NO imprimió: no se marca en Impresion_NP (queda pendiente en la Cola) y el log lo dice ----
     window.__resp = { ok: false, impreso: [], errores: [], motivo: "sin regla para armado" };

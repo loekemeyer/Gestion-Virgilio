@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.17">
+<link rel="stylesheet" href="gv-ui.css?v=30.18">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.17"></script>
+<script type="module" src="recepcion.js?v=30.18"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10798,7 +10798,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.17";
+const APP_VERSION = "v30.18";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -40803,6 +40803,8 @@ function colaImpVRender() {
   if (!items.length) { body.innerHTML = h + '<div style="padding:20px;text-align:center;color:#94a3b8;">No hay notas de pedido pendientes de imprimir.</div>'; return; }
   var thc = 'padding:6px 9px;background:#f1f5f9;color:#475569;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;text-align:center;';
   var td = 'padding:6px 9px;border-bottom:1px solid #eef2f7;text-align:center;';
+  // v30.18 (Luis, 13/10) — la tabla lleva su título: sin él, el «(0)» de las hojas de picking se leía como el total.
+  h += '<div style="font-weight:800;color:#0f172a;margin:4px 0 6px;">📄 Notas de pedido pendientes (' + items.length + ')</div>';
   h += '<div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:13.5px;margin:0 auto;background:#fff;"><thead><tr>' +
     '<th style="' + thc + '">NP</th><th style="' + thc + '">Tanda</th><th style="' + thc + '">Razón Social</th><th style="' + thc + '">Armado<br>hace</th></tr></thead><tbody>';
   items.forEach(function (x) {
@@ -59481,7 +59483,9 @@ async function psPoll(force){
         const p = String(ev.texto || "").split("|"); const np = String(p[0] || "").trim().replace(/\.0+$/, "");
         if (!np || printed.has(np)) return;
         const resumen = p[3] || "";
-        if (!resumen){ psMarkPrinted(np); return; }   // TAL sin resumen (viejo) → nada que imprimir
+        // v30.18 (Luis, 13/10: LK 0410 de F86A, 4:24 en la Cola) — el TAL sin resumen es una NP armada con
+        // 0 cajas (todo faltó). Antes se marcaba y no salía: quedaba para siempre en la Cola de impresión NP.
+        // Ahora va al lote; psPrintBatch saca el remito si tiene faltantes (Entregas_Virgilio).
         fresh.push({ np: np, tanda: String(p[2] || "").trim().toUpperCase(), resumen: resumen, armadorLeg: String(ev.legajo || "") });
       });
       _ps.lastSeen = maxTs; try { localStorage.setItem(PS_LASTSEEN_KEY, maxTs); } catch (_e) {}
@@ -59620,6 +59624,8 @@ async function psPrintBatch(items){
   const ds = await _armadoRemitoDataForItems(items);
   ds.forEach(function (d){
     psMarkPrinted(d.np);   // marcar ANTES de encolar → si hay 2 pestañas abiertas, no imprimen doble
+    // v30.18 — NP sin líos, sin artículos y sin faltantes: no hay hoja que sacar (mismo criterio que la Cola).
+    if (!(d.nLios || (d.arts && d.arts.length) || (d.faltantes && d.faltantes.length))) return;
     // v26.66 — sólo por el helper (gvImprimirAuto, que ya serializa): marca Impresion_NP SÓLO si salió
     // (v12.08: si no, la Cola acusaba pendientes falsos); si no salió, queda pendiente en la Cola.
     gvImprimirAuto("armado", armadoRemitoInnerHtml(d), d.np, String(d.np)).then(function (r){
@@ -63547,7 +63553,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.17"></script>
+<script src="importacion.js?v=30.18"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -66776,15 +66782,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.17"></script>
-<script src="hotsale.js?v=30.17"></script>
-<script src="estadisticas.js?v=30.17"></script>
-<script src="ads.js?v=30.17"></script>
-<script src="plantel.js?v=30.17"></script>
+<script src="cobranzas.js?v=30.18"></script>
+<script src="hotsale.js?v=30.18"></script>
+<script src="estadisticas.js?v=30.18"></script>
+<script src="ads.js?v=30.18"></script>
+<script src="plantel.js?v=30.18"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.17"></script>
+<script src="analisis.js?v=30.18"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.17"></script>
+<script src="ayuda.js?v=30.18"></script>
 
 </body>
 </html>
