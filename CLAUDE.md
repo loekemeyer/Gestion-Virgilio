@@ -8605,6 +8605,29 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
 - Lo sostiene la base: trigger `aa_gv_salida_cervantes_no_racks` → `SC_DESDE_RACKS` (centinela v29.13).
   `sql/gv_salida_cervantes_no_racks_v2913.sql`, `tests/sc-racks-unidad.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-13, v29.67, D2): en INGRESO A RACKS un código que NO EXISTE no entra — y si es una POSICIÓN lo dice
+
+**Luis:** *"956E · va a terminar en AB10 · el operario lo puso mal · ponele candado"*. El 13/10 09:34 el legajo 104
+escribió la **posición** `AB3` en el campo del **código** y entraron **60 cajas de un código fantasma** en AB03 (eran
+**956E** y las volvió a cargar bien en **AB10** a las 09:37). El 09/10 había pasado lo mismo con «606», que era 606E.
+
+| lo tipeado | qué hace el módulo |
+|---|---|
+| código que existe (`gv_stock_cod_conocido`, los 7 maestros) | sigue como siempre |
+| **POSICIÓN de rack** que no es un código (`gv_rack_sector`: AB3 → AB03, W1 → W01) | **bloquea**: «Revisar carga» deshabilitado + aviso rojo *«no es un artículo: es la POSICIÓN de rack AB03 — acá va el código (ej. 956E); la posición va abajo, en Sector»* |
+| código **dado de baja** (`gv_codigo_baja_de`: 865ED → 865E) | bloquea y dice cuál va |
+| no existe y no es posición (606) | **pregunta** (no bloquea): *«No existe el código 606. ¿Lo creo y le cargo N cajas en X?»* |
+| no se pudo verificar | pregunta: *«no pude leer» no es «existe»* |
+
+- Es el mismo candado de **Stocks → Ajustar / Fijar** (v25.28) con el aviso de posición que este caso pide
+  (`_irCodChk` / `_irCodGuard`, cache por código, chequeo con debounce al tipear + candado en `irRevisar`).
+- ⚠ **Solo en modo IMPORTACIÓN**, que es donde el código se TIPEA: en **Nacional** sale de la lista de stock real
+  (y su clave trae el sufijo de empresa, `438E LK`, que `gv_stock_cod_conocido` no conoce: daría falso rojo).
+- ⚠ **La posición bloquea sólo si ADEMÁS el código no existe**: `A1` es rack de insumos **y** código de verdad
+  (medido 13/10: `gv_rack_sector('A1')` = A1 y `gv_stock_cod_conocido('A1')` = true).
+- ⚠ **El dato de AB3 (60 cajas en AB03) NO se corrigió**: es una corrección de datos y pide el «sí».
+- `tests/ir-codigo-candado.cjs` (corre la pantalla; verificado que falla con 10 chequeos en rojo contra la v29.66).
+
 ## ⚠ REGLA (Luis, 2026-10-09, v29.17): ❓ AYUDA — el asistente del operario SÓLO sabe el manual
 
 - ⚠ **v29.18 (Luis): SIN BOTÓN en la botonera hasta que esté terminado** (*"nada de esto hasta que esté terminado"*).

@@ -271,6 +271,9 @@ echo "== mg-tarea-vencida (v26.56: guardado abierto de otro día no cuenta tiemp
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-tarea-vencida.cjs
 echo "== modulo-minimizar-anular (v26.83: Cerrar minimiza BR/MG/IR sin cortar el tramo; Anular sale con ANULADO) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/modulo-minimizar-anular.cjs
+
+echo "== ir-codigo-candado (v29.67: Ingreso a racks no acepta un codigo que no existe; si es una POSICION lo dice) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ir-codigo-candado.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/modulo-tarea-enviar.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/sc-racks-unidad.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ayuda-chat.cjs

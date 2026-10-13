@@ -6401,7 +6401,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.66"></script>
+<script type="module" src="recepcion.js?v=29.67"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10705,7 +10705,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.66";
+const APP_VERSION = "v29.67";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30163,6 +30163,67 @@ async function eaUbicDelete() {
    Evento IR por palet. Contraparte de Mover (mv) y Bajar de racks (rkb). ===== */
 let _ir = null;
 function _irNorm(c) { return String(c == null ? "" : c).toUpperCase().replace(/\s+/g, ""); }
+/* ⚠ v29.67 (Luis, 13/10, D2) — CANDADO del Ingreso a racks: un código que NO EXISTE no entra, y si lo tipeado
+   es una POSICIÓN de rack se lo dice. Caso AB3 (13/10, legajo 104): escribió la posición AB03 en el campo del
+   CÓDIGO y entraron 60 cajas de un código fantasma (eran 956E, que terminaron en AB10); el 09/10 pasó lo mismo
+   con «606» (era 606E). Es el mismo candado de Stocks → Ajustar/Fijar (v25.28) más el aviso de posición.
+   gv_stock_cod_conocido (los 7 maestros) + gv_rack_sector (el Mapa) + gv_codigo_baja_de, las tres anon.
+   ⚠ Solo en modo IMPORTACIÓN, que es donde el código se TIPEA: en Nacional sale de la lista de stock real.
+   ⚠ Bloquea la posición solo si ADEMÁS el código no existe: «A1» es rack de insumos Y código de verdad.
+   ⚠ Si no se puede verificar, pregunta: «no pude leer» no es «existe». */
+const _IR_CHK = {};
+async function _irRpc(fn, body) {
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, { method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(body) });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return await r.json();
+}
+async function _irCodChk(cod) {
+  const k = _irNorm(cod); if (!k) return null;
+  if (_IR_CHK[k]) return _IR_CHK[k];
+  const out = { cod: k, existe: null, baja: null, pos: null };
+  try { out.existe = (await _irRpc("gv_stock_cod_conocido", { p_cod: k })) === true; } catch (_e) {}
+  try { const rep = await _irRpc("gv_codigo_baja_de", { p_cod: k }); if (typeof rep === "string") out.baja = rep || "-"; } catch (_e) {}
+  if (out.existe !== true) { try { const s = await _irRpc("gv_rack_sector", { p: k }); if (s) out.pos = String(s); } catch (_e) {} }
+  if (out.existe !== null || out.baja || out.pos) _IR_CHK[k] = out;   // el "no se pudo leer" no se cachea
+  return out;
+}
+let _irChkT = null;
+function _irChkPedir() {
+  if (_irChkT) { clearTimeout(_irChkT); _irChkT = null; }
+  if (!_ir) return;
+  if (_ir.modo === "nacional") { _ir.chk = null; return; }
+  const k = _irNorm(_ir.cod);
+  if (!k) { _ir.chk = null; return; }
+  if (_IR_CHK[k]) { _ir.chk = _IR_CHK[k]; return; }
+  _ir.chk = null;
+  _irChkT = setTimeout(function () {
+    _irCodChk(k).then(function (res) { if (_ir && _irNorm(_ir.cod) === k) { _ir.chk = res; irRender(); } }).catch(function () {});
+  }, 450);
+}
+function _irChkMal(chk) { return !!(chk && (chk.baja || (chk.pos && chk.existe === false))); }
+function _irChkWarn(chk) {
+  if (!chk) return "";
+  if (chk.baja) return '<div class="ir-warn">⚠ El código <b>' + escapeHtml(chk.cod) + '</b> no se usa más'
+    + (chk.baja !== "-" ? ': es el <b>' + escapeHtml(chk.baja) + '</b>. Cargalo como ' + escapeHtml(chk.baja) + '.' : '.') + '</div>';
+  if (chk.pos && chk.existe === false) return '<div class="ir-warn">⚠ <b>' + escapeHtml(chk.cod) + '</b> no es un artículo: es la <b>POSICIÓN de rack ' + escapeHtml(chk.pos)
+    + '</b>.<br>Acá va el <b>código del artículo</b> (ej. 956E); la posición va abajo, en <b>Sector</b>.</div>';
+  if (chk.existe === false) return '<div class="ir-warn" style="background:#fffbeb;border-color:#fcd34d;color:#92400e">⚠ El código <b>' + escapeHtml(chk.cod) + '</b> no existe en el maestro. Revisalo antes de cargar.</div>';
+  return "";
+}
+async function _irCodGuard(codN) {
+  const cajas = Number(_ir && _ir.inner) || 0, sec = String((_ir && _ir.sector) || "").toUpperCase();
+  const chk = await _irCodChk(codN); if (!chk) return false;
+  if (_ir) { _ir.chk = chk; }
+  if (chk.baja) { try { alert("El código " + codN + " no se usa más" + (chk.baja !== "-" ? ": es el " + chk.baja + ". Cargalo como " + chk.baja + "." : ".")); } catch (_e) {} irRender(); return false; }
+  if (chk.existe === true) return true;
+  if (chk.pos) { try { alert("«" + codN + "» NO es un artículo: es la POSICIÓN de rack " + chk.pos + ".\n\nEn «Código» va el código del artículo (ej. 956E) y la posición va abajo, en «Sector»."); } catch (_e) {} irRender(); return false; }
+  irRender();
+  const q = " " + cajas + " cajas en " + sec + "?";
+  if (chk.existe === false) return confirm("No existe el código " + codN + ".\n\n¿Lo creo y le cargo" + q);
+  return confirm("No pude verificar si el código " + codN + " existe.\n\n¿Cargo igual" + q);
+}
 async function irFetchCxM(plani) {
   const cx = {};
   try {
@@ -30225,6 +30286,8 @@ function irRender() {
   const secU = String(_ir.sector || "").trim().toUpperCase(), ocupadoPor = _ir.ocupados[secU] || "";
   const sectorOcupadoOtro = ocupadoPor && _irNorm(ocupadoPor) !== codN;
   const nombre = _ir.cod ? (artNombre(_ir.cod, "") || "") : "";
+  const chk = (_ir.chk && _ir.chk.cod === codN) ? _ir.chk : null;   // v29.67: candado del código (solo importación)
+  const codMal = !nac && _irChkMal(chk);
   const origTxt = _ir.origen === "excedente" ? "excedente" : "a guardar";
   const disp = nac ? _irDisp(_ir.cod, _ir.origen) : 0;
   // v6.28: toggle Importación (stock nuevo) / Nacional (mover stock existente a racks)
@@ -30247,6 +30310,7 @@ function irRender() {
     h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="ej. 582E" value="' + escapeHtml(codBase(_ir.cod)) + '" oninput="irSetCod(this.value)"></div>';
     if (_ir.cod) h += '<div class="ir-desc">' + escapeHtml(nombre || "(código nuevo, sin nombre)") + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
+    if (chk) h += _irChkWarn(chk);
     h += '<div class="ir-row2"><div class="ir-fld"><div class="ir-lbl">Masters</div><div class="ir-stp"><button class="ir-sb" onclick="irChgM(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.masters) || 0) + '" oninput="irSetM(this.value)"><button class="ir-sb" onclick="irChgM(1)">+</button></div></div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas (inner)</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div></div>';
   }
@@ -30256,7 +30320,7 @@ function irRender() {
   h += '<div class="ir-libres">' + _ir.libres.slice(0, 14).map(function (s) { return '<button class="ir-chip' + (secU === s.toUpperCase() ? ' on' : '') + '" onclick="irSetSec(\'' + escapeHtml(s) + '\')">' + escapeHtml(s) + '</button>'; }).join("") + (_ir.libres.length > 14 ? '<span class="ir-more">+' + (_ir.libres.length - 14) + ' libres</span>' : (_ir.libres.length ? '' : '<span class="ir-more">sin sectores libres</span>')) + '</div>';
   h += '<div class="ir-fld"><div class="ir-lbl">Empresa</div><div class="ir-seg"><button class="ir-segb' + (_ir.emp === "LK" ? " on" : "") + '" onclick="irSetEmp(\'LK\')">LK · Loeke</button><button class="ir-segb' + (_ir.emp === "CH" ? " on" : "") + '" onclick="irSetEmp(\'CH\')">CH · Chef</button></div></div>';
   const dispOk = !nac || (disp > 0 && Number(_ir.inner) <= disp);
-  const ok = codN && (Number(_ir.inner) > 0) && secU && !sectorOcupadoOtro && dispOk;
+  const ok = codN && (Number(_ir.inner) > 0) && secU && !sectorOcupadoOtro && dispOk && !codMal;
   h += '<button class="ir-fin"' + (ok ? "" : " disabled") + ' onclick="irRevisar()">Revisar carga →' + (secU && Number(_ir.inner) > 0 ? ' (' + (Number(_ir.inner) || 0) + ' cajas a ' + escapeHtml(secU) + ')' : '') + '</button>';
   if (_ir.done.length) {
     h += '<div class="ir-done-h">Cargados en esta sesión (' + _ir.done.length + ')</div>';
@@ -30268,7 +30332,7 @@ function irRender() {
   else h += '<button class="gv-anular" onclick="irAnular()">⛔ Anular ingreso</button>';
   _renderKeepFocus(body, h);
 }
-function irSetCod(v) { if (!_ir) return; _ir.cod = String(v == null ? "" : v).toUpperCase().replace(/\s+/g, ""); const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0 && Number(_ir.masters) > 0) _ir.inner = Number(_ir.masters) * cxm; irRender(); }
+function irSetCod(v) { if (!_ir) return; _ir.cod = String(v == null ? "" : v).toUpperCase().replace(/\s+/g, ""); const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0 && Number(_ir.masters) > 0) _ir.inner = Number(_ir.masters) * cxm; _irChkPedir(); irRender(); }
 function irSetM(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || n < 0) n = 0; _ir.masters = n; const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0) _ir.inner = n * cxm; irRender(); }
 function irChgM(d) { if (!_ir) return; irSetM(Math.max(0, (Number(_ir.masters) || 0) + d)); }
 function irSetI(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || n < 0) n = 0; _ir.inner = n; irRender(); }
@@ -30277,7 +30341,7 @@ function irSetSec(v) { if (!_ir) return; _ir.sector = String(v == null ? "" : v)
 function irSetEmp(e) { if (!_ir) return; _ir.emp = (e === "CH") ? "CH" : "LK"; irRender(); }
 /* v6.28 — Ingreso a racks NACIONAL: mover stock existente (a_guardar/excedente) a racks. */
 function _irDisp(cod, origen) { if (!_ir || !_ir.saldos || !cod) return 0; const e = _ir.saldos[String(cod)]; if (!e) return 0; return Math.max(0, Number(e[origen === "excedente" ? "excedente" : "a_guardar"]) || 0); }
-function irSetModo(m) { if (!_ir) return; _ir.modo = (m === "nacional" ? "nacional" : "import"); _ir.cod = ""; _ir.codPick = ""; _ir.masters = 0; _ir.inner = 0; irRender(); }
+function irSetModo(m) { if (!_ir) return; _ir.modo = (m === "nacional" ? "nacional" : "import"); _ir.cod = ""; _ir.codPick = ""; _ir.masters = 0; _ir.inner = 0; _ir.chk = null; irRender(); }
 function irSetOrigen(o) { if (!_ir) return; _ir.origen = (o === "excedente" ? "excedente" : "a_guardar"); _ir.cod = ""; _ir.inner = 0; irRender(); }
 function irSetPick(v) { if (!_ir) return; _ir.codPick = String(v == null ? "" : v); irRender(); }
 function irPickCod(codEnc) { if (!_ir) return; const cod = decodeURIComponent(codEnc); _ir.cod = cod; const disp = _irDisp(cod, _ir.origen); if (Number(_ir.inner) > disp) _ir.inner = disp; irRender(); }
@@ -30310,13 +30374,16 @@ function _irListaNac() {
 /* Paso de revisión (v5.69): "Revisar carga →" no escribe nada — muestra un resumen
    y recién ahí "✓ Confirmar carga" ejecuta irCargar(). "← Volver" vuelve al formulario
    con los datos intactos para corregir antes de confirmar. */
-function irRevisar() {
+async function irRevisar() {
   if (!_ir) return;
   const codN = _irNorm(_ir.cod), secU = String(_ir.sector || "").trim().toUpperCase();
   const ocupadoPor = _ir.ocupados[secU] || "";
   const sectorOcupadoOtro = ocupadoPor && _irNorm(ocupadoPor) !== codN;
   if (!codN || !(Number(_ir.inner) > 0) || !secU || sectorOcupadoOtro) return;
   if (_ir.modo === "nacional") { const disp = _irDisp(_ir.cod, _ir.origen); if (!(disp > 0) || Number(_ir.inner) > disp) return; }
+  // v29.67: el candado del código (D2) — acá es donde frena, aunque el chequeo de fondo no haya llegado
+  if (_ir.modo !== "nacional" && !(await _irCodGuard(codN))) return;
+  if (!_ir) return;
   _ir.confirming = true; irRender();
 }
 function irVolver() { if (!_ir) return; _ir.confirming = false; irRender(); }
@@ -30373,6 +30440,7 @@ async function irCargar() {
   const cxmv = _ir.cxm[cod] || 0;
   const masters = nac ? (cxmv > 0 ? Math.floor(inner / cxmv) : 0) : (Number(_ir.masters) || 0);
   if (!cod || !sector || inner <= 0) return;
+  if (!nac && _irChkMal(_ir.chk && _ir.chk.cod === cod ? _ir.chk : null)) { try { alert("Revisá el código " + cod + " antes de cargar."); } catch (_e) {} return; }   // v29.67
   const origTxt = _ir.origen === "excedente" ? "excedente" : "a guardar";
   if (nac) { const disp = _irDisp(_ir.cod, _ir.origen); if (inner > disp) { try { alert("No hay tantas: solo hay " + Math.round(disp) + " cajas de " + cod + " en " + origTxt + "."); } catch (_e) {} return; } }
   let res = "";
@@ -30401,7 +30469,7 @@ async function irCargar() {
   // nacional: descontar del saldo local (origen −, racks +) para refrescar el buscador
   if (nac && _ir.saldos && _ir.saldos[_ir.cod]) { const key = _ir.origen === "excedente" ? "excedente" : "a_guardar"; _ir.saldos[_ir.cod][key] = (Number(_ir.saldos[_ir.cod][key]) || 0) - inner; _ir.saldos[_ir.cod].racks = (Number(_ir.saldos[_ir.cod].racks) || 0) + inner; }
   _ir.done.push({ cod: cod, sector: sector, masters: masters, inner: inner, nac: nac ? origTxt : "" });
-  _ir.cod = ""; _ir.codPick = ""; _ir.masters = 0; _ir.inner = 0; _ir.sector = (_ir.libres[0] || ""); _ir.confirming = false;
+  _ir.cod = ""; _ir.codPick = ""; _ir.masters = 0; _ir.inner = 0; _ir.sector = (_ir.libres[0] || ""); _ir.confirming = false; _ir.chk = null;
   irRender();
   try { alert("✓ " + (nac ? "Trasladado" : "Cargado") + ": " + inner + " cajas de " + cod + " → " + sector + (nac ? " (desde " + origTxt + ")" : "") + "."); } catch (_e) {}
 }
@@ -62273,7 +62341,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.66"></script>
+<script src="importacion.js?v=29.67"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65203,13 +65271,13 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.66"></script>
-<script src="hotsale.js?v=29.66"></script>
-<script src="estadisticas.js?v=29.66"></script>
-<script src="ads.js?v=29.66"></script>
-<script src="plantel.js?v=29.66"></script>
+<script src="cobranzas.js?v=29.67"></script>
+<script src="hotsale.js?v=29.67"></script>
+<script src="estadisticas.js?v=29.67"></script>
+<script src="ads.js?v=29.67"></script>
+<script src="plantel.js?v=29.67"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.66"></script>
+<script src="ayuda.js?v=29.67"></script>
 
 </body>
 </html>
