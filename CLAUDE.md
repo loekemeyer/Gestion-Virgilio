@@ -1846,7 +1846,7 @@ tenga que vincular bien … y una vez tengamos la base bien armada, limpiamos to
 > SC y SP son **de qué es la PIEZA** (su categoría de Insumos), no de qué es la CELDA: el Mapa
 > **no rotula la celda por sector** y el encabezado no los cuenta aparte.
 
-### ⚠⚠ EL PADRÓN DE LA GRILLA ES EXACTO: **76 celdas, `IN-A1` … `IN-L7`** (Luis, 13/10, v30.05)
+### ⚠⚠ EL PADRÓN DE LA GRILLA ES EXACTO: **76 celdas, `IN-A1` … `IN-L7`** (Luis, 13/10, v30.09)
 
 **Luis, textual:** *"esos sectores deberían ser «IN-» letras de la A a la L con la siguiente logica /
 De la A a la E van del 1 al 6 (ej. IN-A1, IN-E6) / F es del 1 al 5 / G del 1 al 6 / De H a L son del 1 al 7"*.
@@ -1866,6 +1866,8 @@ Mapa dibuja la libre como «libre», no la esconde.
 ⚠ **El front NO tiene el padrón escrito**: `pscpCols` saca las columnas de los datos, así que una celda
 nueva aparece sola con su alta. **Agregar una celda es un `insert`, no un deploy** — y el CHECK del nombre
 ya acepta hasta dos dígitos, así que `IN-L7` entra sin DDL.
+
+`sql/gv_scp_padron_v3009.sql` (el alta, la verificación y el rollback).
 
 ⚠ **`IN-F6` existe y queda FUERA del padrón**: tiene anotada **`D14` · Resorte 520 Niq.** (parte procesado,
 cantidad 0, su stock lo lleva GP2). **No se saca sola**: sacarla manda esa pieza a la alerta «insumo con

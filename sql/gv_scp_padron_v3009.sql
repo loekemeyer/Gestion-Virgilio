@@ -1,4 +1,4 @@
--- v30.05 · 2026-10-13 · EL PADRÓN DE LA GRILLA DE SC/SP: 76 celdas, IN-A1 … IN-L7
+-- v30.09 · 2026-10-13 · EL PADRÓN DE LA GRILLA DE SC/SP: 76 celdas, IN-A1 … IN-L7
 --
 -- Luis, 13/10 (textual): "esos sectores deberían ser «IN-» letras de la A a la L con la
 -- siguiente logica / De la A a la E van del 1 al 6 (ej. IN-A1, IN-E6) / F es del 1 al 5 /
