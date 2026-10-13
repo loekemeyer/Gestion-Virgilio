@@ -8707,18 +8707,42 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
 - Lo sostiene la base: trigger `aa_gv_salida_cervantes_no_racks` → `SC_DESDE_RACKS` (centinela v29.13).
   `sql/gv_salida_cervantes_no_racks_v2913.sql`, `tests/sc-racks-unidad.cjs`.
 
-## ⚠ REGLA (Luis, 2026-10-13, v29.67, D2): en INGRESO A RACKS un código que NO EXISTE no entra — y si es una POSICIÓN lo dice
+## ⚠ REGLA (Luis, 2026-10-13, v29.67 + v29.74, D2): en INGRESO A RACKS el CÓDIGO SE ELIGE — se sugiere mientras se escribe
 
-**Luis:** *"956E · va a terminar en AB10 · el operario lo puso mal · ponele candado"*. El 13/10 09:34 el legajo 104
-escribió la **posición** `AB3` en el campo del **código** y entraron **60 cajas de un código fantasma** en AB03 (eran
-**956E** y las volvió a cargar bien en **AB10** a las 09:37). El 09/10 había pasado lo mismo con «606», que era 606E.
+**Luis:** *"956E · va a terminar en AB10 · el operario lo puso mal · ponele candado"* y, después del candado:
+*"mas que candado, solo debería dar opciones de poner un codigo ya existente. a medida que se escribe se sugiere
+el codigo"*. El 13/10 09:34 el legajo 104 escribió la **posición** `AB3` en el campo del **código** y entraron
+**60 cajas de un código fantasma** en AB03 (eran **956E** y las volvió a cargar bien en **AB10** a las 09:37). El
+09/10 había pasado lo mismo con «606», que era 606E.
+
+> ## **El campo Código del modo Importación BUSCA: el código sale de la LISTA, no del teclado.**
+
+| lo que escribe el operario | qué hace el módulo (v29.74) |
+|---|---|
+| parte del código o del **nombre** (`956`, `cuchara`) | **sugiere** los códigos que existen (🚢 = importado); hay que **tocar** el que corresponde — una coincidencia parcial no elige sola |
+| el código entero, exacto (`956E`, y `26` = `026`) | se elige solo: tipear el código completo sigue andando sin tocar la lista |
+| `606` (el caso del 09/10) | la lista le sugiere el **606E**, que es el que existe |
+| nada que coincida | ⚠ *«No hay ningún código que coincida»* + **«✎ Cargar «XXX» igual (código nuevo)»**, y ahí el candado PREGUNTA antes de crearlo |
+
+- La lista sale de **`gv_stock_cod_lista()`** (lectura, anon, 689 códigos / 155 importados / 321 ms al 13/10):
+  el **MISMO universo** que ya decide el candado `gv_stock_cod_conocido`, así la pantalla **no puede sugerir un
+  código que después el candado rechaza**. Deja afuera los dados de baja (`GV_Codigo_Baja`) y los **insumos puros**
+  —`A1` es insumo **y** posición de rack, justo la confusión que esto cierra—; el insumo importado (**323ES**) entra
+  porque está en `Importados`. Devuelve el código **como lo escriben los maestros** (`026`, no `26`), que es como se
+  escribe en `Movimientos_Stock` / `GV_Lugar_Item` / `Importados` / `OC_Maximos`.
+- ⚠ **Si esa lectura falla, el campo queda libre con el candado de la v29.67** y nada más: *«no pude leer»* no es
+  *«ese código no existe»*.
+- `irSetCod` **ya no cuelga de ningún input** (queda como setter programático): un código que no está en el universo
+  queda marcado como **código nuevo**, el mismo estado que deja el «usar igual», así el candado lo pregunta.
+
+### El candado de la v29.67 sigue abajo de todo (y es lo único que frena a AB3)
 
 | lo tipeado | qué hace el módulo |
 |---|---|
 | código que existe (`gv_stock_cod_conocido`, los 7 maestros) | sigue como siempre |
 | **POSICIÓN de rack** que no es un código (`gv_rack_sector`: AB3 → AB03, W1 → W01) | **bloquea**: «Revisar carga» deshabilitado + aviso rojo *«no es un artículo: es la POSICIÓN de rack AB03 — acá va el código (ej. 956E); la posición va abajo, en Sector»* |
 | código **dado de baja** (`gv_codigo_baja_de`: 865ED → 865E) | bloquea y dice cuál va |
-| no existe y no es posición (606) | **pregunta** (no bloquea): *«No existe el código 606. ¿Lo creo y le cargo N cajas en X?»* |
+| no existe y no es posición | **pregunta** (no bloquea): *«No existe el código X. ¿Lo creo y le cargo N cajas en SEC?»* |
 | no se pudo verificar | pregunta: *«no pude leer» no es «existe»* |
 
 - Es el mismo candado de **Stocks → Ajustar / Fijar** (v25.28) con el aviso de posición que este caso pide
@@ -8730,7 +8754,12 @@ escribió la **posición** `AB3` en el campo del **código** y entraron **60 caj
 - ✅ **El dato de AB3 se corrigió el 13/10** (D3): ajuste inverso `-60` en AB03 (mov **146068820**, `ref 'CORR IR 145833325'`,
   backup `zz_backups."GV_Backup_MovStock_AB3_20261013"`). AB3 queda en **0** y **AB03 libre** en el Mapa; las 60 reales siguen en
   **AB10** (132). El movimiento original NO se borra. Problema **758** de la auditoría, cerrado con este commit.
-- `tests/ir-codigo-candado.cjs` (corre la pantalla; verificado que falla con 10 chequeos en rojo contra la v29.66).
+- ⚠ **Con la lista puesta, `AB3` ya no puede quedar elegido tipeando** (no está en el universo): el aviso lo pinta
+  el chequeo del texto tipeado (`_irCodEfe()` = el código elegido **o** lo que se está escribiendo) y el candado
+  sólo se alcanza forzando el código (`irSetCod`). **Se prueban las dos capas.**
+- Centinelas 403 y 404 · `sql/gv_stock_cod_lista_v2974.sql` (rollback: `drop function public.gv_stock_cod_lista();`) ·
+  `tests/ir-codigo-candado.cjs` (corre la pantalla; verificado que falla con **14 chequeos en rojo** contra la v29.73
+  y con 10 contra la v29.66).
 
 ## ⚠ REGLA (Luis, 2026-10-09, v29.17): ❓ AYUDA — el asistente del operario SÓLO sabe el manual
 

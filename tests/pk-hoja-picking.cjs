@@ -16,7 +16,9 @@ const d = A("E70F", tp, pkc, lug, nps, otras, "Juan Farias");
 ok(d.lineas.map(x => x.cod).join() === "066,501,505,809E", "orden del recorrido y el código pelado (809E, no «809E LK»; su góndola J13, no M13)");
 ok(d.lineas[3].lug.sector === "J13", "dual con su empresa");
 ok(d.lineas[2].lug.sector === "D01" && d.lineas[0].lug.sector === "A05", "sector = el primero del código (D01, no D18) y el 066 encuentra su celda «66»");
-ok(!/Orden/.test(H(d)) && !/background:\s*#/i.test(H(d)), "sin columna Orden, sin fondos de color");
+/* el #111 y el #777 son la DIAGONAL y el tachado (v25.71), no un fondo de color: la hoja sigue
+   sin relleno. Cualquier otro background: # sí es un fondo y rompe la regla. */
+ok(!/Orden/.test(H(d)) && !/background:\s*#(?!111|777)/i.test(H(d)), "sin columna Orden, sin fondos de color (la diagonal y el tachado no cuentan)");
 ok(d.minOtras === 30 && d.minNeto === 120, "muestra otras tareas (30 min, sin contar dos veces lo que se pisa) y NO las descuenta");
 ok(Math.abs(d.m3h - 0.5) < 1e-9, "m³/hora = m³ ÷ horas del picking (sin descontar)");
 const h = H(d);

@@ -1,15 +1,22 @@
-/* v29.67 (Luis, 13/10, D2: «el operario lo puso mal · ponele candado») — CANDADO del Ingreso a racks.
+/* v29.67 (D2: «ponele candado») + v29.74 (Luis, 13/10: «mas que candado, solo debería dar opciones de
+   poner un codigo ya existente. a medida que se escribe se sugiere el codigo») — el campo CÓDIGO del
+   Ingreso a racks (modo Importación).
 
    Caso que lo originó: el 13/10 09:34 el legajo 104 escribió la POSICIÓN «AB3» en el campo del CÓDIGO y
    entraron 60 cajas de un código fantasma en AB03 (eran 956E y terminaron en AB10, 09:37). El 09/10 había
    pasado lo mismo con «606», que era 606E. Se prueba, corriendo la pantalla de verdad:
      A) un código que existe (956E) no avisa nada y deja seguir.
-     B) una POSICIÓN de rack (AB3 → AB03) avisa que NO es un artículo, nombra la posición y el campo Sector,
-        y DESHABILITA «Revisar carga»: no se puede ingresar.
-     C) un código que no existe y no es posición (606) avisa y PREGUNTA (no bloquea): «no» no sigue, «sí» sí.
-     D) un código dado de baja (865ED → 865E) avisa cuál va y bloquea.
+     B) una POSICIÓN de rack (AB3 → AB03) avisa que NO es un artículo, nombra la posición y el campo
+        Sector, no se puede elegir, no ofrece el «usar igual» y DESHABILITA «Revisar carga»; forzado por
+        código (irSetCod) el candado lo frena con el cartel.
+     C) «606» (lo que se tipeó el 09/10) sugiere el 606E, que es el que existe; y un código que no
+        coincide con nada ofrece «✎ Cargar igual (código nuevo)», y ahí el candado PREGUNTA.
+     D) un código dado de baja (865ED → 865E) avisa cuál va, no ofrece el «usar igual» y bloquea.
      E) en modo NACIONAL no hay candado: el código sale de la lista de stock real.
-     F) candado invertido: irRevisar tiene que llamar a _irCodGuard antes del paso de revisión.
+     F) candado invertido: irRevisar tiene que llamar a _irCodGuard antes del paso de revisión, y el
+        input de Importación tiene que llamar a irSetPick (BUSCA), no a irSetCod (texto libre).
+     G) las SUGERENCIAS: por código parcial, por nombre, el cero adelante (26 → 026) y que una
+        coincidencia parcial NO elige sola.
    Sale 1 si falla. */
 const fs = require("fs");
 const path = require("path");
@@ -40,14 +47,21 @@ catch (_e) {
     window.racksFetchPlani = async function () { return [{ sector: "AD05", estado: "libre", cod_art: null }]; };
     window.irFetchCxM = async function () { return {}; };
     window.trySendOneReport = async function () { return { ok: true }; };
-    // los tres RPC del candado, contestados acá (la base no se toca)
-    const EX = { "956E": true, "502": true, "AB3": false, "606": false, "865ED": false };
+    // el universo de códigos (gv_stock_cod_lista) y los tres RPC del candado, contestados acá (la base no se toca)
+    const LISTA = [
+      { cod: "026", nombre: "Colador Ø 8cm", importado: true },
+      { cod: "502", nombre: "Prueba 502", importado: false },
+      { cod: "606E", nombre: "Pinza 30 cm Ac Inox c/ Silic", importado: true },
+      { cod: "956E", nombre: "Cuchara Calada Silicona Mgo Bambú", importado: true }
+    ];
+    const EX = { "956E": true, "502": true, "026": true, "606E": true, "AB3": false, "606": false, "XQ7": false, "865ED": false };
     const POS = { "AB3": "AB03", "AB10": "AB10", "X22": "X22" };
     const BAJA = { "865ED": "865E" };
     const pedidos = [];
     window.fetch = async function (url, opt) {
       const u = String(url); const body = JSON.parse((opt && opt.body) || "{}");
       const j = (v) => ({ ok: true, status: 200, json: async () => v });
+      if (u.indexOf("gv_stock_cod_lista") >= 0) { pedidos.push("lista"); return j(LISTA); }
       if (u.indexOf("gv_stock_cod_conocido") >= 0) { pedidos.push("ex:" + body.p_cod); return j(EX[body.p_cod] === true); }
       if (u.indexOf("gv_codigo_baja_de") >= 0) { pedidos.push("baja:" + body.p_cod); return j(BAJA[body.p_cod] || null); }
       if (u.indexOf("gv_rack_sector") >= 0) { pedidos.push("pos:" + body.p); return j(POS[body.p] || null); }
@@ -58,33 +72,59 @@ catch (_e) {
     const inp = document.getElementById("legajoInput"); if (inp) inp.value = "77";
     await showIngresoRacksModal("77");
     await wait(30);
+    out.leyoLista = !!(_ir && (_ir.cods || []).length === 4);
     const btn = () => document.querySelector("#irBody .ir-fin");
     const warn = () => { const w = document.querySelector("#irBody .ir-warn"); return w ? w.innerText : ""; };
-    const poner = async (cod) => {
-      if (typeof window._irCodChk === "function") await _irCodChk(cod);   // calienta el cache: el aviso sale sin esperar el debounce
-      irSetModo("import"); irSetCod(cod); irSetSec("AD05"); irSetI(60); await wait(10);
+    const sug = () => Array.prototype.map.call(document.querySelectorAll("#irBody button[onclick^='irPickCod']"), (x) => x.innerText.replace(/\s+/g, " ").trim());
+    const nuevoBtn = () => document.querySelector("#irBody button[onclick^='irCodNuevo']");
+    // escribir en el campo (el camino del operario): el código se ELIGE, no se escribe libre
+    const tipear = async (txt) => {
+      if (typeof window._irCodChk === "function") await _irCodChk(txt);   // calienta el cache: el aviso sale sin esperar el debounce
+      irSetModo("import"); irSetPick(txt); irSetSec("AD05"); irSetI(60); await wait(10);
     };
 
-    // A) código que existe
-    await poner("956E");
+    // A) código que existe: escrito entero se elige solo
+    await tipear("956E");
+    out.aElige = !!(_ir && _ir.cod === "956E" && !_ir.codNuevo);
     out.aSinAviso = warn() === "" && !!btn() && !btn().disabled;
     alerts.length = 0; await irRevisar();
     out.aSigue = !!(_ir && _ir.confirming) && alerts.length === 0;
     irVolver();
 
+    // G) sugerencias
+    await tipear("956");
+    out.gParcialSugiere = sug().length === 1 && /956E/.test(sug()[0]) && /🚢/.test(sug()[0]);
+    out.gParcialNoElige = !!(_ir && !_ir.cod) && !!btn() && btn().disabled === true;
+    const bs = document.querySelector("#irBody button[onclick^='irPickCod']"); if (bs) bs.click();
+    await wait(10);
+    out.gClickElige = !!(_ir && _ir.cod === "956E") && !!btn() && btn().disabled === false;
+    await tipear("cuchara");
+    out.gPorNombre = sug().length === 1 && /956E/.test(sug()[0]);
+    await tipear("26");
+    out.gCeroAdelante = !!(_ir && _ir.cod === "026");
+
     // B) una POSICIÓN de rack
-    await poner("AB3");
+    await tipear("AB3");
     const wB = warn();
     out.bAvisa = /AB03/.test(wB) && /no es un art/i.test(wB) && /Sector/i.test(wB);
+    out.bNoElige = !!(_ir && !_ir.cod) && !nuevoBtn();
     out.bBoton = !!btn() && btn().disabled === true;
     alerts.length = 0; await irRevisar();
-    out.bNoSigue = !(_ir && _ir.confirming);
-    out.bAlerta = alerts.length === 1 && /AB03/.test(alerts[0]) && /POSICI/i.test(alerts[0]);
+    out.bNoSigue = !(_ir && _ir.confirming) && alerts.length === 0;
+    irSetCod("AB3"); await wait(10);                       // forzado por código: lo frena el candado
+    alerts.length = 0; await irRevisar();
+    out.bForzadoFrena = !(_ir && _ir.confirming) && alerts.length === 1 && /AB03/.test(alerts[0]) && /POSICI/i.test(alerts[0]);
 
-    // C) código que no existe y no es posición: pregunta
-    await poner("606");
-    out.cAvisa = /606/.test(warn()) && /no existe/i.test(warn());
-    out.cBotonHabilitado = !!btn() && btn().disabled === false;
+    // C) «606» (el caso del 09/10): no existe como código, pero la lista sugiere el que sí existe
+    await tipear("606");
+    out.cSugiere606E = sug().length === 1 && /606E/.test(sug()[0]) && !nuevoBtn();
+    out.cBotonSinElegir = !!btn() && btn().disabled === true;
+    // un código que no coincide con nada: se puede cargar igual y ahí el candado pregunta
+    await tipear("XQ7");
+    out.cNoEstaEnLaLista = sug().length === 0 && !!nuevoBtn();
+    const bn = nuevoBtn(); if (bn) bn.click(); await wait(10);
+    out.cUsarIgual = !!(_ir && _ir.cod === "XQ7" && _ir.codNuevo === true) && !!btn() && btn().disabled === false;
+    out.cAvisa = /XQ7/.test(warn()) && /no existe/i.test(warn());
     siNo = false; await irRevisar();
     out.cNoSinConfirmar = !(_ir && _ir.confirming);
     siNo = true; await irRevisar();
@@ -92,9 +132,11 @@ catch (_e) {
     irVolver();
 
     // D) código dado de baja
-    await poner("865ED");
+    await tipear("865ED");
     out.dAvisa = /865E/.test(warn()) && /no se usa/i.test(warn());
+    out.dNoOfrece = !nuevoBtn() && sug().length === 0;
     out.dBoton = !!btn() && btn().disabled === true;
+    irSetCod("865ED"); await wait(10);
     alerts.length = 0; siNo = true; await irRevisar();
     out.dNoSigue = !(_ir && _ir.confirming) && alerts.length === 1 && /865E/.test(alerts[0]);
 
@@ -110,23 +152,34 @@ catch (_e) {
   });
   await b.close();
 
+  const sin = idx.replace(/\r/g, "");
   let bad = 0;
   const ok = (c, t) => { console.log((c ? "OK  " : "FALLA ") + t); if (!c) bad++; };
   ok(!errs.length, "la pantalla corre sin errores de JS" + (errs.length ? " — " + errs[0] : ""));
-  ok(r.aSinAviso, "956E (existe): sin aviso y el botón habilitado");
+  ok(r.leyoLista, "el modal lee el universo de códigos (gv_stock_cod_lista)");
+  ok(r.aElige && r.aSinAviso, "956E escrito entero: se elige solo, sin aviso y el botón habilitado");
   ok(r.aSigue, "956E: pasa al paso de revisión sin preguntar nada");
+  ok(r.gParcialSugiere, "«956»: sugiere 956E con el 🚢 de importado");
+  ok(r.gParcialNoElige, "una coincidencia parcial NO elige sola: hay que tocarla");
+  ok(r.gClickElige, "tocar la sugerencia elige el código");
+  ok(r.gPorNombre, "«cuchara»: sugiere por NOMBRE, no sólo por código");
+  ok(r.gCeroAdelante, "«26» elige el 026 (el código como lo escriben los maestros)");
   ok(r.bAvisa, "AB3: el aviso nombra la posición AB03 y el campo Sector");
-  ok(r.bBoton, "AB3: «Revisar carga» queda DESHABILITADO");
-  ok(r.bNoSigue, "AB3: no pasa al paso de revisión");
-  ok(r.bAlerta, "AB3: el cartel dice que es una POSICIÓN de rack, no un artículo");
-  ok(r.cAvisa, "606 (no existe, no es posición): avisa que no existe");
-  ok(r.cBotonHabilitado, "606: el botón NO se bloquea — es una pregunta, no un candado");
-  ok(r.cNoSinConfirmar, "606: si dice «no», no carga");
-  ok(r.cSiConConfirmar, "606: si dice «sí», sigue");
-  ok(r.dAvisa, "865ED: el aviso dice que va el 865E");
+  ok(r.bNoElige, "AB3: no se puede elegir ni ofrecer «usar igual» (es una posición)");
+  ok(r.bBoton && r.bNoSigue, "AB3: «Revisar carga» deshabilitado y no pasa");
+  ok(r.bForzadoFrena, "AB3 forzado por código: el candado lo frena con el cartel de POSICIÓN");
+  ok(r.cSugiere606E, "«606» (el caso del 09/10): sugiere el 606E, que es el que existe");
+  ok(r.cBotonSinElegir, "«606»: sin elegir nada el botón queda deshabilitado");
+  ok(r.cNoEstaEnLaLista, "un código que no coincide con nada ofrece «Cargar igual (código nuevo)»");
+  ok(r.cUsarIgual && r.cAvisa, "con «usar igual»: queda como código nuevo y avisa que no existe");
+  ok(r.cNoSinConfirmar, "«usar igual»: si dice «no», no carga");
+  ok(r.cSiConConfirmar, "«usar igual»: si dice «sí», sigue");
+  ok(r.dAvisa && r.dNoOfrece, "865ED: el aviso dice que va el 865E y no se ofrece cargarlo");
   ok(r.dBoton && r.dNoSigue, "865ED: bloqueado y avisado");
   ok(r.eNacSinCandado, "modo Nacional: sin candado (el código sale de la lista de stock)");
-  ok(/await _irCodGuard\(/.test(idx.replace(/\r/g, "")), "irRevisar llama al candado _irCodGuard (candado invertido)");
-  if (!bad) console.log("\nTODO OK (" + 15 + " chequeos)"); else console.log("\n" + bad + " en rojo");
+  ok(/await _irCodGuard\(/.test(sin), "irRevisar llama al candado _irCodGuard (candado invertido)");
+  ok(/id="irCod"[^>]*oninput="irSetPick\(/.test(sin) && !/id="irCod"[^>]*oninput="irSetCod\(/.test(sin),
+     "el campo Código de Importación BUSCA (irSetPick), no acepta texto libre (irSetCod)");
+  if (!bad) console.log("\nTODO OK (24 chequeos)"); else console.log("\n" + bad + " en rojo");
   process.exit(bad ? 1 : 0);
 })();
