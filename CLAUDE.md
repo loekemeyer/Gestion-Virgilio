@@ -8625,7 +8625,9 @@ escribió la **posición** `AB3` en el campo del **código** y entraron **60 caj
   (y su clave trae el sufijo de empresa, `438E LK`, que `gv_stock_cod_conocido` no conoce: daría falso rojo).
 - ⚠ **La posición bloquea sólo si ADEMÁS el código no existe**: `A1` es rack de insumos **y** código de verdad
   (medido 13/10: `gv_rack_sector('A1')` = A1 y `gv_stock_cod_conocido('A1')` = true).
-- ⚠ **El dato de AB3 (60 cajas en AB03) NO se corrigió**: es una corrección de datos y pide el «sí».
+- ✅ **El dato de AB3 se corrigió el 13/10** (D3): ajuste inverso `-60` en AB03 (mov **146068820**, `ref 'CORR IR 145833325'`,
+  backup `zz_backups."GV_Backup_MovStock_AB3_20261013"`). AB3 queda en **0** y **AB03 libre** en el Mapa; las 60 reales siguen en
+  **AB10** (132). El movimiento original NO se borra. Problema **758** de la auditoría, cerrado con este commit.
 - `tests/ir-codigo-candado.cjs` (corre la pantalla; verificado que falla con 10 chequeos en rojo contra la v29.66).
 
 ## ⚠ REGLA (Luis, 2026-10-09, v29.17): ❓ AYUDA — el asistente del operario SÓLO sabe el manual
