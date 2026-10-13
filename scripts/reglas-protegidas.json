@@ -1,15 +1,6 @@
 {
-<<<<<<< HEAD
-  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82/v26.93 gv_ppp_dia_ajustar; + v26.86 gv_alerta_gondola_llena_telegram; + v26.98 gv_importado_alta, gv_importados_bache_primer_pedido; + v26.99 gv_importado_guardar); + v27.89 gv_cc_sombra_tick, gv_cc_sombra_racha; + v27.92 gv_ads_stock2; + v28.34 gv_ppp_mismo_lugar_dos_dias; + v28.38 gv_ppp_web_zona_retira; + v28.40 gv_ppp_web_zona_recalc, gv_ppp_tanda_zona_fuera_regla; + v28.43 vista_importados_stock_parte; + v28.96 racks_plani_ingreso, gv_imp_imputar_ingreso_racks; + v29.05 gv_racks_ajuste_sin_posicion + v29.11 gv_imp_ir_asignar + v29.16 gv_anon_insert_log + v29.48 gv_picking_estimar, gv_ppp_plantel, gv_armado_tanda_refresh; + v29.49 reconciliar_pipeline_stock_etapa2, gv_entregas_norm, gv_npd_tope_faltante_picking; + v29.50 gv_evento_duplicado; + v29.62 reconciliar_pipeline_stock_etapa1",
-=======
-  "_generado": "2026-10-13 (+ v29.78 sub-posiciones de rack: gv_rack_sector/pos/partir/pos_chequear/saldo_pos/ubicar, racks_plani_*, registrar_baja_racks, Racks_Planimetria, gv_rack_celda) · 2026-10-13 (+ v29.77 gv_stock_cod_lista; + v29.74 gv_gp2_inventario; + v29.66 gv_gp2_espejo_insumos; + cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82/v26.93 gv_ppp_dia_ajustar; + v26.86 gv_alerta_gondola_llena_telegram; + v26.98 gv_importado_alta, gv_importados_bache_primer_pedido; + v26.99 gv_importado_guardar); + v27.89 gv_cc_sombra_tick, gv_cc_sombra_racha; + v27.92 gv_ads_stock2; + v28.34 gv_ppp_mismo_lugar_dos_dias; + v28.38 gv_ppp_web_zona_retira; + v28.40 gv_ppp_web_zona_recalc, gv_ppp_tanda_zona_fuera_regla; + v28.43 vista_importados_stock_parte; + v28.96 racks_plani_ingreso, gv_imp_imputar_ingreso_racks; + v29.05 gv_racks_ajuste_sin_posicion + v29.11 gv_imp_ir_asignar + v29.16 gv_anon_insert_log + v29.48 gv_picking_estimar, gv_ppp_plantel, gv_armado_tanda_refresh; + v29.49 reconciliar_pipeline_stock_etapa2, gv_entregas_norm, gv_npd_tope_faltante_picking; + v29.50 gv_evento_duplicado; + v29.82 gv_insumo_origenes, gv_insumo_fleje_proveedor; + v29.98 gv_scp_sector, gv_insumo_sector, gv_insumo_ubicacion, gv_insumo_ubicaciones_guardar, gv_insumo_posicion_guardar (SC y SP = su propio lugar, IN-A1)",
->>>>>>> origin/main
+  "_generado": "2026-10-13 (regenerado entero desde GV_Reglas_Centinela al resolver el conflicto de merge de la v30.08; + v29.62 reconciliar_pipeline_stock_etapa1)",
   "reglas": [
-    {
-      "objeto": "Racks_Planimetria",
-      "regla": "Racks_Planimetria emite una fila por DIRECCION: un rack partido muestra sus N partes (ocupadas y libres)",
-      "quien": "Luis"
-    },
     {
       "objeto": "entregas_virgilio_dedup",
       "regla": "El dedup de Entregas_Virgilio no puede tomar una fila ANULADA (tanda con sufijo -X) como antecedente: descarta la del rearmado y el remito sale incompleto (E29D",
@@ -21,14 +12,24 @@
       "quien": "Luis"
     },
     {
+      "objeto": "generar_ocs_automaticas",
+      "regla": "Una OC de menos de 10 cajas sólo se pide si la góndola está a menos del 30 % de su capacidad",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_ads_stock2",
-      "regla": "ADS saldo = disponible - el mayor entre comprometido y Est. Madre del horizonte (no la suma: el comprometido ya es parte de la Est. Madre)",
+      "regla": "ADS: saldo = disponible − comprometido − Est. Madre × gv_ads_em_dias(plazo)/30 (distribución real de 2 semanas o días a mano; Luis 08/10, v28.59)",
       "quien": "Luis"
     },
     {
       "objeto": "gv_alerta_gondola_llena_telegram",
       "regla": "guardar en gondola por encima de la capacidad avisa por Telegram (no frena el guardado)",
       "quien": "Luis"
+    },
+    {
+      "objeto": "gv_alerta_inactivo_servidor",
+      "regla": "alarma de inactivo: llegada sólo con el código de la TV",
+      "quien": "Thomas"
     },
     {
       "objeto": "gv_analisis_acceso_ok",
@@ -56,18 +57,33 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_armado_tanda_calc",
+      "regla": "AUI no corta la cola del armado: es un evento de detalle, no una tarea.",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_armado_tanda_refresh",
       "regla": "D5: una tanda frenada en armado (APF) no se mide en el Ritmo de armado",
       "quien": "Thomas"
     },
     {
+      "objeto": "gv_cc_sombra_corte",
+      "regla": "Modo sombra: el corte de un Excel de deuda = fecha ISIS mas nueva de los comprobantes que trae.",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_cc_sombra_estimar",
+      "regla": "Modo sombra: lo posterior al Excel se mide por CORTE de datos (fecha del ultimo comprobante que trae), no por la hora de la subida: FC y NC del dia del corte qu",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_cc_sombra_racha",
-      "regla": "Racha del modo sombra: un dia habil sin cruce del Excel o con alguna diferencia corta la racha.",
+      "regla": "Racha del modo sombra: suma los dias habiles CUBIERTOS por cruces OK seguidos (corte_prev+1..corte_nuevo); un dia sin Excel no corta, un cruce con diferencia si",
       "quien": "Luis"
     },
     {
       "objeto": "gv_cc_sombra_tick",
-      "regla": "Modo sombra de la cuenta corriente: con 20 dias habiles seguidos con 0 diferencia abre UNA tarea en el Planify de Luis. Nada se le muestra al cliente hasta pedido explicito de Thomas o Luis.",
+      "regla": "Modo sombra de la cuenta corriente: con 20 dias habiles seguidos con 0 diferencia contra el Excel de deuda abre UNA tarea en el Planify de Luis. Nada se le mues",
       "quien": "Luis"
     },
     {
@@ -151,6 +167,11 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_conteo_picking_calc",
+      "regla": "El conteo de góndola del picking se mide contra la góndola al momento de contar: el picking de la misma tanda cuenta como anterior y lo posterior no ensucia la ",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_cruce_fc_asig_refrescar",
       "regla": "el recalculo del cruce NP-FC no espera a otro en curso ni reescribe filas sin cambios",
       "quien": "Luis"
@@ -161,18 +182,28 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_cuarentena_armado_asignar_dia",
+      "regla": "El pedido armado retenido sólo recibe día cuando está aprobado, y a mano",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_cuarentena_comentario_cod",
       "regla": "Un comentario de cuarentena sin cod se completa con el cliente del pedido; sin eso no aparece en el historial del cliente",
       "quien": "Luis"
     },
     {
       "objeto": "gv_cuarentena_deuda_pedido",
-      "regla": "La factura de menos de 5 dias corridos no cuenta como deuda para retener (v25.45)",
+      "regla": "La factura de menos de 5 dias corridos no cuenta como deuda para retener",
       "quien": "Luis"
     },
     {
       "objeto": "gv_cuarentena_deuda_sucursal",
       "regla": "la deuda busca su comprobante por índice, no recalcula la clave de los 41.000 de ISIS",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_cuarentena_devolver",
+      "regla": "Sacar a cuarentena NO se puede con la tanda en proceso (picking o armado empezado sin terminar): hay que esperar a que la tanda entera esté armada",
       "quien": "Luis"
     },
     {
@@ -209,6 +240,11 @@
       "objeto": "gv_destino_score",
       "regla": "El destino del expreso se desambigua por la ETIQUETA de la sucursal: 119 clientes tienen direcciones en mas de una provincia y cruzar por (empresa, cod) solo se",
       "quien": "Luis, Thomas"
+    },
+    {
+      "objeto": "gv_disc_liberar_gondolas_trg",
+      "regla": "Al dictaminar un codigo discontinuado (alta en Articulos_Discontinuados) se liberan sus celdas de gondola que estan en cero.",
+      "quien": "Luis"
     },
     {
       "objeto": "gv_dto_pago_pedido",
@@ -256,24 +292,44 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_gondola_discontinuada",
+      "regla": "Un SECUNDARIO con OC_Maximos.activo=false NO es discontinuado: significa que no se compra porque su proyeccion va al principal (574). Solo se libera si esta mar",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_gondola_liberar",
+      "regla": "Una celda con cajas en gondola o con demanda viva NO se libera sola: decir «libre» con mercaderia adentro manda al pickeador a una celda que el mapa no reconoce",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_gondola_liberar_auto",
+      "regla": "El automatico libera SOLO lo que esta en cero absoluto; el resto queda marcado en el Mapa.",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_gondola_sugerida_resolver",
       "regla": "El si del supervisor a una gondola informada en el picking DA DE ALTA la celda en el Mapa.",
       "quien": "Luis 13/10/2026"
     },
     {
       "objeto": "gv_gp2_espejo_insumos",
-      "regla": "GP2 ve en su deposito en Virgilio el saldo real de insumos de Virgilio (D32); el deposito «<sector> en Virgilio» se crea solo si falta (v29.66)",
+      "regla": "GP2 ve en su depósito en Virgilio el saldo real de insumos de Virgilio (D32)",
       "quien": "Luis, Thomas"
     },
     {
       "objeto": "gv_gp2_espejo_sync",
-      "regla": "El stock de insumos de Virgilio es una VISTA en vivo (GP2.virgilio_insumo_stock): el bloque 1 del sync NO lo copia mas (v29.88).",
+      "regla": "El stock de insumos de Virgilio es una VISTA en vivo (GP2.virgilio_insumo_stock): el sync NO lo copia mas. Si vuelve el bloque 1, la pantalla de GP2 lee una cop",
       "quien": "Luis"
     },
     {
       "objeto": "gv_gp2_inventario",
-      "regla": "El codigo de Virgilio de un componente sale de GP2.insumo_equivalencia, la tabla UNICA de equivalencias; la columna componente.codigo_virgilio se borro (v29.74)",
+      "regla": "El codigo de Virgilio de un componente sale de GP2.insumo_equivalencia (la columna componente.codigo_virgilio se borro en la v29.74)",
       "quien": "Luis"
+    },
+    {
+      "objeto": "gv_horas_operario_detalle_v2",
+      "regla": "Copia de la regla v27.55-mgpisa del MG en el detalle por operario (xlsx de Elías).",
+      "quien": "Thomas, Thomas (D6)"
     },
     {
       "objeto": "gv_imp_carga_pedido_set",
@@ -307,7 +363,12 @@
     },
     {
       "objeto": "gv_imp_ir_asignar",
-      "regla": "el pedido de un ingreso a racks de importación lo elige un supervisor en Importación, no el operario (v29.11)",
+      "regla": "el pedido de un ingreso a racks lo elige un supervisor en Importación, no el operario",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_imp_ir_avisos",
+      "regla": "Los ingresos a racks de importación anteriores a la imputación automática se revisan a mano en Importación → Recibido",
       "quien": "Luis"
     },
     {
@@ -348,7 +409,7 @@
     {
       "objeto": "gv_imp_recepcion_anular",
       "regla": "Anular una recepción frena si lo recibido ya se movió de donde se puso",
-      "quien": "Luis"
+      "quien": "dueño (30/09), Luis"
     },
     {
       "objeto": "gv_imp_recibir",
@@ -382,7 +443,7 @@
     },
     {
       "objeto": "gv_importado_guardar",
-      "regla": "alta/modificación de un importado: no pisa un (código, empresa) existente, deja el ajuste de 0 cajas para que figure en Stocks y escribe su caja en GV_UxB",
+      "regla": "el alta de un importado no pisa un (código, empresa) que ya existe",
       "quien": "Luis"
     },
     {
@@ -408,12 +469,17 @@
     {
       "objeto": "gv_importados_resync",
       "regla": "Importación: esta RPC escribe y sólo la puede usar un supervisor logueado (o el servicio); sin esto cualquiera con la clave pública carga o borra giros, baches,",
-      "quien": "Thomas"
+      "quien": "dueño (30/09), Thomas"
     },
     {
       "objeto": "gv_ingreso_virgilio_denegado",
       "regla": "Si Cervantes dice No a lo que Virgilio le recibió, el pedido vuelve a EN VIAJE en Virgilio (📥 RECIBIR y 📦 Baches) con el chip «Denegado por Cervantes».",
       "quien": "dueño (30/09)"
+    },
+    {
+      "objeto": "gv_insumo_desde_gp2",
+      "regla": "Recibir insumos: elegir un componente de GP2 que falta en Virgilio lo da de alta con el nombre de GP2 y lo vincula (v29.74: la tabla unica es GP2.insumo_equival",
+      "quien": "Thomas"
     },
     {
       "objeto": "gv_insumo_equiv_espejo",
@@ -422,17 +488,17 @@
     },
     {
       "objeto": "gv_insumo_fleje_proveedor",
-      "regla": "Elegido un proveedor de flejes, el operario ve SOLO los flejes que GP2 le tiene asignados (los que no tienen proveedor quedan atras de un boton, nunca se esconden).",
+      "regla": "Elegido un proveedor de flejes, el operario ve SOLO los flejes que GP2 le tiene asignados (los que no tienen proveedor quedan atras de un boton, nunca se escond",
       "quien": "Luis"
     },
     {
       "objeto": "gv_insumo_isis_sync",
-      "regla": "GP2 es el canonico del codigo ISIS: lo que se guarda en GP2.insumo_equivalencia.isis se escribe en Insumos.isis de Virgilio, incluido vaciarlo; nunca al reves (v29.79)",
+      "regla": "GP2 es el canonico del codigo ISIS: lo que se guarda en GP2.insumo_equivalencia.isis se escribe en Insumos.isis de Virgilio, incluido vaciarlo. Nunca al reves.",
       "quien": "Luis"
     },
     {
       "objeto": "gv_insumo_origenes",
-      "regla": "El origen de una recepcion de insumos es una lista CERRADA por categoria, derivada de GP2 menos GV_Insumo_Origen_Excluido. SC/SP no preguntan: siempre Cervantes.",
+      "regla": "El origen de una recepcion de insumos es una lista CERRADA por categoria, derivada de GP2 menos GV_Insumo_Origen_Excluido. SC/SP no preguntan: siempre Cervantes",
       "quien": "Luis"
     },
     {
@@ -442,7 +508,7 @@
     },
     {
       "objeto": "gv_insumo_sector",
-      "regla": "Una posicion de INSUMO se resuelve por UN solo cuello",
+      "regla": "Una posicion de INSUMO se resuelve por UN solo cuello: rack de insumo (R01AD, AF13) o celda de SC/SP (IN-A1). SC y SP son la tercera clase de lugar del deposito",
       "quien": "Luis"
     },
     {
@@ -472,8 +538,13 @@
     },
     {
       "objeto": "gv_monitor_horas_operario_dia",
-      "regla": "Hs MOVIMIENTO son MG/RT/RI/EI + trabajo en racks (RKB bajar de racks, IRT ingreso a racks; Luis v23.66). Baño, limpieza, timbre, comida, conteo y permiso NO son ",
-      "quien": "Damian (via Marianela), Luis (v19.07, v23.66) / Damian, Thomas"
+      "regla": "Hs MOVIMIENTO son MG/RT/RI/EI + trabajo en racks (RKB bajar de racks, IRT ingreso a racks; Luis v23.66). Baño, limpieza, timbre, comida, conteo y permiso NO son",
+      "quien": "Damian (via Marianela), Luis, Luis (v19.07) / Damian, Thomas, Thomas (D6)"
+    },
+    {
+      "objeto": "gv_monitor_ingresos",
+      "regla": "TV/Mon. Admin: «entró» sólo con el código de la TV",
+      "quien": "Thomas"
     },
     {
       "objeto": "gv_monitor_tanda_camion",
@@ -516,6 +587,11 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_oc_chica_frenada",
+      "regla": "OC chica (< oc_chica_cajas) frenada con góndola >= oc_chica_gondola_pct de la capacidad",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_oc_codigos_sin_config",
       "regla": "los importados no se compran por OC: no van en el chequeo de codigos sin config",
       "quien": "Luis"
@@ -523,6 +599,11 @@
     {
       "objeto": "gv_oc_entrega_ajena",
       "regla": "la entrega ajena compara por código base: la OC \"437E CH\" del proveedor cuenta como suya",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_oc_entrega_proy_guardar",
+      "regla": "cada guardado de Entrega proy. queda en el historial (no se pierde al borrarlo)",
       "quien": "Luis"
     },
     {
@@ -542,7 +623,7 @@
     },
     {
       "objeto": "gv_picking_estimar",
-      "regla": "D7: el estimado de picking suma la caja por encima de 30 por línea",
+      "regla": "D7: el estimado de picking antes de pickear también suma la caja por encima de 30 por línea",
       "quien": "Thomas"
     },
     {
@@ -553,21 +634,26 @@
     {
       "objeto": "gv_picking_puntaje_operario",
       "regla": "el puntaje 1-10 de picking es sólo para supervisores (Mon. Admin): nunca a la TV ni a anon",
-      "quien": "Luis"
+      "quien": "Luis, Luis (D17)"
     },
     {
       "objeto": "gv_picking_tanda_calc",
       "regla": "paradas del picking: el par de góndolas enfrentadas (A1-14↔B, A15-17↔C, E↔G, D↔F, H↔J, L↔M) cuenta UNA parada (esquema D17)",
-      "quien": "Luis"
+      "quien": "Luis, Luis (D17), Thomas"
     },
     {
       "objeto": "gv_picking_tanda_calc_frenada",
-      "regla": "D17: en el puntaje de picking, una tanda FRENADA entra con la parte de cada uno (sus tramos); el tramo del freno sin cola y la ventana de PKC sin solaparse con el tramo vecino",
-      "quien": "Luis"
+      "regla": "D17: el tramo que termina en un FRENO no lleva cola; la espera hasta el freno se topea como la cola",
+      "quien": "Luis (D17)"
     },
     {
       "objeto": "gv_picking_tanda_refresh",
-      "regla": "D17: una tanda con freno de picking se mide por tramos y se suma por legajo (gv_picking_tanda_calc_frenada)",
+      "regla": "D17: una tanda con freno de picking se mide por tramos y se suma por legajo",
+      "quien": "Luis (D17)"
+    },
+    {
+      "objeto": "gv_planimetria_celda",
+      "regla": "El Mapa de gondolas marca la celda ocupada por un codigo discontinuado y dice si se puede liberar.",
       "quien": "Luis"
     },
     {
@@ -602,7 +688,12 @@
     },
     {
       "objeto": "gv_ppp_dia_ajustar",
-      "regla": "opción 2 del pop-up de día ocupado: lo nuevo queda fijo y del pendiente se mueve sólo lo que no entra en los m³ del día (sin tope de camiones, Luis 05/10); lo programado a mano no se mueve y ningún grupo se mueve si así pasa a vencer (v26.93)",
+      "regla": "opción 2 del pop-up de día ocupado: lo nuevo queda fijo y del pendiente se mueve sólo lo que no entra en los m³ del día (sin tope de camiones, Luis 05/10)",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_ppp_entregados_meta",
+      "regla": "Entregados: short-circuit del espejo y cada tabla leída una vez (741 ms -> 35 ms)",
       "quien": "Luis"
     },
     {
@@ -642,7 +733,7 @@
     },
     {
       "objeto": "gv_ppp_plantel",
-      "regla": "D6: el Plantel cuenta A Programar y Cuarentena · D5: horas de armado por dificultad",
+      "regla": "D6: el Plantel cuenta lo que espera en A Programar y Cuarentena (plazo desde la fecha del pedido)",
       "quien": "Thomas"
     },
     {
@@ -652,7 +743,7 @@
     },
     {
       "objeto": "gv_ppp_reprogramar_sin_factura",
-      "regla": "18:00 reprograma por grupo de zonas lo no fijado a mano; no mueve en proceso, diferido ni cliente nuevo aprobado; respeta armar -> facturar -> salir",
+      "regla": "18:00: solo mueve a un dia que ya tiene camion a su grupo; nunca abre camion nuevo",
       "quien": "Luis"
     },
     {
@@ -701,6 +792,11 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_ppp_web_dia_grupo",
+      "regla": "P14a: de los días del plazo con camión del grupo, va al MENOS cargado (día entero web+ISIS), no al primero: reparte en vez de amontonar",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_ppp_web_dias_ancla",
       "regla": "gv_ppp_web_dias_ancla copia los filtros de gv_ppp_web_dia_camion: un camion de super NO es camion a esa zona.",
       "quien": "Luis"
@@ -716,9 +812,19 @@
       "quien": "Thomas"
     },
     {
+      "objeto": "gv_ppp_web_forzado_sin_tanda",
+      "regla": "El umbral del intradia no frena un pendiente que un pase programa si o si hoy: Retira con dia pactado (a4), diferido con el piso cumplido (b2) y cliente nuevo a",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_ppp_web_fusionar_tandas",
       "regla": "la fusion no junta tandas de gondola distinta ni pasa el tope de NP",
       "quien": "Luis"
+    },
+    {
+      "objeto": "gv_ppp_web_no_reprogramar_cancelada",
+      "regla": "Un pedido CANCELADO no vuelve a tomar tanda por ningun camino (trigger en PPP_Web_Programacion, caso LK 0066)",
+      "quien": "Usuario 07/10"
     },
     {
       "objeto": "gv_ppp_web_proximo_dia_con_cupo",
@@ -734,6 +840,11 @@
       "objeto": "gv_ppp_web_super_tanda_sola",
       "regla": "Pedido de súper siempre en su propia tanda: ni con clientes ni con otro pedido del mismo súper, aunque sea el mismo día y la misma condición de entrega",
       "quien": "Luis"
+    },
+    {
+      "objeto": "gv_ppp_web_tanda_agregar",
+      "regla": "Un pedido CANCELADO no se vuelve a programar desde A Programar (caso LK 0066, 06/10)",
+      "quien": "Usuario 07/10"
     },
     {
       "objeto": "gv_ppp_web_tanda_programar",
@@ -757,7 +868,7 @@
     },
     {
       "objeto": "gv_ppp_web_zona_recalc",
-      "regla": "Cambia la dirección de una NP programada en tanda sin empezar: la zona se recalcula; empezada: no se toca y va al cartel",
+      "regla": "Cambia la dirección de una NP programada en tanda sin empezar → la zona se recalcula; empezada: no se toca y va al cartel",
       "quien": "Luis"
     },
     {
@@ -788,7 +899,7 @@
     {
       "objeto": "gv_rack_posicion_guardar",
       "regla": "El conteo del Mapa de racks, si cuenta DE MAS, primero traslada lo SIN POSICION del mismo codigo (es la misma mercaderia); si no, el total de racks se duplica (",
-      "quien": "Marianela"
+      "quien": "Luis, Marianela"
     },
     {
       "objeto": "gv_rack_saldo_pos",
@@ -831,13 +942,23 @@
       "quien": "Thomas"
     },
     {
+      "objeto": "gv_salida_cervantes_no_racks",
+      "regla": "La salida a Cervantes no sale de racks: se baja con BR a A guardar y se manda desde ahí",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_scp_sector",
-      "regla": "La grilla de un digito A1..L6 es Sector Crudo / Procesado (tipo scp en GV_Lugar, nombre IN-A1), NO un rack",
+      "regla": "La grilla de un digito A1..L6 es Sector Crudo / Procesado (tipo scp en GV_Lugar, nombre IN-A1), NO un rack: gv_rack_sector no la resuelve mas.",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_stock_cod_conocido",
+      "regla": "un código dado de baja (865ED) no es un artículo vivo: no sale en Stocks",
       "quien": "Luis"
     },
     {
       "objeto": "gv_stock_cod_lista",
-      "regla": "v29.74: la lista de codigos que sugiere Ingreso a racks NO ofrece un codigo dado de baja (865ED -> 865E), igual que el candado gv_stock_cod_conocido.",
+      "regla": "v29.74: el código se devuelve como lo escriben los maestros (026, no 26): es como se escribe en Movimientos_Stock / GV_Lugar_Item / Importados / OC_Maximos.",
       "quien": "Luis"
     },
     {
@@ -852,8 +973,8 @@
     },
     {
       "objeto": "gv_tanda_credito",
-      "regla": "Una tanda FRENADA se reparte: cada operario se lleva el m³ de lo que hizo (último PKC por código; líos que cerró), en el día en que lo hizo",
-      "quien": "Luis"
+      "regla": "Sólo se reparte una tanda FRENADA en esa fase; el resto sigue entera al que dio el TP/TAP",
+      "quien": "Luis (D6)"
     },
     {
       "objeto": "gv_tanda_frenar",
@@ -873,16 +994,21 @@
     {
       "objeto": "gv_tanda_reservar",
       "regla": "una fase anulada (TPX/TAPX) sin TP/TAP vivo libera el candado: la tanda se puede volver a pickear/armar (D69H)",
-      "quien": "Marianela"
+      "quien": "Luis, Marianela"
     },
     {
       "objeto": "gv_tanda_tomar_frenada",
-      "regla": "Al tomar una tanda frenada se devuelve dónde quedó el carro (ubicación del último freno)",
+      "regla": "Al tomar una frenada se devuelve dónde quedó el carro (ubicación del último freno)",
       "quien": "Luis"
     },
     {
       "objeto": "gv_tanda_trabajo_hecho",
       "regla": "La fila de Entregas_Virgilio cuenta como armado SOLO si es posterior a la ultima anulacion del armado de esa tanda. Sin esto un armado ya anulado dice \"tanda co",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_tanda_ubicacion",
+      "regla": "El monitor muestra la ubicacion fisica MAS RECIENTE de la tanda (picking PUB / freno / armado AUB), una fila por tanda.",
       "quien": "Luis"
     },
     {
@@ -897,13 +1023,18 @@
     },
     {
       "objeto": "gv_tandas_frenar_fichaje",
-      "regla": "Una tanda tomada se frena sola cuando el dueño ficha salida, sólo si no volvió a trabajar después del FJ",
+      "regla": "El freno al fichar salida sólo frena si el dueño NO volvió a trabajar después del FJ",
       "quien": "Luis"
     },
     {
       "objeto": "gv_ventas_clientes_mes_cod",
       "regla": "El desglose por cliente del pop-up de proyección suma la familia del principal (702EN en 702E), igual que el total mensual",
       "quien": "Luis"
+    },
+    {
+      "objeto": "gv_web_np_809_nacional",
+      "regla": "Las 9 cajas del 809 nacional salen primero: en NP de CH el 809E se cambia por 809 hasta agotar el cupo",
+      "quien": "Luis 05/10"
     },
     {
       "objeto": "gv_web_oculto_set",
@@ -938,7 +1069,7 @@
     {
       "objeto": "ppp_web_armar_tandas",
       "regla": "El armador PERSISTE la fecha de recepcion que trae el pedido. La otra (fecha_recep, con fallback a hoy) solo ORDENA la cola FIFO y no se puede escribir: pondria",
-      "quien": "Thomas"
+      "quien": "Luis, Thomas"
     },
     {
       "objeto": "ppp_web_resync",
@@ -947,15 +1078,10 @@
     },
     {
       "objeto": "racks_plani_ingreso",
-      "regla": "El ingreso a racks de importación descuenta el pedido de importación en viaje (gv_imp_imputar_ingreso_racks)",
+      "regla": "El ingreso a racks de importación descuenta el pedido de importación en viaje",
       "quien": "Luis"
     },
     {
-<<<<<<< HEAD
-      "objeto": "reconciliar_pipeline_stock_etapa1",
-      "regla": "una tanda que ya tiene fila de excedente conserva su reparto: el excedente de hoy no se reparte hacia atras (conteo 13/10, problema 766)",
-      "quien": "Giuliana De La Vega"
-=======
       "objeto": "racks_plani_ingreso_nacional",
       "regla": "El traslado nacional a racks escribe la DIRECCION (con la parte)",
       "quien": "Luis"
@@ -964,7 +1090,16 @@
       "objeto": "racks_plani_mover",
       "regla": "Mover racks trabaja por DIRECCION: saca de la parte que se le dice y frena si el rack partido no la nombra",
       "quien": "Luis"
->>>>>>> origin/main
+    },
+    {
+      "objeto": "Racks_Planimetria",
+      "regla": "Racks_Planimetria emite una fila por DIRECCION: un rack partido muestra sus N partes (ocupadas y libres)",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "reconciliar_pipeline_stock_etapa1",
+      "regla": "una tanda que ya tiene fila de excedente conserva su reparto: el excedente de hoy no se reparte hacia atras (conteo 13/10, problema 766)",
+      "quien": "Giuliana De La Vega"
     },
     {
       "objeto": "reconciliar_pipeline_stock_etapa2",
@@ -999,7 +1134,7 @@
     {
       "objeto": "trg_normalizar_empresa_stock",
       "regla": "Codigo NO dual: la empresa la da el ARTICULO, no el pedido",
-      "quien": "Luis 16/09, problema 336, problema 378"
+      "quien": "Luis 05/10, Luis 16/09, problema 336, problema 378"
     },
     {
       "objeto": "trg_pipeline_empresa_estable",
@@ -1033,7 +1168,7 @@
     },
     {
       "objeto": "vista_importados_stock_parte",
-      "regla": "La parte en Virgilio (942P…) se reparte por E.M. entre los que la comparten (GV_Piezas_Reparto)",
+      "regla": "La parte en Virgilio (942P…) se reparte por E.M. entre los que la comparten",
       "quien": "Luis"
     },
     {
@@ -1058,7 +1193,7 @@
     },
     {
       "objeto": "vista_tanda_status",
-      "regla": "Una tanda con PKF/APF figura FRENADA (picking/armado), no en curso ni terminada",
+      "regla": "Una tanda con PKF figura FRENADA (picking), no en curso ni terminada",
       "quien": "Luis"
     }
   ]
