@@ -1846,9 +1846,37 @@ tenga que vincular bien … y una vez tengamos la base bien armada, limpiamos to
 > SC y SP son **de qué es la PIEZA** (su categoría de Insumos), no de qué es la CELDA: el Mapa
 > **no rotula la celda por sector** y el encabezado no los cuenta aparte.
 
+### ⚠⚠ EL PADRÓN DE LA GRILLA ES EXACTO: **76 celdas, `IN-A1` … `IN-L7`** (Luis, 13/10, v30.09)
+
+**Luis, textual:** *"esos sectores deberían ser «IN-» letras de la A a la L con la siguiente logica /
+De la A a la E van del 1 al 6 (ej. IN-A1, IN-E6) / F es del 1 al 5 / G del 1 al 6 / De H a L son del 1 al 7"*.
+
+| columnas | números | celdas |
+|---|---|---:|
+| **A · B · C · D · E** | 1 a 6 | 30 |
+| **F** | 1 a **5** | 5 |
+| **G** | 1 a 6 | 6 |
+| **H · I · J · K · L** | 1 a **7** | 35 |
+| | | **76** |
+
+Las **22 que faltaban** se dieron de alta el 13/10 (A4, C3, C4, D2, E3, E4, F3, F4, F5, I1, I2, I3, I5,
+I6, I7, J5, J7, K1, K2, K3, K7, **L7**), todas vacías. Al 13/10: **55 celdas con pieza y 22 libres**; el
+Mapa dibuja la libre como «libre», no la esconde.
+
+⚠ **El front NO tiene el padrón escrito**: `pscpCols` saca las columnas de los datos, así que una celda
+nueva aparece sola con su alta. **Agregar una celda es un `insert`, no un deploy** — y el CHECK del nombre
+ya acepta hasta dos dígitos, así que `IN-L7` entra sin DDL.
+
+`sql/gv_scp_padron_v3009.sql` (el alta, la verificación y el rollback).
+
+⚠ **`IN-F6` existe y queda FUERA del padrón**: tiene anotada **`D14` · Resorte 520 Niq.** (parte procesado,
+cantidad 0, su stock lo lleva GP2). **No se saca sola**: sacarla manda esa pieza a la alerta «insumo con
+stock y sin posición», que es justo lo que Luis dejó para después (D1, 13/10: *"dejalo ahi nomas, hay que
+ver bien que se hace pero no en esta sesion"*). Queda viva hasta que él diga a qué celda va el D14.
+
 | pieza | qué es |
 |---|---|
-| `GV_Lugar` | las 55 celdas con **`tipo = 'scp'`**, empresa `IN`, nombre `IN-A1`…`IN-L6`. Se dieron de alta **IN-K4, IN-K5 e IN-K6**, que tenían piezas cargadas y no existían |
+| `GV_Lugar` | las **76** celdas del padrón con **`tipo = 'scp'`**, empresa `IN`, nombre `IN-A1`…`IN-L7` (+ `IN-F6`, fuera del padrón, ver arriba). Se dieron de alta **IN-K4, IN-K5 e IN-K6**, que tenían piezas cargadas y no existían, y las 22 del padrón que faltaban |
 | **`gv_scp_sector(txt)`** | el resolvedor de la grilla: `IN-A1`, `IN A1`, `in-a1` y el **`A1` pelado** (es lo que se tipea hoy) |
 | **`gv_insumo_sector(txt)`** | el **cuello ÚNICO de una posición de INSUMO** = `coalesce(gv_rack_sector, gv_scp_sector)`: rack de insumo (`R01AD`, `AF13`, `X20`) **o** celda de SC/SP. Lo usan `gv_insumo_ubicacion` y las **dos** RPC que escriben una posición (`gv_insumo_ubicaciones_guardar`, `gv_insumo_posicion_guardar`) |
 | **`gv_scp_celda`** | la vista de la solapa nueva: una fila por celda, con la pieza, su sector (SC/SP) y su saldo |
@@ -1865,7 +1893,7 @@ tenga que vincular bien … y una vez tengamos la base bien armada, limpiamos to
 - **El saldo de una pieza de SC/SP lo lleva GP2**, no Virgilio: acá se dice **DÓNDE** está. En
   `GP2.ubicacion` no hay celdas (SC y SP son **una** ubicación cada uno), así que la celda física
   existe sólo en `Insumos_Ubicaciones.sector`. El espejo `gv_gp2_espejo_sync` copia todo `GV_Lugar`
-  sin filtrar tipo, así que GP2 ve las 55 celdas solo (medido: `GP2.virgilio_lugar` tipo `scp` = 55).
+  sin filtrar tipo, así que GP2 ve las celdas solo (medido 13/10: `GP2.virgilio_lugar` tipo `scp` = **77**).
 - **Y de paso se arreglaron 3 insumos** que estaban en rojo: `gv_insumo_ubicacion` pasó de **145 a
   148** posiciones resueltas. Quedan **2** sin lugar, y son las dos de **`medio`**.
 - ⚠⚠ **`medio` NO ES UN LUGAR y no se le inventa uno** (Luis, 13/10: *"medio no se que es ni que
@@ -1890,7 +1918,7 @@ tenga que vincular bien … y una vez tengamos la base bien armada, limpiamos to
   dice qué haría, fila por fila.
 
 **Chequeo:** `select public.gv_scp_sector('A1'), public.gv_rack_sector('A1'), public.gv_insumo_sector('R1Ad');`
-→ `IN-A1`, **NULL**, `R01AD` · `select count(*) from public.gv_scp_celda;` (63 en 55 celdas) ·
+→ `IN-A1`, **NULL**, `R01AD` · `select count(*) from public.gv_scp_celda;` (77: 55 con pieza + 22 libres) ·
 `select * from public.gv_reglas_perdidas;` · `select count(*) from public."Insumos_Ubicaciones";` (110,
 todas resueltas y con el nombre canónico) · `node tests/pmap-scp.cjs`.
 `sql/gv_sector_scp_v2998.sql` (rollback: `select public.gv_scp_revertir();`), 5 centinelas.
