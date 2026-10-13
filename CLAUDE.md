@@ -8715,6 +8715,12 @@ F48A 3 cajas de góndola de más (ya salieron o están en el pallet), y el factu
   topa el ajuste `npd_…` de Pickeados con el faltante que el PKC ya registró (F58A/102E quedaba en −5).
 - Lo pasado NO se corrige solo (los pares ya separados están balanceados): la corrección de datos pide el «sí».
 - Centinelas 394-396. `sql/gv_etapa2_codigo_l_correccion_v2949.sql`, `sql/gv_npd_tope_faltante_picking_v2949.sql`.
+- **v29.52: el PKC mueve la góndola EN EL MOMENTO.** `trg_pkc_reconciliar_rt` pasó a SECURITY DEFINER: como invoker,
+  con la clave pública daba *permission denied* (tragado) y el picking recién se registraba con el cron 68 (hasta 10 min).
+  Probado como `anon` y en vivo (PKC 09:04:28 → picking 09:04:28). `sql/gv_pkc_rt_definer_v2950.sql`.
+- **Cómo se prueba un módulo de operario**: como `anon` (`set local role anon`) en transacción abortada, con una tanda de
+  formato real (`Z98Z`: los guards miran `^[A-Z][0-9]{2}[A-Z]$`) y las Entregas en UN insert (el armado las manda juntas;
+  de a una, el trigger separa la tanda con la primera línea sola).
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.50, D3): el SERVIDOR reconoce un EVENTO DUPLICADO aunque llegue con OTRO client_id
 
