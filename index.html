@@ -63773,9 +63773,12 @@ const GV_SUP_ROLES = {
   thomas:    { nombre: "Thomas",         area: "admin" },
   marianela: { nombre: "Marianela",      area: "ventas" },
   tomas:     { nombre: "Tomás González", area: "ventas" },
-  viviana:   { nombre: "Viviana",        area: "impo" }
+  viviana:   { nombre: "Viviana",        area: "impo" },
+  /* v30.05 (13/10): Juan está en la PC de la impresora. Su área es UNA cosa: que la nota de
+     picking y la de armado salgan solas. No ve nada de la PPP ni de compras. */
+  juan:      { nombre: "Juan",           area: "impresion" }
 };
-const GV_AREA_NOMBRE = { admin: "Administración general", ventas: "Ventas", impo: "Importaciones · Comex · Cobranzas" };
+const GV_AREA_NOMBRE = { admin: "Administración general", ventas: "Ventas", impo: "Importaciones · Comex · Cobranzas", impresion: "Impresión de notas" };
 const GV_ROL_ITEMS = [
   { id: "sin_zona",  areas: ["admin", "ventas"], label: "Pedidos sin zona",                          cnt: function (d) { return d.sin_zona_ped; },                       open: function () { openPPP(); },                hint: "Asignales zona en «A Programar»" },
   { id: "atrasados", areas: ["admin", "ventas"], label: "Pedidos atrasados · reprogramar",           cnt: function (d) { return d.atrasados; },                          open: function () { openPPP(); },                hint: "Abrí «Pasar de día» y confirmá" },
@@ -63784,7 +63787,43 @@ const GV_ROL_ITEMS = [
   { id: "imp_ir",    areas: ["admin", "impo"],   label: "Ingresos a racks sin revisar",          cnt: function (d) { return d.imp_ir; },                           open: function () { openPedidosImportacion(); }, hint: "Importación → Recibido" },
   { id: "ads",       areas: ["admin", "impo"],   label: "Quiebres de stock a 10 días",               cnt: function (d) { return (d.ads_stock && d.ads_stock.q10) || 0; }, open: function () { openAds(); },               hint: "ADS → Stock", tall: function (d) { return d.ads_tall; } },
   { id: "expreso",   areas: ["admin", "impo"],   label: "Expresos por cargar en ISIS",               cnt: function (d) { return d.expreso; },                            open: function () { openExpresoIsis(); },        hint: "No frena ningún pedido" },
-  { id: "conc",      areas: ["admin", "impo"],   label: "Movimientos por resolver",             cnt: function (d) { return d.conc; },                               open: function () { openCobranzas(); },          hint: "Cobranzas → Conciliación" }
+  { id: "conc",      areas: ["admin", "impo"],   label: "Movimientos por resolver",             cnt: function (d) { return d.conc; },                               open: function () { openCobranzas(); },          hint: "Cobranzas → Conciliación" },
+
+  /* v30.05 — ÁREA «impresion» (Juan). Estos dos NO salen de `gv_rol_panel`: se miden ACÁ
+     (`local`), porque el estado de la impresión automática es de ESTA PC, no de la base.
+     ⚠⚠ EL PANEL NO TOCA EL HELPER: no llama a `gvHelperConectar`, `gvHelperGuardar` ni
+     `psSetAuto` — sólo MIRA y abre el pop-up de siempre. Y **no le pega a 127.0.0.1 si el
+     helper no está conectado en esta PC**: desconectado, el navegador nunca sale al
+     loopback (en un celular Chrome pediría permiso de red local para nada, regla v26.24). */
+  { id: "imp_auto", areas: ["impresion"], label: "Impresión automática", open: function () { openHelperImpresion(); },
+    local: async function () {
+      try {
+        if (typeof _facIsMobile === "function" && _facIsMobile())
+          return { n: 1, hint: "Esto va en la PC de la impresora, no en el celular" };
+        if (!gvHelperActivo())
+          return { n: 1, hint: "No está conectada en esta PC · Configuración → Helper de impresión" };
+        var vivo = false; try { vivo = await helperVivo(); } catch (_e) { vivo = false; }
+        if (!vivo)
+          return { n: 1, hint: "Conectada pero no contesta: abrí el helper en esta PC" };
+        if (!psIsAuto())
+          return { n: 1, hint: "El helper anda pero esta PC no imprime sola" };
+        var arranco = !!(typeof _ps !== "undefined" && _ps && _ps.timer);
+        return { n: 0, hint: arranco ? "Sale sola: picking al TP y armado al terminar cada NP"
+                                     : "Prendida · arranca sola en menos de un minuto" };
+      } catch (_e) { return { n: null, hint: "No se pudo mirar el estado de la impresión" }; }
+    } },
+  { id: "imp_cola", areas: ["impresion"], label: "Hojas sin imprimir", open: function () { openColaImpHistorial(); },
+    local: async function () {
+      var rows = null;
+      try { rows = await colaImpFetch(_colaImpDia(-21), _colaImpDia(14)); } catch (_e) { rows = null; }
+      /* una lectura ROTA no es un CERO: va «—», no «✓ al día» */
+      if (!rows) return { n: null, hint: "No se pudieron leer las hojas pendientes" };
+      var pend = _colaImpPendientes(rows).filter(function (x) { return x.tipo !== "fac"; });
+      var lim = Date.now() - 24 * 3600000;
+      var venc = pend.filter(function (x) { return x.ts && new Date(x.ts).getTime() < lim; }).length;
+      return { n: pend.length, hint: venc ? (venc + " hace +24 h \u00B7 tocá para imprimirlas")
+                                          : "Picking y armado · tocá para imprimirlas" };
+    } }
 ];
 
 function _rolGet() { try { return localStorage.getItem("gv_sup_quien") || ""; } catch (_e) { return ""; } }
@@ -63870,12 +63909,28 @@ function rolPanelCargar() {
   var area = window.__gvRol || "admin";
   var items = GV_ROL_ITEMS.filter(function (it) { return it.areas.indexOf(area) >= 0; });
   var listEl = document.getElementById("rolpList"); var bgEl = document.getElementById("rolpBadge");
+  /* v30.05 — dos clases de ítem: los REMOTOS (un contador de `gv_rol_panel`) y los LOCALES
+     (`it.local`, que se miden en esta PC: la impresión automática de Juan). Un área puede no
+     tener ninguno remoto; ahí ni se llama a la RPC. */
+  var remotos = items.filter(function (it) { return typeof it.cnt === "function"; });
+  var _loc = {};                      // id -> { n, hint } ya resuelto de los LOCALES
+  var _data = remotos.length ? null : {};   // sin remotos no hay nada que esperar
   function paint(data) {
+    if (data !== undefined) _data = data;
     if (!listEl) return;
-    var alerts = 0;
+    var alerts = 0, falta = false;
     listEl.innerHTML = items.map(function (it) {
       var idx = GV_ROL_ITEMS.indexOf(it);
-      var n = data ? (it.cnt(data) || 0) : null;
+      var n, hint = it.hint || "";
+      if (it.local) {
+        var r = _loc[it.id];
+        n = r ? r.n : null;
+        if (r && r.hint) hint = r.hint;
+        if (!r) falta = true;
+      } else {
+        n = _data ? (it.cnt(_data) || 0) : null;
+        if (!_data) falta = true;
+      }
       if (n > 0) alerts++;
       /* v30.04 (pase GV-UI): el PUNTO puede ser `--gv-muted` (es un ícono), el NÚMERO no:
          el \u2014 de «no pude leer» salía en #94a3b8 = 2,45 y el \u2713 en #16a34a = 3,15,
@@ -63883,21 +63938,29 @@ function rolPanelCargar() {
       var dot = (n === null) ? "var(--gv-muted)" : (n > 0 ? "var(--gv-error)" : "var(--gv-ok)");
       var numc = (n === null) ? "var(--gv-ink-2)" : (n > 0 ? "var(--gv-error)" : "var(--gv-ok)");
       var num = (n === null) ? "\u2014" : (n > 0 ? String(n) : "\u2713");
-      var tall = (it.tall && data) ? it.tall(data) : 0;
+      var tall = (it.tall && _data) ? it.tall(_data) : 0;
       var extra = (it.id === "ads" && tall > 0) ? ' \u00B7 <span class="rolp-sub">' + tall + ' talleristas flojos</span>' : '';
       return '<button class="rolp-row" onclick="GV_ROL_ITEMS[' + idx + '].open()">' +
         '<span class="rolp-dot" style="background:' + dot + '"></span>' +
-        '<span class="rolp-lbl">' + it.label + extra + '<span class="rolp-hint">' + it.hint + '</span></span>' +
+        '<span class="rolp-lbl">' + it.label + extra + '<span class="rolp-hint">' + hint + '</span></span>' +
         '<span class="rolp-num" style="color:' + numc + '">' + num + '</span></button>';
     }).join("");
     /* el BADGE es el dato de la barra: el color NUNCA va solo (GV-UI 5), lleva palabra. */
     if (bgEl) {
-      if (data === null) { bgEl.className = "rolp-badge rolp-b-gris"; bgEl.textContent = "sin contadores"; bgEl.title = "No se pudieron leer los contadores \u00B7 tocá un ítem igual"; }
+      if (falta && !alerts) { bgEl.className = "rolp-badge rolp-b-gris"; bgEl.textContent = "sin contadores"; bgEl.title = "No se pudieron leer todos los contadores \u00B7 tocá un ítem igual"; }
       else if (alerts === 0) { bgEl.className = "rolp-badge rolp-b-verde"; bgEl.textContent = "\u2713 al día"; bgEl.title = "Nada pendiente en tu área"; }
       else { bgEl.className = "rolp-badge rolp-b-rojo"; bgEl.textContent = alerts + " para mirar"; bgEl.title = "Tocá para ver el detalle"; }
     }
   }
-  paint(null);
+  paint(undefined);
+  /* cada LOCAL se mide por su cuenta y repinta al resolver: uno lento no traba a los otros */
+  items.filter(function (it) { return it.local; }).forEach(function (it) {
+    Promise.resolve().then(function () { return it.local(); })
+      .then(function (r) { _loc[it.id] = (r && typeof r === "object") ? r : { n: null, hint: it.hint || "" }; })
+      .catch(function () { _loc[it.id] = { n: null, hint: "No se pudo mirar" }; })
+      .then(function () { paint(undefined); });
+  });
+  if (!remotos.length) return;
   fetch(SUPABASE_URL + "/rest/v1/rpc/gv_rol_panel", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) { paint(d && typeof d === "object" ? d : null); })

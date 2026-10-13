@@ -10184,3 +10184,34 @@ Verificado que falla contra el index anterior reproduciendo los números del pas
 > del regex pierde la barra —en un template una escapada desconocida deja sólo la letra—, el match
 > no devuelve nada y **TODO contraste sale 1:1**: el test queda verde con los colores mal puestos.
 > Pasó en el primer intento y lo cazó que los 18 chequeos dieran exactamente «1:1».
+
+### ⚠ v30.05 (Luis, 13/10): el rol de JUAN es la IMPRESIÓN, y el panel NO TOCA EL HELPER
+
+**Luis:** *"agregale un usuario tambien a Juan. Necesita que la impresion automatica de notas de
+picking/armado salga y nada más. fijate que esto no joda con el helper"*.
+
+Área nueva **`impresion`** («Impresión de notas»), con **dos** ítems y nada más — Juan no ve la PPP,
+ni compras, ni cobranzas:
+
+| ítem | qué dice | abre |
+|---|---|---|
+| **Impresión automática** | si en ESTA PC el helper está conectado, contesta y la estación está prendida | ⚙️ Helper de impresión |
+| **Hojas sin imprimir** | picking y armado pendientes de `colaImpFetch` (el facturado no es de Juan) | 📅 Cola por día |
+
+> ## **El panel MIRA el helper; no lo prende, no lo apaga y no le pega a 127.0.0.1 de más.**
+
+- No llama a `gvHelperConectar`, `gvHelperGuardar` ni `psSetAuto`: eso sigue siendo del pop-up de
+  ⚙️ Configuración, donde conectar = esta PC imprime sola (v26.30).
+- ⚠⚠ **Y sólo pinguea el loopback si el helper está CONECTADO en esa PC.** Desconectado, el
+  navegador no sale a `127.0.0.1` — en un celular Chrome pediría permiso de red local para nada
+  (regla v26.24). Es lo único que podía «joder con el helper» y es lo que mide el candado.
+- Los ítems de Juan son **LOCALES** (`it.local`, se miden en el navegador) y no en `gv_rol_panel`.
+  Por eso `rolPanelCargar` tiene ahora dos clases de ítem; **un área sin ítems remotos ni llama a la
+  RPC**. Cada local resuelve por su cuenta y repinta: uno lento no traba a los otros, y una lectura
+  rota deja «—», nunca «✓ al día».
+
+**Chequeo:** `node tests/rol-panel-click.cjs`, bloque **(h)** — con el helper desconectado mide que
+**no salga un solo request a 127.0.0.1**, que Juan vea sus 2 ítems y que `gv_helper_imp_v1` y
+`ps_auto_virgilio` queden **sin tocar**; con el helper conectado y contestando, que sí lo pinguee y
+marque ✓ sin apagarle nada. Verificado que falla sacando el guard: *«el panel le pegó a 127.0.0.1
+con el helper DESCONECTADO»*.

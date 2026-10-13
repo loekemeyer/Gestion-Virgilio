@@ -56,8 +56,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   await p.evaluate(() => { if (typeof window.rolPickerAbrir === "function") window.rolPickerAbrir(); });
 
   const nombres = await p.$$eval("#rolPickerOv button", (bs) => bs.map((x) => (x.textContent || "").trim()));
-  if (nombres.length !== 5) fallas.push("el cuadro dibujó " + nombres.length + " nombres, tienen que ser 5");
-  else ok("el cuadro dibuja los 5 nombres");
+  if (nombres.length !== 6) fallas.push("el cuadro dibujó " + nombres.length + " nombres, tienen que ser 6");
+  else ok("el cuadro dibuja los 6 nombres");
   if (!/^Luis\b/.test(nombres[0] || "")) fallas.push("el primer botón no es Luis: «" + nombres[0] + "»");
 
   // (d) GENÉRICO: todo onclick del cuadro resuelve contra window
@@ -147,7 +147,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   // (f) v29.98: PLEGADO por defecto, una sola línea, badge con PALABRA y «cambiar» angosto.
   //     Y vale para LOS CINCO roles, no sólo para Luis (Luis, 13/10: "que el arreglo sea
   //     general y no solo para luis").
-  for (const k of ["luis", "thomas", "marianela", "tomas", "viviana"]) {
+  for (const k of ["luis", "thomas", "marianela", "tomas", "viviana", "juan"]) {
     const m = await p.evaluate(async (rol) => {
       try { localStorage.setItem("gv_sup_quien", rol); localStorage.removeItem("gv_rol_abierto"); } catch (_e) {}
       const ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none";
@@ -177,7 +177,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     if (!m.filas) fallas.push(k + ": el checklist quedó vacío");
     if (!m.quien.trim()) fallas.push(k + ": la barra no dice quién es");
   }
-  ok("los 5 roles: una línea plegada, badge con palabra, «cambiar» angosto");
+  ok("los 6 roles: una línea plegada, badge con palabra, «cambiar» angosto");
 
   // y al desplegar muestra el checklist
   await p.evaluate(() => { try { localStorage.setItem("gv_sup_quien", "luis"); } catch (_e) {} window.rolElegir("luis"); });
@@ -194,6 +194,76 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   if (!desp.abierto || desp.alto <= antes) fallas.push("tocar la barra no despliega el checklist (" + antes + " → " + desp.alto + " px)");
   else ok("la barra despliega el checklist (" + antes + " → " + desp.alto + " px)");
   if (desp.guardado !== "1") fallas.push("el estado abierto/cerrado no se guarda por dispositivo");
+
+  // (h) v30.05 — EL ROL DE JUAN: sólo la impresión automática, y SIN JODER CON EL HELPER.
+  //     Luis, 13/10: "agregale un usuario tambien a Juan. Necesita que la impresion automatica
+  //     de notas de picking/armado salga y nada más. fijate que esto no joda con el helper".
+  //     ⚠ Lo que esto candaá, y no se ve leyendo el código: que el panel NO le pegue a
+  //     127.0.0.1 cuando el helper no está conectado en esta PC (ahí un celular pediría
+  //     permiso de red local para nada, regla v26.24) y que NO lo prenda ni lo apague solo.
+  {
+    const loopback = [];
+    await p.route("http://127.0.0.1:**", (route) => { loopback.push(route.request().url()); route.abort(); });
+
+    // (h1) helper DESCONECTADO: ni un request al loopback, y el ítem lo dice
+    const sin = await p.evaluate(async () => {
+      try { localStorage.setItem("gv_sup_quien", "juan"); localStorage.setItem("gv_rol_abierto", "1"); } catch (_e) {}
+      try { localStorage.removeItem("gv_helper_imp_v1"); localStorage.removeItem("ps_auto_virgilio"); } catch (_e) {}
+      const ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none";
+      window.rolElegir("juan");
+      await new Promise((r) => setTimeout(r, 700));
+      const sp = document.getElementById("supervisorPanel"); if (sp) { sp.classList.remove("hidden"); sp.style.display = ""; }
+      return {
+        area: (document.querySelector("#rolPanel .rolp-area") || {}).textContent || "",
+        filas: Array.from(document.querySelectorAll("#rolPanel .rolp-lbl")).map((e) => e.firstChild.textContent.trim()),
+        hints: Array.from(document.querySelectorAll("#rolPanel .rolp-hint")).map((e) => e.textContent.trim()),
+        nums: Array.from(document.querySelectorAll("#rolPanel .rolp-num")).map((e) => e.textContent.trim()),
+        helperOn: (function () { try { return localStorage.getItem("gv_helper_imp_v1"); } catch (_e) { return "?"; } })(),
+        psAuto: (function () { try { return localStorage.getItem("ps_auto_virgilio"); } catch (_e) { return "?"; } })()
+      };
+    });
+    if (loopback.length) fallas.push("el panel le pegó a 127.0.0.1 con el helper DESCONECTADO: " + loopback.join(", "));
+    if (sin.filas.length !== 2) fallas.push("Juan ve " + sin.filas.length + " ítems, tiene que ver 2 (la impresión y la cola): " + sin.filas.join(" | "));
+    if (!/Impresi/i.test(sin.area)) fallas.push("el área de Juan dice «" + sin.area + "»");
+    if (sin.nums[0] !== "1") fallas.push("sin helper conectado la impresión automática tendría que marcar pendiente, marca «" + sin.nums[0] + "»");
+    if (!/no está conectada/i.test(sin.hints[0] || "")) fallas.push("el hint no dice que no está conectada: «" + sin.hints[0] + "»");
+    if (sin.helperOn !== null) fallas.push("el panel TOCÓ la config del helper (gv_helper_imp_v1 = " + sin.helperOn + ")");
+    if (sin.psAuto !== null) fallas.push("el panel TOCÓ la estación de impresión (ps_auto_virgilio = " + sin.psAuto + ")");
+    if (/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/u.test(sin.hints.join(" ") + sin.filas.join(" ")))
+      fallas.push("emoji decorativo en los ítems de Juan (GV-UI 8): " + sin.filas.join(" | ") + " · " + sin.hints.join(" | "));
+
+    // (h2) helper CONECTADO y contestando: ahí sí pinguea, y marca ✓
+    await p.unroute("http://127.0.0.1:**");
+    const loop2 = [];
+    await p.route("http://127.0.0.1:**", (route) => {
+      loop2.push(route.request().url());
+      route.fulfill({ status: 200, contentType: "text/plain", body: "Impresion Virgilio OK v1.2.0" });
+    });
+    const con = await p.evaluate(async () => {
+      try {
+        localStorage.setItem("gv_helper_imp_v1", JSON.stringify({ on: true, puerto: 17777 }));
+        localStorage.setItem("ps_auto_virgilio", "1");
+      } catch (_e) {}
+      window.rolElegir("juan");
+      await new Promise((r) => setTimeout(r, 900));
+      const sp = document.getElementById("supervisorPanel"); if (sp) { sp.classList.remove("hidden"); sp.style.display = ""; }
+      return {
+        nums: Array.from(document.querySelectorAll("#rolPanel .rolp-num")).map((e) => e.textContent.trim()),
+        hints: Array.from(document.querySelectorAll("#rolPanel .rolp-hint")).map((e) => e.textContent.trim()),
+        helperOn: (function () { try { return JSON.parse(localStorage.getItem("gv_helper_imp_v1") || "{}").on; } catch (_e) { return "?"; } })(),
+        psAuto: (function () { try { return localStorage.getItem("ps_auto_virgilio"); } catch (_e) { return "?"; } })()
+      };
+    });
+    if (!loop2.length) fallas.push("con el helper conectado el panel no lo pingueó: no puede saber si anda");
+    if (con.nums[0] !== "\u2713") fallas.push("con el helper vivo y la estación prendida tendría que estar al día, marca «" + con.nums[0] + "»");
+    if (!/Sale sola|arranca sola/i.test(con.hints[0] || "")) fallas.push("el hint no dice que sale sola: «" + con.hints[0] + "»");
+    if (con.helperOn !== true) fallas.push("el panel APAGÓ el helper (on = " + con.helperOn + ")");
+    if (con.psAuto !== "1") fallas.push("el panel APAGÓ la estación (ps_auto_virgilio = " + con.psAuto + ")");
+
+    await p.unroute("http://127.0.0.1:**");
+    await p.evaluate(() => { try { localStorage.removeItem("gv_helper_imp_v1"); localStorage.removeItem("ps_auto_virgilio"); localStorage.setItem("gv_sup_quien", "luis"); } catch (_e) {} });
+    ok("Juan: sólo sus 2 ítems, y el panel no prende, no apaga ni pinguea el helper de más");
+  }
 
   // (g) v30.04 — EL PASE GV-UI, medido sobre la pantalla CORRIENDO (no leyendo el CSS):
   //     el `font-size` que vale es el COMPUTADO, y el que manda puede venir del CSS global.
