@@ -5380,6 +5380,25 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
 
+## ⚠ REGLA (v29.99): `dead-handlers` mira TODOS los módulos que carga el index, no sólo dos
+
+Un `onclick="fn(...)"` llama a `window.fn`: una función que queda **dentro de una closure** deja el
+botón **muerto** y la página no tira ningún error. `tests/dead-handlers.cjs` cubría `index.html` +
+`importacion.js`; hoy cubre también cobranzas, hotsale, estadisticas, ads, plantel, analisis, ayuda,
+recepcion, planimetria y los dos de talleristas (**1.104 handlers**). **Al sacar un módulo nuevo del
+index, agregarlo a `ARCHIVOS`** — si el archivo no existe, el test falla y lo dice.
+
+Lo que destapó: la v29.92 puso `rolPickerAbrir` y `rolElegir` adentro de la closure donde ya viven
+`gsLoad` / `gsResolver` (que se exponen a mano con `window.x = x`), así que los dos botones del panel
+por rol no hacían nada. **Ese bloque de `index.html` (~63000) NO es top-level**: toda función que se
+llame desde un `onclick` va expuesta.
+
+**Barrido del 13/10, 0 muertos fuera de esos dos:** `monitor/tv.html`, `monitor/admin.html`, el
+selector y Cervantes no usan `onclick="..."` de texto (asignan la función o usan `addEventListener`,
+que no se puede romper por nombre); `admin/` (el espejo de LK) tiene 88 handlers y los 88 resuelven;
+`impocomex/` tiene 49 y los 4 que un escaneo estático marca (`onBlur`, `onBorrar`, `onInput`,
+`repinta`) son **métodos de objeto y callbacks de `IC.on(...)`**, no globales: falsos positivos.
+
 ## ⚠⚠ REGLA (Luis, 2026-10-13, v29.96): EN EL MONITOR SÓLO VAN LOS LEGAJOS QUE SE LOGUEARON
 
 **Luis, textual:** *"se habrá hecho como una prueba para ver visuales desde el admin, no deberían

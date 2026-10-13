@@ -46,7 +46,18 @@ function extractHandlerFns(src) {
 }
 
 (async () => {
-  const src = (fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8") + "\n" + fs.readFileSync(path.join(__dirname, "..", "importacion.js"), "utf8"));
+  /* v29.97: TODOS los módulos que carga el index, no sólo importacion.js. Cada uno arma HTML con
+     onclick="fn(...)" y sus funciones tienen que ser globales: una que quede dentro de una closure
+     deja el botón muerto (pasó en la v29.92 con rolPickerAbrir / rolElegir). Al sacar un módulo
+     nuevo del index, agregarlo acá. */
+  const ARCHIVOS = ["index.html", "importacion.js", "cobranzas.js", "hotsale.js", "estadisticas.js",
+                    "ads.js", "plantel.js", "analisis.js", "ayuda.js", "recepcion.js", "planimetria.js",
+                    "modulo_talleristas_arts.js", "modulo_talleristas_edit.js"];
+  const src = ARCHIVOS.map(function (f) {
+    const p = path.join(__dirname, "..", f);
+    if (!fs.existsSync(p)) { console.error("FALTA " + f + " — ¿se renombró? agregalo/sacalo de ARCHIVOS"); process.exit(1); }
+    return fs.readFileSync(p, "utf8");
+  }).join("\n");
   const fns = extractHandlerFns(src);
   const b = await chromium.launch();
   const p = await b.newPage();
