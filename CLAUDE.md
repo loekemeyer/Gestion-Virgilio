@@ -5486,6 +5486,39 @@ interna y **no tiene candado**: quien la use directo se lo pone él. Hoy son tre
 tres filtran el legajo de prueba. Lo sostiene el bloque **(d)** de `tests/legajo1-confirma.cjs`,
 que lo mide sobre la cola de verdad (verificado que falla sin el guard).
 
+## ⚠ REGLA (Luis, 2026-10-13, v30.00): el UMBRAL DEL INTRADÍA no frena lo que tiene DÍA FORZADO
+
+**Luis:** *"lk 1670, por que no se programo solo?"*. Era un **Retira con día pactado** (16/10) que
+entró 13:31 y seguía sin tanda.
+
+> El intradía (cron 73, cada 5 min) llama al armador **sólo** si lo pendiente de las **zonas
+> automáticas** (1, 2 y 3) llega al umbral, o si hay algo de zona manual con camión a su zona.
+> **Retira, Súper y el resto no suman ahí** (`pendienteAutomatico` de la Edge Function lo dice
+> textual, y el conteo manual exige zona `^Zona N`), así que un pendiente que un pase programa
+> **sí o sí hoy** no llegaba NUNCA al armador: la corrida salía por `intradia_sin_umbral` sin
+> llamarlo y el pedido esperaba el job de las 00:01 — hasta **11 h** parado.
+
+Mismo agujero que la regla v19.52 ya marca para `'^\s*Zona\s*[0-9]+'`: **al tocar el armado,
+preguntarse si ahí no falta Retira.**
+
+| pieza | qué hace |
+|---|---|
+| **`gv_ppp_web_forzado_sin_tanda()`** | los pedidos SIN TANDA que un pase programa hoy sí o sí: **(a4)** Retira con día elegido (`gv_web_retiro_pactado`) · **(b2)** diferido con su piso cumplido · **(a0e)** cliente nuevo aprobado. Lee `lk_pedidos_match` (el FDW ya está en la base): no necesita el feed |
+| cron **156 `gv-ppp-web-forzado`** | minutos 7,17,37,47, anti-solape: si esa función devuelve algo, llama a la Edge Function en modo **diario** (el de las 00:01, que no mira el umbral) y el armador corre. Si no, no hace nada |
+
+- **No hizo falta redeploy** de `gv-ppp-web-tandas-diarias`. Queda además
+  **`gv_ppp_web_pendiente_forzado(text,jsonb)`** —el mismo criterio recibiendo los pendientes por
+  jsonb— **sin llamador**: es la mitad del fix para el día que esa función se re-deploye y el
+  umbral se arregle adentro (sumar su conteo a `npManual`).
+- Sobrar una fila no cuesta nada (decide el armador); faltar una deja el pedido sin programar.
+- Probado: con LK 1670 pendiente la función devolvía 1 fila y la corrida lo programó como
+  **LK 0414, tanda F89A, Retira, 16/10**.
+- Los objetos y el centinela de la base dicen **v29.82** (la versión con que se aplicaron): es la
+  llave, no cambiarla. `sql/gv_ppp_web_forzado_sin_tanda_v3000.sql` (rollback en la cabecera).
+
+**Chequeo:** `select * from public.gv_ppp_web_forzado_sin_tanda();` — lo que el armador tiene que
+tomar sí o sí · `select * from public.gv_reglas_perdidas;`.
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.69): el código SIN GÓNDOLA en el Mapa se lo PREGUNTA AL OPERARIO
 
 **Luis:** *"si el modulo de pickeo los promptea a pickear un codigo para el que no tiene registro de
