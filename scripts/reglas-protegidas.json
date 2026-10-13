@@ -950,6 +950,11 @@
       "objeto": "gv_insumo_isis_sync",
       "regla": "GP2 es el canonico del codigo ISIS: lo que se guarda en GP2.insumo_equivalencia.isis se escribe en Insumos.isis de Virgilio, incluido vaciarlo; nunca al reves (v29.79)",
       "quien": "Luis"
+    },
+    {
+      "objeto": "gv_insumo_equiv_espejo",
+      "regla": "Vincular una equivalencia de insumos dispara el espejo de ESE codigo en el acto (28 ms): el cron de los :19/:49 es la red, no el camino.",
+      "quien": "Luis"
     }
   ]
 }
