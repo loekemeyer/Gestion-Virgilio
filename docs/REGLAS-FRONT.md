@@ -461,6 +461,6 @@ las rutas en el orden inverso al de registro (la última agregada va primero), a
 después tapa a los específicos.
 
 ⚠ Los objetos de la base, el centinela y los comentarios del código dicen **v30.14** (la versión con que se
-aplicaron): es la llave de idempotencia, **no cambiarla**; la app salió en v30.18 porque otras sesiones se
-adelantaron entre medio.
+aplicaron): es la llave de idempotencia, **no cambiarla**; la app salió en v30.19 porque otras sesiones se
+adelantaron entre medio (dos veces: primero a v30.17, después a v30.18).
 
