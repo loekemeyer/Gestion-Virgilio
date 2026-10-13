@@ -6401,7 +6401,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.67"></script>
+<script type="module" src="recepcion.js?v=29.69"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6536,6 +6536,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openCobranzas()"><span class="sup-ico">💳</span><span>Cobranzas</span></button>
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
+      <button class="sup-action-btn" onclick="openAnalisisProductivo()" title="Por tanda: ritmo, dificultad, rendimiento contra lo esperado y qué pasó código por código"><span class="sup-ico">📈</span><span>Análisis Productivo</span></button>
       <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpHoras" style="display:none;font-size:12px;font-weight:800;background:rgba(255,255,255,.18);padding:2px 9px;border-radius:8px;line-height:1.15;white-space:nowrap;" title="Horas de guardado pendientes (lo que entra ahora a góndola ÷ cajas/h)"></span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
       <button class="sup-action-btn" onclick="openAds()" style="position:relative;" title="Alertas Damián Stock: talleristas que no entregan lo pedido y quiebres de stock a 10, 20 y 30 días"><span class="sup-ico">🚨</span><span>ADS — Alertas Damián Stock</span><span id="adsBadge" class="dp-badge" style="display:none;background:#7c3aed;left:2px;right:auto;"></span><span id="adsSemaf" style="display:none;position:absolute;top:2px;right:2px;flex-direction:column;gap:2px;align-items:flex-end;" title="Quiebres de stock previstos: rojo a 10 días · naranja a 20 · amarillo a 30"></span></button>
       <!-- v28.59 (Luis, 08/10): «Corregir códigos de NPs» salió: lo hace solo gv_web_np_sec_auto (cron 119) y lo que no
@@ -6982,6 +6983,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div id="tmBar" class="tm-bar">
     <div id="tmMuerto" class="tm-muerto" title="Tiempo del día sin ninguna tarea registrada">⏱ Tiempo muerto <b id="tmMuertoVal">—</b></div>
     <button id="btnHistTareas" type="button" class="tm-hist-btn" onclick="histTareasAbrir()">📋 Historial<br>de tareas</button>
+    <!-- v29.64 (Luis, 13/10): el Análisis Productivo en el módulo de operarios. El botón sólo se muestra
+         para los legajos de GV_Analisis_Acceso (hoy Juan, 8): lo resuelve anMostrarBotonOperario. -->
+    <button id="btnAnalisisOp" type="button" class="tm-hist-btn" style="display:none" onclick="openAnalisisProductivo(this.getAttribute('data-legajo'))">📈 Análisis<br>productivo</button>
   </div>
   <!-- Deshacer último mensaje — visible 60s después de enviar -->
   <div id="undoBanner" class="hidden">
@@ -9362,6 +9366,8 @@ function goToOptions() {
   optionsScreen.classList.remove("hidden");
   document.getElementById("btnHistDias").classList.add("hidden");
   try { tmStart(legajoInput.value); } catch (_e) {}   // v25.65
+  // v29.64: el botón de Análisis Productivo sólo para los legajos habilitados (GV_Analisis_Acceso).
+  try { if (typeof anMostrarBotonOperario === "function") anMostrarBotonOperario(legajoInput.value); } catch (_e) {}
   renderPendingSuggestion();
   updateCoreButtonsState();
   try { const _lgFr = legajoInput.value; setTimeout(function () { _frenoAvisoDelDia(_lgFr); }, 1200); } catch (_e) {}   // v26.65
@@ -10705,7 +10711,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.67";
+const APP_VERSION = "v29.69";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -62341,7 +62347,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.67"></script>
+<script src="importacion.js?v=29.69"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65271,13 +65277,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.67"></script>
-<script src="hotsale.js?v=29.67"></script>
-<script src="estadisticas.js?v=29.67"></script>
-<script src="ads.js?v=29.67"></script>
-<script src="plantel.js?v=29.67"></script>
+<script src="cobranzas.js?v=29.69"></script>
+<script src="hotsale.js?v=29.69"></script>
+<script src="estadisticas.js?v=29.69"></script>
+<script src="ads.js?v=29.69"></script>
+<script src="plantel.js?v=29.69"></script>
+<!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
+<script src="analisis.js?v=29.69"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.67"></script>
+<script src="ayuda.js?v=29.69"></script>
 
 </body>
 </html>

@@ -12,6 +12,16 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_analisis_acceso_ok",
+      "regla": "El Analisis Productivo lo ven el supervisor y los legajos activos de GV_Analisis_Acceso (Juan, 8).",
+      "quien": "Luis 13/10/2026"
+    },
+    {
+      "objeto": "gv_analisis_tanda",
+      "regla": "El aviso que NO depende del reloj: el picking dio completo un codigo que el armado declaro faltante.",
+      "quien": "Luis 13/10/2026"
+    },
+    {
       "objeto": "gv_ads_stock2",
       "regla": "ADS saldo = disponible - el mayor entre comprometido y Est. Madre del horizonte (no la suma: el comprometido ya es parte de la Est. Madre)",
       "quien": "Luis"

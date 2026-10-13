@@ -5106,6 +5106,55 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
 
+## ⚠ REGLA (Luis, 2026-10-13, v29.68): ANÁLISIS PRODUCTIVO por tanda — y el s/caja del PKC NO es un detector
+
+Botón **📈 Análisis Productivo** en el panel del supervisor y en la botonera del operario (ahí **sólo** para
+los legajos de `GV_Analisis_Acceso`; hoy **Juan, legajo 8**). El monitor ya evalúa por OPERARIO y por DÍA
+(Monitor → Ritmo, v29.47-48): esto es la misma cuenta abierta **por TANDA**, con el detalle código por código.
+
+| pieza | qué hace |
+|---|---|
+| `gv_analisis_lista(dias, legajo, buscar)` | las tandas del período con el rendimiento de picking y de armado, su dificultad y **cuántos avisos DUROS** tiene cada una (se calculan para todo el período de una, 1,4 s a 60 días) |
+| `gv_analisis_tanda(tanda, legajo)` | el detalle: esperado por dificultad vs real, composición del tiempo (bruto · pausas · huecos · cola), m³/h, cajas/h, el promedio de ese operario y el del depósito en esa dificultad, la tabla línea por línea y los avisos (260 ms) |
+| `gv_analisis_cod_base(dias)` | cuánto tarda **normalmente** una línea de cada código: mediana de 120 días, y la misma mediana descontando el término por caja del D17 (3,74 s). 194 de 289 códigos tienen 8+ líneas medidas y cubren el 96 % |
+| `GV_Analisis_Acceso` | quién lo ve desde el celular. Agregar a alguien es un `insert`, no un deploy |
+
+> ## **El `ts` del PKC dice cuándo se TOCÓ OK, no cuándo se levantó la caja.**
+> Medido el 13/10 sobre 120 días: marcar «menos de 1 s por caja con 5+ cajas» salta en **148 de 560 tandas
+> (26 %)**, y agrupando las ráfagas en **283 de 588 (48 %)**. Eso no es fraude: es que se confirma en bloque.
+> Por eso el s/caja del PKC va como **dato** en la tabla, con lo normal del código al lado, y **no dispara
+> una alarma por sí solo**. No volver a proponerlo como detector.
+
+**Los tres avisos que SÍ tienen señal, y por qué:**
+
+1. **El picking dio completo y el armado declaró faltante** de ese código. No depende del reloj.
+   Medido: **14 casos en 13 de 486 tandas (2,7 %), 44 cajas**.
+2. **Paso confirmado sin tiempo frente a la góndola**: del registro por paso (`GV_Picking_Paso_Evento`,
+   v26.25, **desde el 05/10**), de que la pantalla MOSTRÓ el código a que se confirmó. Mediana **29 s**,
+   p10 7,1 s; **36 de 1.081 pasos (3,3 %)** bajan de 2 s. Con el filtro de 3+ cajas quedan **6 pasos en 6
+   tandas**, más 10 con menos de 1 s por caja en 5+ cajas. Una tanda anterior al 05/10 no tiene este dato y
+   la pantalla lo dice: **no se inventa el aviso**.
+3. **El conteo cíclico de góndola de ese picking** (CG, v28.58) que no coincide con el sistema.
+
+El resto (línea lenta, huecos de +5 min, celular bloqueado, reconfirmaciones, sin stock en góndola,
+ritmo alto o bajo contra su dificultad) va como **media/baja**: son para mirar, no para acusar.
+
+⚠ **El tiempo «frente a la góndola» es desde el ÚLTIMO `mostrado` anterior a la confirmación**, no desde el
+primero: `gv_picking_paso.primera_vez` es el primero y da negativos cuando la cola manda el `mostrado`
+después del `ok`. Con el primero el aviso saltaba en el 46 % de las tandas; con el último, en el 13 %.
+
+⚠ **No es un candado**: el legajo lo manda el celular y no se puede verificar (el operario entra con el
+código de la TV, no con una sesión). Frena a quien lo lee, como el semáforo de repos. El supervisor entra
+por su sesión de Google.
+
+⚠ El marcador de la regla va en **código** (`v_regla constant text := 'v29.64-acceso'`), no en un comentario
+de línea: el centinela saca los comentarios antes de buscar (regla v21.82) y el patrón quedaba en rojo.
+
+**Chequeo:** `select public.gv_analisis_lista(14, '8');` · `select public.gv_analisis_tanda('<TANDA>', '8');` ·
+`select * from public.gv_reglas_perdidas;` · `node tests/analisis-productivo.cjs`.
+`sql/gv_analisis_productivo_v2964.sql`, `analisis.js`. ⚠ Los objetos de la base y los centinelas dicen
+**v29.64** (la versión con que se aplicaron): es la llave, no cambiarla.
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.50): los INSTRUCTIVOS de pared se GENERAN, no se dibujan
 
 Hoja de **40 × 50 cm** con el paso a paso de un módulo, pantalla por pantalla, para colgar en el
@@ -8935,3 +8984,35 @@ select m.cod_art, m.creado, m.legajo, m.delta
 
 Al 13/10 queda **1 fila y es de antes del módulo actual**: 542, 22/07/2026, `legajo` y `client_id` en NULL (una
 carga de panel, no del celular). **No se tocó**: corregirla es otra decisión de datos y pide el «sí».
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.69): una BAJA DE RACKS que no se guarda queda colgada — y el reconteo del rack la DUPLICA
+
+Caso **606E**: el 09/10 15:55 el legajo 104 bajó **10 cajas de X22** a «A guardar» y nunca las guardó (entre esa fecha
+y el 13/10 no hay un solo MG del 606E). El 13/10 10:00 se recontó X22 (**130 cajas**, +10 de ingreso) y se bajaron las
+130, que se guardaron enteras a las 10:36. Resultado: A guardar quedó con **10 cajas que ya estaban contadas adentro de
+las 130**. Luis, 13/10: *"las 130 eran lo único que había, no hay 10 cajas sueltas en ningún lado (a guardar, góndolas,
+racks, nada)"*.
+
+> **Una baja de racks (BR) sin su guardado (MG) deja saldo vivo en «A guardar». Si después se recuenta ese rack, ese
+> saldo pasa a contar dos veces.** El conteo del rack no sabe que esas cajas ya habían salido en la base.
+
+✅ Corregido el 13/10 (Luis: *"corregilas"*): ajuste **`a_guardar −10`** con `ref = 'CORR BR 132730592'` (mov
+146068819). No va a `terminado`: las cajas no existen aparte, estaban dentro de las 130 ya guardadas. A guardar del
+606E = **0** en movimientos y en el caché; `gv_stock_negativos` sin el 606E. El `baja_racks` original NO se borra.
+
+**Cómo encontrar otro caso igual** — código con saldo vivo en «A guardar» cuyo último movimiento es un `baja_racks`
+(no un guardado), sin su ajuste de corrección:
+
+```sql
+select m.cod_art, m.empresa, sum(m.delta) a_guardar,
+       (array_agg(m.tipo order by m.creado desc))[1] ultimo_tipo,
+       max(m.creado)::date desde
+  from public."Movimientos_Stock" m
+ where m.deposito = 'a_guardar'
+ group by 1,2 having sum(m.delta) > 0
+ order by 3 desc;
+```
+
+⚠ **Un saldo en «A guardar» no es un error por sí mismo**: es mercadería bajada o recibida esperando guardarse. Lo que
+hay que mirar es si ese rack se recontó después de la baja. **La corrección va con el «sí» del dueño**, porque la
+pregunta («¿esas cajas están físicamente?») sólo la puede contestar el depósito.
