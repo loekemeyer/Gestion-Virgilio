@@ -5106,6 +5106,26 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
 
+## ⚠ REGLA (Luis, 2026-10-13, v29.50): los INSTRUCTIVOS de pared se GENERAN, no se dibujan
+
+Hoja de **40 × 50 cm** con el paso a paso de un módulo, pantalla por pantalla, para colgar en el
+depósito. El primero: **recepción de mercadería de un tallerista**
+(`docs/instructivos/recepcion-tallerista.pdf`).
+
+> **Las capturas salen de correr la app con Playwright, nunca de un dibujo ni de una foto de
+> pantalla.** Si cambia una pantalla, se rehace el instructivo y vuelve a quedar igual a lo que ve
+> el operario: `docs/instructivos/caps-recepcion/_generar-capturas*.cjs` →
+> `node scripts/instructivo-recepcion.cjs` (imprime cuántas páginas salieron: **tiene que decir 1**).
+
+- Los pasos viven en la lista `PASOS` del generador; el reparto en 5 columnas y el ancho de cada
+  columna se calculan solos para que no quede hoja en blanco al pie (regla de espacio del dueño).
+- Los datos son de ejemplo (Lucho, remito 40873, códigos 505/518/586 con su OC): salen del mock,
+  no de la base.
+- ⚠ El `input type=date` de Chromium headless pinta `MM/DD/AAAA` y el celular `DD/MM/AAAA`: el
+  script lo reemplaza antes de la captura.
+- Al cambiar un módulo del operario se actualizan **el manual** (`ayuda/manual-operario.md`, regla
+  v29.19) **y el instructivo del módulo** si existe. `docs/instructivos/LEEME.md`.
+
 ## Git
 
 - **Trabajar SIEMPRE directo en `main`**: commitear y pushear ahí sin preguntar.
