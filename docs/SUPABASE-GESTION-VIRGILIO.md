@@ -31833,3 +31833,25 @@ Objetos nuevos: `gv_picking_estimar(text[])` (anon, 1,45 s para las 37 pendiente
   armar corr 0,848 (×1,021); Plantel 1,6 s; Ritmo armado 14 días: 60 tandas, 103 %.
 - Rollback: `cron.alter_job(155, command := <el viejo, en la cabecera del sql>)`, poner `caja_extra` en 0 (y restar
   0,0061 × (cajas − cajas30) del caché), recrear `gv_ppp_plantel` desde `sql/gv_ritmo_picking_v2947.sql`.
+
+## §3.v2962 — el excedente cargado por un conteo no se reparte hacia atrás (Giuliana, 13/10/2026, problema 766)
+
+El conteo de la estantería P (13/10) cargó excedente en 26 códigos (ajustes `ref = 'CONTEO P 13/10'`) y la corrida
+15:11 del cron 68 le devolvió a góndola el de **14** (501, 315, 222, 220, 862, 221, 355, 207, 560, 654, 234, 026, 902,
+570): totales por código intactos, reparto góndola/excedente pisado cada 10 min. Causa, en el pase forward de
+`reconciliar_pipeline_stock_etapa1` (tandas con PKC desde `etapa1_pkc_desde`, 13/08): recalculaba `from_exc` de
+**todas** las tandas contra el excedente de hoy, con una ventana acumulada que además restaba de nuevo lo ya tomado.
+
+**Cambio (marcador `v29.62-exc-fijo`):** CTE `ya_exc`; una tanda que ya tiene fila `excedente/picking` conserva su
+reparto tal cual (`least(picked, greatest(tomado, 0))`, también si el PKC trae la pila: ese dato ya se aplicó la
+primera vez, topado al excedente que había — E12F/512 y F21C/440E decían 1 de excedente con excedente 0 y recalcularlas
+dejaba −1); sólo una tanda NUEVA toma del excedente libre de hoy. Y los cruces `ya_exc` / `exc_avail` van por el código
+sin ceros a la izquierda: el PKC de D72C decía `66` y la fila `066`, así que cada corrida le devolvía 28 cajas a góndola
+que el trigger en vivo volvía a sacar del excedente.
+
+Medido en transacción abortada: 0 saldos cambian sobre el estado actual; con los 14 ajustes cargados en el medio
+cambian exactamente esos 28 saldos (14 excedente +N, 14 góndola −N). Aplicado 13/10 ~15:40 y recargados los 14
+(`client_id conteoP_20261013b_*`). Se descartó el «excedente al momento del PKC»: re-repartía 106 saldos de 50 códigos
+y dejaba 4 góndolas en negativo. Centinela: `least\(f\.picked, greatest\(f\.tomado, 0\)\)`.
+Backup de la definición anterior: `zz_backups."GV_Backup_Etapa1_def_20261013"` (md5 prosrc 7d6a3bb2…).
+`sql/reconciliar_pipeline_stock_etapa1_v2962.sql`.

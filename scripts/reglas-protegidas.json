@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82/v26.93 gv_ppp_dia_ajustar; + v26.86 gv_alerta_gondola_llena_telegram; + v26.98 gv_importado_alta, gv_importados_bache_primer_pedido; + v26.99 gv_importado_guardar); + v27.89 gv_cc_sombra_tick, gv_cc_sombra_racha; + v27.92 gv_ads_stock2; + v28.34 gv_ppp_mismo_lugar_dos_dias; + v28.38 gv_ppp_web_zona_retira; + v28.40 gv_ppp_web_zona_recalc, gv_ppp_tanda_zona_fuera_regla; + v28.43 vista_importados_stock_parte; + v28.96 racks_plani_ingreso, gv_imp_imputar_ingreso_racks; + v29.05 gv_racks_ajuste_sin_posicion + v29.11 gv_imp_ir_asignar + v29.16 gv_anon_insert_log + v29.48 gv_picking_estimar, gv_ppp_plantel, gv_armado_tanda_refresh; + v29.49 reconciliar_pipeline_stock_etapa2, gv_entregas_norm, gv_npd_tope_faltante_picking; + v29.50 gv_evento_duplicado",
+  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82/v26.93 gv_ppp_dia_ajustar; + v26.86 gv_alerta_gondola_llena_telegram; + v26.98 gv_importado_alta, gv_importados_bache_primer_pedido; + v26.99 gv_importado_guardar); + v27.89 gv_cc_sombra_tick, gv_cc_sombra_racha; + v27.92 gv_ads_stock2; + v28.34 gv_ppp_mismo_lugar_dos_dias; + v28.38 gv_ppp_web_zona_retira; + v28.40 gv_ppp_web_zona_recalc, gv_ppp_tanda_zona_fuera_regla; + v28.43 vista_importados_stock_parte; + v28.96 racks_plani_ingreso, gv_imp_imputar_ingreso_racks; + v29.05 gv_racks_ajuste_sin_posicion + v29.11 gv_imp_ir_asignar + v29.16 gv_anon_insert_log + v29.48 gv_picking_estimar, gv_ppp_plantel, gv_armado_tanda_refresh; + v29.49 reconciliar_pipeline_stock_etapa2, gv_entregas_norm, gv_npd_tope_faltante_picking; + v29.50 gv_evento_duplicado; + v29.62 reconciliar_pipeline_stock_etapa1",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -35,6 +35,11 @@
       "objeto": "gv_armado_avance_guardar",
       "regla": "la copia del armado no se pisa con una foto más vieja del mismo celular",
       "quien": "Luis"
+    },
+    {
+      "objeto": "gv_armado_tanda_refresh",
+      "regla": "D5: una tanda frenada en armado (APF) no se mide en el Ritmo de armado",
+      "quien": "Thomas"
     },
     {
       "objeto": "gv_cc_sombra_racha",
@@ -202,6 +207,11 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_entregas_norm",
+      "regla": "Entregas normalizadas al código de picking: corrección secundario->principal + L pelada",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_equivalencia_facturar_pendiente",
       "regla": "El aviso de equivalencias al facturar tiene que mirar TAMBIEN los pedidos web, no solo los de ISIS.",
       "quien": "Luis"
@@ -209,6 +219,11 @@
     {
       "objeto": "gv_es_dia_con_reparto",
       "regla": "Son dos preguntas distintas: gv_es_dia_habil = se trabaja en el deposito; gv_es_dia_con_reparto = ademas sale el camion. Meter el dia sin reparto en GV_Dias_No_",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_evento_duplicado",
+      "regla": "El servidor descarta un evento que repite el mismo tramo (legajo, inicio y fin ±2 s) con otro client_id, y la copia h_* del Historial",
       "quien": "Luis"
     },
     {
@@ -412,6 +427,11 @@
       "quien": "Thomas (problema 432)"
     },
     {
+      "objeto": "gv_npd_tope_faltante_picking",
+      "regla": "El «de menos» del armado no descuenta de Pickeados lo que el picking ya registró como faltante",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_oc_auto_corrida",
       "regla": "La generacion automatica de OC respeta el ancla GV_OC_Auto.proxima_auto: si se generaron a mano, no vuelve a generar hasta la fecha que eligio el supervisor.",
       "quien": "Luis"
@@ -440,6 +460,11 @@
       "objeto": "gv_oc_recompute_recibido",
       "regla": "La entrega del fabricante imputa contra la OC emitida a Log/ Fabr: sin esto la OC no se cierra nunca (eran 2.190 cajas de 544/560 con cantidad_recibida = 0).",
       "quien": "Luis"
+    },
+    {
+      "objeto": "gv_picking_estimar",
+      "regla": "D7: el estimado de picking suma la caja por encima de 30 por línea",
+      "quien": "Thomas"
     },
     {
       "objeto": "gv_picking_pickeado",
@@ -535,6 +560,11 @@
       "objeto": "gv_ppp_pedido_mover",
       "regla": "Al mover un pedido ARMADO a una tanda nueva, el registro del armado (TP/TAP + Entregas + su porcion de la pila) viaja con el. Sin esto la tanda nueva nace pendi",
       "quien": "Luis"
+    },
+    {
+      "objeto": "gv_ppp_plantel",
+      "regla": "D6: el Plantel cuenta A Programar y Cuarentena · D5: horas de armado por dificultad",
+      "quien": "Thomas"
     },
     {
       "objeto": "gv_ppp_prog_arbol",
@@ -797,6 +827,16 @@
       "quien": "Luis"
     },
     {
+      "objeto": "reconciliar_pipeline_stock_etapa1",
+      "regla": "una tanda que ya tiene fila de excedente conserva su reparto: el excedente de hoy no se reparte hacia atras (conteo 13/10, problema 766)",
+      "quien": "Giuliana De La Vega"
+    },
+    {
+      "objeto": "reconciliar_pipeline_stock_etapa2",
+      "regla": "El armado cruza Entregas con el picking por gv_entregas_norm (pela la L y aplica Correcciones_Pedido): sin eso lo pickeado de un pedido con L vuelve a góndola",
+      "quien": "Luis"
+    },
+    {
       "objeto": "refresh_stocks_carga_rapida",
       "regla": "El badge FC s/Salida se cruza por (cod_base, linea) — las dos columnas que la tabla YA tiene separadas — nunca por el string concatenado scr.cod = fc.cod. Con i",
       "quien": "Luis"
@@ -879,41 +919,6 @@
     {
       "objeto": "vista_tanda_status",
       "regla": "Una tanda con PKF/APF figura FRENADA (picking/armado), no en curso ni terminada",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_picking_estimar",
-      "regla": "D7: el estimado de picking suma la caja por encima de 30 por línea",
-      "quien": "Thomas"
-    },
-    {
-      "objeto": "gv_ppp_plantel",
-      "regla": "D6: el Plantel cuenta A Programar y Cuarentena · D5: horas de armado por dificultad",
-      "quien": "Thomas"
-    },
-    {
-      "objeto": "gv_armado_tanda_refresh",
-      "regla": "D5: una tanda frenada en armado (APF) no se mide en el Ritmo de armado",
-      "quien": "Thomas"
-    },
-    {
-      "objeto": "reconciliar_pipeline_stock_etapa2",
-      "regla": "El armado cruza Entregas con el picking por gv_entregas_norm (pela la L y aplica Correcciones_Pedido): sin eso lo pickeado de un pedido con L vuelve a góndola",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_entregas_norm",
-      "regla": "Entregas normalizadas al código de picking: corrección secundario->principal + L pelada",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_npd_tope_faltante_picking",
-      "regla": "El «de menos» del armado no descuenta de Pickeados lo que el picking ya registró como faltante",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_evento_duplicado",
-      "regla": "El servidor descarta un evento que repite el mismo tramo (legajo, inicio y fin ±2 s) con otro client_id, y la copia h_* del Historial",
       "quien": "Luis"
     }
   ]
