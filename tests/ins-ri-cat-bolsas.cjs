@@ -60,7 +60,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await showInsumoModal("RI", "104");
     const plaRI = _ins.items.filter(function (x) { return x.cat === "plastico"; }).map(function (x) { return x.cod; }).sort();
     const htmlRI = document.getElementById("insBody").innerHTML;
-    // v29.55 (Luis, 13/10): el operario NO da de alta un insumo al recibir — insNuevoOpen se planta
+    // v29.56 (Luis, 13/10): el operario NO da de alta un insumo al recibir — insNuevoOpen se planta
     insNuevoOpen("");
     const altaBloqueada = _ins.nuevo === null;
     window._insGp2 = null;

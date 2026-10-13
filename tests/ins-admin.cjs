@@ -395,7 +395,7 @@ catch (_e) {
     out.opVeInsumoDeLaCat = /Etiqueta chica/.test(document.getElementById("insBody").innerHTML);
     // la unidad permitida de la categoría es la que se preselecciona
     out.opUniDeLaCat = (_ins.items.filter(function (i) { return i.cod === "ET1"; })[0] || {}).unidad;   // "Rollos"
-    // v29.55 (Luis, 13/10): el operario ya NO da de alta un insumo al recibir — insNuevoOpen se planta
+    // v29.56 (Luis, 13/10): el operario ya NO da de alta un insumo al recibir — insNuevoOpen se planta
     let altaAlerta = ""; const _alOp = window.alert; window.alert = function (m) { altaAlerta = String(m); };
     insNuevoOpen("");
     out.opSinAltaRI = _ins.nuevo === null && /no se puede agregar un insumo/i.test(altaAlerta) &&

@@ -10,7 +10,7 @@
      · Atrás vuelve a las categorías conservando lo cargado (se manda todo junto)
      · buscar desde la pantalla 1 mira TODO (incluso lo a depurar)
      · la unidad por defecto sale de la categoría salvo que ya haya saldo en una sola
-     · v29.55 (Luis, 13/10): el operario NO da de alta un insumo — ni en RI ni en EI.
+     · v29.56 (Luis, 13/10): el operario NO da de alta un insumo — ni en RI ni en EI.
        No hay "+ Agregar insumo" en ningún lado e insNuevoOpen se planta siempre.
    Sin red (fetch mockeado). */
 const path = require("path");
@@ -182,7 +182,7 @@ catch (_e) {
     out.movUni = mov && mov[0] ? mov[0].unidad : null;                      // "kg"
     out.movDelta = mov && mov[0] ? mov[0].delta : null;                     // -3 (EI)
 
-    // 10) v29.55 (Luis, 13/10): el operario YA NO DA DE ALTA un insumo al RECIBIR.
+    // 10) v29.56 (Luis, 13/10): el operario YA NO DA DE ALTA un insumo al RECIBIR.
     //     No hay "+ Agregar insumo" en la grilla de categorías ni dentro de una categoría,
     //     y si algún camino viejo llama a insNuevoOpen, se planta con el aviso.
     await showInsumoModal("RI", "104");
