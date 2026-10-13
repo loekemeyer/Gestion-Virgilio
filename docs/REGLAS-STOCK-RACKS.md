@@ -259,6 +259,15 @@ idempotencia, **no cambiarla**; la app salió en la v29.94 porque otras sesiones
 contemplar igual en OCs que en Stocks. eso es lo que estoy diciendo"* · *"el neto adelante y el
 pickeado en el tooltip"*.
 
+> ⚠⚠ **v30.14 (Thomas, 13/10/2026) REVIERTE «el neto adelante»: la CELDA muestra el TOTAL (658),
+> no el neto.** Textual: *"tanto afuera como adentro en las cajas en cualquier circunstancia o
+> estado tiene que figurar"* → *"658, y cuando entro, veo el desglose y el estado de cada una"*.
+> **Cambia sólo el número de la celda** (`_pn.tot` en vez de `_pn.neto`, y el orden va por `tot`);
+> el desglose por estado (a cubrir · pickeadas TP · picking s/TP · total) sigue en el tooltip y en
+> el pop-up, y el Excel lleva las dos columnas («a cubrir» = neto, «Ped. total» = tot).
+> ⚠ **El NETO no se toca: sigue manejando la compra** (`gv_stock_pedidas_neto.neto`, el generador
+> de OC lee `.neto`). La regla de abajo sobre QUÉ se compra no cambia. `tests/stk-pedidas-neto.cjs`.
+
 Stocks decía **251** cajas pedidas del 501 y OCs decía **225**. No era redondeo: son **dos columnas
 de la MISMA fila** de `vista_stock_procesada` con dos criterios —`cajas_pedidas` (toda la demanda
 viva) y `cajas_pedidas_familia` (sin las NP cuya tanda ya tiene **TP**, la regla v19.85 de Thomas)—
@@ -271,9 +280,9 @@ y cada pantalla leía una.
 
 | dónde | qué muestra |
 |---|---|
-| celda **Cajas Pedidas** | el **neto**: lo que falta cubrir |
+| celda **Cajas Pedidas** | el **total** (v30.14 Thomas; antes el neto) — el desglose por estado va al tocar |
 | tooltip | `N a cubrir` · `N ya pickeadas (tanda con TP)` · `N con el picking empezado sin TP, siguen contando` · `N pedidas en total` |
-| Excel de la tabla | el mismo neto + dos columnas nuevas con el desglose |
+| Excel de la tabla | «a cubrir» = neto **y** «Ped. total» = tot, más TP y s/TP |
 
 Lo resuelve **`gv_stock_pedidas_neto`** (`cod, familia, es_secundario, total, neto, con_tp,
 en_curso, fam_*`). `total = neto + con_tp`, y `sum(total)` coincide **exacto** con
