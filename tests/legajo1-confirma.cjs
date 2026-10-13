@@ -37,6 +37,15 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await correr("104");
     out.c_noPregunta = preguntas.filter((m) => /Legajo 1/.test(m)).length === 0 && enq.length > 0;
     out.c_60s = _undoWindowMs("104") === 60000 && /— (60|59)s/.test(banner());
+    /* (d) v29.86 — el cierre de insumos NO puede saltearse el candado del legajo de prueba.
+       `insEmitCierre` llamaba a `_enqueueReportRaw` directo (el único evento de operario que lo
+       hacía): el 13/10 dejó en la base un cierre de RI del legajo 1 SIN su apertura, y el
+       monitor lo leyó como jornada viva. Se mide sobre la cola de verdad, no sobre el texto. */
+    const cola0 = (JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]") || []).length;
+    insEmitCierre("1", "RI", new Date(Date.now() - 60000).toISOString(), 0);
+    out.d_pruebaNoCierra = (JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]") || []).length === cola0;
+    insEmitCierre("104", "RI", new Date(Date.now() - 60000).toISOString(), 7);
+    out.d_realSiCierra = (JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]") || []).length === cola0 + 1;
     return out;
   });
   const pass = Object.values(r).every(Boolean) && errs.length === 0;

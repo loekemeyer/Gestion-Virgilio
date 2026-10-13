@@ -5241,6 +5241,51 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
 
+## ⚠ REGLA (Luis, 2026-10-13, v29.86): en el MONITOR, el día dice CUÁNDO DEBIÓ ARMARSE
+
+**Luis, textual:** *"quiero que en el monitor, en el día figure así: «Mié 14/10 (debió armarse Vie 9)»
+o «Vie 16/10 (debe armarse Mié 14/10)»"*.
+
+> **El dato es el VERBO.** «debió» = esa fecha de armado YA PASÓ, o sea que ese día de reparto
+> viene atrasado. «debe» = todavía hay tiempo.
+
+| pieza | qué hace |
+|---|---|
+| **`restarHabiles(key, n)`** (`monitor/tv.html`) | el espejo de `sumarHabiles`: mismo criterio de día hábil (finde + `GV_Feriados`, con la lista de respaldo si el fetch falla) |
+| **`diaArmado(key)`** | armado = **salida − 2 hábiles** (norma de Thomas del 23/09, v21.56: se arma el día 1, se factura el 2 y sale el 3 — es la misma cuenta que ya hacía `calcularMeta` con `sumarHabiles(hoy, 2)`). Devuelve `{fecha, txt, vencido}` |
+| cuadro **«NPs por Día»** | el texto va en el `<small>` de la celda del día (que `.rd td small` ya dibuja en bloque): **no ensancha la columna** — regla de espacio del 28/09 |
+| rojo (`.rd-arm.tarde`) | sólo si la fecha de armado **ya pasó Y** ese día todavía tiene NP sin armar (pendiente + proceso neto). Una fecha vieja de un día que ya salió entero no es un atraso. **El color no va solo**: el verbo lo dice igual |
+
+⚠ **Es la TV y lo hereda Mon. Admin** (`monitor/build-admin.cjs` se arma de `tv.html`). El monitor
+de `index.html` no tiene este cuadro. `monitor/tv.html` queda **afuera del sistema GV-UI** a
+propósito (regla v29.83): acá manda su escala en `--u`.
+
+⚠ **El caso difícil es el feriado, y es justo el ejemplo de Luis:** dos hábiles antes del
+**miércoles 14/10** son el **viernes 9**, no el lunes 12, porque el 12/10 es feriado. Contar días
+corridos da el número equivocado tres veces por mes.
+
+**Chequeo:** `node tests/mon-dia-armado.cjs` — corre la TV con el reloj fijo en el martes 13/10 y
+mide los dos ejemplos textuales de Luis, el caso «debe armarse hoy» y que la columna no se
+ensanche. Verificado que falla al sacar la etiqueta, al ignorar los feriados y al correr el límite
+del verbo.
+
+### ⚠⚠ Y el LEGAJO DE PRUEBA entraba al monitor por el cierre de insumos
+
+Lo que destapó el pedido: el 13/10 el monitor mostraba al **legajo 1 «en jornada»** con un cierre
+de Recepción de Insumos (12:32→12:33) **sin su apertura**. `insEmitCierre` era la **única**
+escritura de un evento de operario que llamaba a **`_enqueueReportRaw` DIRECTO**, salteándose el
+gate que `enqueueReport` (`esOperadorPrueba`) y `enqueueAutoClose` (`esLegajoPrueba`) sí tienen:
+la apertura la descartó el gate y el cierre salió igual.
+
+> **Un cierre huérfano no se distingue de una tarea abierta**, así que
+> `gv_monitor_horas_operario_dia` lo lee como jornada viva — y el legajo 1 cuenta en el monitor
+> desde la v27.63 (Thomas, D13), así que queda ahí con el tiempo muerto corriendo.
+
+**Al escribir un evento de operario se llama a `enqueueReport`.** `_enqueueReportRaw` es la lógica
+interna y **no tiene candado**: quien la use directo se lo pone él. Hoy son tres llamadores y los
+tres filtran el legajo de prueba. Lo sostiene el bloque **(d)** de `tests/legajo1-confirma.cjs`,
+que lo mide sobre la cola de verdad (verificado que falla sin el guard).
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.69): el código SIN GÓNDOLA en el Mapa se lo PREGUNTA AL OPERARIO
 
 **Luis:** *"si el modulo de pickeo los promptea a pickear un codigo para el que no tiene registro de
