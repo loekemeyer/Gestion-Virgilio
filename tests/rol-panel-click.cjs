@@ -56,8 +56,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   await p.evaluate(() => { if (typeof window.rolPickerAbrir === "function") window.rolPickerAbrir(); });
 
   const nombres = await p.$$eval("#rolPickerOv button", (bs) => bs.map((x) => (x.textContent || "").trim()));
-  if (nombres.length !== 6) fallas.push("el cuadro dibujó " + nombres.length + " nombres, tienen que ser 6");
-  else ok("el cuadro dibuja los 6 nombres");
+  if (nombres.length !== 7) fallas.push("el cuadro dibujó " + nombres.length + " nombres, tienen que ser 7");
+  else ok("el cuadro dibuja los 7 nombres");
   if (!/^Luis\b/.test(nombres[0] || "")) fallas.push("el primer botón no es Luis: «" + nombres[0] + "»");
 
   // (d) GENÉRICO: todo onclick del cuadro resuelve contra window
@@ -147,7 +147,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   // (f) v29.98: PLEGADO por defecto, una sola línea, badge con PALABRA y «cambiar» angosto.
   //     Y vale para LOS CINCO roles, no sólo para Luis (Luis, 13/10: "que el arreglo sea
   //     general y no solo para luis").
-  for (const k of ["luis", "thomas", "marianela", "tomas", "viviana", "juan"]) {
+  for (const k of ["luis", "thomas", "marianela", "tomas", "viviana", "juan", "pagos"]) {
     const m = await p.evaluate(async (rol) => {
       try { localStorage.setItem("gv_sup_quien", rol); localStorage.removeItem("gv_rol_abierto"); } catch (_e) {}
       const ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none";
@@ -177,7 +177,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     if (!m.filas) fallas.push(k + ": el checklist quedó vacío");
     if (!m.quien.trim()) fallas.push(k + ": la barra no dice quién es");
   }
-  ok("los 6 roles: una línea plegada, badge con palabra, «cambiar» angosto");
+  ok("los 7 roles: una línea plegada, badge con palabra, «cambiar» angosto");
 
   // y al desplegar muestra el checklist
   await p.evaluate(() => { try { localStorage.setItem("gv_sup_quien", "luis"); } catch (_e) {} window.rolElegir("luis"); });
@@ -263,6 +263,71 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await p.unroute("http://127.0.0.1:**");
     await p.evaluate(() => { try { localStorage.removeItem("gv_helper_imp_v1"); localStorage.removeItem("ps_auto_virgilio"); localStorage.setItem("gv_sup_quien", "luis"); } catch (_e) {} });
     ok("Juan: sólo sus 2 ítems, y el panel no prende, no apaga ni pinguea el helper de más");
+  }
+
+  // (i) v30.14 — EL ROL DE PAGOS: el ítem "Recepciones vencidas" y el cartel bloqueante.
+  //     Luis, 13/10: si una recepción no se resuelve para la hora del siguiente día hábil,
+  //     en GV logueado como Pagos tiene que saltar algo que obligue a resolverla ya.
+  {
+    await p.unroute("**/rest/v1/**");
+    // Playwright prueba las rutas en orden INVERSO al de registro (la última agregada va
+    // primero): el genérico va ACÁ ARRIBA para que los dos específicos, agregados después,
+    // se prueben antes y le ganen — si no, el genérico los tapa a los dos.
+    await p.route("**/rest/v1/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "{}" }));
+    // gv_rol_panel con 1 vencida: el ítem del checklist tiene que decir "1", no "✓".
+    await p.route("**/rest/v1/rpc/gv_rol_panel", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: '{"recep_pagos_vencida":1}' }));
+    // gv_recepcion_pagos_vencida con 1 fila: el cartel tiene que tapar la pantalla.
+    await p.route("**/rest/v1/rpc/gv_recepcion_pagos_vencida", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body:
+        '[{"id":1,"nombre":"Carriero","remito":"1751","detalle":"321 → 50","horas_vencida":4.8}]' }));
+
+    const pag = await p.evaluate(async () => {
+      try { localStorage.setItem("gv_sup_quien", "pagos"); localStorage.setItem("gv_rol_abierto", "1"); } catch (_e) {}
+      const ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none";
+      // pagosAlertaCheck exige una sesión de supervisor real (window.__isSupervisor), que
+      // normalmente pone showSupervisor() al loguearse con Google — acá no hay login real.
+      window.__isSupervisor = true;
+      window.rolElegir("pagos");
+      await new Promise((r) => setTimeout(r, 700));
+      const sp = document.getElementById("supervisorPanel"); if (sp) { sp.classList.remove("hidden"); sp.style.display = ""; }
+      const cartel = document.getElementById("pagosAlertaOv");
+      return {
+        area: (document.querySelector("#rolPanel .rolp-area") || {}).textContent || "",
+        label: (function () { const e = document.querySelector("#rolPanel .rolp-lbl"); return e ? e.firstChild.textContent.trim() : ""; })(),
+        num: (document.querySelector("#rolPanel .rolp-num") || {}).textContent || "",
+        cartelVisible: !!(cartel && cartel.style.display !== "none" && cartel.textContent.includes("Carriero")),
+        cartelTexto: cartel ? cartel.textContent : "",
+        tieneBoton: !!(cartel && cartel.querySelector("button"))
+      };
+    });
+    if (!/Pagos/i.test(pag.area)) fallas.push("el área de Pagos dice «" + pag.area + "»");
+    if (!/vencid/i.test(pag.label)) fallas.push("Pagos no tiene el ítem de recepciones vencidas: «" + pag.label + "»");
+    if (pag.num !== "1") fallas.push("con 1 vencida el ítem tendría que marcar «1», marca «" + pag.num + "»");
+    if (!pag.cartelVisible) fallas.push("con una recepción vencida no apareció el cartel bloqueante: «" + pag.cartelTexto + "»");
+    if (!pag.tieneBoton) fallas.push("el cartel de Pagos no tiene botón para ir a resolver");
+
+    // el cartel desaparece sólo al resolverse (0 filas), y al cambiar de rol se apaga la vigilancia
+    await p.unroute("**/rest/v1/rpc/gv_recepcion_pagos_vencida");
+    await p.route("**/rest/v1/rpc/gv_recepcion_pagos_vencida", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    const res = await p.evaluate(async () => {
+      // SIN cambiar de rol: el mismo chequeo que corre solo cada 60 s, forzado una vez.
+      await window.pagosAlertaCheck();
+      await new Promise((r) => setTimeout(r, 200));
+      const cartel = document.getElementById("pagosAlertaOv");
+      return { sigue: !!cartel };
+    });
+    if (res.sigue) fallas.push("resuelta la recepción, el cartel de Pagos siguió tapando la pantalla (sin cambiar de rol)");
+    else ok("Pagos: el ítem marca cuántas vencidas hay y el cartel se cae solo al resolverse, sin cambiar de rol");
+
+    await p.unroute("**/rest/v1/rpc/gv_rol_panel");
+    await p.unroute("**/rest/v1/rpc/gv_recepcion_pagos_vencida");
+    await p.evaluate(() => {
+      try { localStorage.setItem("gv_sup_quien", "luis"); } catch (_e) {}
+      window.rolElegir("luis");
+      window.__isSupervisor = false;   // vuelve al estado de los bloques anteriores
+    });
   }
 
   // (g) v30.04 — EL PASE GV-UI, medido sobre la pantalla CORRIENDO (no leyendo el CSS):
