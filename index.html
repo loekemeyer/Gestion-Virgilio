@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=29.85">
+<link rel="stylesheet" href="gv-ui.css?v=29.86">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6422,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.85"></script>
+<script type="module" src="recepcion.js?v=29.86"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10737,7 +10737,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.85";
+const APP_VERSION = "v29.86";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11479,7 +11479,8 @@ function _horaCortaAR(iso) {
   } catch (_e) { return ""; }
 }
 
-async function send() {
+async function send(_opts) {
+  const _sinAviso   = !!(_opts && _opts.sinAviso);   // v29.82: lo llamó un módulo, no un toque
   const legajoStr   = String(legajoInput.value || "").trim();
   const opcion      = selected;
   const descripcion = desc[selected] || "";
@@ -12021,7 +12022,7 @@ async function send() {
   if (r.ok) {
     removeFromQueue(payload.id);
     setHistoryItemStatus(legajoStr, getTodayKey(), payload.id, "sent", new Date().toISOString(), r.created_at);
-    alert("Reporte enviado correctamente");
+    if (!_sinAviso) alert("Reporte enviado correctamente");
   } else {
     // Si fue rechazo del server (datos inválidos, etc.) marco "failed" en el historial.
     // Si fue caída de red, dejo "queued" — se reintenta solo.
@@ -27411,6 +27412,29 @@ async function insFetchGp2Ri() {
     return r.ok ? await r.json() : null;
   } catch (_e) { return null; }
 }
+/* v29.82 (Luis) — de qué proveedor es cada fleje, para que al elegir un proveedor el operario vea
+   SÓLO los de él. La clave es el código de Virgilio y, para el fleje que todavía no existe acá, el
+   componente de GP2 que la lista de recepción ya muestra (v29.35). null = no se pudo leer. */
+async function insFetchFlejeProv() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_fleje_proveedor", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return null;
+    const m = {};
+    rows.forEach(function (x) {
+      const pv = String(x.proveedor || "").trim(); if (!pv) return;
+      if (x.cod) m[_insK(x.cod)] = pv;
+      if (x.comp_id) m["#" + x.comp_id] = pv;
+    });
+    return m;
+  } catch (_e) { return null; }
+}
+/* El proveedor de un fleje de la lista: por su código, o por el componente de GP2 que trae. */
+function _insProvDe(it) {
+  if (!_ins || !_ins.flejeProv || !it) return "";
+  return (it.cod ? _ins.flejeProv[_insK(it.cod)] : "") || (it.gp2Comp ? _ins.flejeProv["#" + it.gp2Comp] : "") || "";
+}
 async function insFetchCatalogo() {
   try {
     // v22.80: la ubicación que ve el operario es la del módulo de Insumos resuelta contra el Mapa (vista_insumos).
@@ -27425,10 +27449,10 @@ async function insFetchCatalogo() {
    sentido recibiendo). Popup liviano al estilo de showMGChooser. */
 function insumoChooser(legajo) {
   let ov = document.getElementById("insChooserModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
   const btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
   const sub = 'font-weight:600;opacity:.85;';
-  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;margin:auto;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📦 Insumos y Productos Movimiento</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué querés hacer?</div>' +
     '<button onclick="insChooserGo(\'RI\')" style="' + btn + 'background:#4f46e5;">📥 Recibir insumos <span style="' + sub + '">(entra stock — o agregá uno nuevo)</span></button>' +
@@ -27476,8 +27500,8 @@ function _insMarcaHtml(it, i, isIn) {
 function insSetCajaMarca(i, m) { if (!_ins || !_ins.items[i]) return; _ins.items[i].marca = (_ins.items[i].marca === m) ? "" : m; insRender(); }
 async function insRecibirCat() {
   let ov = document.getElementById("insChooserModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
-  const card = function (inner) { return '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' + inner + '</div>'; };
+  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
+  const card = function (inner) { return '<div style="background:#f8fafc;max-width:380px;width:100%;margin:auto;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' + inner + '</div>'; };
   ov.innerHTML = card('<div style="font-size:18px;font-weight:800;">📥 Recibir insumos</div><div style="font-size:13px;color:#64748b;margin-top:8px;">Cargando…</div>');
   ov.style.display = "flex";
   try { await insLoadMeta(true); } catch (_e) { /* quedan los defaults */ }
@@ -27492,6 +27516,15 @@ function insRecibirCatGo(k) {
   window._insEnvioSub = null;
   closeInsumoChooser();
   window._insRiCat = k;
+  window._insProvFleje = null;
+  /* v29.82 (Luis, 13/10): "SC y SP no preguntar de quien es, no entregan con factura nunca
+     (solo remito, siempre es Cervantes, que ni pregunte)" — se saltean las DOS preguntas:
+     el origen queda fijo en Cervantes y la documentacion arranca en el N de remito. */
+  if (k === "partes_crudo" || k === "parte_procesado") {
+    window._insUbicacion = "Cervantes"; window._insGp2 = null;
+    askInsDocumentacion("RI", "Cervantes", { soloRemito: true });
+    return;
+  }
   askInsUbicacion("RI");
 }
 /* v21.74 — Entregar insumos: DOS botones antes del destino.
@@ -27499,9 +27532,9 @@ function insRecibirCatGo(k) {
    "Envío a otros"      → sólo el destino en texto libre. */
 function insEnvioTipo() {
   let ov = document.getElementById("insChooserModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
   const btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
-  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;margin:auto;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📤 Entregar insumos</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué envío es?</div>' +
     '<button onclick="insEnvioTipoGo(\'iny\')" style="' + btn + 'background:#0d9488;">🏭 Envío a inyectores</button>' +
@@ -27526,14 +27559,17 @@ function askInsUbicacion(mode, sub) {
   const hint = isIn ? "Origen/Proveedor" : "Destino/Ubicación";
 
   let ov = document.getElementById("insUbicModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insUbicModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement("div"); ov.id = "insUbicModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
 
-  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;margin:auto;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">' + (isIn ? "📥 Recepción" : "📤 Entrega") + '</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + (soloIny ? "¿A qué inyector lo envías?" : titulo) + '</div>' +
     // v14.95 — bolsas plásticas: los inyectores (EI) / las OC de material de GP2 (RI) como botones,
     // arriba del texto libre. Se llenan async; si GP2 no responde queda el texto libre de siempre.
     '<div id="insUbicGp2">' + (soloIny ? '<div style="font-size:13px;color:#64748b;margin-bottom:10px;">Cargando inyectores…</div>' : '') + '</div>' +
+    // v29.82 (Luis): el ORIGEN es una lista cerrada por categoria (gv_insumo_origenes, que sale
+    // de GP2). Se llena async; si la base no contesta queda el texto libre de siempre.
+    '<div id="insUbicProv"></div>' +
     '<div id="insUbicLibre"' + (soloIny ? ' style="display:none;"' : '') + '>' +
     '<input type="text" id="insUbicInput" placeholder="' + hint + ' (ej: Cervantes, Centro, Proveedor X)" ' +
       'style="width:100%;box-sizing:border-box;height:48px;border:2px solid #cbd5e1;border-radius:12px;padding:0 12px;font-size:16px;margin-bottom:12px;" />' +
@@ -27548,6 +27584,9 @@ function askInsUbicacion(mode, sub) {
   // v29.22: las OC de bolsas de GP2 sólo si lo que se recibe son plásticos
   const _riCat = isIn ? (window._insRiCat || "") : "";
   if (!soloOtros && (!isIn || !_riCat || _riCat === "plastico")) _insGp2Opciones(mode, soloIny);
+  // v29.82: los origenes de ESA categoria, como botones. Sin categoria (EI, o una sesion vieja)
+  // no hay lista cerrada que mostrar: queda el texto libre.
+  if (isIn && _riCat) _insOrigenBotones(mode, _riCat);
 
   // Auto-focus en el input
   setTimeout(() => {
@@ -27559,11 +27598,14 @@ function insUbicCancel() {
   const ov = document.getElementById("insUbicModal");
   if (ov) ov.style.display = "none";
 }
-function insUbicOk(mode, _gp2) {
+function insUbicOk(mode, _gp2, _fijo) {
   let ubicacion = "";
   if (_gp2) {
     ubicacion = _gp2.modo === "EI" ? _gp2.inyector : (_gp2.oc.proveedor || ("OC " + _gp2.oc.numero));
     window._insGp2 = _gp2;
+  } else if (_fijo) {
+    ubicacion = String(_fijo).trim();      // v29.82: salió de la lista cerrada de GP2
+    window._insGp2 = null;
   } else {
     const inp = document.getElementById("insUbicInput");
     ubicacion = (inp && inp.value) ? String(inp.value).trim() : "";
@@ -27582,26 +27624,75 @@ function insUbicOk(mode, _gp2) {
     askInsDocumentacion(mode, ubicacion);
     return;
   }
-  selectOption(mode);
+  _insArrancarToggle(mode);   // v29.82: un solo «Enviar» (el de la botonera)
 }
 
+/* v29.82 (Luis, 13/10) — "quiero que el menu sea reducido dependiendo de que es lo que estan
+   recibiendo": el origen de una recepción es una lista CERRADA, la que corresponde a esa categoría.
+   NO está escrita acá: sale de `gv_insumo_origenes`, que la arma con los proveedores y los
+   inyectores de GP2 menos lo anotado en GV_Insumo_Origen_Excluido. Agregar o sacar un origen es
+   un insert, no un deploy.
+     bolsas plásticas → sus proveedores (los que entregan acá)      cajas → sus proveedores
+     partes plásticas → los inyectores + Cervantes                  flejes → sus proveedores + Cervantes
+   ⚠ Si la base no contesta queda el TEXTO LIBRE de siempre: "no pude leer" no es "no hay de dónde
+   recibir", y el operario no se puede quedar sin poder cargar lo que ya tiene en la mano. Por lo
+   mismo, con la lista puesta sigue habiendo un "✏ Otro origen" para el camión que no estaba previsto. */
+async function _insOrigenBotones(mode, cat) {
+  const box = document.getElementById("insUbicProv");
+  if (!box) return;
+  box.innerHTML = '<div style="font-size:13px;color:#64748b;margin-bottom:10px;">Cargando…</div>';
+  let rows = null;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_origenes", {
+      method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_cat: cat }), cache: "no-store" });
+    if (r.ok) rows = await r.json();
+  } catch (_e) { rows = null; }
+  if (!Array.isArray(rows) || !rows.length) { box.innerHTML = ""; return; }   // sin lista: el texto libre de siempre
+  window._insOrigenes = rows;
+  const btn = "width:100%;margin-bottom:8px;padding:13px 14px;border:2px solid #a5b4fc;border-radius:12px;background:#eef2ff;color:#0f172a;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
+  box.innerHTML = rows.map(function (o, i) {
+    const ap = Object.prototype.hasOwnProperty.call(INS_INY_APODO, o.nombre) ? INS_INY_APODO[o.nombre] : "";
+    const em = o.fuente === "cervantes" ? "🏭 " : (o.fuente === "inyector" ? "🧩 " : "🚛 ");
+    return '<button onclick="insUbicOrigen(' + i + ',\'' + mode + '\',\'' + cat + '\')" style="' + btn + '">' + em + escapeHtml(o.nombre) +
+      (ap ? ' <span style="font-weight:700;color:#475569;">(' + escapeHtml(ap) + ')</span>' : '') + '</button>';
+  }).join("") +
+    '<button onclick="_insOrigenOtro()" style="width:100%;margin:2px 0 10px;padding:15px;border:none;border-radius:10px;background:#f1f5f9;color:#475569;font-weight:700;cursor:pointer;font-size:13px;">✏ Otro origen</button>';
+  // la lista cerrada es lo que se usa: el texto libre queda atrás del botón de arriba
+  const lib = document.getElementById("insUbicLibre"); if (lib) lib.style.display = "none";
+  const bt = document.getElementById("insUbicContinuar"); if (bt) bt.style.display = "none";
+}
+function _insOrigenOtro() {
+  const lib = document.getElementById("insUbicLibre"); if (lib) lib.style.display = "";
+  const bt = document.getElementById("insUbicContinuar"); if (bt) bt.style.display = "";
+  const inp = document.getElementById("insUbicInput"); if (inp) inp.focus();
+}
+function insUbicOrigen(i, mode, cat) {
+  const o = (window._insOrigenes || [])[i]; if (!o) return;
+  /* v29.82: "Si es cervantes, aparecen todos los flejes. Sino, por proveedor (cada proveedor en
+     GP2 tiene asignados sus flejes correspondientes)". El filtro viaja con la sesión. */
+  window._insProvFleje = (cat === "fleje" && o.fuente === "proveedor") ? o.nombre : null;
+  insUbicOk(mode, null, o.nombre);
+}
 /* Paso intermedio RI: capturar datos de documentación (remito/factura) antes de
    abrir el modal de insumos. Mismo flujo de 3 botones que mercadería. */
-function askInsDocumentacion(mode, proveedor) {
+function askInsDocumentacion(mode, proveedor, opt) {
+  var soloRemito = !!(opt && opt.soloRemito);   // v29.82: SC/SP nunca vienen con factura
   var ov = document.getElementById("insDocModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "insDocModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement("div"); ov.id = "insDocModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
 
   // Estado temporal para la documentación de insumos
   window._insDocState = { tipoDoc: '', nroRemito: '', nroFactura: '', fechaRemito: '', fechaFactura: '', proveedor: proveedor || '' };
 
-  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;margin:auto;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📄 Documentación recibida</div>' +
-    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué documentación recibís?</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + (soloRemito ? "🏭 Cervantes · remito" : "¿Qué documentación recibís?") + '</div>' +
     '<div id="insDocBody"></div>' +
     '</div>';
   ov.style.display = "flex";
 
-  _insDocStep1(mode);
+  if (soloRemito) { window._insDocState.tipoDoc = 'remito'; window._insDocSolo = true; _insDocStep2(mode); }
+  else { window._insDocSolo = false; _insDocStep1(mode); }
 }
 
 function _insDocStep1(mode) {
@@ -27634,7 +27725,7 @@ function _insDocStep2(mode) {
     html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de Factura</label><input type="date" id="insDocFechaFactura" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;" value="' + hoyAR + '"></div>';
   }
   html += '<div style="display:flex;gap:10px;margin-top:14px;">' +
-    '<button onclick="_insDocStep1(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
+    '<button onclick="' + (window._insDocSolo ? "insDocCancel();insRecibirCat()" : "_insDocStep1('" + mode + "')") + '" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
     '<button onclick="insDocOk(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;font-size:16px;">Continuar</button>' +
     '</div>';
   body.innerHTML = html;
@@ -27663,7 +27754,34 @@ function insDocOk(mode) {
 
   // Cerrar modal y continuar al modal de insumos
   insDocCancel();
-  selectOption(mode);
+  _insArrancarToggle(mode);
+}
+/* v29.82 (Luis, 13/10: "actualmente tienen que apretar «enviar» dos veces … ¿hace falta que sea
+   así?") — NO hacía falta. El tiempo ya arranca con el «Enviar» de la botonera (la tarea Insumos,
+   MDI de MOD_TAREA v28.93); el segundo apretón sólo servía para que `send()` abriera el toggle
+   RI/EI. Ahora, terminada la ubicación y la documentación, el toggle se abre SOLO y la recepción
+   queda en pantalla: el operario no vuelve a la botonera a mitad de camino.
+   `send()` hace exactamente lo mismo que hacía al tocar Enviar (evento, historial, cola offline);
+   lo único que se saca es el cartel "Reporte enviado correctamente", que acá no aporta nada —
+   lo que confirma que arrancó es la lista de insumos abierta. El aviso de FALLA se mantiene. */
+function _insArrancarToggle(mode) {
+  const _leg = String((typeof legajoInput !== "undefined" && legajoInput) ? (legajoInput.value || "") : "").trim();
+  /* ⚠ Si el toggle RI/EI quedó ABIERTO (la app se reinició con la recepción a medias), `send()`
+     lo CERRARÍA: acá se RETOMA, con lo que estaba cargado. Cerrarla sin que nadie lo pida sería
+     perder la sesión del operario, y el cierre ya tiene su camino propio dentro del módulo. */
+  try {
+    const st = getLegajoState(_leg) || {};
+    if (_leg && st.toggles && st.toggles[mode]) {
+      let d = null; try { d = opDraftLoad(_leg); } catch (_e) {}
+      if (d && d.op === "INS") opDraftResume(_leg); else showInsumoModal(mode, _leg);
+      return;
+    }
+  } catch (_e) {}
+  try {
+    selected = mode;
+    if (typeof textInput !== "undefined" && textInput) textInput.value = "";
+    send({ sinAviso: true });
+  } catch (_e) { selectOption(mode); }   // si algo falla, el camino viejo (seleccionar + Enviar)
 }
 
 function insDocCancel() {
@@ -27713,11 +27831,26 @@ async function _insGp2Opciones(mode, soloIny) {
           return '<button onclick="insUbicGp2Ok(\'RI\',' + i + ')" style="' + btn + '">OC N° ' + escapeHtml(String(o.numero)) + ' · ' + escapeHtml(o.proveedor || "") +
             '<span style="' + sub + '">' + escapeHtml(its) + (o.fecha_entrega_estimada ? ' · est. ' + escapeHtml(o.fecha_entrega_estimada) : "") + '</span></button>';
         }).join("") +
-        '<div style="font-size:12px;color:#64748b;margin:2px 0 10px;">— o escribí de dónde recibís (otro insumo) —</div>';
+        '<div style="font-size:12px;color:#64748b;margin:2px 0 10px;">— o elegí de dónde recibís (otro insumo) —</div>';
     } else {
       const mv = await insGp2Rpc("material_virgilio_bundle", {});
       window._insGp2Cache = { mv: mv || null };
       if (!mv || !mv.inyectores || !mv.inyectores.length) { if (soloIny) _insUbicSinIny(box); return; }
+      /* v29.82 (Luis, 13/10): "Bolsas plásticas sólo se envían a Kollplast, Pat Bet Plast y
+         Pettofrezza". GP2 marca como inyector también a JL Matriceria; la diferencia queda anotada
+         en GV_Insumo_Origen_Excluido y se aplica acá. Si esa lectura falla, se ofrecen los de GP2
+         (lo de antes): un destino de menos deja al operario sin poder registrar la salida. */
+      try {
+        const rOk = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_origenes", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: JSON.stringify({ p_cat: "inyector" }), cache: "no-store" });
+        if (rOk.ok) {
+          const ok = await rOk.json();
+          if (Array.isArray(ok) && ok.length) {
+            const vale = {}; ok.forEach(function (o) { vale[_insK(o.nombre)] = true; });
+            const fil = mv.inyectores.filter(function (nom) { return vale[_insK(nom)]; });
+            if (fil.length) mv.inyectores = fil;
+          }
+        }
+      } catch (_e) { /* queda la lista de GP2 */ }
       box.innerHTML = (soloIny ? '' : '<div style="font-size:12.5px;font-weight:800;color:#115e59;margin-bottom:6px;">🧪 Bolsas plásticas — ¿van a un inyector?</div>') +
         mv.inyectores.map(function (nom, i) {
           const apodo = INS_INY_APODO[nom];   // v29.27 (Thomas, D12): el nombre con que lo conoce el operario
@@ -27830,7 +27963,9 @@ async function showInsumoModal(mode, legajo, _resume) {
     // force: si el admin cambió una categoría o una unidad, el operario la ve en la
     // próxima apertura de RI/EI sin tener que recargar la app.
     await insLoadMeta(true);
-    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni(), mode === "RI" ? insFetchGp2Ri() : Promise.resolve(null)]);
+    const _provFleje = (mode === "RI") ? String(window._insProvFleje || "") : ""; window._insProvFleje = null;
+    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni(), mode === "RI" ? insFetchGp2Ri() : Promise.resolve(null),
+      _provFleje ? insFetchFlejeProv() : Promise.resolve(null)]);
     const saldos = res[1] || {};
     const xUni = res[2] || {};
     // idea 7382: default de unidad = la unidad real del saldo si el insumo tiene UNA sola
@@ -27881,6 +28016,10 @@ async function showInsumoModal(mode, legajo, _resume) {
     else if (mode === "EI") lista = lista.filter(function (x) { return insCatOf(x) !== "plastico"; });
     window._insEnvioSub = null;
     _ins = { mode: mode, legajo: String(legajo || "").trim(), items: lista, filtro: "", cat: (riCat && insCatDef(riCat)) ? riCat : "", qty: null, nuevo: null };
+    /* v29.82: vino de un proveedor de flejes → se ven SÓLO sus flejes. Si el mapa no se pudo leer,
+       se ven TODOS (con el aviso): esconder flejes por una lectura caída es dejar al operario sin
+       poder cargar lo que ya descargó del camión. */
+    if (_provFleje) { _ins.provFleje = _provFleje; _ins.flejeProv = res[4] || null; _ins.provOtros = false; }
     if (envIny) { _ins.soloBolsas = true; _ins.cat = "plastico"; }
     // v14.95 — bolsas ↔ GP2: si en la ubicación se eligió un inyector / una OC de GP2, queda en la
     // sesión (viaja con el borrador). RI con OC: precarga las bolsas pendientes de cada material.
@@ -28086,8 +28225,25 @@ function insRender() {
     const base = f
       ? (cat ? _ins.items.filter(function (it) { return insCatOf(it) === (cat === "?" ? "" : cat); }) : _ins.items)
       : _ins.items.filter(function (it) { const k = insCatOf(it); return cat === "?" ? k === "" : k === cat; });
-    const shown = (f ? base.filter(function (it) { return stkMatchBusq(f, it.cod || it.gp2Cod || "", (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || ""), true); }) : base)   // v21.43
+    /* v29.82 (Luis): recibiendo flejes DE UN PROVEEDOR se ven sólo los que GP2 le tiene asignados.
+       Los que GP2 no tiene asignados a nadie NO se esconden: quedan atrás de un botón, contados.
+       Buscando (`f`) no se filtra nada: si el operario escribe el código, lo tiene que encontrar. */
+    let baseP = base, nSinProv = 0;
+    if (!f && cat === "fleje" && _ins.provFleje && _ins.flejeProv) {
+      nSinProv = base.filter(function (it) { return !_insProvDe(it); }).length;
+      baseP = base.filter(function (it) {
+        const pv = _insProvDe(it);
+        return pv ? _insK(pv) === _insK(_ins.provFleje) : !!_ins.provOtros;
+      });
+    }
+    const shown = (f ? baseP.filter(function (it) { return stkMatchBusq(f, it.cod || it.gp2Cod || "", (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || ""), true); }) : baseP)   // v21.43
       .slice().sort(_insSortCat(cat));
+    if (!f && cat === "fleje" && _ins.provFleje) {
+      h += '<div class="ins-depw" style="background:#eef2ff;border-color:#a5b4fc;color:#1e293b;">🚛 Flejes de <b>' + escapeHtml(_ins.provFleje) + '</b>' +
+        (_ins.flejeProv ? '' : ' — <b>no se pudo leer</b> qué flejes son suyos: se muestran todos') + '</div>';
+      if (_ins.flejeProv && nSinProv) h += '<button class="ins-back" style="width:100%;margin-bottom:8px;" onclick="insProvOtros()">' +
+        (_ins.provOtros ? '➖ Ocultar los ' + nSinProv + ' flejes sin proveedor asignado' : '➕ Ver los ' + nSinProv + ' flejes sin proveedor asignado en GP2') + '</button>';
+    }
     if (_ins.soloBolsas) h += '<div class="ins-bar"><span class="ins-bar-t">🧪 Bolsas plásticas</span></div>';
     else h += '<div class="ins-bar"><button class="ins-back" onclick="insBack()">‹ Atrás</button>' +
       '<span class="ins-bar-t">' + escapeHtml(cat ? insCatLbl(cat === "?" ? "" : cat) : "🔎 Buscar") + '</span></div>';
@@ -28365,6 +28521,7 @@ function _insSaleMC(it) {
   return mc ? mc.u : "";
 }
 function insCloseQty() { if (!_ins) return; _ins.qty = null; insRender(); }
+function insProvOtros() { if (!_ins) return; _ins.provOtros = !_ins.provOtros; insRender(); }
 function insBack() { if (!_ins || _ins.soloBolsas) return; _ins.cat = ""; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = null; insRender(); }
 /* Entrar a una categoría (pantalla 2). Volver a tocarla desde adentro = volver. */
 function insSetCat(k) { if (!_ins || _ins.soloBolsas) return; _ins.cat = (_ins.cat === k) ? "" : k; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = null; insRender(); }
@@ -62659,7 +62816,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.85"></script>
+<script src="importacion.js?v=29.86"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65677,15 +65834,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.85"></script>
-<script src="hotsale.js?v=29.85"></script>
-<script src="estadisticas.js?v=29.85"></script>
-<script src="ads.js?v=29.85"></script>
-<script src="plantel.js?v=29.85"></script>
+<script src="cobranzas.js?v=29.86"></script>
+<script src="hotsale.js?v=29.86"></script>
+<script src="estadisticas.js?v=29.86"></script>
+<script src="ads.js?v=29.86"></script>
+<script src="plantel.js?v=29.86"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.85"></script>
+<script src="analisis.js?v=29.86"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.85"></script>
+<script src="ayuda.js?v=29.86"></script>
 
 </body>
 </html>

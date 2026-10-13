@@ -8955,6 +8955,71 @@ el codigo"*. El 13/10 09:34 el legajo 104 escribió la **posición** `AB3` en el
   (ABS, AI, EBA, NY c/Carga 25%, NY Recup, NY Virgen, PE Polie, PP 2630, PS PE). Una bolsa nueva aparece cuando se le da ubicación.
 - `tests/ins-ri-cat-bolsas.cjs`.
 
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.82): el ORIGEN de una recepción de insumos es una LISTA CERRADA por categoría — y hay UN SOLO «Enviar»
+
+**Luis:** *"quiero que el menu sea reducido dependiendo de que es lo que estan recibiendo"* · *"tienen que
+apretar «enviar» dos veces … ¿hace falta que sea asi?"*.
+
+> ## **No se escribe de dónde vino: se ELIGE de los que pueden traer eso.** Y la lista **NO vive en el front**:
+> sale de **`gv_insumo_origenes(categoria)`**, que la arma con GP2 menos **`GV_Insumo_Origen_Excluido`**.
+
+| categoría | de dónde salen los botones | al 13/10 |
+|---|---|---|
+| 🧪 **Bolsas plásticas** | `proveedor_insumo` rubro *Sector Bolsas Plásticas* **que entrega en Virgilio** (`entrega_en is null`) | Indarnyl · Beta Plásticos · Santa Rosa Plásticos |
+| 📦 **Cajas** | `proveedor_insumo` rubro *Sector Caja* | Corrugadora del Plata · Recicor |
+| 🧩 **Partes plásticas** | los **inyectores** (`ubicacion` tipo `inyector`) **+ Cervantes** | Cervantes · Kollplast · Pat Bet Plast · Pettofrezza Rafael |
+| 🧵 **Flejes** | `componente.proveedor` del sector Fleje **+ Cervantes** | Cervantes + 8 (Altrak, Aperam, Basconia, Brawin, Hermac, JL Metales, Resortes Charcas, Szapiro) |
+| **SC y SP** | **no se pregunta**: siempre **Cervantes**, siempre **remito** | — |
+
+- **SC y SP se saltean las DOS preguntas** (Luis: *"no entregan con factura nunca, solo remito, siempre es
+  Cervantes, que ni pregunte"*): el origen queda fijo y la documentación **arranca en el N° de remito**, sin el
+  paso Remito / Factura / los dos. El «‹ Atrás» de ahí vuelve a las **categorías**, no a un paso que no existe.
+- **Flejes**: con **Cervantes** se ven **todos**; con un **proveedor**, sólo los que GP2 le tiene asignados
+  (`gv_insumo_fleje_proveedor`, por el código de Virgilio o por el componente de GP2 que la lista ya muestra).
+- **Las bolsas sólo se ENVÍAN a los inyectores habilitados** (ámbito `inyector`): el mismo filtro se le aplica a
+  `material_virgilio_bundle` en «📤 Envío a inyectores».
+
+### ⚠ Lo que GP2 tiene y acá NO va: queda ANOTADO, no se adivina
+
+`GV_Insumo_Origen_Excluido` (ámbito, nombre, motivo). Al 13/10, **dos filas, las dos con la diferencia contra
+GP2 escrita** — y las dos **para revisar allá**, porque o GP2 está mal o la lista de Luis está incompleta:
+
+| ámbito | nombre | por qué |
+|---|---|---|
+| `plastico` | **Simco** | GP2 lo tiene activo en *Sector Bolsas Plásticas* (sin cód. de proveedor) y Luis nombró 3 |
+| `partes_plasticas` · `inyector` | **JL Matriceria** | GP2 lo tiene como inyector y Luis nombró 3 |
+
+⚠ **Arcolor y Julio Garcia e Hijos NO hacen falta excluirlos**: GP2 dice que entregan en **Cervantes 2868**, así
+que el filtro `entrega_en is null` ya los deja afuera de una recepción **de Virgilio**. Si algún día entregan acá,
+se les borra ese campo en GP2 y aparecen solos.
+
+### ⚠⚠ La lista cerrada NO puede dejar al operario sin poder cargar
+
+- **«✏ Otro origen»** siempre está: el camión que nadie previó se escribe a mano, como antes.
+- **Si la base no contesta, queda el texto libre de siempre** — *"no pude leer"* no es *"no hay de dónde recibir"*.
+- En flejes, los que **GP2 no le asignó a nadie** (al 13/10: **29 de los 48** de Virgilio) **no se esconden**:
+  van contados atrás de **«➕ Ver los N flejes sin proveedor asignado en GP2»**. Y **buscando se ve TODO**: si el
+  operario escribe el código, lo tiene que encontrar (regla v20.95).
+  ⚠ Los 19 vinculados cubren **4** de los 8 proveedores (Basconia 12, Aperam 6, Altrak 1, Hermac 1); los otros 4
+  (Brawin, JL Metales, Szapiro, Resortes Charcas) se ven igual, porque la lista de recepción ya trae **sus
+  componentes de GP2** (v29.35) y el alta en Virgilio la hace `gv_insumo_desde_gp2` al elegirlos.
+
+### UN SOLO «Enviar» (y no, no hacía falta el segundo)
+
+El primer «Enviar» de la botonera ya arranca el tiempo (la tarea **Insumos**, `MDI` de `MOD_TAREA`, v28.93). El
+segundo sólo servía para que `send()` abriera el toggle RI/EI. Hoy, terminada la documentación, lo abre
+**`_insArrancarToggle(mode)`**: el mismo `send()` de siempre (evento, historial, cola offline) con
+`{sinAviso:true}` — se saca el cartel *"Reporte enviado correctamente"*, que ahí no aporta nada: lo que confirma
+que arrancó es la lista en pantalla. **El aviso de FALLA se mantiene.** Vale para Recibir **y** Entregar.
+
+⚠ **Si el toggle RI/EI quedó ABIERTO** (la app se reinició con la recepción a medias), `_insArrancarToggle`
+**RETOMA** —con el borrador si hay— en vez de llamar a `send()`, que lo **cerraría**. Perder la sesión del
+operario por volver a entrar sería peor que el segundo Enviar que esto saca.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` (vacía) · `select nombre, fuente from
+public.gv_insumo_origenes('plastico');` · `node tests/ins-ri-origen-menu.cjs` (verificado que falla contra la
+v29.85). `sql/gv_insumo_origenes_v2982.sql`, centinelas 416-418.
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.57): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
 
 (los comentarios del código, el `.sql` y la vista dicen **v29.56**: otra sesión se llevó ese número mientras se escribía esto.)

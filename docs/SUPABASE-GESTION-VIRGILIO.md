@@ -31833,3 +31833,22 @@ Objetos nuevos: `gv_picking_estimar(text[])` (anon, 1,45 s para las 37 pendiente
   armar corr 0,848 (×1,021); Plantel 1,6 s; Ritmo armado 14 días: 60 tandas, 103 %.
 - Rollback: `cron.alter_job(155, command := <el viejo, en la cabecera del sql>)`, poner `caja_extra` en 0 (y restar
   0,0061 × (cajas − cajas30) del caché), recrear `gv_ppp_plantel` desde `sql/gv_ritmo_picking_v2947.sql`.
+
+### §3.v2982 — Recepción de insumos: el ORIGEN es una lista cerrada por categoría (Luis, 13/10/2026)
+
+- **Nuevo, nada existente tocado**: tabla `GV_Insumo_Origen_Excluido` (RLS on, sin escritura para anon/authenticated),
+  `gv_insumo_origenes(text)` y `gv_insumo_fleje_proveedor()` — las dos SECURITY DEFINER **porque leen el schema `GP2`**
+  (`proveedor_insumo`, `ubicacion`, `componente`, `insumo_equivalencia`), que `anon` no ve; INVOKER devolvería MENOS
+  filas sin dar error (trampa v20.45). Verificado con `set local role anon`: las 7 categorías contestan y
+  `gv_insumo_fleje_proveedor()` da 53.
+- **Centinelas 416-418** (`gv_reglas_perdidas` vacía). ⚠ Los patrones van del CÓDIGO, no del comentario, y `objeto`
+  es el **nombre pelado** de la función: la vista cruza por `pg_proc.proname`. Con la firma (`public.f(text)`) y con
+  un marcador en un `--` el centinela decía «regla perdida» con la regla puesta.
+- **Lo que devuelve al 13/10**: plástico → Indarnyl · Beta Plásticos · Santa Rosa Plásticos (los que entregan en
+  Virgilio) · cajas → Corrugadora del Plata · Recicor · partes plásticas → Cervantes + los 3 inyectores · flejes →
+  Cervantes + 8 proveedores · SC/SP → Cervantes · `inyector` (para el envío de bolsas) → los 3.
+- **Impacto en otras pantallas: 0** (sólo lectura; no se tocó ninguna función ni vista existente). El filtro de
+  inyectores de «📤 Envío a inyectores» se aplica **en el front**, sobre lo que devuelve `material_virgilio_bundle`.
+- **Rollback**: `drop function public.gv_insumo_origenes(text); drop function public.gv_insumo_fleje_proveedor();`
+  `drop table public."GV_Insumo_Origen_Excluido";` + borrar los centinelas 416-418. El front cae solo al texto libre
+  y a ver todos los flejes (fail-open). `sql/gv_insumo_origenes_v2982.sql`.

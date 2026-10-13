@@ -230,6 +230,8 @@ echo "== ins-ri-gp2-catalogo (v29.35: Recibir insumos muestra el catálogo de GP
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-ri-gp2-catalogo.cjs
 echo "== ins-marca-empresa (v29.56: al recibir insumos se marca de qué empresa vienen, en toda categoría) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-marca-empresa.cjs
+echo "== ins-ri-origen-menu (v29.82: origen cerrado por categoría, SC/SP sin preguntas, un solo Enviar, flejes por proveedor) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-ri-origen-menu.cjs
 echo "== ins-bolsa-sin-equivalencia (v29.74: una bolsa sin fila en GP2.insumo_equivalencia no sale en silencio) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-bolsa-sin-equivalencia.cjs
 echo "== historial-no-replay (v29.24: el replay de Terminar Día no re-manda los items h_* del Historial) =="
