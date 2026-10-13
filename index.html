@@ -28562,13 +28562,17 @@ async function showMGModal(legajo, _resume) {
     mgRender(); return;
   }
   try {
-    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), ocgFetchCapacidad(), ocgFetchCeldas(),
+    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCapacidad(), ocgFetchCeldas(),
       // v12.14 (idea 4926) — demanda del día y cajas×MC, best-effort: si fallan no bloquean el guardado.
       (async function () { try { return await ocgDemanda(true); } catch (_e) { return {}; } })(),
       (async function () { try { return (await rkbFetchCxM()).cxm || {}; } catch (_e) { return {}; } })(),
       (async function () { try { return await gvFetchLugares(); } catch (_e) { return null; } })()]);
     const saldos = res[0] || {};
-    const capMap = res[2] || {};
+    /* v29.64 (Luis, 13/10, D5) - la capacidad del DUAL es POR EMPRESA: `stockFetchSaldos` emite
+       la clave con sufijo ("437E LK") y `ocgFetchCapacidad` indexa el codigo PELADO, asi que el
+       dual quedaba con cap = 0 (sin maximo, sin maxMC y al final del orden). `_rkbCapDe` resuelve
+       por (cod, empresa) y para un codigo no dual devuelve la misma suma pelada que antes. */
+    const capObj = res[2] || { pelada: {}, porEmp: {} };
     const celdasMap = res[3] || {};   // v10.08 — cod → [celdas de góndola]
     const demMap = res[4] || {};      // v12.14 — demanda (cajas pedidas) del día por código
     const cxmMap = res[5] || {};      // v12.14 — cajas por master caja (planimetría)
@@ -28608,14 +28612,20 @@ async function showMGModal(legajo, _resume) {
     });
     const items = _filas.map(function (a) {
       const kk = _ocgNorm(a.cod);
-      const cap = capMap[kk] || 0;
+      /* v29.64 (D5) - en un DUAL la clave trae el sufijo ("437E LK"): las cajas x MC y las celdas
+         de gondola se indexan por el codigo PELADO (son del ARTICULO, iguales en las dos empresas),
+         asi que se busca con sufijo y se cae al pelado. La DEMANDA no: `ocgDemanda(true)` ya la
+         emite por empresa (`pkCodEmpresa`) y caer al pelado le daria a cada empresa los pedidos
+         de las dos. Las celdas se siguen filtrando por `a.emp` dos lineas mas abajo. */
+      const kb = kk.replace(/\s+(LK|CH)$/, "");
+      const cap = _rkbCapDe(a.cod, capObj);
       const gond = Number(a.terminado) || 0;
       const ped = Number(demMap[kk]) || 0;
-      const cxm = Number(cxmMap[kk]) || 0;
+      const cxm = Number(cxmMap[kk]) || Number(cxmMap[kb]) || 0;
       // v15.40 — si la fila tiene empresa, sólo muestra las celdas DE ESA empresa:
       // un 809E de LK va a J13/J14 y uno de CH a M13/M15; mostrarle las cuatro al
       // operario es justo el error que se quiere evitar.
-      let celdas = celdasMap[kk] || [];   // v10.08 — dónde va en góndola
+      let celdas = celdasMap[kk] || celdasMap[kb] || [];   // v10.08 — dónde va en góndola · v29.64: el dual, por el pelado
       if (a.emp && _gvLugares && _gvLugares.emp) {
         const _f = celdas.filter(function (c) { const e = _gvLugares.emp[gvNormSector(c)]; return !e || e === a.emp; });
         if (_f.length) celdas = _f;
@@ -29309,9 +29319,12 @@ async function showGuardarOrden(legajo) {
     + '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;"><b style="font-size:17px;">📋 ¿Qué bajar primero?</b><button onclick="closeGuardarOrden()" style="width:auto;background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;">Cerrar</button></div>'
     + '<div id="gordenBody" style="padding:13px 14px;"><div style="text-align:center;color:#64748b;padding:24px;">Calculando prioridades…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
+    const res = await Promise.all([stockFetchSaldos(), rkbFetchCapacidad(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.guardado_cajas_por_hora&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })]);
-    const saldos = res[0] || {}, capMap = res[1] || {}, cxmMap = (res[3] && res[3].cxm) || {}, _facG = res[4] || {}, _noG = res[5] || {};
+    /* v29.64 (Luis, 13/10, D5) - capacidad del dual por EMPRESA (`_rkbCapDe`): con el lookup
+       pelado el dual daba cap = 0, y el `if (cap <= 0) return null` de los URGENTES lo SACABA de
+       la lista (el 437E LK con 225 cajas en racks no aparecia nunca). */
+    const saldos = res[0] || {}, capObj = res[1] || { pelada: {}, porEmp: {} }, cxmMap = (res[3] && res[3].cxm) || {}, _facG = res[4] || {}, _noG = res[5] || {};
     // v8.91 — ratio de guardado (cajas/h) directo de Stock_Config; si no hay, 380. Para la tarjeta de horas.
     var _rateRow = (res[6] && res[6][0]) || null; var _gRateVal = _rateRow ? parseFloat(_rateRow.valor) : 380; if (!(_gRateVal > 0)) _gRateVal = 380;
     const items = Object.keys(saldos).map(function (k) {
@@ -29319,7 +29332,7 @@ async function showGuardarOrden(legajo) {
       if (_noG[_ocgNorm(a.cod)]) return null;   // v24.52 — a liquidar: no se manda a guardar
       const aGuardar = Math.round(Number(a.a_guardar) || 0), exc = Math.round(Number(a.excedente) || 0), racks = Math.round(Number(a.racks) || 0);
       if (aGuardar + exc + racks <= 0) return null;   // nada esperando para bajar
-      const cap = Math.round(capMap[_ocgNorm(a.cod)] || 0), gond = Math.round(Number(a.terminado) || 0);
+      const cap = Math.round(_rkbCapDe(a.cod, capObj)), gond = Math.round(Number(a.terminado) || 0);
       // v8.90: cxm de planimetría; si no hay, fallback a Cajas_x_Master de la tabla de artículos
       var _cxmVal = cxmMap[_cpNorm(a.cod)] || 0;
       if (!_cxmVal) { var _fG = _facG[String(a.cod).toUpperCase()]; if (_fG && _fG.cajasXMaster > 0) _cxmVal = _fG.cajasXMaster; }
@@ -29331,7 +29344,7 @@ async function showGuardarOrden(legajo) {
     var urgentes = Object.keys(saldos).map(function (k) {
       var a = saldos[k];
       if (_noG[_ocgNorm(a.cod)]) return null;   // v24.52
-      var cap = Math.round(capMap[_ocgNorm(a.cod)] || 0); if (cap <= 0) return null;
+      var cap = Math.round(_rkbCapDe(a.cod, capObj)); if (cap <= 0) return null;
       var gond = Math.round(Number(a.terminado) || 0);
       var ratio = gond / cap; if (ratio >= _URG) return null;
       var back = Math.round((Number(a.a_guardar) || 0) + (Number(a.excedente) || 0) + (Number(a.racks) || 0));
@@ -46697,14 +46710,15 @@ async function qbpLoadBadge() {
     // v22.39 — además del badge de SOS, la tarjeta de HORAS DE GUARDADO PENDIENTES en el
     // propio botón (mismo cálculo que ¿Qué bajar primero?: cajas que ENTRAN ahora a góndola
     // ÷ cajas/h). Se traen cxm y ratio para que coincida con la pantalla, no una cuenta aparte.
-    var res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
+    var res = await Promise.all([stockFetchSaldos(), rkbFetchCapacidad(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.guardado_cajas_por_hora&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })]);
-    var saldos = res[0] || {}, capMap = res[1] || {}, cxmMap = (res[2] && res[2].cxm) || {}, _facG = res[3] || {}, _noG = res[4] || {}, n = 0, totCajas = 0;
+    // v29.64 (D5) - la misma capacidad por empresa que la pantalla, o el badge y la lista no coinciden.
+    var saldos = res[0] || {}, capObj = res[1] || { pelada: {}, porEmp: {} }, cxmMap = (res[2] && res[2].cxm) || {}, _facG = res[3] || {}, _noG = res[4] || {}, n = 0, totCajas = 0;
     var _rateRow = (res[5] && res[5][0]) || null; var rate = _rateRow ? parseFloat(_rateRow.valor) : 380; if (!(rate > 0)) rate = 380;
     Object.keys(saldos).forEach(function (k) {
       var a = saldos[k];
       if (_noG[_ocgNorm(a.cod)]) return;   // v24.52 — a liquidar: ni SOS ni horas de guardado
-      var cap = Math.round(capMap[_ocgNorm(a.cod)] || 0); if (cap <= 0) return;
+      var cap = Math.round(_rkbCapDe(a.cod, capObj)); if (cap <= 0) return;
       var back = Math.round((Number(a.a_guardar) || 0) + (Number(a.excedente) || 0) + (Number(a.racks) || 0));
       if (back > 0 && (Math.round(Number(a.terminado) || 0)) / cap < 0.20) n++;   // SOS: góndola < 20% con stock atrás
       if (back <= 0) return;

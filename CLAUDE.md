@@ -8838,13 +8838,28 @@ objetivo es que ninguna celda se quede sin mercadería para el picking, y el ped
 celda. **No volver a proponer el orden por hueco en cajas** (`min(cap − góndola − A guardar + pedido, racks)`),
 que es la otra lectura y quedó descartada.
 
-⚠⚠ **El MISMO cruce pelado sigue en Guardado a Góndola y en «¿Qué bajar primero?»** (`showMGModal` y
-`showGuardarOrden`, las dos con `capMap[_ocgNorm(a.cod)]`). Ahí el dual queda con `cap = 0`, y en «¿Qué bajar
-primero?» el filtro `x.it.cap > 0` **lo saca de la lista**. No se tocó: en MG la empresa viaja en la fila
-(`a.emp`), así que el arreglo es de una línea pero cambia qué filas se ven. Queda a decisión de Luis.
+⚠⚠ **v29.64 (D5, Luis 13/10: *"que no lo saque, que pueda evaluar individualmente a cada uno"*): el mismo
+`_rkbCapDe` en GUARDADO A GÓNDOLA, en «¿QUÉ BAJAR PRIMERO?» y en su BADGE.** Los tres cruzaban la capacidad
+con `capMap[_ocgNorm(a.cod)]`, o sea el código **pelado** contra una clave de saldo que para los duales trae
+el sufijo: el dual quedaba con `cap = 0` y, en «¿Qué bajar primero?», el `if (cap <= 0) return null` de los
+urgentes **lo borraba de la pantalla y del badge** (el 437E LK con 225 cajas en racks y la góndola de LK a 72
+no aparecía nunca). Hoy los tres llaman a `rkbFetchCapacidad()` + `_rkbCapDe(a.cod, capObj)`, así que **cada
+empresa del dual se evalúa por separado** y para un código no dual el número es idéntico al de antes.
+En MG, además, las **cajas × MC y las celdas de góndola** se buscan con sufijo y se caen al pelado (son del
+ARTÍCULO, iguales en las dos empresas): sin eso el dual no mostraba el hint de MC ni sus celdas. **La DEMANDA
+no cae al pelado**: `ocgDemanda(true)` ya la emite por empresa (`pkCodEmpresa`) y el fallback le daría a cada
+empresa los pedidos de las dos.
 
-**Chequeo:** `node tests/rkb-orden-urgencia.cjs` — corre la pantalla y mide el orden y que el 437E LK tome **120**
-(el de LK), no los 168 de las dos empresas sumadas. Verificado que falla contra el index anterior.
+⚠ **Capacidad en más de una empresa son SÓLO 5 códigos** (medido 13/10): los 4 duales y el **606E** (LK + IN),
+que por eso sigue midiéndose con la suma pelada (218) — `porEmp` guarda únicamente LK y CH.
+
+⚠ **D6 (Luis, 13/10): el 505I queda al final y la capacidad la carga Luis a mano** (*"cerralo así después se
+la asigno manualmente"*). Tiene **1.475 cajas en racks** con la góndola en 0 porque su celda del Mapa no tiene
+`cajas_max`. No cargarla desde una sesión.
+
+**Chequeo:** `node tests/rkb-orden-urgencia.cjs` · `node tests/mg-prioridad.cjs` · `node tests/qbp-liquidar.cjs`
+— los tres corren la pantalla y miden que el 437E LK tome **120** (el de LK), no los 168 de las dos empresas
+sumadas, y que no se caiga de la lista. Verificado que los tres fallan contra el index anterior.
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.64, D11): el GUARDADO A GÓNDOLA puede entrar A MEDIAS — y queda así
 
