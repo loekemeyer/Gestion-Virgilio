@@ -317,6 +317,10 @@ echo "== ins-categorias (idea 7917 / v7.31: navegación + alta por categorías e
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-categorias.cjs
 echo "== ins-alta-duplicado (v30.05: el alta avisa si la medida ya existe) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-alta-duplicado.cjs
+echo "== ins-remito-guardado (v30.06: el remito queda en gv_doc, no se pierde) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-remito-guardado.cjs
+echo "== rcp-remito-en-movimiento (v30.10: el papel de la recepcion va en gv_doc) =="
+node tests/rcp-remito-en-movimiento.cjs
 
 echo "== ssg-carrera-cron (v7.06: SSG no avisa si el cron ya descontó el picking de la tanda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ssg-carrera-cron.cjs

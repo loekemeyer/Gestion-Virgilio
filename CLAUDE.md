@@ -1819,247 +1819,7 @@ se da de alta en `GV_Lugar`, no se carga en otra.
 
 ## ⚠⚠ REGLA (Luis, 2026-10-13, v29.97): EN EL DEPÓSITO HAY **TRES** CLASES DE LUGAR — Góndolas · Racks · **Sector SC y SP**
 
-**Luis, textual:** *"Vamos a entender algo. en el deposito tenes diferentes cosas: Gondolas / Racks / Sector SC
-y SP. Sector SC y SP usa un nomenclador similar al de gondolas y racks y puede que la confusion surja de ahi."*
-
-> ## **SC = Sector Crudo · SP = Sector Procesado.** Son la mesa de trabajo de **Cervantes (GP2)** dentro del
-> ## depósito, NO racks de Virgilio. Su nomenclador es la **grilla de UN DÍGITO** (`A1`…`L6`), y por eso se
-> ## confunde con la góndola `A01` y con el rack `AD05`.
-
-| clase | nomenclador | qué guarda | dónde vive el saldo |
-|---|---|---|---|
-| **Góndola** | letra + **2 dígitos**: `A01`…`Ñ60`, `P`, `Y`, `Z` | cajas de artículo para pickear | `Movimientos_Stock` dep. `terminado` |
-| **Rack** | letra(s) + **2 dígitos**, con `AD`/`AT` en los de insumo: `AD05`, `X22`, `R01AD`, `V09AT`, `AF13` | master cajas de artículo · fleje · plástico · importados | `Movimientos_Stock` dep. `racks` / `racks_ch` / `insumos` |
-| **SC y SP** | letra(s) + **UN dígito**: `A1`…`L6` (52 celdas) + `MEDIO` | **piezas de Cervantes**: `partes_crudo` (SC) y `parte_procesado` (SP) | **`GP2.inventario`** (ubicación «Sector Crudo» / «Sector Procesado»), NO Virgilio |
-
-### ⚠⚠ v30.03 (Luis, 13/10): SC y SP es SU PROPIO LUGAR — la celda se llama **`IN-A1`** y su tipo es **`scp`**
-
-**Luis:** *"hagamos que sea su propio sector, lugar. IN-A1 por ejemplo? queda bien asi?"* · *"claro,
-agrega al mapa este sector"* · *"una vez hecho fijate que vincule bien con insumos y con todo lo que
-tenga que vincular bien … y una vez tengamos la base bien armada, limpiamos todo"*.
-
-> ## **ES UN SOLO SECTOR Y NO SE PARTE: `IN-<letra><número>`, y nada más que eso.**
-> **Luis, 13/10:** *"no importa SP o SC, ese sector tiene de los dos. todo ese sector es
-> IN-\*Letra\*\*Numero\*, no te compliques mas que eso"*. La grilla está **INTERCALADA** —`G1`-`G4`
-> tiene piezas de SC y `G5`-`G6` de SP; `L1`-`L4` SP y `L5`-`L6` SC; `H1` SP y `H2`-`H7` SC—, así
-> que **un prefijo `SC-` / `SP-` habría que renombrarlo cada vez que una pieza cambia de celda**.
-> SC y SP son **de qué es la PIEZA** (su categoría de Insumos), no de qué es la CELDA: el Mapa
-> **no rotula la celda por sector** y el encabezado no los cuenta aparte.
-
-### ⚠⚠ EL PADRÓN DE LA GRILLA ES EXACTO: **76 celdas, `IN-A1` … `IN-L7`** (Luis, 13/10, v30.09)
-
-**Luis, textual:** *"esos sectores deberían ser «IN-» letras de la A a la L con la siguiente logica /
-De la A a la E van del 1 al 6 (ej. IN-A1, IN-E6) / F es del 1 al 5 / G del 1 al 6 / De H a L son del 1 al 7"*.
-
-| columnas | números | celdas |
-|---|---|---:|
-| **A · B · C · D · E** | 1 a 6 | 30 |
-| **F** | 1 a **5** | 5 |
-| **G** | 1 a 6 | 6 |
-| **H · I · J · K · L** | 1 a **7** | 35 |
-| | | **76** |
-
-Las **22 que faltaban** se dieron de alta el 13/10 (A4, C3, C4, D2, E3, E4, F3, F4, F5, I1, I2, I3, I5,
-I6, I7, J5, J7, K1, K2, K3, K7, **L7**), todas vacías. Al 13/10: **55 celdas con pieza y 22 libres**; el
-Mapa dibuja la libre como «libre», no la esconde.
-
-⚠ **El front NO tiene el padrón escrito**: `pscpCols` saca las columnas de los datos, así que una celda
-nueva aparece sola con su alta. **Agregar una celda es un `insert`, no un deploy** — y el CHECK del nombre
-ya acepta hasta dos dígitos, así que `IN-L7` entra sin DDL.
-
-`sql/gv_scp_padron_v3009.sql` (el alta, la verificación y el rollback).
-
-⚠ **`IN-F6` existe y queda FUERA del padrón**: tiene anotada **`D14` · Resorte 520 Niq.** (parte procesado,
-cantidad 0, su stock lo lleva GP2). **No se saca sola**: sacarla manda esa pieza a la alerta «insumo con
-stock y sin posición», que es justo lo que Luis dejó para después (D1, 13/10: *"dejalo ahi nomas, hay que
-ver bien que se hace pero no en esta sesion"*). Queda viva hasta que él diga a qué celda va el D14.
-
-| pieza | qué es |
-|---|---|
-| `GV_Lugar` | las **76** celdas del padrón con **`tipo = 'scp'`**, empresa `IN`, nombre `IN-A1`…`IN-L7` (+ `IN-F6`, fuera del padrón, ver arriba). Se dieron de alta **IN-K4, IN-K5 e IN-K6**, que tenían piezas cargadas y no existían, y las 22 del padrón que faltaban |
-| **`gv_scp_sector(txt)`** | el resolvedor de la grilla: `IN-A1`, `IN A1`, `in-a1` y el **`A1` pelado** (es lo que se tipea hoy) |
-| **`gv_insumo_sector(txt)`** | el **cuello ÚNICO de una posición de INSUMO** = `coalesce(gv_rack_sector, gv_scp_sector)`: rack de insumo (`R01AD`, `AF13`, `X20`) **o** celda de SC/SP. Lo usan `gv_insumo_ubicacion` y las **dos** RPC que escriben una posición (`gv_insumo_ubicaciones_guardar`, `gv_insumo_posicion_guardar`) |
-| **`gv_scp_celda`** | la vista de la solapa nueva: una fila por celda, con la pieza, su sector (SC/SP) y su saldo |
-| Mapa | tercer modo **📐 SC y SP** (`pmapModo('scp')`), una solapa por columna; tocar una celda abre su editor y escribe por **la misma RPC** que las posiciones de racks |
-| `Insumos_Ubicaciones.sector` | las 63 filas de la grilla pasaron a `IN-xx` |
-
-> ## ⚠⚠ **Lo que esto CIERRA: `gv_rack_sector('A1')` ahora devuelve NULL.**
-> `gv_rack_sector` filtra `tipo = 'rack'`, así que **Ingreso a racks no puede ofrecer una celda de
-> SC/SP ni guardar una caja ahí**. Antes devolvía `A1`. Es el mismo pozo de la v29.67 (el operario
-> escribió `AB3` en el campo del código) visto del otro lado.
-
-- **Al agregar una celda a SC/SP va con el prefijo**: `insert into "GV_Lugar"(sector,tipo,empresa) values ('IN-C3','scp','IN');`
-  Los dos CHECK se ampliaron (`tipo` acepta `scp`; el nombre acepta `IN-xx`).
-- **El saldo de una pieza de SC/SP lo lleva GP2**, no Virgilio: acá se dice **DÓNDE** está. En
-  `GP2.ubicacion` no hay celdas (SC y SP son **una** ubicación cada uno), así que la celda física
-  existe sólo en `Insumos_Ubicaciones.sector`. El espejo `gv_gp2_espejo_sync` copia todo `GV_Lugar`
-  sin filtrar tipo, así que GP2 ve las celdas solo (medido 13/10: `GP2.virgilio_lugar` tipo `scp` = **77**).
-- **Y de paso se arreglaron 3 insumos** que estaban en rojo: `gv_insumo_ubicacion` pasó de **145 a
-  148** posiciones resueltas. Quedan **2** sin lugar, y son las dos de **`medio`**.
-- ⚠⚠ **`medio` NO ES UN LUGAR y no se le inventa uno** (Luis, 13/10: *"medio no se que es ni que
-  debería ser, no va para mi, es como que algo no tenga lugar"*). Sus dos filas salieron, y las piezas
-  **`A1`** (Mgo Plano 501 Pint., 7 cajones) y **`H1`** (Manija Redonda p/cromar, 10 cajones) pasaron
-  a la alerta **«insumo con stock y sin posición»** del Mapa, que es donde se ven y donde se las
-  ubica con un click. **Si vuelve a aparecer un `medio`, es eso: algo sin lugar.**
-- ⚠ **`gv_rack_celda` ya no ve la grilla** (Luis, 13/10: *"d1 dale"*). Su rama de insumos traía
-  `gv_insumo_ubicacion` **sin mirar el tipo del lugar**, así que las 63 filas de SC/SP salían como
-  `sin_lugar` en la solapa Racks — la vista no sabía que esas celdas habían dejado de ser racks. El
-  parche le agrega `exists (… GV_Lugar lr where lr.sector = u.sector and lr.tipo = 'rack')`. La
-  **regla protegida** que toca (*"una celda por DIRECCIÓN: un rack partido se ve como sus N partes"*)
-  **sigue en pie**: no cambia nada de las partes. Medido: de 306 filas a 243 y el **md5 de esas 243
-  es el mismo antes y después**; `prkRacks` del front saltea `^IN[-\s]` como segunda red.
-- ⚠⚠ **Y se LIMPIÓ `Insumos_Ubicaciones`** (Luis: *"d3 limpia"*): **150 → 110 filas**, las 110
-  resuelven, **0 con código fantasma** y **0 fuera del nombre canónico**. Salieron las **38** que no
-  matcheaban ningún código de `Insumos` y tenían su gemelo válido en la misma celda (29 el fleje sin
-  el `N°`, 4 con su código ISIS, 8 la pieza con un punto de más, 5 basura `-` `--` `---` `----`
-  `N|24`; las 38 en cantidad 0) y las **2 de `medio`**; **30** pasaron al nombre canónico
-  (`N7` → `N07`, `R1AD` → `R01AD`, `V9 AT` → `V09AT`, `AF1` → `AF01`, `Z2` → `Z02`).
-  Backup: `zz_backups."GV_Backup_InsUbic_20261013"` · `select jsonb_pretty(public.gv_scp_limpiar(true));`
-  dice qué haría, fila por fila.
-
-**Chequeo:** `select public.gv_scp_sector('A1'), public.gv_rack_sector('A1'), public.gv_insumo_sector('R1Ad');`
-→ `IN-A1`, **NULL**, `R01AD` · `select count(*) from public.gv_scp_celda;` (77: 55 con pieza + 22 libres) ·
-`select * from public.gv_reglas_perdidas;` · `select count(*) from public."Insumos_Ubicaciones";` (110,
-todas resueltas y con el nombre canónico) · `node tests/pmap-scp.cjs`.
-`sql/gv_sector_scp_v2998.sql` (rollback: `select public.gv_scp_revertir();`), 5 centinelas.
-⚠ Los objetos de la base, los 5 centinelas, el `.sql` y los comentarios del código dicen **v29.98**
-(la versión con que se aplicaron): es la llave de idempotencia, **no cambiarla**; la app salió en la
-v30.03 porque otras sesiones se adelantaron.
-
-### El mislabel que esto RETIRA
-
-⚠⚠ **El bullet de la v22.80 dice que la grilla `A1…L6` son «racks de insumos». ES FALSO y queda RETIRADO.**
-Se dieron de alta así el 25/09 —tipo `rack`, empresa `IN`— y de ahí salió la confusión; **la v30.03 las
-pasó a `tipo = 'scp'` y a nombre `IN-A1`** (bloque de arriba). Medido el 13/10, antes de tocar nada:
-
-- las **52 celdas de un dígito** de `GV_Lugar` son **exactamente** donde viven `parte_procesado` (SP: `A1`-`A6`,
-  `B1`-`B6`, `C1`, `C2`, `C5`, `C6`, `D1`, `D3`-`D6`, `E1`, `E2`, `E5`, `E6`, `F1`, `F2`, `F6`, `G5`, `G6`, `H1`,
-  `L1`-`L4`) y `partes_crudo` (SC: `G1`-`G4`, `H2`-`H7`, `I4`, `J1`-`J4`, `J6`, `L5`, `L6`);
-- **0 cajas de artículo** pasaron por ellas en toda la historia (`deposito in (racks, racks_ch)` con ubicación de
-  un dígito → vacío). No son racks: no guardan cajas.
-- `K4`, `K5` y `K6` tienen piezas de SC cargadas y **no existen en `GV_Lugar`**: el alta del 25/09 los salteó.
-
-⚠ **`gv_rack_sector('A1')` devolvía `A1`** (y `('A01')` NULL, porque A01 es góndola): el resolvedor de racks
-**aceptaba una celda de SC/SP** y **Ingreso a racks la ofrecía**. No hizo daño porque nadie guardó una caja ahí.
-**Cerrado en la v30.03**: con `tipo = 'scp'` ese `coalesce` no la encuentra más y devuelve NULL.
-
-### Y en GP2 no hay celdas: SC y SP son UNA ubicación cada uno
-
-`GP2.ubicacion` tiene **12 `sector`** (`Sector Crudo`, `Sector Procesado`, `Sector Fleje`, `Sector Caja`…) y
-**ninguna celda adentro**: el saldo de una pieza es por (componente, sector), sin posición. **La celda física
-`A1`…`L6` existe SÓLO en `Insumos_Ubicaciones.sector` de Virgilio**, para que el operario sepa dónde mirar. Son
-dos niveles de detalle distintos y no se reconcilian.
-
-⚠⚠ **Y el CÓDIGO de una pieza de SC/SP también se pisa con el de una caja.** `CONOCIMIENTO_GP2.md` lo tiene
-medido del 03/09: **`A1`, `A4`, `A8` y `A9` existen DOS veces en `GP2.componente`** —una pieza de Sector
-Procesado y una Caja— y la regla de allá es *"unir por `componente.id`, y si hay que resolver desde un código,
-desambiguar por sector"*. O sea: la colisión de nomencladores **no es sólo de lugares, es también de códigos**.
-
-> **Antes de decir que una posición «no existe» o que un código «está mal cargado»: mirar si no es SC/SP.**
-> El criterio es el dígito: **un dígito = SC/SP · dos dígitos = góndola o rack.**
-
-**Chequeo:**
-
-```sql
--- las 52 celdas de SC/SP, con qué categoría de insumo vive en cada una
-select u.sector, i.categoria, count(*)
-  from public."Insumos_Ubicaciones" u
-  join public."Insumos" i on upper(btrim(i.cod)) = upper(btrim(u.cod))
- where upper(btrim(u.sector)) ~ '^[A-Z]{1,2}[0-9]$'
- group by 1,2 order by 1;
--- y que ninguna tenga cajas de artículo (tiene que dar vacío)
-select m.ubicacion, m.cod_art, sum(m.delta) from public."Movimientos_Stock" m
- where m.deposito in ('racks','racks_ch') and upper(btrim(coalesce(m.ubicacion,''))) ~ '^[A-Z]{1,2}[0-9]$'
- group by 1,2 having sum(m.delta) <> 0;
-```
-
-### ⚠ Lo que esto explica: las posiciones «con dos códigos» NO son racks compartidos
-
-Barrido del 13/10 sobre `Insumos_Ubicaciones`: **38 filas** no matchean ningún código de `Insumos`, **las 38 en
-cantidad 0** y **las 38 con su gemelo válido en LA MISMA celda**. No es un lugar con dos cosas: es **la misma
-cosa escrita dos veces**.
-
-| cuántas | qué son | ejemplo |
-|---:|---|---|
-| 29 | el fleje **sin el `N°`** | `63` junto a `N°63` en R11AD |
-| 4 | el fleje **con su código ISIS** | `1645` = `N°35` · `2565` = `N°36` · `2615` = `N°18` · `2745` = `N°37` |
-| 8 | la pieza de SP **con un punto de más** | `DISC.1` junto a `DISC1` · `DISC. 4` junto a `DISC4` |
-| 5 | basura de verdad | `-`, `--`, `---`, `----`, `N|24` |
-
-⚠⚠ **Queda RETIRADO lo que reporté antes** (*"basura de carga, no racks compartidos — eso se limpia en
-`Insumos_Ubicaciones`"*): de las 38, **sólo 5 son basura**; las otras 33 son el mismo insumo con una segunda
-grafía, y 4 de ellas son **su código ISIS**, que es un dato bueno escrito en el campo equivocado — el ISIS vive
-en `Insumos.isis` y en `GP2.insumo_equivalencia.isis` (regla v29.79), no en el código de una ubicación.
-
-### ⚠ INSUMOS: dónde está cada uno sale del Mapa (Luis, 25/09, v22.80)
-
-**Luis:** *"es un mismo depósito físico … son racks de insumos. Dejalos con el nomenclador que ya existe, no inventes
-uno nuevo · AD adelante AT atrás · sí, ponelo en el mapa"*.
-
-- Los racks de insumos son `GV_Lugar` tipo `rack`, **empresa `IN`** (R01AD, K04, X20…). Se sumaron 69 que faltaban:
-  ⚠⚠ **la grilla A1…L6 NO son racks de insumos: es SC/SP — ver la regla de arriba, v29.97** (A1 ≠ A01: A01 es
-  góndola; por eso `gv_lugar_sector_fmt` acepta un dígito) y
-  R07AD, R10AD/AT, R12AT, R16AD, V01AD, V02AT, V05AT, V11AT, V12AT, V13AD, AF02/04/07/16/18, AE04.
-- **`gv_rack_sector(texto)`** resuelve cualquier grafía: primero el nombre exacto (A1), después con cero y AD/AT
-  (`R1Ad` → R01AD, `V9 At` → V09AT, `W1` → W01). Es la misma para racks de artículos y de insumos.
-- `Insumos_Ubicaciones` sigue siendo la tabla del módulo; se lee resuelta en **`gv_insumo_ubicacion`** y se escribe
-  por **`gv_insumo_ubicaciones_guardar`**, que rechaza una posición que no esté en el Mapa. `vista_insumos.ubicacion`
-  (lo que ve el operario en Recibir/Entregar insumos) sale de ahí. Al 25/09: 145 de 149 resuelven; `medio`, Y29 y Z07
-  (celdas de góndola) quedan en rojo ⚠ en la pestaña Insumos.
-- El Mapa de racks muestra los insumos (🧰, con la cantidad declarada en el módulo, en su unidad).
-- `Insumos_Ubicaciones_Unificadas` está muerta desde el 11/08: nadie la lee ni la escribe.
-- ⚠⚠ **`Insumos_Ubicaciones.cantidad` es DECORATIVA: no se carga a mano y no se corrige** (medido el 13/10, con
-  el conteo de 505C). **142 de 149 filas están en 0 o null** (112 códigos de 116), **ninguna función la lee** para
-  calcular algo —sólo las dos RPC que la escriben, `gv_insumo_ubicaciones_guardar` y `gv_insumo_posicion_guardar`—
-  y el front **omite el número cuando es 0** (`_stkInsUbicStr` en Stocks y el `🧰 insumo` del Mapa): nadie ve un
-  «0» en pantalla. El saldo real de un insumo sale SIEMPRE de `Movimientos_Stock` (deposito `insumos`, convertido
-  con `Insumos_Factores`), que es lo que leen el módulo, las compras y el espejo a GP2.
-  ⚠ **Cargarle el número a un código suelto es peor que dejarlo vacío**: lo vuelve el 5.º con dato entre 112 sin
-  dato, sin que nada lo reconcilie después — es el pozo de la copia que nadie poda (regla v23.00). Si algún día
-  esa columna tiene que valer, se llena sola desde el saldo, no a mano.
-- `sql/gv_insumos_ubicacion_v2279.sql` (rollback en la cabecera), `tests/ins-aceptar-ubic.cjs`.
-
-### ⚠⚠ EL MAPA ES EL PUNTO PRINCIPAL — y avisa el stock sin lugar (Luis, 25/09, v22.82)
-
-**Luis:** *"que todas las definiciones de qué cosa hay en cada rack/góndola se puedan editar desde mapas; pasa a ser
-el punto principal y cambiarlo ahí informa a todos los demás"* · *"evitá choques con el stock: sería raro que
-Movimientos_Stock diga que hay stock de un código pero ninguna góndola/rack lo tenga"*.
-
-| qué | tabla canónica | se edita en el Mapa por |
-|---|---|---|
-| código y capacidad de cada celda de góndola | `GV_Lugar_Item` (`Capacidad_Sector` es vista) | `gv_lugar_item_guardar` / `_sacar` |
-| qué hay en cada posición de rack de artículos | `Movimientos_Stock` (racks, `ubicacion`) (`Racks_Planimetria` es vista) | `gv_rack_posicion_guardar` · `gv_rack_ubicar` |
-| qué insumo hay en cada posición | `Insumos_Ubicaciones` (lectura resuelta `gv_insumo_ubicacion`) | **`gv_insumo_posicion_guardar`** |
-
-- **La pestaña Insumos ya no tipea la ubicación**: la muestra y tiene **📍 Editar en el Mapa**. La única escritura
-  que queda fuera del Mapa es «Aceptar» un TMP (la ubicación inicial, por `gv_insumo_ubicaciones_guardar`).
-- Una posición de rack con varios insumos es **una** celda; un rack `IN` abre sólo el editor de insumos.
-- **Alerta**: `gv_mapa_stock_sin_lugar` (góndola con cajas y sin celda · racks sin posición · insumo con stock y
-  sin posición · insumo anotado en un lugar que no existe). Se ve arriba del Mapa en las dos pestañas y cada
-  renglón se arregla ahí mismo. Al 25/09: 3 góndola (55219 LK 835 caj) · 7 racks · 38 insumos · 4 sin lugar.
-- ⚠ **38 filas de `Insumos_Ubicaciones` con códigos que no existen en Insumos** (`63`, `N|24`, `---`, `DISC.1`…),
-  todas en 0: se ven como «(no está en Insumos)» y se sacan con 🗑 (la RPC deja quitar aunque el código no exista).
-- `sql/gv_mapa_punto_unico_v2281.sql` (rollback en la cabecera), `tests/pmap-punto-unico.cjs`.
-
-### ⚠ `Capacidad_Sector` es una VISTA (Luis, 25/09, v22.75)
-
-Había dos lugares para lo mismo y se desincronizaban: el mapa (`GV_Lugar_Item`) tenía **654 celdas
-sin capacidad** y la capacidad vivía sólo en `Capacidad_Sector`, que escribían tres pantallas por su
-cuenta (Stock → Capacidad «Importar» y «Borrar todo», y Despiece «Guardar sector») más el espejo de
-`gv_lugar_item_guardar`. Hoy **`GV_Lugar_Item` es la única fuente** y `Capacidad_Sector` la lee
-(`security_invoker`, sólo celdas con capacidad, empresa del `GV_Lugar`).
-
-- Escribir: **`gv_lugar_item_guardar`** / **`gv_lugar_item_sacar`**. Un `INSERT`/`UPDATE` sobre la vista
-  (front viejo, Producción) pasa por el trigger `gv_capacidad_sector_escribir` → la misma RPC, que
-  rechaza un lugar que no existe en `GV_Lugar` (`A-62`). **Sin DELETE**: «Borrar todo» ya no existe.
-- ⚠ Producción Virgilio tiene el «Importar» con `on_conflict` (upsert): **sobre una vista falla**. A
-  propósito: era la puerta de los sectores mal escritos.
-- Al pasar se midió la suma de capacidad por código: cambian **sólo 828** (−45: la fila `C-08/828` era
-  falsa, el relevamiento del 11/09 dice C08 = 539E) y **865E** (−60: su celda L57 está inactiva).
-
-**Rollback** y el bloque que se corrió: `sql/gv_capacidad_sector_vista_v2275.sql`. Las definiciones de
-los 12 dependientes quedaron en `zz_backups."GV_Backup_CapSector_defs_20260925"`. Lo sostiene
-`tests/cap-sector-vista.cjs`.
+⚠ El detalle completo de esta regla vive en **`docs/MODULO-UBICACIONES.md`** (movido el 2026-10-13, poda de CLAUDE.md). **Leerlo ENTERO antes de tocar este módulo** — no se resume acá para no cargar en cada sesión lo que sólo hace falta cuando se toca esto.
 
 
 ## ⚠⚠ REGLA (Luis, 2026-10-13, v29.78): UN RACK SE PUEDE PARTIR — `Y25-1`, `Y25-2`, `Y25-3`…
@@ -6136,219 +5896,7 @@ E78A. Se levanta del todo con `update public."PPP_Web_Config" set valor = 0 wher
 'np_mover_frenado';`. Centinela en `GV_Reglas_Centinela`. `sql/gv_np_mover_pendiente_v2160.sql`.
 ## ⚠ REGLA (Thomas, 2026-09-22, v21.06): el refresco del stock se hace SOLO si algo cambió
 
-Cron 55 refrescaba `vista_stock_procesada` **cada 2 minutos, siempre**: **1.770 s sobre una
-ventana de 26,4 h = 7,4 % del tiempo total de la base**, para una matview de **367 filas /
-216 kB**. Y sobre 7 días, sólo **277 de los 5.040 bloques** de 2 minutos tuvieron movimiento de
-stock: el **94,5 % de los refrescos no cambiaba una sola fila**. Esa contención es la que daba
-los `canceling statement due to statement timeout` de la Cuarentena (problema 492).
-
-Hoy el cron llama a **`gv_refresh_stock_si_cambio()`**. Medido en vivo: **refresco 1.813 ms ·
-chequeo que salta 12 ms (150×)**.
-
-⚠⚠ **Y con esa primera versión el ahorro fue del 1,2 %, no del 94,5 % (v21.31).** La huella
-contaba **escrituras**, y hay crons que reescriben tablas enteras sin cambiar nada: el **cron 81
-`gv-reconciliar-aguardar` corre cada 2 minutos** —el mismo minuto que el 55— y toca
-`Movimientos_Stock`. Medido: `PPP_Web_Base` 582.748 updates contra 372 inserts, `GV_UxB` 34.036
-contra 0. El riesgo estaba escrito acá mismo como caso raro; **es el caso normal de esta base**,
-y la medición de 5 minutos que lo dio por bueno cayó justo entre dos corridas del cron. Hoy las
-5 tablas ruidosas llevan **firma de CONTENIDO** (`GV_Stock_Huella_Expr`, que es un `insert`, no
-código): 60-74 ms de huella y **0 refrescos / 3 saltos = 100 % ahorrado** con el cron 81
-corriendo en el medio. §3.mj.
-
-⚠ **La frescura NO empeora.** El chequeo sigue corriendo cada 2 minutos: apenas se escribe un
-movimiento, el refresco sale en la corrida siguiente. Lo único que se saca es el refresco que
-no cambiaba nada.
-
-⚠ **El árbol de dependencias se camina EN VIVO, no es una lista a mano.** La matview cuelga de
-**23 tablas y 5 vistas**; se resuelve con `pg_rewrite`/`pg_depend`, así que una tabla nueva entra
-sola (verificado 23 de 23, 11 ms). Una lista escrita a mano es el mismo pozo de los pases que
-eligen fecha (v20.83), el `ref` compuesto (v20.72) y las 18 tablas del renombre (v20.88):
-**siempre falta una**.
-
-⚠ **La matview se excluye de su propia huella**, o su refresco cambiaría la huella y se
-refrescaría para siempre. Y la comparación que manda es el **jsonb entero**, no clave por clave:
-así una tabla que entra o sale del árbol también cuenta.
-
-⚠ **FAIL-OPEN, al revés del guard de cuarentena (v20.95):** sin huella, se refresca. Un refresco
-de más cuesta 2 s; una vista de stock vieja la mira un operario y le miente. Más el **piso de
-frescura** (60 min).
-
-⚠ **La huella cuenta ESCRITURAS, no contenido** (`pg_stat_user_tables`). Un `delete`+`insert`
-con contenido idéntico dispara un refresco al pedo, y un reset de estadísticas fuerza uno: las
-dos fallan hacia refrescar de más, nunca de menos.
-
-⚠⚠ **Y lo que el stock gasta de verdad NO es esto.** Medido el 22/09: `vista_saldos_stock` se
-lee **directo desde la app en 5 lugares** de `index.html` — **1.759 llamadas, 2.850 s**, contra
-los **1.808 s** del refresco. Pedir **un solo código** (`clave=eq.438E`) cuesta lo mismo que
-pedir todos (**769 ms**): `clave` es una expresión calculada, así que no hay índice que valga y
-recorre las 67.242 filas y las ordena para devolver 0 (`Rows Removed by Filter: 496`). El
-arreglo **NO es una columna nueva**: `clave` no existe en la tabla, pero `ckey` —la
-normalización del código— es función pura de `cod_art` con funciones inmutables, así que alcanza
-un **índice de EXPRESIÓN** (`mov_stock_ckey_idx`, 496 kB): sin columna, sin trigger, sin backfill
-y sin reescribir una fila. Y como el índice sólo sirve si alguien filtra por esa expresión, va con
-**`gv_saldos_por_clave(text[])`**: **687 ms → 7 ms** para un código, 69 ms para diez, con salida
-verificada idéntica (496 = 496 filas, `EXCEPT ALL` 0 en las dos direcciones). v21.31, §3.mj.
-
-⚠ **`work_mem` NO es el arreglo, se midió y se descartó.** Con 4 MB el orden se cae a disco
-(`external merge Disk: 3.304 kB`); con 32 MB entra en memoria y el I/O temporal se va a 0 — pero
-la consulta pasa de **769 ms a 751 ms**. Los 750 ms son el recorrido y el regex por fila, no el
-orden. No volver a proponerlo para esto.
-
-### ⚠⚠ Y `vista_stock_procesada` NO puede reemplazar a `vista_saldos_stock` (medido 23/09)
-
-La tentación es obvia — la matview ya está calculada y las lecturas del universo entero de
-`vista_saldos_stock` son hoy el mayor consumidor del stock: **cuatro formas de consulta, 3.524 s
-sobre una ventana de 47,9 h = 2,0 % del tiempo de la base** (`stockFetchSaldos` 1.902 llamadas,
-`_pppChkFetchSaldos` 254). **No se puede, y el número lo cierra:**
-
-| | |
-|---|---:|
-| filas de `vista_saldos_stock` | 496 |
-| filas de `vista_stock_procesada` | 367 |
-| códigos que la matview NO tiene | **152** |
-| …de esos, **con stock real** | **119** |
-| …de esos, **insumos** | **101** |
-| cajas de `terminado` que se perderían | **2.266** |
-
-En las 344 filas comunes los números coinciden (**0 difieren**), así que la matview *parece*
-equivalente mirando cualquier código de góndola. Y los módulos que llaman a `stockFetchSaldos`
-son justamente MG, bajar racks, **insumos** y salida Cervantes. Sería el pozo de la v20.95:
-**una fila que no sale no se distingue de un código que no existe.**
-
-⚠⚠ **Y TAMPOCO se cachea `vista_saldos_stock` en una matview propia. RETIRADO**: lo propuse
-el 23/09 y Thomas lo bajo el mismo dia — ***"todo el stock tiene que verse lo mas en vivo posible
-siempre"***. Esa vista se recalcula en cada lectura a proposito (765 ms, 67.945 movimientos), y
-`gv_saldos_por_clave` tampoco cachea nada: el indice acelera el recorrido, no lo evita. **El stock
-no se cachea.** Si el 2,0 % molesta algún día, el camino es bajar CUÁNTO recorre (la idea de los
-últimos 2 meses con el histórico por código a demanda), no congelarlo.
-
-⚠ **El picking NO se repunta a `gv_saldos_por_clave`**, y no es olvido: son **44 llamadas y 35 s
-sobre esos 3.524 s (1 %)**, contra tocar el camino caliente del operario. Lo sostiene el candado
-invertido de `tests/stock-clave-indexada.cjs`.
-
-⚠ **El `count=exact` que todavía aparece en `pg_stat_statements`** (887 llamadas pagando el doble:
-1.925 ms contra 1.021 ms de la misma consulta sin él) **no está en el código**: lo sacó la v20.78.
-Son celulares con el `index.html` viejo cacheado. Se muere solo; no hay nada que arreglar.
-
-### ⚠ Cron 81 `gv-reconciliar-aguardar`: reescribe lo mismo cada 2 minutos, y se deja así
-
-Su `on conflict … do update set delta = excluded.delta, legajo = excluded.legajo` **no tiene
-`where`**, así que reescribe sus 10 filas cada corrida cambie o no el valor: 1.438 corridas /
-278 s / 194 ms de media (peor 13.271 ms), y `Movimientos_Stock` con **10.719 updates contra 2.853
-inserts, 11.847 tuplas muertas y `last_autovacuum` en null**.
-
-**Era la causa de que la primera huella (por escrituras) ahorrara 1,2 % en vez de 94,5 %.** Con la
-huella por CONTENIDO eso ya no importa, y **Thomas decidió el 23/09 dejar el cron 55 y el 81 como
-están**. Lo que queda es el churn del libro de stock, que no molesta a nadie hoy. Si algún día se
-toca, el arreglo es una línea (`where … is distinct from …`) — y toca una función que escribe en
-`Movimientos_Stock`, o sea que lo autoriza el dueño.
-
-### ⚠⚠ REGLA (Thomas, 2026-09-23, v21.48): la pantalla de Stocks NO lee la matview — lee `stocks_carga_rapida`
-
-**Thomas, textual:** *"todo el stock tiene que verse lo mas en vivo posible siempre"*.
-
-Al medirlo apareció que esa regla **no se estaba cumpliendo, y no por el cron 55**. El dato llega
-a la pantalla por **tres saltos**, no uno:
-
-| salto | quién | cada |
-|---|---|---|
-| `Movimientos_Stock` | el libro | **en vivo** |
-| → `vista_stock_procesada` | cron 55 | 2 min, y sólo si cambió |
-| → **`stocks_carga_rapida`** | **cron 57** | **5 min, siempre** |
-| → pantalla Stocks | `supaFetchAllSafe` | al abrir |
-
-**Atraso máximo: 7 minutos**, y los dos crons no están sincronizados — si el 57 corre justo antes
-de que el 55 refresque, se pagan los 7 completos. Los 2 min del 55 eran el salto chico.
-
-Desde la v21.48 **`gv_refresh_stock_si_cambio` reescribe `stocks_carga_rapida` en la MISMA corrida
-en que refresca la matview**: la frescura baja a **2 min** y de paso el cron 57 deja de reescribirla
-cuando no cambió nada (eran 580 corridas / 324 s / 559 ms por ventana de 47,9 h, con el mismo
-94,5 % de corridas inútiles que ya se le había sacado al 55).
-
-⚠ **El lock va con `pg_try_advisory_xact_lock`, NUNCA con el bloqueante.** El advisory **5768** lo
-toman **TRES** jobs — el **57**, el **68** (`reconciliar-pipeline-stock`) y el **92**
-(`gv-refrescar-articulo-empresa`, `*/15`) —: esperarlo ocuparía uno de los **SEIS** worker slots de
-la instancia (`max_worker_processes = 6`, medido). Si no se consigue, no pasa nada — lo reescribe
-el 57.
-
-### ⚠⚠ Y ahí había una CARRERA: el 57 le ganaba el lock al 55 y leía la matview VIEJA (v21.57)
-
-**Thomas, textual:** *"fijate que el 57 no lo este pisando"*. No lo estaba pisando siempre, pero
-podía — y el registro lo muestra. Los tres arrancaban **en el mismo segundo**:
-
-| minuto | cron 55 | cron 57 | cron 68 |
-|---|---|---|---|
-| **08:50** | 00.327 · **4.156 ms** | 00.343 · 1.175 ms | 00.389 · **6.529 ms** |
-| 08:30 | 00.620 · 4.264 ms | 00.628 · 1.216 ms | 00.748 |
-| 08:00 | 00.929 · 1.187 ms | 00.870 · **2.625 ms** | 01.102 |
-
-`*/2` y `*/5` coinciden en los múltiplos de 10: **seis veces por hora**. En la corrida de las
-**08:50** el 68 se quedó el lock 6,5 s y el 55 terminó su refresco a los 4,1 s: **no pudo
-encadenar**. Cuando gana el 57, además, escribe `stocks_carga_rapida` desde la matview **vieja**.
-
-⚠ **Y no es teórico:** `cron.job_run_details` tiene un **`job startup timeout` del propio cron 68**
-el 22/09 a las 10:30 — uno de los dos minutos más cargados. El pozo de los seis worker slots ya
-estaba mordiendo acá, no sólo en LK.
-
-**El arreglo no toca la función: los desfasa.** El 55 corre **sólo en minutos PARES**, así que los
-otros van a **IMPARES** y la carrera desaparece (el 55 dura 4,3 s en su peor caso: no cruza el
-minuto).
-
-| job | antes | ahora | minutos |
-|---|---|---|---|
-| 57 `refresh_stocks_carga_rapida` | `*/5` | **`3-59/6`** | 3,9,15,21,27,33,39,45,51,57 |
-| 68 `reconciliar-pipeline-stock` | `*/10` | **`1-59/10`** | 1,11,21,31,41,51 |
-
-> ⚠ **Cada 6 y cada 10, NO cada 5 ni cada 15.** La paridad se conserva sólo si el paso es PAR:
-> `*/5` y `*/15` alternan par/impar por construcción, así que **un cron cada 5 o cada 15 minutos
-> no puede quedar siempre impar**. Por eso el 57 pasó de 5 a 6 minutos, y por eso **el 92 no se
-> movió**: sigue pisando al 55 en :00 y :30.
-
-**Medido**, minutos por hora en que el 55 se encuentra el lock ocupado: **6 → 2**
-(55 vs 57: **0** · 55 vs 68: **0** · 55 vs 92: 2). Y el pico por minuto bajó: **:00 de 19 a 17
-jobs**, :30 de 17 a 15.
-
-⚠ El 57 y el 68 **siguen chocando entre sí** 2 veces por hora (:21 y :51) y es **inevitable**
-(paso 6 y paso 10, mcm 30). No molesta: el lock los serializa y ninguno lee una matview a medio
-refrescar, porque el 55 no corre en impares.
-
-⚠ **Costo aceptado:** `fc_sin_salida` y las descripciones pasan de 5 a **6 min**.
-
-**Rollback, dos líneas:**
-```sql
-select cron.alter_job(57, schedule := '*/5 * * * *');
-select cron.alter_job(68, schedule := '*/10 * * * *');
-```
-
-⚠ **FAIL-OPEN, y con el fallo A LA VISTA.** Si la derivada explota, la matview se refresca igual y
-el motivo lo dice. **Probado rompiéndola a propósito** (`perform 1/0`) en transacción abortada:
-`refrescada=true | motivo=piso de frescura (60 min) (carga_rapida fallo: division by zero)`.
-Un tapón sin forma de enterarse es cambiar un error ruidoso por uno mudo (regla de Elías, v20.58).
-
-⚠ **El cron 57 NO se apaga**: es la red del lock ocupado y del fallo. Bajarlo a `*/10` sería un
-segundo paso y **no está hecho**.
-
-⚠ **Lo que NO arregla:** si querés el stock *realmente* en vivo en esa pantalla, hay que sacarle a
-`stocks_carga_rapida` la dependencia de la matview, y eso se paga con latencia al abrir (~765 ms
-contra los 55 ms de hoy). Es otra conversación.
-
-**Verificado corriéndolo** (23/09): `solo_medir` → no encadena · piso de frescura en 0 →
-`"... + carga_rapida"`, 3.260 ms · `stocks_carga_rapida` **idéntica antes y después**
-(367 filas, md5 `3000430e5cfbde71e8b995819a3ce21e`): el encadenado adelanta el dato, no lo cambia.
-`sql/gv_stock_carga_rapida_encadenada_v2148.sql`, `tests/stock-carga-rapida-encadenada.cjs`, §3.mo.
-
-**Chequeo:**
-```sql
-select * from public.gv_stock_refresh_salud;              -- estado='ok' y pct_ahorrado
-select * from public.gv_refresh_stock_si_cambio(60,true); -- qué HARÍA, sin refrescar
-```
-
-**Rollback, una línea:**
-```sql
-select cron.alter_job(55, command := 'REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada');
-```
-
-`sql/gv_refresh_stock_si_cambio_v2105.sql`, `tests/stock-refresh-si-cambio.cjs`, §3.mi.
+⚠ El detalle completo de esta regla vive en **`docs/MODULO-STOCK-REFRESH.md`** (movido el 2026-10-13, poda de CLAUDE.md). **Leerlo ENTERO antes de tocar este módulo** — no se resume acá para no cargar en cada sesión lo que sólo hace falta cuando se toca esto.
 
 ## ⚠ REGLA: una lectura ROTA no es un CERO — y un centinela que sólo mira el log del éxito es ciego
 
@@ -7071,207 +6619,7 @@ que aborta todo (verificado: la fila encolada desapareció al revertir).
 
 ## ⚠⚠ REGLA (Luis, 2026-09-22, v21.20): a BLISTPACK, OSCAR y PEDERNERA **no se les manda OC**
 
-**Luis, textual:** *"a blistpack/oscar/pedernera no se le manda OC, porque ellos fabrican acorde
-a lo que le mandamos desde log/fabr"*. Y antes, sobre esos tres códigos: *"544, 560, 800 son pedernera 100%, pero no se le manda la OC a pedernera, solo
-se le manda a log. Pero la recepción de mercadería es mercadería de Pedernera"*.
-
-**Es el caso Oscar exactamente al revés**, y las dos puntas están bien: la orden se le emite a
-**`Log/ Fabr`** y el que trae las cajas es **`Pedernera`**. Ninguna de las dos se "corrige".
-
-Medido el 22/09:
-
-| | 544 Batidor Pera | 560 Pinza Chica | 800 Pinza Chica Display |
-|---|---|---|---|
-| OC emitidas | **Log/ Fabr** · 6 · 2.022 cajas | **Log/ Fabr** · 4 · 168 | **0** |
-| recepción | **Pedernera** · 22 · 1.866 | **Pedernera** · 7 · 259 | **0** |
-| `OC_Maximos.proveedor` (quién FABRICA) | **Pedernera** (v21.23) | **Pedernera** (v21.23) | Pedernera |
-
-⚠ **La consecuencia medible: `cantidad_recibida = 0` en las DIEZ OC.** 2.190 cajas ordenadas,
-2.125 recibidas, **0 imputadas** — nueve quedaron `anulada` y una `pendiente`.
-**`gv_oc_recompute_recibido(proveedor, codigo)` cruza por el par `(proveedor, código)`**, así que
-con nombres distintos en las dos puntas la OC **no se cierra nunca sola**.
-
-### ⚠⚠ Y son EXACTAMENTE estos tres: NO es un patrón de toda la tabla
-
-**Luis, 2026-09-22, textual:** *"No siempre es la norma general de que le entrega a otro. En los
-únicos que la orden sale en nombre de uno y le entrega a otro son los casos de Pedernera,
-Blistpack y Oscar."*
-
-O sea: **«la OC sale a uno y entrega otro» es una REGLA de negocio sólo para los tres fabricantes
-de `GV_OC_Fabrica_Para`.** Cualquier otro código donde eso pase **es configuración mal puesta**, y
-se arregla poniendo en `OC_Maximos.proveedor` al que de verdad entrega. **No se agrandan las
-excepciones**: si aparece un caso nuevo, primero se mira la config, y sólo Luis decide si ese
-fabricante entra a la tabla.
-
-**Los 19 códigos que quedaban los revisa y los configura Luis, uno por uno** (22/09: *"lo
-configuro yo, los 22 artículos que me pasaste, y lo damos por cerrado con eso"*). **Claude no los
-toca.** Medido ese día contra `vista_generador_oc` —que es lo que se va a emitir, no lo que se
-emitió—: **5 ya están bien** (550, 584E, 234, 609, 580: la config ya dice el que entrega y las OC
-viejas a otro nombre son restos que se limpian solos), **1 no tiene proveedor** (583E, que por eso
-no se puede comprar) y **13 hay que mirarlos**.
-
-**El 591 (Despolvillador de Yerba) ya está cerrado: DISCONTINUADO** (Luis, 22/09: *"no se va a
-recibir más ni va a salir en OC"*). `activo = false`, `proveedor = null` y el motivo en la
-descripción; backup en `zz_backups."GV_Backup_OCMaximos_591_20260922"`. Verificado **como `anon`**,
-que es la identidad del celular: sale de la lista de compra, del buscador de códigos activos de
-Recepción (el «+» de Log/ Fabr lee `OC_Maximos where activo`) y del botón de Tierra Nativa — los
-tres en **0**. Sus 6 OC (119 cajas, del 12/08 al 16/09) ya estaban **todas `anulada` con 0
-recibido**, así que no quedó ninguna viva que cancelar.
-
-⚠ **Discontinuar acá NO lo saca de la página.** En LK `products.active` sigue en `true` y sin
-badge: el cliente lo sigue pidiendo. Al 22/09 hay **7 NP programadas** con 591 (22/09 al 02/10)
-contra **13 cajas de stock** — salen con lo que hay. Si además hay que dejar de venderlo, es otro
-cambio, en el proyecto de LK.
-
-⚠ **La medición se hace contra `vista_generador_oc`, NO contra `OC_Maximos` a secas ni contra las
-OC ya emitidas.** El 550 es el ejemplo: sus OC salieron a **Poly** hasta el 16/09 y hoy la config
-dice **Garcia**, o sea que ya está corregido y lo que se ve es historia. Mirando sólo las OC
-emitidas, un código ya arreglado sigue apareciendo como problema para siempre.
-
-**El número era 22, no 25.**
-
-> **Se retira el "25 pares" del barrido anterior: estaba CONTAMINADO.** Cruzaba por **número de
-> código** y **Basconia compra ACERO EN KILOS** (rubro `Flejes`, unidad `Kg`), con códigos que
-> chocan con los de artículo terminado: su `0635` es *"Arandela Gde/Chica Afila (77 x 1,25)"*, no
-> el artículo 635. Basconia tiene **una sola tanda, del 13/07, 10 líneas, 7.650 Kg**, y **cero
-> entregas** en `Entregas Tallerista Virgilio`: **no entra en esto por ningún lado**, ni tiene
-> nada que ver con 544/560/800.
-
-El barrido que vale filtra **`rubro = 'Art Term'` y `unidad = 'Cajas'`**, y deja afuera los alias
-que `gv_prov_match` ya resuelve (`Martin C` = Martin, `Carlos E` = Carlos, `Pettofrezza` = Rafael)
-y los tres fabricantes de `GV_OC_Fabrica_Para`. Al 22/09: **22 pares · 19 códigos · 4.654 cajas de
-OC sin imputar**. Los que pesan:
-
-| código | OC a | entrega | cajas OC | qué dice la config |
-|---|---|---|---:|---|
-| 510 | Carlos E | Log/ Fabr | 1.250 | el de la OC |
-| 550 | **Poly** | Garcia (256) · Log/ Fabr (21) | 1.007 | **Garcia — ninguno de los dos** |
-| 583E | Garcia | Log/ Fabr | 599 | el de la OC |
-| 505 | Garcia | **Lucho (3.221)** · Log/ Fabr (98) | 274 | el de la OC |
-| 584E | Garcia | Log/ Fabr | 222 | el de la OC |
-| 103 | Martin C | Log/ Fabr | 186 | el de la OC |
-| 922 · 911 · 224 · 223 | Pintos | Log/ Fabr | 275 | el de la OC |
-| 123 | Lucho ↔ Garcia (los dos sentidos) | Garcia / Lucho | 179 | Garcia |
-| 609 | German | Rafael | 151 | el de la OC |
-| 591 | Tierra Nativa | Log/ Fabr | 119 | el de la OC |
-| 580 | Carlos E | Log/ Fabr | 119 | el de la OC |
-| 760 | Poly | Garcia | 99 | el de la OC |
-| 234 | Tierra Nativa | Log/ Fabr | 94 | **el que entrega** |
-| 519 · 719 | Log/ Fabr | Lucho | 39 | el de la OC |
-| 355 | German ↔ Pettofrezza | Rafael / German | 31 | Pettofrezza |
-
-**Ninguno se tocó**, y quedaron para Luis. El barrido, para volver a correrlo, y la consulta que
-arma la lista de trabajo (código · qué emitiría hoy · quién viene entregando · estado) están en
-`sql/gv_oc_maximos_544_560_v2123.sql`.
-
-> **Son dos datos distintos y los dos son ciertos:** quién **fabrica y entrega** (así se carga en
-> Recepción, y está bien) y a quién se le **emite la orden** (siempre `Log/ Fabr`, que es el que
-> les manda el material). **Ninguno se "corrige" con el otro** — y en particular `OC_Maximos` NO
-> se toca: su `proveedor` sigue diciendo quién fabrica, que es lo que el dueño pidió conservar el
-> 15/09 (*"dejalo ahí"*). Lo que faltaba es la pieza que los relaciona.
-
-**La pieza es `GV_OC_Fabrica_Para`** (fabricante → quién recibe la OC), con las tres filas que
-dictó Luis. Al 22/09 **el dato y el centinela están aplicados; las dos mitades del arreglo NO**
-— son dato real y las autoriza el dueño. Están escritas, con su medición, en
-`sql/gv_oc_fabrica_para_v2120.sql`:
-
-1. **que la OC salga a nombre de quién la recibe** — un solo lugar, `gv_oc_generar_pendientes`,
-   por donde escriben el generador manual **y** el automático (cron 50).
-2. **que la recepción del fabricante impute contra la OC de `Log/ Fabr`** — el mecanismo **ya
-   existe**: `gv_norm_prov_keys` devuelve un **array** de claves y `gv_prov_match` las compara
-   todas contra todas (así está resuelto hoy `pettofrezza → rafael`, hardcodeado adentro de dos
-   funciones). Se le suma esta tabla como fuente y ese alias se migra ahí.
-   ⚠ **Fusiona los dos nombres a efectos de imputación.** Riesgo medido: sólo **3 códigos** tienen
-   entregas de los dos por separado desde el 01/06 — 506 (Log/ Fabr 3.439 vs Blistpack 203), 659
-   (42 vs 8) y 764 (49 vs 8). ⚠ Y recalcula `cantidad_recibida` y `estado`: va con backup.
-
-### ✅ v21.23: `OC_Maximos` de 544 y 560 → Pedernera (Luis: *"si, corregí 544 y 560 a Pedernera"*)
-
-Hasta la v21.22 convivían **las dos configuraciones para el mismo fabricante**: de los 7 códigos
-que fabrica Pedernera, la config decía `Pedernera` en 5 (115, 561, 800, 801, 802) y `Log/ Fabr`
-en 2 (**544 y 560**). Medido sobre las entregas desde el 01/06, Pedernera entregó 115, 544, 560 y
-802 — o sea que los dos que decían `Log/ Fabr` son suyos igual.
-
-**Esto NO cambia a quién se le emite la OC**: `OC_Maximos.proveedor` dice **quién FABRICA** (regla
-del dueño del 15/09, caso Oscar: *"dejalo ahí"*) y la emisión la resuelve `gv_oc_emite_a()`.
-Verificado: los 7 códigos dicen `Pedernera` en la config y los 7 siguen emitiendo a `Log/ Fabr`.
-
-Backup `zz_backups."GV_Backup_OCMaximos_20260922"` (clave `cod`, única: 360/360).
-`sql/gv_oc_maximos_544_560_v2123.sql`.
-
-**Chequeo:** `select * from public.gv_oc_proveedor_no_recibe_oc;` — vacía = todo emitido a quién
-corresponde. Al 22/09 marca **225 cajas en 12 líneas** por salir mal en la próxima corrida:
-Blistpack **177** (10 códigos, casi todos bombillas, más Manga Repostera) y Pedernera **48**
-(561 Pinza Larga y 801 Pinza Grande Alambre).
-
-### ⚠⚠ LAS TRES CAPAS, y la del medio es la que usa el operario todos los días
-
-**Luis, textual:** *"Cuando pedernera entrega, el operario de GV debe poner pedernera y anotar ahí
-lo que reciben. En el celular del operario de GV debe figurar la OC de las cajas a entregar"*.
-
-| capa | a nombre de quién | dónde |
-|---|---|---|
-| se **emite** la OC | `Log/ Fabr` | `gv_oc_generar_pendientes` |
-| se **entrega** | el fabricante | `Entregas Tallerista Virgilio` |
-| el **botón del celular** | **el fabricante** | `oc_vigentes_por_proveedor` |
-
-**Antes (medido llamando la RPC con cada nombre): `Pedernera` devolvía CERO** — el operario tocaba
-el botón del que le estaba entregando y no veía ninguna OC — mientras el **560**, que trae
-Pedernera, aparecía bajo **`Log/ Fabr`**. Y sin OC a la vista se pierde el control de cantidad:
-`opState.ocOk` queda en false y el margen del +20 % no se exige.
-
-**Las tres mitades aplicadas en la v21.22**, acotadas a `GV_OC_Fabrica_Para` (Luis: *"2 no
-necesariamente, tengo que ver caso x caso"* — el resto de la tabla **no** se tocó):
-
-1. **Al emitir**: `gv_oc_emite_a()` dentro de `gv_oc_generar_pendientes`, el **único** lugar por
-   donde escriben el generador manual y el cron 50.
-2. **Al imputar**: `gv_oc_recompute_recibido` suma las claves de los fabricantes a `pkeys`. El
-   mecanismo **ya existía** (es un array, y `gv_prov_match` compara todas contra todas: así estaba
-   resuelto `pettofrezza → rafael`). Impacto medido: **6 filas, todas 544 y 560** — 776 cajas del
-   544 imputadas en 5 OC anuladas y el 560 completo (57/57) pasando a **recibida**. Ninguna OC de
-   otro proveedor se movió. Backup: `zz_backups."GV_Backup_OrdenesCompra_20260922"`.
-3. **El botón**: `gv_oc_codigo_del_fabricante` dice qué códigos entrega cada uno, y
-   `oc_vigentes_por_proveedor` se lo suma al fabricante y se lo saca al que recibe la orden.
-
-⚠⚠ **Y el botón NO puede derivarse de `OC_Maximos.proveedor` a secas, porque ese campo está
-MEZCLADO.** De los 4 códigos que Pedernera entregó desde el 01/06 (115, 544, 560, 802 · 2.355
-cajas) la config dice **Pedernera en 2 y `Log/ Fabr` en los otros 2**. Derivarlo sólo de ahí mueve
-**11 líneas de OC** que son config vieja y no esta regla: 515/615/635 (Basconia → Carlos E, 1.800
-cajas), 222 y 910 (Maspoli → Pintos), 234, 618, 725. Por eso la vista une **config ∪ lo que viene
-entregando**, y sólo para los tres fabricantes de la tabla.
-
-⚠⚠⚠ **Y mordió la trampa de la v20.45.** `GV_OC_Fabrica_Para` nació con RLS sin policy y
-`oc_vigentes_por_proveedor` es **INVOKER**: medido, **postgres veía 1 código y el operario 0**.
-No da error — da menos filas, y probarlo desde el MCP no prueba nada porque el MCP entra como
-`postgres`. Se le puso policy de **SELECT** (es config de proveedores: 3 filas con nombres); la
-escritura sigue revocada. **Toda RPC nueva que el celular llame se prueba con
-`set local role anon`, no desde el MCP.**
-
-**La prueba que vale, corrida como `anon`** (OC del 561 emitida, transacción abortada):
-
-```
-boton PEDERNERA: 561 (pend 41)          <- la OC donde el operario la necesita
-boton LOG/ FABR: 255                    <- sigue con lo suyo, sin el 561
-Garcia (control): 113, 323, 439E, 839   <- sin cambios
-```
-
-**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien ·
-`select * from public.gv_oc_codigo_del_fabricante order by 2,3;`
-`sql/gv_oc_fabrica_para_v2122.sql`.
-
-### ⚠ Lo que NO va: la excepción de la doble OC (v21.14, aplicada y revertida el mismo día)
-
-Una lectura anterior del pedido —*"deberían generar OCs por el total (100%) para fab y para
-carlos"*— se implementó como `OCG_DOBLE_100`: dos OC por código, una a `Log/ Fabr` y otra a
-`Carlos E`. **El dato la desmintió**: en toda la historia de `Ordenes_Compra` esos códigos tienen
-**cero OC a `Carlos E`** y cero a Pedernera. El único rastro de un Carlos son **3 filas de
-recepción de mayo-junio a nombre de `AGUIRRE CARLOS RODOLFO`** (260 cajas de 544), muertas desde
-el **04/06**, justo antes de que empezara Pedernera el 10/06. `Carlos E` y `Carlos` son entidades
-distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
-
-**Se revirtió entero** (la constante, el armado de subs, la marca `dupProv`, el `Math.max` de la
-vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
-códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
+⚠ El detalle completo de esta regla vive en **`docs/MODULO-OC-FABRICANTES.md`** (movido el 2026-10-13, poda de CLAUDE.md). **Leerlo ENTERO antes de tocar este módulo** — no se resume acá para no cargar en cada sesión lo que sólo hace falta cuando se toca esto.
 
 ## ⚠ REGLA (Thomas, 2026-09-26, v22.87-93): la CONCILIACIÓN BANCARIA vive en `GV_Conc_*` y el AGENTE de cobranzas en `GV_Cobranza_Imputacion`
 
@@ -7942,89 +7290,7 @@ de LK viejas del 14/09, ninguna con NP programada). `sql/gv_ppp_web_base_podar_v
 
 ## ⚠⚠ REGLA (Luis, 2026-10-02, v26.43): la COLA sin registro después del TP/TAP es PICKING/ARMADO
 
-**Luis, textual:** *"si hay tiempos sin registros, luego de que estén haciendo picking o armado, hasta que
-inicien la nueva tarea, esos tiempos quiero que se registren dentro de picking o armado … si vos pusiste
-terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que realmente no terminaste"*.
-
-- **Qué cuenta:** desde el cierre (TP/TAP) hasta el **inicio de la próxima tarea registrada** del legajo
-  (`coalesce(ts_inicio, ts_cliente)` de cualquier evento que no sea automático: PUB, AUB, PKC, ENT, RSP, ROC,
-  RAG, FGU, FSS, IMPT, TAL, GST, MGR, PKM, SSG, PSP, NPD, PKAX ni los `*X`), o el **fin de jornada**
-  (`max(último evento, hora de salida)`; el FJ es un evento y la corta solo), o la primera **bajada de racks
-  sin tramo** (ese tramo ya cuenta como racks). Un tramo que **ya estaba abierto** al cerrar deja la cola en
-  0; un 2.º TP/TAP de la **misma** tanda no la corta y la cola que se suma es la del **primer** cierre (como
-  el m³, v12.97). Se suma a la tanda: `pick/arm = max(dur_s) + cola`.
-- **Dónde:** `gv_monitor_horas_operario_dia` (CTE `cola`) y su copia verbatim `gv_horas_operario_detalle_v2`
-  (xlsx de Elías); `index.html` `fetchMonitorDayStats` (`colaMsDe`, ≡ vista) y el pop-up por tanda dice
-  «incl. N de cola hasta la próxima tarea». TV y Mon. Admin la heredan de la vista. **No entra** en «Min trab»
-  del pop-up m³/h por tanda del Mon. Admin (apertura → cierre, v25.92).
-- **Medido:** 15/09 → 277 picking 6,37 → 7,77 h · 237 armado 5,60 → 6,63 · 8 armado 6,75 → 8,76. 60 días, por
-  tanda: mediana 1,7 min · p90 9,7 (TP) / 16,4 (TAP) · 4 colas > 60 min, la mayor **518 min** (TP a la mañana y
-  ningún evento hasta la hora de salida). Es a propósito: la regla pide que eso cuente, y queda a la vista.
-- La calibración de dificultad (D17, `docs/PICKING-DIFICULTAD-D17.md`) mide el tiempo real como picking puro **más la
-  cola topeada a 30 min** (dos tandas con cola «cap» de 5 y 8 h quedaron afuera): la cola cayó 55 % en un fijo por
-  tanda (2,4 min) y 32 % en la parada; las alturas no se movieron. **03/10, Luis delegó (*"aplicá lo que te parezca"*): sin tope en la
-  base; 30 min sólo en la calibración (D18) · dificultad por caja (D19) · la app no registra la celda por ahora (D20) · escala de altura
-  FÍSICA de Luis (D21: piso 1 · 2.ª 1,5 · 3.ª 2 · 4.ª 2,5 · 5.ª de A 3; la 5.ª de A «es medio que lo mismo» que la 4.ª de B). Lo medido con
-  alturas libres (A5 72 s, el doble de B4) queda de referencia en `d17_esquema.json`; el registro por paso del 05/10 dirá si era el artículo.**
-  **Niveles de dificultad (Luis, 03/10, v26.48): «pajosa» se RETIRA y son CUATRO — Baja · Media · Alta · Muy alta —, atados al grado
-  1-10 (decil de min/caja sobre las 338 tandas): Baja = grado 1-2 · Media = 3-5 · Alta = 6-8 · Muy alta = 9-10, así nivel y grado no se
-  contradicen. El multiplicador del m³/h es 1 + 0,1 × (grado − 5), de ×0,6 a ×1,5, topeado a propósito: una tanda de cajas sueltas
-  (Manig F54A: 19 artículos, 19 cajas, 0,102 m³, 10 líneas con escalera → grado 10) se evalúa por índice tamaño ÷ real, no por m³/h.**
-  **Puntaje 1-10 del operario de picking (Luis, 03/10, v26.49: *"objetivo y en función de los datos, para el empleado nuevo"*):
-  puntaje = 5,5 + 10 × (índice − 1), con índice = Σ tamaños esperados ÷ Σ tiempos reales de sus ÚLTIMAS 20 tandas (y el período
-  aparte); 1 punto = 10 % de velocidad, 5-6 = el promedio del depósito. Con 10 tandas el margen es ±2 a ±3 puntos: menos de 10
-  es provisorio. Mide velocidad, no calidad. `docs/picking-d17/puntaje_operario.py`, sección (j) de `docs/PICKING-DIFICULTAD-D17.md`.**
-  **v26.50: el puntaje VIVE EN LA BASE y se ve SÓLO en Mon. Admin** (Luis: *"en monitor admin, no en el que ven los operarios; sé que
-  hay dos, ojo con eso"*). `GV_Picking_Esquema` (coeficientes y deciles: recalibrar = UPDATE) · `GV_Picking_Tanda` (caché por
-  tanda+legajo: líneas, paradas, alturas por stock al EP, tamaño, dificultad, grado, tiempo real, índice; la llena
-  `gv_picking_tanda_refresh`, cron `gv-picking-tanda-refresh` c/10 min) · `gv_picking_puntaje_operario(p_dias)` SECURITY DEFINER
-  que **raise 'SUPERVISOR'** sin sesión de supervisor. Validado contra el Python de las 340 tandas: tamaño |dif| mediana 0,21 min,
-  p90 0,80, corr 1,000 (ninguna a más de 3 min). La columna «Punt.» y su pop-up los inyecta `monitor/build-admin.cjs` (el token sale de `window.parent.sbAuth`);
-  `tests/mon-admin.cjs` canda que **tv.html no lleve** `gv_picking_puntaje_operario`. Desde la sesión, `execute_sql` se cuelga
-  con DELETE/DROP/UPDATE/CREATE TABLE de primer nivel: la instalación va adentro de `gv_picking_instalar()` (ver el SQL).
-  `sql/gv_picking_puntaje_v2650.sql`. Acomodar en la mesa (cola vs cajas/NP/mesas): `docs/PICKING-ACOMODAR-MESA.md` — no sigue
-  a las cajas ni a las mesas ocupadas; manda el operario.**
-  **v26.51 (Luis, D24, 03/10: *"debe descontar los m³ pickeados si algo no se pickeó"*): LO NO PICKEADO SE DESCUENTA.** El m³/h de
-  picking (TV, Mon. Admin y el monitor viejo del index) acredita **m³ de la tanda × fracción pickeada** (`gv_picking_pickeado`,
-  lectura, anon: último PKC por código, Σ reales×m³/caja ÷ Σ pedidas×m³/caja, tope 1; sin respuesta, m³ entero), y en el **puntaje**
-  una línea confirmada con **0 cajas no cuenta** (ni línea, ni parada, ni altura: `where pk.re > 0` en `gv_picking_tanda_calc`; sigue
-  en los huecos, que miden tiempo). ~~**El armado no se prorratea.**~~ (retirado en la v26.55: ver abajo) Medido 60 días: 834 de 8.347 líneas en 0 (230 de 334 tandas),
-  10,0 % del m³ pedido; por operario el m³/h baja 6,4 % (122) · 8,8 % (104) · 11,2 % (504) · **17,5 % (277)**. El pop-up de m³/h
-  del Mon. Admin dice «1,2 de 1,5» cuando se prorrateó. `GV_Picking_Tanda` + `lineas_cero` · `cajas_ped` · `m3_frac`.
-  `sql/gv_picking_no_pickeado_v2651.sql` (centinelas v26.51; `gv_picking_pickeado` entró a `scripts/reglas-protegidas.json`),
-  `tests/mon-tv.cjs` (techo 100 → 105 KB) y `tests/mon-admin.cjs`. **Aplicado el 04/10 (v26.53)**, sin «sí» aparte (Luis: *«no esperes mi
-  sí para aplicar algo que ya te pedí yo»*): 356 tandas recalculadas; **826 líneas en 0 salieron** (8.218 → 7.391); fracción pickeada
-  media **0,905**, 258 de 356 tandas por debajo de 1; el índice de las últimas 20 por operario baja 4 a 9 % (104 1,634 → 1,555 · 122
-  1,081 → 1,019 · 277 0,890 → 0,836 · 504 0,792 → 0,722) y el puntaje sólo cambia en el 237 (7 → 6). Los **deciles del grado se
-  recalibraron** sobre la dificultad nueva (media 0,290 → 0,260; decil_5 0,2406 → 0,2280, decil_9 0,5168 → 0,4819): sin eso el
-  grado dejaba de ser un decil (21 a 41 tandas por grado). ⚠ El `gv_picking_puntaje_operario` **vivo** tenía un filtro de turno
-  (`real_min between 0.5 and 240` · `lineas > 0` · `bruto_min <= 720`) que el repo no tenía —otra sesión—: se trajo la definición
-  viva y se conservó, en la base y en el `.sql`.
-  **v26.54 (Luis, 04/10: *"me estás pidiendo aplicar algo que no me estás mostrando"*): el m³/h AJUSTADO por dificultad SE VE en el
-  Mon. Admin.** Pop-up de m³/h picking → por tanda **Dif.** (grado y nivel) y **Ajust. m³/h** = ritmo × (1 + 0,1 × (grado − 5)),
-  Total ajustado y la nota; en la celda, chiquito, el del día («1,5 → 1,4») cuando todas sus tandas tienen grado. Caso real 02/10
-  (104): F22A 1,7 m³/h grado 7 Alta → 2,0 · E89A 1,2 grado 3 → 0,9 · el día 1,5 → 1,4. RPC nueva de lectura `gv_picking_grado(text[])`
-  (anon, lee `GV_Picking_Tanda`); `gv_picking_pickeado` no se tocó. **La TV no lo lleva** (candado en `tests/mon-admin.cjs`).
-  `sql/gv_picking_grado_v2654.sql`, §3.v2654.
-  **v26.55 (Luis, 04/10: *"una vez que ya se pickea, ya no se mira más el m³ del pedido entero … lo que se carga en el camión es lo
-  pickeado … el camión se debe pedir en función de lo pickeado"*): UNA TANDA CON TP VALE SU m³ PICKEADO EN TODOS LADOS.** No sólo el
-  m³/h de picking: armado, carga, Días, camión del día (y la unión Z2+Z3 < 1 m³), Programación y Resumen de la PPP. Fuente única
-  **`gv_tanda_m3_pickeado(text[])`** (lectura, anon): la fracción de `GV_Picking_Tanda.m3_frac` y, para un TP de las últimas 48 h que
-  la caché todavía no tiene, en vivo con `gv_picking_pickeado`; sin fila = sin pickear = m³ del pedido. La aplican **en la base**
-  `vista_tanda_m3` (m3 = pickeado; `m3_pedido` y `fraccion` al final), `gv_monitor_tanda_camion` y `gv_ppp_prog_arbol` (la NP va con la
-  fracción de su tanda); **en el front**, la TV / Mon. Admin (copia de la programación con el m³ pickeado; se fue el «1,2 de 1,5») y el
-  index **en la fuente**: `fetchMonitorSheet`, `fetchHistoricSheet` y `pppLoadProgFromSupabase` (`gvFracPickeado`, una lectura cada
-  60 s; `monPickFrac` se fue). ⚠ **Lo que se GUARDA sigue siendo el m³ del PEDIDO**: `pppGuardarWeb` manda `m3Ped`, o reprogramar una NP
-  pickeada pisaría `PPP_Web_Programacion.m3`. Medido 05/10: el 06/10 pasa de 6,869 a 6,372 m³ (10 de 11 tandas pickeadas).
-  `sql/gv_m3_pickeado_v2655.sql` (centinelas 292-295), `tests/m3-pickeado-fuente.cjs`, `tests/mon-tv.cjs`, `tests/mon-admin.cjs`, §3.v2655.
-- `sql/gv_monitor_horas_cola_v2643.sql` (idempotente sobre `pg_get_functiondef`, con rollback; huella y centinela
-  v26.43 adentro). **Aplicado el 03/10 con el sí de Luis** (v26.45): el 15/09 dio idéntico a la foto, `gv_huellas_cambiadas`
-  y `gv_reglas_perdidas` vacías. ⚠ **La huella se compara por `md5(prosrc)`, NO por `md5(pg_get_functiondef(...))`**:
-  el primer intento la dejó en rojo con el cuerpo correcto. Lo pendiente de D18 (tope de la cola) no se tocó: corre
-  hasta la próxima tarea o la hora de salida, como está escrito arriba. `tests/tools/vista-15.json` re-congelado con la cola; `tests/mon-vs-vista.cjs`;
-  `tests/muerto-neteado.cjs` y `tests/mejoras-v1297.cjs` (la siguiente tarea arranca 1 s después del cierre y el
-  día termina con FJ, para que la cola quede en 0 y sigan midiendo lo suyo). CI 1698 cayó por el segundo: regla
-  v21.53, se arregló en el mismo pedido.
+⚠ El detalle completo de esta regla vive en **`docs/MODULO-HORAS-COLA.md`** (movido el 2026-10-13, poda de CLAUDE.md). **Leerlo ENTERO antes de tocar este módulo** — no se resume acá para no cargar en cada sesión lo que sólo hace falta cuando se toca esto.
 
 ## ⚠ REGLA (Luis, 2026-09-28, v23.68): el trabajo en racks sin tramo se INFIERE — y el admin abre en la Vista TV
 
@@ -8972,77 +8238,7 @@ abre un **hilo** de comentarios sobre el estado de esa recepción. Badge azul co
 
 ## ⚠ REGLA (Luis, 2026-10-06, v27.21): ADS — ALERTAS DAMIÁN STOCK (`ads.js`)
 
-Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **violeta** (`#adsBadge`, `gv_ads_badge()`).
-
-- **Entregas talleristas** (`gv_ads_talleristas(p_n, p_incluir_actual)`): por (proveedor de la OC, código) en las
-  últimas N OC (fechas de generación, rubro `Art Term`). La OC de cada semana REEMPLAZA a la anterior, así que
-  **pedido = 1.ª OC del rango + Σ max(0, OC_k − (OC_{k−1} − recibido_{k−1}))** (ejemplo de Luis: 300/150 + 200/100 →
-  350 pedido, 250 entregado). ~~Entregado = `cantidad_recibida` (imputado a la OC)~~ → **v27.28 (Luis, D6: *"estamos
-  tratando de evaluar stock real y quiebres reales"*): Entregado = lo que RECIBIÓ VIRGILIO** de ese proveedor y código
-  (`Entregas Tallerista Virgilio` + `Entregas Prov AT`, `gv_prov_match` + `GV_OC_Fabrica_Para`) desde la 1.ª OC del
-  rango hasta la OC siguiente a la última (o hoy), **topado en lo pedido por artículo** (el exceso de un código no tapa
-  a otro). Las dos tablas de entregas quedan separadas (D8, Luis: *"dejalo"*). La OC más nueva
-  no entra por defecto (su semana corre). Tallerista con % < umbral → cuenta en el badge. Medido 06/10: badge 13 → 10
-  (Lucho 40 → 51 %, Poly 36 → 60 %, Pedernera 22 → 76 %). **v27.31**: lo recibido cuenta desde la 1.ª OC de ESE artículo en el rango, no desde la 1.ª OC del rango (599E: 34 cajas del 28/09 se contaban contra una OC del 30/09 → «100 %»). `sql/gv_ads_recibido_virgilio_v2731.sql`.
-- **v27.73 (Luis, 07/10): rango 1 a 12, cada opción con la fecha de la OC más vieja que entra (`1 - 07.10.26`, `gv_ads_oc_fechas`); la OC en curso entra SIEMPRE (se fue la casilla).**
-- ⚠⚠ **v28.95 (Luis, 09/10): el % de talleristas es un SNAPSHOT de las OC CERRADAS — la OC vigente NO entra nunca** (pantalla, Excel y badge; `Stock_Config.ads_incluir_actual = 0`). Retira el «entra SIEMPRE» de la v27.73. El selector dice la fecha de la n-ésima OC cerrada. **v28.96**: el selector se llama «Rango últimas cerradas»; el recuadro de la derecha (pantalla y Excel) es la **OC VIGENTE** (`gv_ads_talleristas(1, true)`), no la última del período; la pestaña Stock sigue leyendo el período CON la vigente (`_ads.tallInc`).
-- **v27.75 (Luis): el rango abre siempre en 4 (el guardado sólo vale para el badge) y la Proporción lleva las cajas: `Garcia 57 % (140)`; en el Excel separadas con « - ». Con un solo tallerista también: `Lucho (350)` (v27.76, D1).**
-- Rango, umbral (50 %) e «incluir la OC en curso» viven en `Stock_Config` (`ads_n_ocs`, `ads_umbral`,
-  `ads_incluir_actual`); los guarda `gv_ads_config_guardar` (supervisor). Cambiarlos es un `update`.
-- **Stock** (`gv_ads_stock2()`, v27.22; `gv_ads_stock` queda sin llamador, de rollback): saldo a 10/20/30 días =
-  (góndola + racks + racks CH + a guardar + **excedente**, D2 Luis 06/10) − NP programadas sin
-  pickear con entrega hasta hoy+N (vencidas incluidas, `gv_demanda_programada_pendiente`) − Est. Madre × N/30.
-  Negativo = quiebre. Con la última OC vigente del código y el % de entrega del tallerista en ese artículo.
-  **Sólo artículos CON TALLERISTA** (v27.23, Luis: *"los importados no"*): proveedor activo en `OC_Maximos`. Un importado
-  que igual se le compra a un tallerista local (437E, 590E, 26…: 34 códigos) entra, porque tiene OC (D4, Luis 06/10: *"quedan, tienen tallerista"* — no volver a proponer sacarlos). 316 → 220 artículos;
-  quiebres 45 / 61 / 90 a 10/20/30 días.
-- **Botón del panel (D3, Luis 06/10)**: a la IZQUIERDA badge violeta = talleristas a revisar; a la DERECHA semáforo
-  (`gv_ads_badge_stock`): **rojo** = quiebre a 10 días · **naranja** = los que recién quiebran a 20 · **amarillo** = los que
-  recién quiebran a 30 (cada artículo cuenta una vez, en su color más urgente). Cada pastilla lleva su leyenda **10d / 20d / 30d** al lado del número (v27.25, Luis). Son DOS pestañas (D1: no hay tercera).
-- Medido 06/10 (últimas 4 OC cerradas): 13 de 18 talleristas debajo del 50 %; quiebres 80 / 98 / 127 a 10/20/30 días
-  (con excedente) → semáforo 80 · 18 · 29.
-  El % bajo refleja también la imputación (Oscar / Tierra Nativa se reciben como Log/ Fabr): mirar antes de reclamar.
-- Sub-tabla (v27.29, Luis): **Fecha · Pedida · Recibida son de la ÚLTIMA OC** y van bajo un rótulo común «Última OC»
-  dentro de un recuadro violeta. «Incluir la OC en curso» viene **prendido** por defecto.
-- **Pestaña Stock (v27.30, Luis)**: TODO se calcula al horizonte elegido (10/20/30; «todos» muestra todo al último
-  elegido). Columnas: Cód · Descripción · Stk · Comprom. H d · Est. Madre H d (mes × H/30) · Saldo H d · Días cobertura
-  ((disp − comprom. H) ÷ Est. Madre diaria) · recuadro «Última OC» (Fecha · Pedido · **Recibido** · %) · Proporción (v27.42, antes «Dist.»: tallerista
-  ; v27.33: sólo a quién le corresponde, y con varios la parte de cada uno en lo pedido del rango — lo entregado está en la otra pestaña). **Recibido = lo que recibió Virgilio de ese proveedor desde la fecha de la OC** (D10), no lo imputado:
-  `gv_ads_stock3` (= stock2 + `oc_rec_v`). `sql/gv_ads_stock3_v2730.sql`.
-- **v27.78 (Luis, 07/10): pestaña Stock sin «Días cobertura»; el recuadro es «Período (N OC)»: Fecha últ. OC · Pedido período · Recibido período · % = suma de todos los talleristas del código en las N OC del rango (lo mismo que Entregas talleristas). La Proporción ya era del período.**
-- **v27.81 (Luis, 07/10): Proporción va ADENTRO del recuadro Período, y columna «Entrega est. H d»** = Σ por tallerista min(lo que le falta, recibido ÷ días desde su 1.ª OC del período × H). El detalle por tallerista va en el `title`; también en el Excel.
-- **v27.82 (Luis, 07/10): la Entrega est. va DISCRIMINADA por tallerista** con su parte de lo estimado (`Garcia 83 % (50) - Poly 17 % (10)`), en el TOOLTIP de la celda (v27.85, Luis: dato aparte, no suma al Saldo ni al Stk) y en la columna «Entr. est. x tall.» del Excel (`estDist` de `_adsStockCalc`).
-- ~~**Días cobertura (v27.62, Luis D16)**~~ (retirada en v27.78): (Stk − Comp. H) ÷ (Est. Madre mes ÷ 30). Si Stk no cubre lo comprometido → **0** aunque no tenga Est. Madre; si sobra y no hay Est. Madre → **«sin venta»** (antes quedaba vacío: 231, 233, 567).
-- **Excel de stock (v27.87, Luis): formato de SU Excel «ADS_stock_10d_20261007_1»** — Arial 14, rótulo alto 72 (Comprom · E M · Ped/Rec período · Entr est), anchos fijos 5,86 · 14,86 · 6 · 7,14 · 6,29 · 6 · 5,57 · 8,71 · 6,29 · 5,29 · 6,29 · 21 · 18,86, todo con ajuste de texto y alto de fila según el texto (`_adsAltos`). «Entr. est. x tall.» va lleno en todas las filas (también un solo tallerista, desde v27.86).
-- **Excel de stock v27.91 (Luis, «ADS_stock_10d_20261007_3», optimización horizontal máxima)**: cada tallerista en su **sub-fila** (salto de línea dentro de la celda) en «Entr. est. x tall.» y «Proporción»; rótulo «Cód», borde grueso abajo del rótulo, descripción a la izquierda SIN ajuste, escala de impresión 74, anchos de su archivo (A 7,71 · L 23,29 · M 27,43). El alto de fila sale de la cantidad de sub-filas.
-- **Excel de talleristas (v27.89, Luis): formato de SU Excel «ADS_talleristas_4OC_20261007»** — Arial 14, rótulo alto 72, filas de 18, anchos fijos 12,71 · 12,43 · 23 · 7,43 · 7,57 · 7,57 · 8,43 · 8,29 · 7,57 · 8,29; texto a la izquierda, números centrados. **v27.90: los anchos van EXACTOS como su archivo (12,7109375…) y el estilo Normal queda en Arial 10** — de esa fuente sale la unidad del ancho; con Normal en 14 las mismas columnas se ven distintas. El 14 va en la fuente de las celdas. El % de talleristas sale como texto «71%» (entero).
-- **v27.97 (Luis, 07/10, caso 609): la Entrega est. sólo cuenta a los talleristas de la OC ACTUAL del código** (la de fecha más nueva): la OC de la semana reemplaza a la anterior, así que el que salió no entrega más. Pedido/Recibido/Proporción del período no cambian.
-- **v28.28 (Luis, 07/10): los dos Excel de ADS (stock y talleristas) llevan TODOS los bordes** (fino en las 4 caras de cada celda; el rótulo con el de abajo grueso) → se imprimen en cuadrícula. `_adsXlsxFormato`, `borders` 1 y 2.
-- **v28.30 (Luis, 07/10, «ADS_stock_10d_20261007_8_1», *"ese es el formato que quiero"*): Excel de stock con SUS anchos exactos** (A 11,29 · B 14,86 · C 5,29 · D 5,14 · E 7,14 · F 6 · G 7,71 · H 8,71 · I 6,29 · J 5,29 · K 6,14 · L 19,14 · M 27,43), filas de **2 renglones mínimo** (36; 54 / 72 si una sub-fila de L o M no entra: `_adsAltos(…, 2, 1.4)`), escala de impresión **68** y márgenes normales de Excel (`margenStd`). Retira los anchos y la escala 75 de la v27.99.
-- **v28.01 (Luis, 07/10): en el Excel de stock el SALDO H d es la columna C (primera de datos) y va en NEGRITA** — es el dato más importante. Orden: Cód · Descripción · Saldo · Stk · Comprom · E M · Fecha últ. OC · … (`negrita` de `_adsXlsxFormato`, xf 5).
-- **v28.00 (Luis, 07/10): TODAS las celdas del Excel van centradas en VERTICAL** (B, L y M incluidas; antes el texto a la izquierda quedaba abajo). Lo horizontal sigue como su archivo.
-- **v27.99 (Luis, 07/10, «ADS_stock_10d_20261007_5», *"así tal cual"*)**: col G (Fecha últ. OC) 8 · L (Entr. est. x tall.) 19,14 · escala de impresión 75; el resto como la v27.91.
-- **v27.98 (Luis, 07/10): en el Excel de stock «Entr. est. x tall.» va «Nombre: cajas»** (`Pettofrezza: 0`, un renglón por tallerista de la OC actual, sin %; `estCaj` de `_adsStockCalc`). Retira el «sólo el número» de la v27.94. La pantalla (tooltip) sigue con % y cajas.
-- **v28.43 (Luis, 07/10): la pestaña Stock se ORDENA por el saldo del lapso elegido** (10/20/30), de mayor déficit a menor (antes siempre por el de 10 d). **El semáforo del botón muestra ACUMULADOS**: 10d = quiebran a 10 · 20d = quiebran a 20 (incluye los de 10) · 30d = quiebran a 30. Retira el «recién quiebra» de la v27.22.
-- **v28.42 (Luis, 07/10): la pestaña Stock se ORDENA por el saldo del lapso elegido** (10/20/30), de mayor déficit a menor (antes siempre por el de 10 d). **El semáforo del botón muestra ACUMULADOS**: 10d = quiebran a 10 · 20d = quiebran a 20 (incluye los de 10) · 30d = quiebran a 30. Retira el «recién quiebra» de la v27.22.
-- **v28.44 (Luis, 07/10): la Entrega est. usa la ENTREGA PROY. cargada a mano en la OC vigente** (`Ordenes_Compra.gv_entrega_proy`, consultada al tallerista) en vez de la estimación, por tallerista. ~~v28.45: × H/7~~ → **v28.47 (Luis): NO se escala al plazo** — la OC completa ya ES la cobertura (30 días × índice). Entrega est. = cuánto de la OC VIGENTE va a entregar cada tallerista: lo declarado o, sin dato, cantidad de la OC × el % que viene entregando en el período; menos lo ya recibido de esa OC. Rótulo «Entrega est. OC». El tooltip dice «cargado en la OC» y el número va subrayado punteado. Lectura rota = queda el ritmo. `tests/ads-entrega-proy.cjs`.
-- **v28.64 (Luis, 08/10): «Entrega est. OC» va X/Y, una fila por tallerista**: X = lo proyectado de la OC vigente (lo cargado en la OC; si la casilla está VACÍA = OC × % que viene entregando, con **\***; un 0 cargado es dato, sin \*), Y = lo pedido en esa OC (`estXY`). Un tallerista con 0 % en el período da 0\* de estimado: es la cuenta, no un bug. `tests/ads-entrega-proy.cjs`.
-- **v28.86 (Luis, 08/10): Pend. est. = Entrega proy. de la OC si está cargada; si no, la OC vigente × el % que entregó el tallerista en el último período CERRADO** (`gv_ads_talleristas(n, false)` → `_ads.tallCerr`), menos lo ya recibido. Antes el % incluía la OC vigente y lo recibido se contaba dos veces (Garcia 550: 247 × 14 % − 35 = 0). Medido 08/10: sólo 248 tiene Entrega proy. cargada (83), y casi todos los talleristas entregaron 0 en el período cerrado, así que el 0* es real.
-- **v28.92 (Luis, 08/10): Excel de stock = la tabla de la pantalla** (Cód · Descripción · Tallerista · Stk · Comp. · E.M. plazo · Saldo en negrita · Últ. OC · Pedido · Recib. · Pend. est., una sub-fila por tallerista). **Excel de talleristas SIN columna Tallerista**: una fila-título por tallerista con su % (combinada, negrita, fondo gris; `titulos` de `_adsXlsxFormato`) y debajo sus artículos.
-- **v28.91 (Luis, 08/10): la Entrega proy. de la OC = lo que el tallerista dice que entrega EN LA SEMANA de la OC** (X = eso − lo ya llegado desde la OC); si X pasa a Y se deja así (D4, no topear). Pestaña Stock ordena Cód · Descripción · Tallerista. Se fueron los renglones explicativos de las dos pestañas (v28.90).
-- **v28.89 (Luis, 08/10): Pend. est. = X/Y por tallerista de la OC vigente**: Y = pedido − ya entregado; X = Entrega proy. cargada en la OC (vacía ≠ 0) o, sin dato, OC × % del período cerrado (con *), menos lo ya entregado. X puede pasar a Y si declararon más de lo que falta.
-- **v28.85 (Luis, 08/10): la letra de las dos pestañas de ADS crece con la pantalla** (`font-size:clamp(14px,1.1vw,26px)`; anchos y rellenos en em), datos centrados en vertical, descripción cortada con «…» y el texto entero en el tooltip.
-- **v28.84 (Luis, 08/10, «optimizame la tabla»)**: «Pend. est.» muestra sólo X (la Y era el mismo número que Pedido), rótulos cortos (Comp. · Saldo · Recib.), celdas de 3 px. ⚠ `.map(_adsN)` le pasa el índice como decimales (salía «87,0» en la 2.ª fila): siempre `map(function (v) { return _adsN(v); })`.
-- **v28.83 (Luis, 08/10): Pedido y Recibido son los de la ÚLTIMA OC**, una línea por tallerista (como Estim. pend.), no la suma del período.
-- **v28.82 (Luis, 08/10): sin recuadro «Período»**: a la derecha del Saldo van Últ. OC · Pedido · Recibido · **Estim. pend.** con el mismo encabezado que el resto (sin %), tabla `ads-stk` en 15 px. Estim. pend. = X/Y por tallerista con **X = lo que FALTA** (proyectado de la OC vigente − lo ya recibido; * si la casilla está vacía), Y = lo pedido en esa OC.
-- **v27.92 (Luis, D3, 07/10): saldo = disponible − el MAYOR entre comprometido H d y Est. Madre H d, NO la suma** (lo comprometido ya es parte de la venta que mide la Est. Madre; sumarlos contaba dos veces). Quiebres 39/61/88 → 32/46/67. `gv_ads_stock2` (marcador `v27.92-max`), centinela, `sql/gv_ads_saldo_max_v2792.sql`.
-- **v28.56 (Luis, 08/10): la columna es «E.M. plazo Xd» = Est. Madre × max(0, X − días que tarda en salir) / 30, y saldo = disponible − comprometido − E.M. plazo** (se SUMA, no el mayor): los pedidos que entran en el plazo salen recién L días después. L = promedio (entrega − fecha del pedido) de las NP web con entrega en las últimas 2 semanas (`gv_ads_lead_auto`, 12,7 d al 08/10) salvo que un supervisor lo fije en ADS → Stock «Tarda en salir» (`Stock_Config.ads_lead_dias` por `gv_ads_lead_guardar`; vacío = automático). 550: −57 / −93 / −127; semáforo 17 / 37 / 60. Retira el «mayor» de la v27.92. Centinela 351. `sql/gv_ads_em_plazo_v2857.sql`, `tests/ads-em-plazo.cjs`.
-- **v28.59 (Luis, 08/10, D4): la E.M. plazo usa la DISTRIBUCIÓN real de lo que tarda un pedido en salir** (no el promedio fijo): cron **146** `gv-ads-lead-diario` (04:19 ART) guarda en **`GV_ADS_Lead`** el promedio y la curva F(d) de las NP web entregadas en las últimas 2 semanas; `gv_ads_em_dias(H)` = Σ_{t=0}^{H-1} F(H−t) días de Est. Madre (al 08/10: 2,14 / 8,36 / 18,26 de 10/20/30). Si se escribe a mano en «Tarda en salir» queda guardado (`Stock_Config.ads_lead_dias`) y vale el escalón max(0, H − días); el botón **«%»** («Promedio real de las últimas 2 semanas») vuelve al automático. 550: −64 / −97 / −131; semáforo 21 / 40 / 62. Centinela 351 (`ld\.e10`). Y ADS escribe el código con el cero adelante (`_adsCod`, 58 → 058, regla v16.23). `sql/gv_ads_lead_distribucion_v2859.sql`, `tests/ads-em-plazo.cjs`.
-- **Saldos en cajas ENTERAS (v27.32, Luis D11)**: quiebre sólo si falta media caja o más (antes −0,3 de una Est. Madre de 1 caja/mes contaba). Rojo 45 → 40. `sql/gv_ads_saldo_cajas_enteras_v2732.sql`.
-- Rango y umbral se guardan en `Stock_Config` **sólo con «Guardar para el badge»**: cambiarlos sin guardar vale para esa
-  pantalla y se pierde al cerrar.
-- **Excel (v27.34, Luis)**: «Descargar Excel» en Talleristas (una fila por tallerista + artículo) y en Stock un botón por rango (10 / 20 / 30 días, sólo lo que quiebra a ese horizonte). La pantalla y el Excel usan la misma cuenta (`_adsStockCalc`). **v27.40: el formato es el del Excel de Luis** (`_adsXlsxFormato`): talleristas sin «% tallerista», anchos fijos chicos (los de su archivo: 11,14 · 6,57 · 23 · 5,14 · 5,29 · 5,86 · 4 · 6,57 · 5,86 · 6), rótulo de alto 45 centrado con ajuste, datos centrados salvo tallerista / descripción / dist., Arial 10, fila 1 congelada, zoom 130 y al imprimir entra a lo ancho (A4 vertical). El de stock va con el mismo molde y rótulos abreviados (Comp. · Días cob. · Fecha/Ped./Rec./% últ. OC, v27.42) para que ninguna palabra se parta; Proporción al ancho de su dato (tope 24). **Optimización horizontal: no ensanchar columnas.**
-- `sql/gv_ads_alertas_damian_v2720.sql`, `sql/gv_ads_excedente_semaforo_v2722.sql`, `tests/ads-alertas.cjs`.
+⚠ El detalle completo de esta regla vive en **`docs/MODULO-ADS.md`** (movido el 2026-10-13, poda de CLAUDE.md). **Leerlo ENTERO antes de tocar este módulo** — no se resume acá para no cargar en cada sesión lo que sólo hace falta cuando se toca esto.
 
 ## ⚠ REGLA (Luis, 2026-10-06, v27.36): Estadísticas ISIS vive en la pestaña 📈 EST. MADRE — plantillas subidas y bajada por mes
 
@@ -9559,6 +8755,67 @@ sale del catálogo y queda en `Insumos_Historial`), **sin tocar la ubicación** 
 están ahí, lo corrige el conteo, no un aviso. Detalle, verificación y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
 §3.v3000. Lo sostiene `tests/stk-busca-decimal.cjs`.
 
+## ⚠⚠ REGLA (Luis, 2026-10-13, v30.06): el REMITO de una recepción NO SE PIERDE — columna `gv_doc`
+
+(el comentario de la columna, el `.sql` y los textos del código dicen **v30.06**: es la versión con la que se
+aplicó. Salió publicada con la v30.09 porque otras sesiones se llevaron los números en el medio.)
+
+**Luis, textual:** *"que no se pierda dios mio, como que se pierde? como columna es lo más elegante, no?"*.
+
+> **El papel va en el MOVIMIENTO: `Movimientos_Stock.gv_doc`** (jsonb)
+> `{tipo, remito, fecha_remito, factura, fecha_factura, proveedor}` — **las mismas claves en TODAS las filas de
+> esa recepción**, porque es UN papel. Se lee por `gv_insumo_recepcion_marca` (`remito`, `factura`, `doc_tipo`).
+
+**Lo que estaba roto, medido:** la recepción pedía el remito en el paso de documentación y `_insDocState` —el
+estado de ese formulario— lo borraba `insDocCancel` al cerrar el modal, dos líneas antes de abrir la lista. El
+movimiento nunca lo llevó. **Y había un segundo agujero peor**: `insEnviar` leía el remito de ese mismo objeto
+para pasárselo a GP2 (`_insGp2Enviar`), así que **las OC de bolsas se recibían con el remito vacío**. Los dos se
+arreglan con lo mismo: `insDocOk` copia el papel a **`window._insDoc`**, que vive hasta que la recepción se
+manda o se anula.
+
+| pieza | qué hace |
+|---|---|
+| `insDocOk` | guarda el papel en `window._insDoc` (sólo lo que tiene algo) |
+| `insConfirmar` | arma `doc` y lo pone en **cada** row (`row.gv_doc`); se lo pasa a GP2; al terminar limpia `_insDoc` |
+| `insAnular` | limpia `_insDoc`: el papel de una recepción anulada no se arrastra a la siguiente |
+| columna | `alter table … add column gv_doc jsonb` — **nullable, prefijo `gv_`, sin default y sin backfill**, como manda la regla de las tablas compartidas con Producción Virgilio. Índice de expresión sobre `gv_doc->>'remito'` |
+
+⚠ **Es jsonb y no cuatro columnas** a propósito: son 5 datos del mismo papel sobre una tabla de 80 mil filas, y
+el que se busca (el número de remito) tiene su índice. Al agregar un dato del papel se agrega una clave, no una
+columna.
+
+⚠ **Forward-facing**: lo recibido antes de hoy queda con `gv_doc` nulo — no se inventa el remito de una
+recepción vieja. La lectura devuelve `remito` nulo ahí.
+
+⚠ `create or replace view` **borra las `reloptions`**: el `security_invoker = true` de
+`gv_insumo_recepcion_marca` se repone en el mismo bloque (verificado como `anon`).
+
+### ⚠ v30.10 (Luis, 13/10, D1 «sí»): el papel va TAMBIÉN en la ENTREGA de insumos y en la RECEPCIÓN de mercadería
+
+| dónde | qué lleva `gv_doc` | obligatorio |
+|---|---|---|
+| **RI** recepción de insumos | remito / factura y sus fechas (el papel del proveedor) | **sí** (como siempre) |
+| **EI** entrega de insumos | el **remito NUESTRO**, el que sale con la mercadería | **sí** (v30.12, Luis: *"obligatorio para mandar insumos que salgan con remito"*) — se retira el «Sin remito — seguir» de la v30.10 |
+| **RT** recepción de mercadería (`recepcion.js`) | remito, factura y **las dos fechas**, más el proveedor | ya se pedían; antes sólo el número llegaba al `ref` |
+
+- En **EI** el modal del papel aparece después del destino (un paso más, pedido por Luis) y su «‹ Atrás»
+  vuelve a la lista de destinos correcta (`window._insEiSub`: inyectores u otros). **Sin número no sale**: el
+  campo se pinta en rojo y no hay ninguna puerta que lo saltee (el 2.º argumento de `insDocOk` ya no existe).
+- En **RT** el movimiento ya llevaba `ref: opState.remito` —el número, sin decir si era remito o factura— y
+  las **fechas y el otro número se perdían**: vivían en `Entregas Prov AT` / el recibo, no en el libro de
+  stock. `ref` se conserva igual (lo leen el dedup y la imputación de OC) y el detalle va en `gv_doc`.
+- **D5 (Luis): «sí, para adelante»** — ningún backfill. Lo recibido o entregado antes de hoy queda con
+  `gv_doc` nulo, y no se inventa el papel de un movimiento viejo.
+- Candados: `node tests/ins-remito-guardado.cjs` (bloque (c): EI pide el papel, **sin número frena y marca el
+  campo**, no queda puerta de escape, y con número lo guarda) · `node tests/rcp-remito-en-movimiento.cjs` (candado estático sobre
+  `recepcion.js`: la fila lleva `gv_doc` armado desde `opState`, sin número escrito a mano, y no se perdió el
+  `ref`).
+
+**Chequeo:** `node tests/ins-remito-guardado.cjs` (corre la recepción de verdad y mide el POST: el papel en las
+dos filas, con su fecha y su tipo; sin papel no escribe `gv_doc`; anular no lo deja colgado) ·
+`select cod_art, origen, marca, remito from public.gv_insumo_recepcion_marca order by id desc limit 5;`
+`sql/gv_mov_stock_gv_doc_v3006.sql`, §3.v3006.
+
 ## ⚠⚠ REGLA (Luis, 2026-10-13, v30.05): el operario SÍ PUEDE crear un código nuevo al RECIBIR — con el aviso de parecidos
 
 **Luis, textual:** *"hay que darles la opción de poder crear códigos nuevos cuando reciben si no están en la lista
@@ -9691,155 +8948,7 @@ Uni**. **No se perdió ningún movimiento**: las líneas se reexpresaron, no se 
 
 ## ⚠⚠ REGLA (Luis, 2026-10-13, v29.74): LA TABLA DE EQUIVALENCIAS DE INSUMOS ES UNA — `GP2.insumo_equivalencia`
 
-**Luis:** *"tiene que haber una tabla de insumos que muestre la equivalencia entre un insumo de virgilio, de
-cervantes y el codigo ISIS que tienen. Punto."* · *"¿cómo catzo terminamos teniendo dos?"*
-
-> **Toda equivalencia de códigos de insumos vive en `GP2.insumo_equivalencia`** (`cod_virgilio` ·
-> `componente_id` → cod de Cervantes · `isis`). Legible: **`GP2.v_insumo_equivalencia`**. Se edita en
-> GP2 → Stock general → pestaña Virgilio. **No se crea otra, ni una columna que haga lo mismo.**
-
-Había dos, y la vieja **no era una tabla: era una COLUMNA** (`GP2.componente.codigo_virgilio`, 8 filas, sólo
-bolsas, de la v14.95). Por eso nadie la encontró el 30/09 cuando hizo falta un mapeo, y se creó la tabla al
-lado. Mismo pozo que el módulo de Matricería duplicado.
-
-⚠ **Y la columna nació mal, no se desalineó:** estaba cargada con abreviaturas del lado de Cervantes (`NV`,
-`NR`, `N25`, `PP`, `PS`, `PE`) que **nunca existieron en Virgilio** — los códigos de Virgilio son `NY Virgen`,
-`PP 2630`, `NY Recup`… desde el 02/07. Coincidían sólo `ABS` y `AI`.
-
-**Lo que costó, medido el 13/10:** `GP2.movimiento` tipo `envio_inyector` tenía **0 filas en toda su
-historia**, mientras en Virgilio salieron **86 bolsas (2.150 kg)** a inyectores entre el 25/08 y el 08/10
-(Rafael 57, Manolo 29). 7 de las 9 bolsas no matcheaban, así que `enviar_material_virgilio` **no se llamaba
-nunca y encima en silencio** (`_insGp2Mat` devolvía null y la fila salía del lote sin avisar). El espejo bajaba
-la 57 igual: los kg se evaporaban.
-
-⚠ **No hay desfase de stock que ajustar** (medido): el espejo del 09/10 fijó la 57 al saldo real de Virgilio
-(la **subió de 0 a 5.525 kg**: GP2 nunca había tenido stock de bolsas), y esas salidas ya estaban netas ahí.
-Lo que no existe es el **circuito del inyector: ni las salidas ni las devoluciones** (0 movimientos con las
-ubicaciones 58-61 en toda la historia). Cargar sólo las salidas dejaría a Rafael debiendo kg que ya devolvió
-inyectado: arrancarlo pide **un conteo de lo que cada inyector tiene hoy**, no un backfill.
-
-| pieza | qué cambió |
-|---|---|
-| `GP2.componente.codigo_virgilio` | **borrada** (backup `zz_backups."GV_Backup_CodigoVirgilio_20261013"`) |
-| `enviar_material_virgilio` · `recibir_oc_virgilio` | resuelven el componente por `insumo_equivalencia`; sin fila, **fallan ruidoso** |
-| `material_virgilio_bundle` · `oc_pendientes_virgilio` | devuelven el **código REAL** de Virgilio (el front de GV matchea con `_insK()`, upper+trim: no hubo que tocarlo) |
-| `recalcular_maximo_material` | «está en Virgilio» = tiene fila en la equivalencia |
-| `public.gv_gp2_inventario` | `codigo_virgilio` sale de la equivalencia — ⚠ con `CREATE OR REPLACE`, nunca `DROP CASCADE` (cuelgan `gv_gp2_stock_componente` y `gv_importados_ordenes`: ese cascade ya dejó Importados en 404 en la v16.20 y la v16.33) |
-| front (`index.html`) | **una bolsa sin equivalencia NO pasa en silencio**: con un inyector elegido, cualquier ítem que el bundle no reconozca frena con el confirm («¿registrar igual sólo en Virgilio?»). El criterio **no usa `insCatOf`**: si el catálogo de categorías no se leyó devuelve `""` para todo y el guard no frenaría nada |
-| `isis` | cargado desde `Insumos.isis`: **29 de 79**. Las bolsas tienen el ISIS igual al código de Cervantes (2455 = ABS); ⚠ **AI no**: componente 2465, ISIS 1135 — mirar si no es un error de carga en `Insumos` |
-
-⚠ **`EBA` queda CERRADO** (Luis, 13/10: *"se definirá después; el admin que está creando la página tiene que
-setear el código de Cervantes"*): sus 20 bolsas (celda Q34) no cruzan al espejo porque no tiene componente en
-Cervantes. **No se da de alta desde acá y no se vuelve a sugerir.**
-⚠ **`CAJA Nº 1` y `CAJA Nº 22` tienen el mismo ISIS (`0127`)** en `Insumos`: uno de los dos está mal.
-⚠ Los centinelas de las 3 funciones de **GP2** no entran en `GV_Reglas_Centinela` (sólo alcanza `public`):
-del lado de GP2 lo sostienen sus tests. En GV quedan los ids 388 y 406.
-
-`sql/gv_insumo_equivalencia_unica_v2974.sql` (rollback en la cabecera), `tests/ins-bolsa-sin-equivalencia.cjs`.
-
-### ⚠ v29.79 (Luis, 13/10): GP2 es el CANÓNICO del código ISIS — se replica a `Insumos`
-
-**Luis:** *"si hay diferencias actualmente, asumi que el de GP2 es el canonico y remplazacelo a Virgilio"* ·
-*"que haya boton para confirmar que se guarda/vincula el codigo ISIS con el de Virgilio y/o con el de Cervantes
-o en cualquier permutacion de esas combinaciones"*.
-
-> El dueño del ISIS de un insumo es **`GP2.insumo_equivalencia.isis`**. Lo que se guarda ahí se escribe en
-> **`public."Insumos".isis`**, **incluido vaciarlo**. **Nunca al revés.**
-
-- Lo hace el trigger **`public.gv_insumo_isis_sync`** (de GV, sobre la tabla de GP2 — mismo patrón que
-  `gv_ingreso_virgilio_denegado`, v25.37). **No hay ciclo**: `gv_gp2_espejo_sync` copia `Insumos.isis` a
-  `GP2.virgilio_insumo_stock`, que es **otra** tabla, y el bundle del editor ya leía la equivalencia primero.
-- Pasa el bloqueo `aaa_gv_anon_bloqueo` porque es SECURITY DEFINER (`current_user` = postgres, regla v29.16).
-- Del lado de GP2 (Stock general v3.7.0): el botón **«🔗 Vincular»** tiene columna propia y guarda en
-  **cualquier permutación** (sólo Cervantes · sólo ISIS · los dos); un ISIS vacío **limpia** el dato en los
-  dos lados. El vínculo con Cervantes no se borra desde ahí, a propósito.
-- ⚠ **Para corregir el ISIS de un insumo de Virgilio se edita en GP2**, no en `Insumos`: si se toca sólo del
-  lado de Virgilio, el próximo guardado desde GP2 lo pisa.
-- Rollback: `drop trigger zz_gv_insumo_isis_sync on "GP2".insumo_equivalencia;`
-  Adenda en `gestion-productiva-2.0/db/migracion_insumo_equivalencia_unica_20261013.sql`.
-- **El Cód. Cervantes del editor sólo acepta códigos que EXISTEN** (Luis, 13/10, Stock general v3.8.0): es un
-  `datalist` con todos los componentes de GP2; uno inventado no habilita el botón y no llega a la base.
-
-#### ⚠ Medido el 13/10 (Luis: *"hacé la prueba de que funcione bien. que no joda ningún stock real"*)
-
-> **VINCULAR NO MUEVE UN GRAMO DE STOCK.** Lo único que escribe es la fila de la equivalencia y el `isis`
-> de `Insumos`. Medido en transacción abortada: `Movimientos_Stock` 82.475 → 82.475 · `GP2.movimiento`
-> 45 → 45 · `GP2.inventario` 148.107,85 → 148.107,85 · el espejo 380.391,3 → 380.391,3.
-
-| qué se probó | resultado |
-|---|---|
-| los dos (Cervantes + ISIS) | GP2 `9991` → GV `9991` |
-| sólo ISIS (Cervantes vacío) | el componente **se conserva** (`coalesce`) y GV toma el ISIS nuevo |
-| ISIS vacío | limpia en los dos lados, como pidió Luis |
-| minúscula (`z23a`) | guarda la grafía real `Z23A` |
-| código de Cervantes inventado | frena con `COMPONENTE_INEXISTENTE` |
-| las 8 bolsas de material | cruzan a su componente (sólo falta **EBA**, cerrado); un envío de 2 bolsas de NY Virgen mueve 50 kg del sector 57 al inyector y **no toca `Movimientos_Stock`** |
-
-⚠ **El riesgo de que un ISIS vacío borre un dato bueno es HOY CERO, y así se mide**: la pantalla pre-carga
-el ISIS del espejo, y el espejo coincide con `Insumos` en **135 de 135** filas (0 casos de «espejo vacío y
-GV tiene»). Si alguna vez el espejo quedara atrás, vincular con el campo vacío **sí** borraría el ISIS de
-Virgilio: la consulta que lo mide es el `case` de `virgilio_insumo_stock` contra `Insumos` por `upper(cod)`.
-
-⚠ **Lo que sí mueve stock es el ESPEJO**: al vincular un código con saldo, le fija ese saldo en el depósito
-«<sector> en Virgilio». **No infla nada de Cervantes**: los 6 depósitos `virgilio_sector` tienen **0 filas en
-`v_nivel_stock`**. Centinelas al cierre: `gv_reglas_perdidas`, `gv_endpoints_rotos` y `gv_huellas_cambiadas`
-en **0**.
-
-#### ⚠ v29.87 (Luis, 13/10): el espejo NO espera al cron — vincular lo dispara en el acto
-
-**Luis, textual:** *"¿por qué tarda 10 min? debería ser lectura de una tabla en conjunto, instantáneo, no?"*.
-Tenía razón, y lo que se mide es el tamaño del desperdicio:
-
-| cuánto cuesta de verdad | medido 13/10 |
-|---|---|
-| calcular el stock de insumos **en vivo** (el bloque 1 de `gv_gp2_espejo_sync`) | **20 ms** · 163 filas |
-| `gv_gp2_espejo_insumos(null, true)`, los 5 rubros | **28 ms** |
-| leer el espejo ya copiado | 0,5 ms |
-| el cron 112 entero (4 bloques con sus md5) | 123 ms, **cada 10 min** |
-| el cron 152 del inventario | **cada 30 min** (`:19,:49`) |
-
-> **~40 ms de trabajo esperaban en una cola de 10 y 30 minutos.** El motivo nunca fue el costo: el espejo
-> se armó como **copia** por la Regla 0 de GP2 (GP2 no lee `public`).
-
-- **El hueco concreto**: el stock ya se adelanta solo en cada movimiento de insumos (trigger
-  `zz_gv_gp2_espejo_insumos` de `Movimientos_Stock`), pero **vincular no es un movimiento**, así que un
-  código recién vinculado no mostraba su stock en GP2 hasta el cron. Hoy lo dispara el vínculo:
-  **`public.gv_insumo_equiv_espejo`** (trigger `zz_gv_insumo_equiv_espejo` AFTER INSERT OR UPDATE OF
-  `componente_id` sobre `GP2.insumo_equivalencia`, mismo patrón que el del ISIS).
-- Medido: vincular N°56 tarda **57 ms** y sus **873 kg aparecen en el acto** en «Sector Fleje en Virgilio».
-  Un vínculo que cambia **sólo el ISIS no dispara** el espejo (4,8 ms, 0 filas de log).
-- ⚠ **Nunca frena el vínculo**: el error va a `GV_GP2_Espejo_Log` con `resultado = 'error'` y lo rehace el
-  cron. Rollback: `alter table "GP2".insumo_equivalencia disable trigger zz_gv_insumo_equiv_espejo;`
-- Centinela 420. `sql/gv_insumo_equiv_espejo_v2987.sql`.
-
-#### ⚠⚠ v29.89 (Luis, 13/10: *"si, pasala a vista"*): `GP2.virgilio_insumo_stock` ES UNA VISTA EN VIVO
-
-> **GP2 ya no lee una copia de hasta 10 minutos atrás: lee el saldo del momento, en 19,5 ms.**
-> La tabla que el bloque 1 de `gv_gp2_espejo_sync` rehacía cada 10 min **se borró**; en su lugar hay una
-> **vista** con las mismas 8 columnas (`actualizado_en = now()`), `security_invoker = true`.
-
-- **Es una excepción APROBADA a la Regla 0 de GP2** (GP2 no lee `public`). La pidió Luis; el precedente
-  que aprobó Thomas es **`GP2.v_produccion_todas`**, que lee `reg_prod_3_0`. **El resto del espejo sigue
-  siendo copia**: los bloques 2, 3 y 4 (ubicaciones, Mapa, categorías) y el cron 112 no se tocaron, y
-  tampoco `gv_gp2_espejo_insumos` / cron 152 / los dos triggers, que escriben el **inventario** de GP2 y
-  son otra cosa.
-- **Medido antes de aplicar** (transacción abortada): la vista devuelve las **mismas 163 filas y el mismo
-  md5** que la copia, y **`anon` 163 · `authenticated` 163** — nadie pierde filas. Ese chequeo no es
-  opcional: una vista con `security_invoker` sobre una tabla con RLS **no da error, devuelve MENOS filas**
-  (la trampa de la v20.45), y `Movimientos_Stock` tiene RLS prendida. Medido aparte: `anon` ve las 163
-  filas del depósito insumos y las 129 de `vista_insumos`.
-- **Quién la lee** (medido, no supuesto): `GP2.virgilio_insumos_sin_match_bundle` (el editor de
-  equivalencias) y `public.gv_insumo_isis_sync` (sólo la nombra en un comentario). **Ninguna vista**, y
-  nadie le escribía salvo el bloque 1 que se sacó.
-- ⚠ Los marcadores de la base dicen **v29.88** (otra sesión se llevó ese número mientras se escribía
-  esto): son la **llave**, no se cambian.
-- ⚠ **El marcador de la regla va en CÓDIGO** (`v_regla constant text := 'v29.88-vista'`), no en el
-  comentario que la explica: `gv_reglas_perdidas` limpia los comentarios antes de buscar (regla v21.82),
-  así que un marcador comentado vigila el rótulo y no la regla. Centinela **421**: si otra sesión repone
-  el bloque 1 desde una copia vieja, avisa.
-- Respaldo `zz_backups."GV_Backup_VirgilioInsumoStock_20261013"` (con RLS y sin escrituras).
-  **Rollback completo** —vuelve la tabla, su PK, su policy y el bloque 1— en la cabecera de
-  `sql/gv_insumo_stock_vista_v2988.sql`.
+⚠ El detalle completo de esta regla vive en **`docs/MODULO-INSUMOS-GP2.md`** (movido el 2026-10-13, poda de CLAUDE.md). **Leerlo ENTERO antes de tocar este módulo** — no se resume acá para no cargar en cada sesión lo que sólo hace falta cuando se toca esto.
 
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
 

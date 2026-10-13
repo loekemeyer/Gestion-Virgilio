@@ -11,7 +11,11 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
+<<<<<<< HEAD
 <link rel="stylesheet" href="gv-ui.css?v=30.10">
+=======
+<link rel="stylesheet" href="gv-ui.css?v=30.12">
+>>>>>>> origin/main
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6441,11 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
+<<<<<<< HEAD
 <script type="module" src="recepcion.js?v=30.10"></script>
+=======
+<script type="module" src="recepcion.js?v=30.12"></script>
+>>>>>>> origin/main
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10798,7 +10806,11 @@ async function flushQueue() {
   }
 }
 
+<<<<<<< HEAD
 const APP_VERSION = "v30.10";
+=======
+const APP_VERSION = "v30.12";
+>>>>>>> origin/main
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27717,7 +27729,8 @@ function insEnvioTipo() {
 function insEnvioTipoGo(sub) {
   window._insEnvioSub = (sub === "iny") ? "iny" : "otros";   // v29.28 (D9): las bolsas sólo salen a un inyector
   closeInsumoChooser();
-  askInsUbicacion("EI", sub === "iny" ? "iny" : "otros");
+  window._insEiSub = (sub === "iny" ? "iny" : "otros");   // v30.10: el Atras del papel vuelve a la lista correcta
+  askInsUbicacion("EI", window._insEiSub);
 }
 
 /* v9.15: Modal para preguntár DÓNDE se envía/recibe antes de abrir el modal de insumos.
@@ -27795,7 +27808,11 @@ function insUbicOk(mode, _gp2, _fijo) {
     askInsDocumentacion(mode, ubicacion);
     return;
   }
-  _insArrancarToggle(mode);   // v29.82: un solo «Enviar» (el de la botonera)
+  /* v30.12 (Luis, 13/10): "obligatorio para mandar insumos que salgan con remito". La ENTREGA
+     pide el remito NUESTRO —el que sale con la mercadería— y SIN ÉL NO SE MANDA. Se retira el
+     «Sin remito — seguir» de la v30.10: un insumo que sale sin papel es lo que no se quiere.
+     El número termina en la columna `gv_doc` de cada movimiento, igual que en RI. */
+  askInsDocumentacion(mode, ubicacion, { soloRemito: true });
 }
 
 /* v29.82 (Luis, 13/10) — "quiero que el menu sea reducido dependiendo de que es lo que estan
@@ -27856,8 +27873,8 @@ function askInsDocumentacion(mode, proveedor, opt) {
   window._insDocState = { tipoDoc: '', nroRemito: '', nroFactura: '', fechaRemito: '', fechaFactura: '', proveedor: proveedor || '' };
 
   ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;margin:auto;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
-    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📄 Documentación recibida</div>' +
-    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + (soloRemito ? "🏭 Cervantes · remito" : "¿Qué documentación recibís?") + '</div>' +
+    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📄 Documentación ' + (mode === "EI" ? "que sale" : "recibida") + '</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + (mode === "EI" ? "N° de remito con el que sale (si hay)" : (soloRemito ? "🏭 Cervantes · remito" : "¿Qué documentación recibís?")) + '</div>' +
     '<div id="insDocBody"></div>' +
     '</div>';
   ov.style.display = "flex";
@@ -27896,7 +27913,7 @@ function _insDocStep2(mode) {
     html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de Factura</label><input type="date" id="insDocFechaFactura" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;" value="' + hoyAR + '"></div>';
   }
   html += '<div style="display:flex;gap:10px;margin-top:14px;">' +
-    '<button onclick="' + (window._insDocSolo ? "insDocCancel();insRecibirCat()" : "_insDocStep1('" + mode + "')") + '" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
+    '<button onclick="' + (mode === "EI" ? "insDocCancel();askInsUbicacion('EI', window._insEiSub)" : (window._insDocSolo ? "insDocCancel();insRecibirCat()" : "_insDocStep1('" + mode + "')")) + '" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
     '<button onclick="insDocOk(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;font-size:16px;">Continuar</button>' +
     '</div>';
   body.innerHTML = html;
@@ -27921,7 +27938,22 @@ function insDocOk(mode) {
     st.fechaFactura = elFF ? elFF.value : '';
     if (!st.nroFactura) { ok = false; if (elNF) elNF.style.borderColor = '#dc2626'; }
   }
+  // v30.12 (Luis): sin número de remito NO se manda, ni al recibir ni al entregar. El `ok = false`
+  // de arriba ya pinta el campo en rojo; acá no hay ninguna puerta que lo saltee.
   if (!ok) return;
+
+  /* v30.06 (Luis, 13/10: "que no se pierda dios mio, como que se pierde?") — el papel se
+     GUARDA. `_insDocState` es el estado del FORMULARIO y `insDocCancel` lo borra al cerrar el
+     modal, así que acá se copia a `window._insDoc`, que sobrevive hasta que la recepción se
+     manda (insEnviar lo escribe en la columna `gv_doc` de cada movimiento) o se anula.
+     ⚠ Y por lo mismo el remito nunca le llegaba a GP2: `insEnviar` lo leía de `_insDocState`,
+     que para entonces ya era null — las OC de bolsas se recibían con el remito vacío. */
+  window._insDoc = {
+    tipo: st.tipoDoc || null,
+    remito: st.nroRemito || null, fecha_remito: st.fechaRemito || null,
+    factura: st.nroFactura || null, fecha_factura: st.fechaFactura || null,
+    proveedor: st.proveedor || window._insUbicacion || null
+  };
 
   // Cerrar modal y continuar al modal de insumos
   insDocCancel();
@@ -27958,7 +27990,7 @@ function _insArrancarToggle(mode) {
 function insDocCancel() {
   var ov = document.getElementById("insDocModal");
   if (ov) ov.style.display = "none";
-  window._insDocState = null;
+  window._insDocState = null;   // el estado del FORMULARIO; el papel guardado vive en _insDoc
 }
 /* ===== v14.95 — BOLSAS PLÁSTICAS ↔ GESTIÓN PRODUCTIVA 2.0 (schema GP2, mismo proyecto) =====
    La materia prima plástica (PP, ABS, AI, NV, NR, N25, PE, PS: bolsas de 25 kg) la COMPRA GP2 y
@@ -28779,6 +28811,14 @@ async function insConfirmar() {
   }
   // v9.15: incluir la ubicación origen/destino (preguntada al inicio) en el ref de cada row
   const ubic = window._insUbicacion || null;
+  /* v30.06 — el papel (remito / factura) que se pidió al abrir. Viene de `window._insDoc`, que
+     `insDocOk` deja puesto; `_insDocState` ya es null para cuando llega acá. Sólo las claves que
+     tienen algo: una recepción sin papel no escribe un jsonb de nulls. */
+  const doc = (function () {
+    const d = window._insDoc; if (!d) return null;
+    const o = {}; Object.keys(d).forEach(function (k) { if (d[k]) o[k] = d[k]; });
+    return Object.keys(o).length ? o : null;
+  })();
   /* v11.76: si el insumo tiene factor de conversión (Insumos_Factores) y la
      unidad elegida NO es la base, convertir qty a la unidad base para que el
      movimiento caiga en el mismo grupo de la vista.  Así no quedan saldos
@@ -28796,14 +28836,18 @@ async function insConfirmar() {
     if (insCatOf(it) === "cajas") { if (_insUEq(uni, "Paquetes")) { nota = " · cargado " + _insNum(qty) + " paquetes × " + INS_CAJA_X_PAQ; qty = qty * INS_CAJA_X_PAQ; } uni = "Uni"; }
     // v29.56 (Luis, 13/10): de qué empresa vino, en toda recepción. No parte el stock (sigue Mixto).
     if (isIn && it.marca) nota += " · marca " + it.marca;
-    return { cod_art: it.cod, descripcion: ((it.nombre || "") + nota).trim() || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: it.ubic || it.sector || null };
+    const row = { cod_art: it.cod, descripcion: ((it.nombre || "") + nota).trim() || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: it.ubic || it.sector || null };
+    // v30.06 (Luis, 13/10): el REMITO / la FACTURA van en el movimiento (columna gv_doc), no se
+    // pierden. Lo mismo para todas las filas de la recepcion: es UN papel.
+    if (doc) row.gv_doc = doc;
+    return row;
   });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
   // v14.95 — bolsas plásticas ↔ GP2: PRIMERO GP2 (es el que manda). Si rechaza, el operario decide
   // si registra igual sólo en Virgilio (queda a la vista que los dos ledgers difieren).
   let gp2Msg = "";
   if (_ins.gp2) {
-    const g = await _insGp2Enviar(_ins.gp2, sel, _ins.legajo, (window._insDocState && window._insDocState.nroRemito) || "");
+    const g = await _insGp2Enviar(_ins.gp2, sel, _ins.legajo, (doc && doc.remito) || "");
     if (!_ins) return;   // se cerró mientras esperaba
     if (!g.ok) {
       let sigue = false;
@@ -28816,7 +28860,7 @@ async function insConfirmar() {
   closeIns();
   window._insUbicacion = null;  // limpiar
   stockMove(rows);   // offline-safe (vir_stock_pend)
-  try { window._insDocState = null; } catch (_e) {}
+  try { window._insDocState = null; window._insDoc = null; } catch (_e) {}
 
   try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)." + (ubic ? "\n" + (isIn ? "Origen" : "Destino") + ": " + ubic : "") + gp2Msg); } catch (_e) {}
 }
@@ -28837,6 +28881,7 @@ async function insAnular() {
   // la apertura con anular_toggle_virgilio.
   const ok = gvToggleAnular(legajo, mode);
   try { opDraftClear(legajo); } catch (_e) {}   // el borrador ya no vale
+  try { window._insDoc = null; } catch (_e) {}  // v30.06: el papel de una recepcion anulada no queda
   closeIns(true);                                // cierra el modal; el toggle ya lo cerró gvToggleAnular
   try {
     renderLegajoHistory(legajo);
@@ -63514,7 +63559,11 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
+<<<<<<< HEAD
 <script src="importacion.js?v=30.10"></script>
+=======
+<script src="importacion.js?v=30.12"></script>
+>>>>>>> origin/main
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -66739,6 +66788,7 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
+<<<<<<< HEAD
 <script src="cobranzas.js?v=30.10"></script>
 <script src="hotsale.js?v=30.10"></script>
 <script src="estadisticas.js?v=30.10"></script>
@@ -66748,6 +66798,17 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="analisis.js?v=30.10"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
 <script src="ayuda.js?v=30.10"></script>
+=======
+<script src="cobranzas.js?v=30.12"></script>
+<script src="hotsale.js?v=30.12"></script>
+<script src="estadisticas.js?v=30.12"></script>
+<script src="ads.js?v=30.12"></script>
+<script src="plantel.js?v=30.12"></script>
+<!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
+<script src="analisis.js?v=30.12"></script>
+<!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
+<script src="ayuda.js?v=30.12"></script>
+>>>>>>> origin/main
 
 </body>
 </html>
