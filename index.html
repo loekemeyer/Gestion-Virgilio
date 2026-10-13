@@ -63494,6 +63494,14 @@ function rolPickerAbrir() {
 }
 function rolElegir(k) { _rolSet(k); var ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none"; rolPanelRender(k); }
 
+/* v29.95 (Luis, 13/10: *"aprieto luis y no entra"*): ⚠ TODO ESTO VIVE ADENTRO DE LA IIFE
+   `initAuth`, así que un `onclick="rolElegir('luis')"` del HTML NO lo encuentra — un handler
+   inline se resuelve contra WINDOW, no contra el scope del script. Es el mismo pozo de
+   `window.sb` (v23.98). Al agregar un botón con onclick a este bloque, exponer su función acá. */
+window.rolElegir = rolElegir;
+window.rolPickerAbrir = rolPickerAbrir;
+window.GV_ROL_ITEMS = GV_ROL_ITEMS;
+
 function rolPanelRender(k) {
   var cont = document.getElementById("rolPanel"); if (!cont) return;
   var r = GV_SUP_ROLES[k]; if (!r) { rolPickerAbrir(); return; }

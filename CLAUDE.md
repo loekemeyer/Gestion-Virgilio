@@ -9719,3 +9719,37 @@ Cierra el agujero que la v29.74 dejó anotado: el **PUB** dice dónde dejó la t
 vacías) · `node tests/arm-mesa-inicio.cjs` (corre la pantalla: el AP con mesa encola AP+AUI, sin contestar no se
 encola AUI, el cuadro que explota **no** traba el asistente) · `node tests/mon-tv.cjs`.
 `sql/gv_armado_mesa_aui_v2990.sql` (rollback al pie).
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.95): un `onclick` del HTML SE RESUELVE CONTRA `window` — no contra el scope del script
+
+**Luis, con la captura del cuadro «¿Quién sos?»:** *"aprieto luis y no entra"*.
+
+El panel por ROL (v29.92) dibujaba sus botones con handlers **inline**
+(`onclick="rolElegir('luis')"`), y todo ese bloque vive **adentro de la IIFE `initAuth`**
+del segundo `<script>` de `index.html` (líneas ~62957-66056). Un handler inline **no ve el
+scope del script: se resuelve contra `window`**, así que el click tiraba *"rolElegir is not
+defined"* y **no pasaba nada** — ni un cartel, ni un error a la vista.
+
+> **Si una función se usa en un `onclick` / `onchange` del HTML y se declaró dentro de esa
+> IIFE, hay que exponerla: `window.laFuncion = laFuncion;`** Es el mismo pozo de `window.sb`
+> (v23.98), y el archivo ya lo resuelve así en decenas de lugares (`window.pkFrenar`,
+> `window.cobrosRenderTab`, `window.histReintentar`…).
+
+| dónde vive la función | ¿hace falta exponerla? |
+|---|---|
+| el primer `<script>` (líneas 7081-62940), que **no** es IIFE | no: ya es global |
+| un `.js` propio cargado como script clásico (`ads.js`, `cobranzas.js`…) | no, salvo que esté en su propia IIFE |
+| **la IIFE `initAuth`** (segundo `<script>`) | **sí**, siempre |
+
+Expuestas para el panel por rol: `rolElegir`, `rolPickerAbrir`, `GV_ROL_ITEMS` (las filas del
+checklist llaman `GV_ROL_ITEMS[i].open()`).
+
+⚠⚠ **UN CANDADO ESTÁTICO NO VE ESTE BUG**: el `onclick` está y la función está. La única forma
+de medirlo es **clickear con la pantalla corriendo**. Lo sostiene
+`tests/rol-panel-click.cjs`, que aprieta «Luis» de verdad y además barre **todo** `onclick` del
+cuadro y del panel exigiendo que resuelva contra `window` (así un botón nuevo del bloque no
+vuelve a nacer muerto). ⚠ Ese barrido lleva un guard de *"¿encontré al menos uno?"*: sin él daba
+**verde con el bug puesto**, porque con el cuadro sin dibujar hay 0 onclicks y 0 faltantes.
+
+**Barrido del 13/10 sobre toda la IIFE** (funciones declaradas ahí y usadas en un handler
+inline sin exponer): **0 casos más**. El panel por rol era el único.
