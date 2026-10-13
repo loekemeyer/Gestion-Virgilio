@@ -119,7 +119,8 @@ const RACKS = [
   const fallas = [];
   const ok = (c, m) => { if (!c) fallas.push(m); };
   ok(!errs.length, "errores de página: " + errs.join(" | "));
-  ok(out.modos.length === 2 && /Góndolas/.test(out.modos[0]) && /Racks/.test(out.modos[1]), "(a) faltan las dos pestañas: " + JSON.stringify(out.modos));
+  // v29.98: son TRES modos (se sumó SC y SP, la grilla IN-A1… de Cervantes). Acá se miden los dos de artículos.
+  ok(out.modos.length === 3 && /Góndolas/.test(out.modos[0]) && /Racks/.test(out.modos[1]), "(a) faltan las pestañas Góndolas y Racks: " + JSON.stringify(out.modos));
   ok(out.arranca === "pmapModoG" && out.gondTab === "A", "(a) no arranca en Góndolas");
   ok(!!pidioRack, "(b) no le pegó a gv_rack_celda");
   ok(out.modoOn === "pmapModoR", "(b) la pestaña Racks no quedó marcada");

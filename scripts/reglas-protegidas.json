@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-13 (+ v29.78 sub-posiciones de rack: gv_rack_sector/pos/partir/pos_chequear/saldo_pos/ubicar, racks_plani_*, registrar_baja_racks, Racks_Planimetria, gv_rack_celda) · 2026-10-13 (+ v29.77 gv_stock_cod_lista; + v29.74 gv_gp2_inventario; + v29.66 gv_gp2_espejo_insumos; + cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82/v26.93 gv_ppp_dia_ajustar; + v26.86 gv_alerta_gondola_llena_telegram; + v26.98 gv_importado_alta, gv_importados_bache_primer_pedido; + v26.99 gv_importado_guardar); + v27.89 gv_cc_sombra_tick, gv_cc_sombra_racha; + v27.92 gv_ads_stock2; + v28.34 gv_ppp_mismo_lugar_dos_dias; + v28.38 gv_ppp_web_zona_retira; + v28.40 gv_ppp_web_zona_recalc, gv_ppp_tanda_zona_fuera_regla; + v28.43 vista_importados_stock_parte; + v28.96 racks_plani_ingreso, gv_imp_imputar_ingreso_racks; + v29.05 gv_racks_ajuste_sin_posicion + v29.11 gv_imp_ir_asignar + v29.16 gv_anon_insert_log + v29.48 gv_picking_estimar, gv_ppp_plantel, gv_armado_tanda_refresh; + v29.49 reconciliar_pipeline_stock_etapa2, gv_entregas_norm, gv_npd_tope_faltante_picking; + v29.50 gv_evento_duplicado; + v29.82 gv_insumo_origenes, gv_insumo_fleje_proveedor",
+  "_generado": "2026-10-13 (+ v29.78 sub-posiciones de rack: gv_rack_sector/pos/partir/pos_chequear/saldo_pos/ubicar, racks_plani_*, registrar_baja_racks, Racks_Planimetria, gv_rack_celda) · 2026-10-13 (+ v29.77 gv_stock_cod_lista; + v29.74 gv_gp2_inventario; + v29.66 gv_gp2_espejo_insumos; + cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82/v26.93 gv_ppp_dia_ajustar; + v26.86 gv_alerta_gondola_llena_telegram; + v26.98 gv_importado_alta, gv_importados_bache_primer_pedido; + v26.99 gv_importado_guardar); + v27.89 gv_cc_sombra_tick, gv_cc_sombra_racha; + v27.92 gv_ads_stock2; + v28.34 gv_ppp_mismo_lugar_dos_dias; + v28.38 gv_ppp_web_zona_retira; + v28.40 gv_ppp_web_zona_recalc, gv_ppp_tanda_zona_fuera_regla; + v28.43 vista_importados_stock_parte; + v28.96 racks_plani_ingreso, gv_imp_imputar_ingreso_racks; + v29.05 gv_racks_ajuste_sin_posicion + v29.11 gv_imp_ir_asignar + v29.16 gv_anon_insert_log + v29.48 gv_picking_estimar, gv_ppp_plantel, gv_armado_tanda_refresh; + v29.49 reconciliar_pipeline_stock_etapa2, gv_entregas_norm, gv_npd_tope_faltante_picking; + v29.50 gv_evento_duplicado; + v29.82 gv_insumo_origenes, gv_insumo_fleje_proveedor; + v29.98 gv_scp_sector, gv_insumo_sector, gv_insumo_ubicacion, gv_insumo_ubicaciones_guardar, gv_insumo_posicion_guardar (SC y SP = su propio lugar, IN-A1)",
   "reglas": [
     {
       "objeto": "Racks_Planimetria",
@@ -432,6 +432,26 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_insumo_posicion_guardar",
+      "regla": "Guardar la posicion de un insumo valida contra racks de insumo Y celdas de SC/SP.",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_insumo_sector",
+      "regla": "Una posicion de INSUMO se resuelve por UN solo cuello",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_insumo_ubicacion",
+      "regla": "La posicion de un insumo se resuelve con gv_insumo_sector (rack de insumo o celda de SC/SP), no con gv_rack_sector.",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_insumo_ubicaciones_guardar",
+      "regla": "El editor de posiciones de insumo valida contra racks de insumo Y celdas de SC/SP.",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_insumo_unidad_base",
       "regla": "Todo movimiento de insumos es empresa Mixto",
       "quien": "Luis"
@@ -805,6 +825,11 @@
       "objeto": "gv_retira_contradictorio",
       "regla": "El centinela compara el destino que se MUESTRA (gv_np_destino.expreso) contra como se esta REPARTIENDO de verdad (gv_np_prog_reparto.es_retira). Si se le saca e",
       "quien": "Thomas"
+    },
+    {
+      "objeto": "gv_scp_sector",
+      "regla": "La grilla de un digito A1..L6 es Sector Crudo / Procesado (tipo scp en GV_Lugar, nombre IN-A1), NO un rack",
+      "quien": "Luis"
     },
     {
       "objeto": "gv_stock_cod_lista",

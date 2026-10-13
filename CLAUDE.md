@@ -1832,10 +1832,58 @@ y SP. Sector SC y SP usa un nomenclador similar al de gondolas y racks y puede q
 | **Rack** | letra(s) + **2 dígitos**, con `AD`/`AT` en los de insumo: `AD05`, `X22`, `R01AD`, `V09AT`, `AF13` | master cajas de artículo · fleje · plástico · importados | `Movimientos_Stock` dep. `racks` / `racks_ch` / `insumos` |
 | **SC y SP** | letra(s) + **UN dígito**: `A1`…`L6` (52 celdas) + `MEDIO` | **piezas de Cervantes**: `partes_crudo` (SC) y `parte_procesado` (SP) | **`GP2.inventario`** (ubicación «Sector Crudo» / «Sector Procesado»), NO Virgilio |
 
+### ⚠⚠ v29.98 (Luis, 13/10): SC y SP es SU PROPIO LUGAR — la celda se llama **`IN-A1`** y su tipo es **`scp`**
+
+**Luis:** *"hagamos que sea su propio sector, lugar. IN-A1 por ejemplo? queda bien asi?"* · *"claro,
+agrega al mapa este sector"* · *"una vez hecho fijate que vincule bien con insumos y con todo lo que
+tenga que vincular bien … y una vez tengamos la base bien armada, limpiamos todo"*.
+
+> ## **El prefijo es UNO para toda la grilla, no uno por sector.** La grilla está **INTERCALADA**:
+> ## `G1`-`G4` son SC y `G5`-`G6` SP; `L1`-`L4` SP y `L5`-`L6` SC; `H1` SP y `H2`-`H7` SC. Un
+> ## prefijo `SC-` / `SP-` habría que renombrarlo cada vez que una pieza cambia de celda.
+
+| pieza | qué es |
+|---|---|
+| `GV_Lugar` | las 55 celdas con **`tipo = 'scp'`**, empresa `IN`, nombre `IN-A1`…`IN-L6`. Se dieron de alta **IN-K4, IN-K5 e IN-K6**, que tenían piezas cargadas y no existían |
+| **`gv_scp_sector(txt)`** | el resolvedor de la grilla: `IN-A1`, `IN A1`, `in-a1` y el **`A1` pelado** (es lo que se tipea hoy) |
+| **`gv_insumo_sector(txt)`** | el **cuello ÚNICO de una posición de INSUMO** = `coalesce(gv_rack_sector, gv_scp_sector)`: rack de insumo (`R01AD`, `AF13`, `X20`) **o** celda de SC/SP. Lo usan `gv_insumo_ubicacion` y las **dos** RPC que escriben una posición (`gv_insumo_ubicaciones_guardar`, `gv_insumo_posicion_guardar`) |
+| **`gv_scp_celda`** | la vista de la solapa nueva: una fila por celda, con la pieza, su sector (SC/SP) y su saldo |
+| Mapa | tercer modo **📐 SC y SP** (`pmapModo('scp')`), una solapa por columna; tocar una celda abre su editor y escribe por **la misma RPC** que las posiciones de racks |
+| `Insumos_Ubicaciones.sector` | las 63 filas de la grilla pasaron a `IN-xx` |
+
+> ## ⚠⚠ **Lo que esto CIERRA: `gv_rack_sector('A1')` ahora devuelve NULL.**
+> `gv_rack_sector` filtra `tipo = 'rack'`, así que **Ingreso a racks no puede ofrecer una celda de
+> SC/SP ni guardar una caja ahí**. Antes devolvía `A1`. Es el mismo pozo de la v29.67 (el operario
+> escribió `AB3` en el campo del código) visto del otro lado.
+
+- **Al agregar una celda a SC/SP va con el prefijo**: `insert into "GV_Lugar"(sector,tipo,empresa) values ('IN-C3','scp','IN');`
+  Los dos CHECK se ampliaron (`tipo` acepta `scp`; el nombre acepta `IN-xx`).
+- **El saldo de una pieza de SC/SP lo lleva GP2**, no Virgilio: acá se dice **DÓNDE** está. En
+  `GP2.ubicacion` no hay celdas (SC y SP son **una** ubicación cada uno), así que la celda física
+  existe sólo en `Insumos_Ubicaciones.sector`. El espejo `gv_gp2_espejo_sync` copia todo `GV_Lugar`
+  sin filtrar tipo, así que GP2 ve las 55 celdas solo (medido: `GP2.virgilio_lugar` tipo `scp` = 55).
+- **Y de paso se arreglaron 3 insumos** que estaban en rojo: `gv_insumo_ubicacion` pasó de **145 a
+  148** posiciones resueltas. Quedan **2** sin lugar, y son las dos de **`medio`**.
+- ⚠ **`medio` NO se tocó a propósito**: no sé si es una celda de verdad o un apunte. Tiene las piezas
+  `A1` (Mgo Plano 501 Pint., SP) y `H1` (Manija Redonda p/cromar, SC) y sigue en rojo en la pestaña
+  Insumos — que es donde se ve. **No inventarle un nombre**: lo define Luis.
+- ⚠ **PENDIENTE del «sí» de Luis**: la rama de insumos de **`gv_rack_celda`** trae
+  `gv_insumo_ubicacion` sin mirar el tipo del lugar, así que las 63 filas de SC/SP salen
+  `sin_lugar` en la solapa Racks. Hoy lo tapa el FRONT (`prkRacks` saltea `^IN[-\s]`); el parche de
+  la vista está escrito y comentado al final del `.sql`. Toca una **regla protegida** (*"El Mapa
+  muestra una celda por DIRECCIÓN"*), que **sigue en pie**: el parche no cambia las partes, sólo
+  saca de la solapa Racks una celda que no es un rack.
+
+**Chequeo:** `select public.gv_scp_sector('A1'), public.gv_rack_sector('A1'), public.gv_insumo_sector('R1Ad');`
+→ `IN-A1`, **NULL**, `R01AD` · `select count(*) from public.gv_scp_celda;` (63 en 55 celdas) ·
+`select * from public.gv_reglas_perdidas;` · `node tests/pmap-scp.cjs`.
+`sql/gv_sector_scp_v2998.sql` (rollback: `select public.gv_scp_revertir();`), 5 centinelas.
+
 ### El mislabel que esto RETIRA
 
 ⚠⚠ **El bullet de la v22.80 dice que la grilla `A1…L6` son «racks de insumos». ES FALSO y queda RETIRADO.**
-Se dieron de alta así el 25/09 —tipo `rack`, empresa `IN`— y de ahí salió la confusión. Medido el 13/10:
+Se dieron de alta así el 25/09 —tipo `rack`, empresa `IN`— y de ahí salió la confusión; **la v29.98 las
+pasó a `tipo = 'scp'` y a nombre `IN-A1`** (bloque de arriba). Medido el 13/10, antes de tocar nada:
 
 - las **52 celdas de un dígito** de `GV_Lugar` son **exactamente** donde viven `parte_procesado` (SP: `A1`-`A6`,
   `B1`-`B6`, `C1`, `C2`, `C5`, `C6`, `D1`, `D3`-`D6`, `E1`, `E2`, `E5`, `E6`, `F1`, `F2`, `F6`, `G5`, `G6`, `H1`,
@@ -1844,9 +1892,9 @@ Se dieron de alta así el 25/09 —tipo `rack`, empresa `IN`— y de ahí salió
   un dígito → vacío). No son racks: no guardan cajas.
 - `K4`, `K5` y `K6` tienen piezas de SC cargadas y **no existen en `GV_Lugar`**: el alta del 25/09 los salteó.
 
-⚠ **`gv_rack_sector('A1')` devuelve `A1` y `gv_rack_sector('A01')` devuelve NULL** (A01 es góndola). O sea que
-el resolvedor de racks **acepta una celda de SC/SP**: hoy no hizo daño porque nadie guardó una caja ahí, pero
-**Ingreso a racks la ofrece**. Es el mismo pozo que `A1 ≠ A01`, un paso más adelante.
+⚠ **`gv_rack_sector('A1')` devolvía `A1`** (y `('A01')` NULL, porque A01 es góndola): el resolvedor de racks
+**aceptaba una celda de SC/SP** y **Ingreso a racks la ofrecía**. No hizo daño porque nadie guardó una caja ahí.
+**Cerrado en la v29.98**: con `tipo = 'scp'` ese `coalesce` no la encuentra más y devuelve NULL.
 
 ### Y en GP2 no hay celdas: SC y SP son UNA ubicación cada uno
 
