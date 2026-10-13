@@ -8700,3 +8700,18 @@ Solapa **Plantel** de la PPP (`plantel.js`, `plantelHtml` / `plantelCalc`). Todo
 - **Plantel (D6)**: cuenta también lo que espera en **A Programar y Cuarentena** (`gv_ppp_sin_programar()`: el universo de A Programar sin lo que `gv_pedidos_web_excluidos` saca, m³ por `items_string` × `vista_volumen_articulo_resuelto`). Su plazo corre desde la fecha del pedido. Al 12/10: 11 pedidos, 6,80 m³, 7 ya vencidos.
 - **Picking (D7)**: la caja por encima de 30 por línea suma **`caja_extra` = 0,0061 min** (pallet entero; E84A 6 → 30 min contra 32 reales). El caché se ajustó una vez (llave `GV_Picking_Esquema.caja_extra_aplicado`): no volver a sumar.
 - Centinelas v29.48 (5 filas). `sql/gv_armado_dificultad_v2948.sql`, `sql/gv_plantel_ritmo_v2948_defs.sql` (definiciones vivas), `docs/armado-dificultad/fit_armado.py`, `tests/ppp-plantel.cjs` (g, h), `tests/monitor-ritmo.cjs` (g).
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.49): el ARMADO cruza Entregas con el picking por el CÓDIGO DE PICKING
+
+Auditoría del módulo de operarios (13/10). `reconciliar_pipeline_stock_etapa2` (el `separado` del TAP) cruzaba
+`Entregas_Virgilio` contra el picking sin pelar la **L** ni aplicar `Correcciones_Pedido`: en un pedido de Chef con
+artículos de Loeke (031L, 102EL…) o con secundario corregido (809 → 809E) no encontraba lo entregado y mandaba lo
+pickeado **de vuelta a góndola** en vez de a «a facturar». Medido: E29G 36 · E18B 43 · F58A 185 · D58A 32 · F13C 5 ·
+F48A 3 cajas de góndola de más (ya salieron o están en el pallet), y el facturado no las drenaba.
+
+- La normalización vive en **una vista, `gv_entregas_norm`** (tanda viva, `artn` sin L / sufijo / ceros, corrección
+  aplicada, `emp_l = 'LK'` si la línea tiene L). La usan los dos bloques de la etapa 2.
+- **El «de menos» del armado no descuenta dos veces**: trigger `aa_gv_npd_tope_picking` → `gv_npd_tope_faltante_picking`
+  topa el ajuste `npd_…` de Pickeados con el faltante que el PKC ya registró (F58A/102E quedaba en −5).
+- Lo pasado NO se corrige solo (los pares ya separados están balanceados): la corrección de datos pide el «sí».
+- Centinelas 394-396. `sql/gv_etapa2_codigo_l_correccion_v2949.sql`, `sql/gv_npd_tope_faltante_picking_v2949.sql`.
