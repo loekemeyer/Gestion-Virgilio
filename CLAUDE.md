@@ -8983,7 +8983,12 @@ select m.cod_art, m.creado, m.legajo, m.delta
 ```
 
 Al 13/10 queda **1 fila y es de antes del módulo actual**: 542, 22/07/2026, `legajo` y `client_id` en NULL (una
-carga de panel, no del celular). **No se tocó**: corregirla es otra decisión de datos y pide el «sí».
+carga de panel, no del celular).
+
+⚠⚠ **El 542 del 22/07 NO SE TOCA Y NO SE PREGUNTA MÁS** (Luis, 13/10: *"542 olvidate, fue hace un montón así que
+seguramente ya se ajustó. Que vos y que cualquier otra sesión dejen de preguntarlo"*). Es de hace tres meses y el
+conteo ya lo ajustó. **Ninguna sesión lo vuelve a reportar ni a ofrecer corregirlo**: al correr la consulta de arriba,
+esa fila se ignora.
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.69): una BAJA DE RACKS que no se guarda queda colgada — y el reconteo del rack la DUPLICA
 
