@@ -31865,3 +31865,41 @@ Objetos nuevos: `gv_picking_estimar(text[])` (anon, 1,45 s para las 37 pendiente
   hoy: la llamada no llega a Postgres y nada se aplica). Por eso el apodo va en su propia RPC.
 - **Rollback**: `drop function public.gv_insumo_config(); drop function public.gv_insumo_apodos();`
   `drop table public."GV_Insumo_Config", public."GV_Insumo_Origen_Apodo";` — el front vuelve a sus defaults solo.
+
+### §3.v3000 — TMP-0037 fusionado en N°19, y los 3 flejes vinculados (Luis, 13/10/2026)
+
+**El caso.** El 13/10 09:09:47 el legajo 104 recibió **144 Kg** de un fleje `13.6 x 0.8` dándolo de alta como
+insumo nuevo: el servidor lo numeró **`TMP-0037`** (`nuevo_insumo_tmp`) y la recepción entró con ese `cod_art`.
+Ese fleje **ya existía** como **`N°19`** («13,6 x 0,8 · Fleje N° 19», posición **R06AT**, saldo 0 desde el 16/09)
+y está vinculado a **IF11** de GP2. O sea: 144 Kg al código equivocado.
+
+**Por qué no lo encontró en la lista** (la causa raíz, medida): el buscador (`stkMatchBusq`) comparaba el texto
+**tal cual**, y el nombre de `N°19` lleva **coma** decimal. Buscar `13.6` NO encuentra `13,6`. En los flejes la
+medida **es** el nombre: **39 de 48 tienen decimal** (27 con coma, 12 con punto), así que el pozo estaba abierto
+para más de la mitad. Arreglado en la v30.00: los dos lados se normalizan (`(\d),(\d)` → `$1.$2`) — sólo **agrega**
+matches, no saca ninguno (suite completa en verde).
+
+**La puerta ya estaba cerrada 26 minutos después**: la **v29.56** (13/10 09:35) sacó el alta de un insumo nuevo
+por el operario. `TMP-0037` es el último que entró por ahí, y el único TMP que quedaba vivo (los otros 17 están
+en 0 y fuera del catálogo: se ceronearon y borraron el 10/10).
+
+**Qué se hizo** (mecanismo de la rama de FUSIÓN de `insumo_identificar`; el front no lo deja hacer porque un TMP
+no se fusiona contra un insumo en uso: `v_existe and v_es_tmp` → exception):
+`update "Movimientos_Stock" set cod_art='N°19', descripcion='… (era TMP-0037)' where cod_art='TMP-0037'`
+(**1 movimiento**) + se saca `TMP-0037` del catálogo + `insumo_hist_log('fusionar', …)`.
+Backup: `zz_backups."GV_Backup_TMP0037_20261013"` (con RLS).
+
+**Verificado**: `N°19` 0 → **144 Kg** · `TMP-0037` fuera del catálogo y en 0 · la alarma del Mapa
+(`gv_mapa_stock_sin_lugar`) deja de marcarlo · el espejo corrió con el UPDATE y GP2 ya tiene los 144 Kg en
+**IF11 / «Sector Fleje en Virgilio»** (`gv_gp2_espejo_insumos('N°19')` → `antes = 144`, `delta = 0`).
+
+⚠ **La UBICACIÓN no se tocó** (Luis: *"no los pongas en el mismo lugar, hay que ver donde esta"*). `N°19` tiene
+R06AT en `Insumos_Ubicaciones` desde antes, así que **el Mapa ahora dice R06AT** — y el aviso de «stock sin lugar»
+se apagó. Si los 144 Kg no están ahí, lo corrige el conteo; nadie lo va a ir a buscar por una alarma.
+
+**Y los 3 flejes limpios vinculados** (Luis: *"los 3 limpios metelos"*), en `GP2.insumo_equivalencia` por
+`componente_id`: `10` → IF2 (Fleje N° 10, **40 Kg**) · `1060500` → IB3 (Fleje N° 6, **540 Kg**) ·
+`FLEJE·91 X 1,75` → IA5 (Fleje N° 29, 0). Los tres de **Basconia**. El espejo corrió en el acto (log 61 y 62,
+`ajustado`) y los kg están en la ubicación **75** («Sector Fleje en Virgilio»), que tiene **0 filas en
+`v_nivel_stock`**: no infla el máximo ni la OC de Cervantes. Ningún ISIS pisado (los tres estaban en null).
+Flejes vinculados: **19 → 22 de 48**.

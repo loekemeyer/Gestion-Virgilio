@@ -5486,7 +5486,7 @@ interna y **no tiene candado**: quien la use directo se lo pone él. Hoy son tre
 tres filtran el legajo de prueba. Lo sostiene el bloque **(d)** de `tests/legajo1-confirma.cjs`,
 que lo mide sobre la cola de verdad (verificado que falla sin el guard).
 
-## ⚠ REGLA (Luis, 2026-10-13, v30.00): el UMBRAL DEL INTRADÍA no frena lo que tiene DÍA FORZADO
+## ⚠ REGLA (Luis, 2026-10-13, v30.02): el UMBRAL DEL INTRADÍA no frena lo que tiene DÍA FORZADO
 
 **Luis:** *"lk 1670, por que no se programo solo?"*. Era un **Retira con día pactado** (16/10) que
 entró 13:31 y seguía sin tanda.
@@ -5514,7 +5514,7 @@ preguntarse si ahí no falta Retira.**
 - Probado: con LK 1670 pendiente la función devolvía 1 fila y la corrida lo programó como
   **LK 0414, tanda F89A, Retira, 16/10**.
 - Los objetos y el centinela de la base dicen **v29.82** (la versión con que se aplicaron): es la
-  llave, no cambiarla. `sql/gv_ppp_web_forzado_sin_tanda_v3000.sql` (rollback en la cabecera).
+  llave, no cambiarla. `sql/gv_ppp_web_forzado_sin_tanda_v3002.sql` (rollback en la cabecera).
 
 **Chequeo:** `select * from public.gv_ppp_web_forzado_sin_tanda();` — lo que el armador tiene que
 tomar sí o sí · `select * from public.gv_reglas_perdidas;`.
@@ -9143,6 +9143,48 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
 - Lo sostiene la base: trigger `aa_gv_salida_cervantes_no_racks` → `SC_DESDE_RACKS` (centinela v29.13).
   `sql/gv_salida_cervantes_no_racks_v2913.sql`, `tests/sc-racks-unidad.cjs`.
 
+## ⚠⚠ REGLA (Luis, 2026-10-13, v30.01): los modos de INGRESO A RACKS son «Ingreso directo» y «Desde A guardar»
+
+**Luis:** *"el problema es que no hay una forma clara para mandar mercadería de A guardar a Racks"* ·
+*"Importado y nacional se tiene que renombrar a «Ingreso directo» o «Desde A guardar»"*.
+
+> ## **El modo se llama por lo que HACE, no por el origen de la mercadería.**
+> **📦 Ingreso directo** = entra al depósito ahora, **crea stock nuevo**. · **📥 Desde A guardar** =
+> ya está en el depósito, **lo mueve** (descuenta de A guardar o de Excedente).
+
+| | antes | ahora |
+|---|---|---|
+| botones | 📦 Importación · 🏠 Nacional | **📦 Ingreso directo · 📥 Desde A guardar** |
+| valor interno | `import` / `nacional` | **igual** (lo usan `racks_plani_ingreso` y `racks_plani_ingreso_nacional`): no se toca |
+
+- **Y avisa**: en «Ingreso directo», un código que YA tiene cajas en A guardar (o en Excedente) saca
+  *«⚠ Este código ya tiene N cajas en A guardar. Si son esas mismas cajas, esto NO es un ingreso
+  directo: se contarían dos veces»* con el botón **📥 Moverlas desde A guardar**, que pasa al otro
+  modo con el código y el origen puestos. **No frena**: lo decide el operario (`_irAvisoAGuardar`,
+  `irDesdeAGuardar`; el saldo sale de `_ir.saldos`, que ya se carga al abrir el módulo).
+
+**Lo que costó, el 13/10:** el **934E** (1 master, 12 cajas, Y07, 14:40) y el **606E** (10 cajas,
+X22, 10:00) se cargaron por Importación cuando esas cajas ya estaban en A guardar: racks sumó y
+A guardar quedó igual, o sea **el stock contado dos veces**, y nada avisó — lo vio Luis en Stocks.
+Corregido con un ajuste (`CORR IR 146592538`, A guardar 934E −12 → 0; racks queda en 180, que es lo
+que hay). El movimiento de racks NO se toca: la mercadería está en Y07.
+
+**Cómo se encuentra otro igual** — un IR que no descontó nada y dejó saldo vivo en A guardar:
+
+```sql
+select m.id, m.creado, m.cod_art, m.delta, m.ref, m.legajo
+  from public."Movimientos_Stock" m
+ where m.deposito = 'racks' and m.tipo = 'ingreso' and m.ref like 'ingreso a racks %'
+   and m.creado >= now() - interval '30 days'
+   and exists (select 1 from public."Movimientos_Stock" x
+                where x.deposito = 'a_guardar' and upper(btrim(x.cod_art)) = upper(btrim(m.cod_art))
+                group by 1 having sum(x.delta) > 0)
+ order by m.creado desc;
+```
+
+**Chequeo:** `node tests/ir-codigo-candado.cjs` (bloque **H**: el aviso, que no frena, que el botón
+cambia de modo con el código puesto, y los dos rótulos nuevos; verificado que falla contra la v30.00).
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.67 + v29.77 + v29.78, D2): en INGRESO A RACKS el CÓDIGO SE ELIGE — se sugiere mientras se escribe
 
 **Luis:** *"956E · va a terminar en AB10 · el operario lo puso mal · ponele candado"* y, después del candado:
@@ -9329,6 +9371,41 @@ public.gv_insumo_origenes('plastico');` · `select * from public.gv_insumo_confi
 `node tests/ins-ri-origen-menu.cjs` (verificado que falla contra la v29.85) · `node tests/ins-envio-tipo.cjs`
 (el que quedó viejo: exigía JL Matriceria entre los inyectores, y de paso le pegaba a la base de verdad).
 `sql/gv_insumo_origenes_v2982.sql`, centinelas 416-418.
+
+## ⚠ REGLA (Luis, 2026-10-13, v30.00): el SEPARADOR DECIMAL no decide una búsqueda — y un TMP no se da de alta sobre un código que ya existe
+
+**Luis, con los 144 Kg del `TMP-0037`:** *"¿cómo es que se aceptó sin lugar? ¿se permite eso? ¿cómo es que se
+guardó sin código?"*.
+
+> ## **`stkMatchBusq` normaliza el decimal de los DOS lados: buscar `13.6` encuentra `13,6`.**
+> En los flejes la MEDIDA es el nombre, y **39 de 48 tienen decimal** (27 con coma, 12 con punto).
+
+Lo que costó no normalizarlo: el 13/10 09:09 el legajo 104 recibió 144 Kg de un fleje `13.6 x 0.8`, no lo encontró
+en la lista — se llama **`N°19`**, *«13,6 x 0,8 · Fleje N° 19»*, con **coma** — y lo dio de alta como insumo nuevo.
+El servidor lo numeró `TMP-0037` y los 144 Kg quedaron en un código que no existe para nadie. El arreglo sólo
+**agrega** matches (`(\d),(\d)` → `$1.$2`), no saca ninguno, y vale para TODO buscador que use esa función.
+
+**Tres cosas del circuito que la pregunta destapó, y conviene tener a mano:**
+
+1. **La recepción de un insumo NUNCA pregunta el lugar.** Pide categoría → origen → documentación (remito /
+   factura) → el insumo de la lista → cantidad + unidad + **marca** (v29.57). El lugar de un insumo vive en el
+   **Mapa** y lo pone un supervisor; la red es la alarma **`gv_mapa_stock_sin_lugar`** (*"hay N en stock y el insumo
+   no está en ninguna posición del Mapa"*). ⚠ **Al 13/10 esa alarma tiene 19 insumos**, 7 de ellos cajas: existe,
+   pero nadie la mira.
+2. **«Aceptar» es del ADMIN, no de la recepción** (Stock y Compras → Insumos): es el paso que le pone el código real,
+   el nombre y la ubicación inicial. `TMP-0037` **nunca se aceptó**: quedó pendiente desde las 09:09. Y no se podía
+   — `insumo_identificar` **frena** un TMP contra un código en uso (*"una sugerencia del operario no se puede
+   fusionar contra un insumo en uso"*), que es correcto: fusionar dos stocks lo decide una persona, no un botón.
+3. **La puerta ya está cerrada**: la **v29.56** (13/10 09:35, 26 minutos después) sacó el alta de un insumo nuevo
+   por el operario (`insNuevoOpen` arranca con un `alert` y un `return`). `TMP-0037` fue el último que entró por ahí
+   y el único TMP que quedaba vivo. **Lo que sigue abierto no es el código: es el LUGAR** — un código del catálogo
+   de GP2 (`gv_insumo_desde_gp2`) también se recibe sin posición, y queda en esa alarma.
+
+Los 144 Kg se fusionaron en `N°19` con el mecanismo de la casa (se renombra el `cod_art` del movimiento, el TMP
+sale del catálogo y queda en `Insumos_Historial`), **sin tocar la ubicación** (Luis: *"hay que ver dónde está"*).
+⚠ Ojo con el efecto: `N°19` ya tenía R06AT, así que **el Mapa ahora dice R06AT y la alarma se apagó** — si no
+están ahí, lo corrige el conteo, no un aviso. Detalle, verificación y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
+§3.v3000. Lo sostiene `tests/stk-busca-decimal.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.57): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
 
