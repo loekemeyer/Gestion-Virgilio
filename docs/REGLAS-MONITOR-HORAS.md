@@ -103,6 +103,10 @@ que lo mide sobre la cola de verdad (verificado que falla sin el guard).
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.68): ANÁLISIS PRODUCTIVO por tanda — y el s/caja del PKC NO es un detector
 
+**Abre en el DÍA DE LA FECHA** (Luis, 13/10, v30.20; supervisor y Juan igual): lista las tandas de hoy, y el
+botón **«Días anteriores»** pasa a los 7/14/30/60 días previos **sin** el de hoy (pide N+1 y saca las de
+`hasta`, el hoy del servidor). «← Hoy» vuelve. Lo sostiene el bloque (j) de `tests/analisis-productivo.cjs`.
+
 Botón **📈 Análisis Productivo** en el panel del supervisor y en la botonera del operario (ahí **sólo** para
 los legajos de `GV_Analisis_Acceso`; hoy **Juan, legajo 8**). El monitor ya evalúa por OPERARIO y por DÍA
 (Monitor → Ritmo, v29.47-48): esto es la misma cuenta abierta **por TANDA**, con el detalle código por código.

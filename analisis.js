@@ -28,7 +28,9 @@
    APP_VERSION. Candado: tests/analisis-productivo.cjs.
    ============================================================================ */
 
-var _an = { dias: 14, q: "", lista: null, err: "", cargando: false, filtro: "todas",
+/* v30.20 (Luis, 13/10): abre en el DÍA DE LA FECHA (modo "hoy", p_dias = 1: el servidor corta
+   en su propio hoy). «Días anteriores» pasa a los N días previos SIN el de hoy (modo "ant"). */
+var _an = { modo: "hoy", dias: 14, q: "", lista: null, err: "", cargando: false, filtro: "todas",
             tanda: null, det: null, detErr: "", detCargando: false, legajo: null, marcas: {} };
 
 function _anEsc(s) {
@@ -109,6 +111,10 @@ function _anCss() {
     "#anOv .an-bar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px var(--gv-sp-5);",
     "  background:var(--gv-surface);border-bottom:1px solid var(--gv-line);font-size:var(--gv-fs-md);}",
     "#anOv .an-bar .an-sep{width:var(--gv-sp-3);}",
+    "#anOv .an-bar .an-hoy{font-weight:700;font-size:var(--gv-fs-md);margin-right:var(--gv-sp-2);}",
+    "#anOv .an-bar .sp{flex:1;}",
+    "#anOv .an-bar input{font-size:var(--gv-fs-md);}",
+    "#anOv .an-bar .gv-chip{display:inline-flex;align-items:center;}",
     "#anOv .an-body{flex:1;overflow:auto;padding:var(--gv-sp-5) var(--gv-sp-5) var(--gv-sp-8);}",
     "#anOv .an-wrap{max-width:1040px;margin:0 auto;}",
     /* ── lista: una tarjeta por tanda ── */
@@ -158,7 +164,10 @@ function _anCss() {
     "#anOv .an-gl{font-size:var(--gv-fs-md);color:var(--gv-ink-2);line-height:1.55;}",
     "#anOv .an-gl b{color:var(--gv-ink);}",
     "@media(max-width:560px){#anOv .an-body{padding:var(--gv-sp-4) 11px var(--gv-sp-8);}",
-    "  #anOv .an-fase{padding:var(--gv-sp-4) 13px;}}"
+    "  #anOv .an-fase{padding:var(--gv-sp-4) 13px;}",
+    /* celular: fila 1 = modo (rótulo «Hoy» + Días anteriores), fila 2 = filtros, fila 3 = buscar; el buscador llega a 44 px y a 16 px (iOS no hace zoom) */
+    "  #anOv .an-bar .an-hoy{order:-2;} #anOv #anBtnAnt{order:-1;} #anOv .an-bar .sp{display:none;} #anOv .an-bar .an-sep{flex-basis:100%;height:0;}",
+    "  #anOv .an-bar input{min-height:var(--gv-tap);font-size:var(--gv-fs-lg);flex:1;}}"
   ].join("\n");
   document.head.appendChild(st);
 }
@@ -171,18 +180,25 @@ function openAnalisisProductivo(legajo) {
   ov.style.display = "flex";
   // El supervisor va sin legajo (manda su sesión); el operario manda el suyo.
   _an.legajo = legajo || (typeof window.gvLegajoActual === "function" ? window.gvLegajoActual() : null) || null;
-  _an.tanda = null; _an.det = null; _an.detErr = "";
+  _an.tanda = null; _an.det = null; _an.detErr = ""; _an.modo = "hoy";
   _anRender(); _anCargar();
 }
 function anCerrar() { var ov = document.getElementById("anOv"); if (ov) ov.style.display = "none"; try { anLoadBadge(); } catch (_e) {} }
 function anDias(n) { _an.dias = n; _anCargar(); }
+function anModo(m) { _an.modo = m === "ant" ? "ant" : "hoy"; _an.tanda = null; _an.det = null; _anCargar(); }
+/* Lo que se le pide al servidor: hoy = 1 día; anteriores = N días + el de hoy, que después se saca. */
+function _anPDias() { return _an.modo === "hoy" ? 1 : _an.dias + 1; }
+function _anHoyIso() {
+  if (_an.lista && _an.lista.hasta) return String(_an.lista.hasta).slice(0, 10);
+  return new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);   // UTC-3 fijo
+}
 function anBuscar(v) { _an.q = String(v || "").toUpperCase().trim(); _anRender(); }
 function anVolver() { _an.tanda = null; _an.det = null; _an.detErr = ""; _anRender(); }
 
 function _anCargar() {
   if (_an.cargando) return;
   _an.cargando = true; _an.err = ""; _an.lista = null; _anRender();
-  _anRpc("gv_analisis_lista", { p_dias: _an.dias, p_legajo: _an.legajo }).then(function (r) {
+  _anRpc("gv_analisis_lista", { p_dias: _anPDias(), p_legajo: _an.legajo }).then(function (r) {
     if (r.error || !r.data) {
       var m = String((r.error && r.error.message) || "sin respuesta");
       // Una lectura rota NO es "no hay tandas" (regla «una lectura ROTA no es un CERO»).
@@ -193,7 +209,7 @@ function _anCargar() {
     _an.cargando = false; _anRender();
   });
   // Las marcas van en su propia lectura: si falla, la lista se ve igual (sin los banderines).
-  _anRpc("gv_analisis_marcas", { p_dias: _an.dias, p_legajo: _an.legajo }).then(function (r) {
+  _anRpc("gv_analisis_marcas", { p_dias: _anPDias(), p_legajo: _an.legajo }).then(function (r) {
     if (r && !r.error && r.data && typeof r.data === "object") { _an.marcas = r.data; _anRender(); }
   });
 }
@@ -235,10 +251,14 @@ function _anRender() {
   if (!_an.tanda) {
     var c = function (n, t) { return '<span class="gv-chip' + (_an.dias === n ? ' on' : '') + '" onclick="anDias(' + n + ')">' + t + '</span>'; };
     var f = function (k, t) { return '<span class="gv-chip' + (_an.filtro === k ? ' on' : '') + '" onclick="anFiltro(\'' + k + '\')">' + t + '</span>'; };
-    h += '<div class="an-bar">' + c(7, "7 d") + c(14, "14 d") + c(30, "30 d") + c(60, "60 d") +
+    h += '<div class="an-bar">' + (_an.modo === "hoy"
+           ? '<span class="an-hoy">Hoy · ' + _anDia(_anHoyIso()) + '</span>'
+           : '<button onclick="anModo(\'hoy\')">← Hoy</button>' + c(7, "7 d") + c(14, "14 d") + c(30, "30 d") + c(60, "60 d")) +
          '<span class="an-sep"></span>' + f("todas", "Todas") + f("avisos", "Con avisos") + f("marcadas", "Marcadas") +
          '<input id="anQ" placeholder="Buscar tanda" value="' + _anEsc(_an.q) + '" oninput="anBuscar(this.value)" style="width:128px">' +
-         '<button onclick="_anCargar()">Actualizar</button></div>';
+         '<button onclick="_anCargar()">Actualizar</button>' +
+         (_an.modo === "hoy" ? '<span class="sp"></span><button id="anBtnAnt" onclick="anModo(\'ant\')">Días anteriores</button>' : '') +
+         '</div>';
   }
   h += '<div class="an-body"><div class="an-wrap">' + (_an.tanda ? _anDetalleHtml() : _anListaHtml()) + '</div></div>';
   ov.innerHTML = h;
@@ -247,14 +267,18 @@ function _anRender() {
 function _anListaHtml() {
   if (_an.err) return '<div class="gv-err">' + _anEsc(_an.err) + '</div>';
   if (_an.cargando || !_an.lista) return '<div class="msg">Calculando…</div>';
+  var hoy = _anHoyIso();
   var t = (_an.lista.tandas || []).filter(function (x) {
+    if (_an.modo === "ant" && String(x.dia || "").slice(0, 10) >= hoy) return false;
     if (_an.q && String(x.tanda).indexOf(_an.q) < 0) return false;
     if (_an.filtro === "avisos") return (Number(x.alerta) || 0) > 0;
     if (_an.filtro === "marcadas") return !!_an.marcas[x.tanda];
     return true;
   });
-  if (!t.length) return '<div class="gv-msg">' + (_an.filtro === "marcadas" ? "Ninguna tanda marcada en el período."
-    : _an.filtro === "avisos" ? "Ninguna tanda con avisos en el período."
+  var per = _an.modo === "hoy" ? "hoy." : "en el período.";
+  if (!t.length) return '<div class="gv-msg">' + (_an.filtro === "marcadas" ? "Ninguna tanda marcada " + per
+    : _an.filtro === "avisos" ? "Ninguna tanda con avisos " + per
+    : _an.modo === "hoy" ? "Todavía no hay tandas con picking o armado terminado hoy."
     : "No hay tandas con picking o armado terminado en el período.") + '</div>';
   var fase = function (f, rot) {
     if (!f) return '';

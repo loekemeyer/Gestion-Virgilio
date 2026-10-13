@@ -10,7 +10,9 @@
      (f) el overlay no hereda el button{width:100%} global del index;
      (g) el SISTEMA DE DISEÑO «GV-UI» (regla del CLAUDE.md), que esta pantalla sostiene:
          el dato principal es el texto más grande de la pantalla · el veredicto es UNA línea ·
-         nada de lo explicativo se dibuja abierto (va en <details>) · sin emojis decorativos.
+         nada de lo explicativo se dibuja abierto (va en <details>) · sin emojis decorativos;
+     (j) v30.20 (Luis, 13/10): abre en el DÍA DE LA FECHA (p_dias 1) y el botón «Días anteriores»
+         pide N+1 días y saca las tandas de hoy (el «hoy» es el `hasta` del servidor).
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -97,6 +99,11 @@ const DET = {
 
     window.openAnalisisProductivo(); await espera(120);
     out.abierto = (document.getElementById("anOv") || {}).style ? document.getElementById("anOv").style.display : "";
+    // (j) abre en el día
+    out.pideHoy = out.pedidos.filter((x) => /^gv_analisis_lista:/.test(x)).pop() || "";
+    out.rotHoy = (document.querySelector("#anOv .an-hoy") || {}).textContent || "";
+    out.btnAnt = !!document.getElementById("anBtnAnt");
+    out.chipsEnHoy = document.querySelectorAll("#anOv .an-bar .gv-chip[onclick^='anDias']").length;
 
     // (b) lista
     const t = [...document.querySelectorAll("#anOv .an-t")];
@@ -161,6 +168,15 @@ const DET = {
     window.anFiltro("marcadas"); await espera(40);
     out.filtroMarcadas = document.querySelectorAll("#anOv .an-t").length;
     window.anFiltro("todas"); await espera(40);
+    // (j) días anteriores
+    document.getElementById("anBtnAnt").click(); await espera(80);
+    out.pideAnt = out.pedidos.filter((x) => /^gv_analisis_lista:/.test(x)).pop() || "";
+    out.antTandas = [...document.querySelectorAll("#anOv .an-t .cod")].map((x) => x.textContent);
+    out.chipsEnAnt = document.querySelectorAll("#anOv .an-bar .gv-chip[onclick^='anDias']").length;
+    out.antSinBtn = !document.getElementById("anBtnAnt");
+    const vh = [...document.querySelectorAll("#anOv .an-bar button")].find((x) => /Hoy/.test(x.textContent));
+    if (vh) vh.click(); await espera(80);
+    out.volvioHoy = !!document.getElementById("anBtnAnt") && /"p_dias":1\b/.test(out.pedidos.filter((x) => /^gv_analisis_lista:/.test(x)).pop() || "");
     _an.tanda = "F13C"; _an.det = DET; _anRender(); await espera(40);
 
     // (f) el botón Cerrar no hereda el width:100% global
@@ -194,6 +210,14 @@ const DET = {
   ok(r.badgeTrasRoto === "3", "(i) una lectura rota APAGÓ el badge (quedó «" + r.badgeTrasRoto + "»)");
   ok(r.botonPanel, "(a) falta el botón «Análisis Productivo» en el panel del supervisor");
   ok(r.abierto === "flex", "(a) la pantalla no se abrió");
+  ok(/"p_dias":1\b/.test(r.pideHoy), "(j) no abre en el día: pidió " + r.pideHoy);
+  ok(/^Hoy · Mar 13\/10$/.test(r.rotHoy), "(j) el rótulo del día dice «" + r.rotHoy + "»");
+  ok(r.btnAnt, "(j) falta el botón «Días anteriores»");
+  ok(r.chipsEnHoy === 0, "(j) en la vista del día no van los chips de período (hay " + r.chipsEnHoy + ")");
+  ok(/"p_dias":15\b/.test(r.pideAnt), "(j) «Días anteriores» pidió " + r.pideAnt + " (esperaba 14 + hoy = 15)");
+  ok(r.antTandas.join() === "F13C", "(j) en días anteriores quedan " + r.antTandas.join() + " (esperaba sólo F13C, sin la de hoy)");
+  ok(r.chipsEnAnt === 4 && r.antSinBtn, "(j) en días anteriores faltan los chips o sigue el botón");
+  ok(r.volvioHoy, "(j) «← Hoy» no vuelve a la vista del día");
   ok(r.tarjetas === 2, "(b) tarjetas: " + r.tarjetas + " (esperaba 2)");
   ok(r.primera === "F77A", "(b) la primera tanda es " + r.primera);
   ok(r.alerta.indexOf("2") >= 0, "(b) F13C tendría que mostrar ⚠ 2, muestra «" + r.alerta + "»");
