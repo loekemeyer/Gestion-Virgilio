@@ -8712,6 +8712,21 @@ ninguna pantalla de compra.
   consumo) lo carga el admin dentro de GP2. `gv_insumo_envio_inyector` queda sin grant y sin llamador.
 - Lectura: `select * from public.gv_gp2_espejo_insumos(null, true);` (qué haría) · `select * from public."GV_GP2_Espejo_Log" order by id desc;`
 - Rollback: `select cron.unschedule('gv-gp2-espejo-insumos');` + `alter table public."Movimientos_Stock" disable trigger zz_gv_gp2_espejo_insumos;`
+- ⚠⚠ **v29.66 (Luis, 13/10): el depósito «<sector> en Virgilio» SE CREA SOLO si falta.** Sin eso la fila salía «sin depósito
+  en Virgilio» y ese stock **no se reflejaba nunca, sin que nadie se enterara**: pasó el 13/10 al vincular C9 y D14
+  (Resortes, Sector Bombilla, 24.552 u mudas). Hoy la función lo crea (sólo ejecutando, no al simular) y sigue con el ajuste.
+  El insert va con `not exists`, **no** con `on conflict (tipo, ref_id)`: el índice es PARCIAL (`where ref_id is not null`) y
+  da 42P10; y el guard hace falta porque dos componentes del mismo sector entran en el mismo loop (el 2.º chocaba con la
+  ubicación que creó el 1.º). Marcadores `v29.61-ubic` / `v29.61-ubic3` (llave, no cambiarlos), centinela 398 con patrón de
+  CÓDIGO (el `-- v29.61-ubic3` es comentario y `gv_reglas_perdidas` limpia los comentarios antes de buscar: con ese patrón
+  el centinela daba «perdida» con la regla puesta). `sql/gv_gp2_espejo_insumos_ubic_v2966.sql`.
+- ⚠ **NO se duplica nada, medido el 13/10.** La verdad es Virgilio; GP2 tiene la copia en depósitos SEPARADOS: los 5 (hoy 6)
+  `virgilio_sector` **no entran en `v_nivel_stock`**, así que no inflan máximos ni OC de Cervantes, y el **único** escritor de
+  esos depósitos es el espejo (0 movimientos de otra fuente). Las bolsas viven sólo en la ubicación 57 (`tipo='sector'`, la
+  única que SÍ entra en `v_nivel_stock`, y está bien: el sector se mudó a Virgilio y no hay otro depósito de bolsas). Probado
+  en transacción abortada: +1 cajón de G11 en Virgilio → GP2 15.380 → 16.149 **en el acto**. Y 59 de 59 filas en `ok`.
+- ⚠ **590E (Pincel Silicona) NO se espeja**: es categoría `importados` en Virgilio y los importados están fuera del alcance a
+  propósito (tienen su propio circuito, `Importados_Stock_Parte` / `gv_importados_stock_insumos`).
 - `sql/gv_gp2_espejo_insumos_v2932.sql`.
 
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
