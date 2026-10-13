@@ -64,12 +64,7 @@ emitidas, un código ya arreglado sigue apareciendo como problema para siempre.
 
 **El número era 22, no 25.**
 
-> **Se retira el "25 pares" del barrido anterior: estaba CONTAMINADO.** Cruzaba por **número de
-> código** y **Basconia compra ACERO EN KILOS** (rubro `Flejes`, unidad `Kg`), con códigos que
-> chocan con los de artículo terminado: su `0635` es *"Arandela Gde/Chica Afila (77 x 1,25)"*, no
-> el artículo 635. Basconia tiene **una sola tanda, del 13/07, 10 líneas, 7.650 Kg**, y **cero
-> entregas** en `Entregas Tallerista Virgilio`: **no entra en esto por ningún lado**, ni tiene
-> nada que ver con 544/560/800.
+> Basconia (acero en Kg, códigos que chocan con artículos) **no entra en este cruce** (ver «Retirado» al pie).
 
 El barrido que vale filtra **`rubro = 'Art Term'` y `unidad = 'Cajas'`**, y deja afuera los alias
 que `gv_prov_match` ya resuelve (`Martin C` = Martin, `Carlos E` = Carlos, `Pettofrezza` = Rafael)
@@ -207,3 +202,15 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
+## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
+
+> Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
+> **No leer esta sección en el trabajo normal**: sólo cuando alguien pregunta por un comportamiento viejo
+> y no aparece en las reglas vigentes de arriba. Nada de acá se vuelve a aplicar sin un pedido explícito.
+
+> **Se retira el "25 pares" del barrido anterior: estaba CONTAMINADO.** Cruzaba por **número de
+> código** y **Basconia compra ACERO EN KILOS** (rubro `Flejes`, unidad `Kg`), con códigos que
+> chocan con los de artículo terminado: su `0635` es *"Arandela Gde/Chica Afila (77 x 1,25)"*, no
+> el artículo 635. Basconia tiene **una sola tanda, del 13/07, 10 líneas, 7.650 Kg**, y **cero
+> entregas** en `Entregas Tallerista Virgilio`: **no entra en esto por ningún lado**, ni tiene
+> nada que ver con 544/560/800.

@@ -11,8 +11,7 @@
   lectura caída dice **s/d**, nunca 0.
 - **«📈 Est. Madre»** (primera solapa) **no es una copia**: es `admin/admin.html#estadistica-madre` en un iframe que
   vive fuera de `#stkBody` (los re-render no lo recargan). Cambiar la Est. Madre = cambiarla en `pagina-LK-copia` y
-  re-copiar el espejo `admin/`. ~~Entra con el puente `lk_bridge_vjwt` y pide el OTP si el mail no es el admin~~ →
-  **desde la v25.72 entra SIN código** (ver la regla de abajo).
+  re-copiar el espejo `admin/`. **Desde la v25.72 entra SIN código** (ver la regla de abajo).
 - `tests/proy-entregadas.cjs` · `tests/stk-est-madre-tab.cjs` · `sql/gv_pedidos_mensuales_cod_v2565.sql`.
 
 ## ⚠ REGLA (Tomás Beviglia, 2026-10-01, v25.72): la Est. Madre de Gestión entra SIN CÓDIGO — la página LK queda igual
@@ -165,3 +164,11 @@ puerta). Arriba del iframe de la Est. Madre (Stock y Compras) va la barra `#emBa
   (026 sep/26 = 165 cajas − 3 u de la NC a Coto + 36 u de 026L de Chef = 5.973 u; sale del parser de ISIS), y un código
   vendido que no tiene fila en la planilla (599E / 599EZ en Costos LK) va **al fondo en naranja**, como está.
 - Una RPC vacía o con error no baja nada. `sql/gv_est_plantilla_v2736.sql`, `tests/est-madre-mes.cjs`.
+
+## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
+
+> Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
+> **No leer esta sección en el trabajo normal**: sólo cuando alguien pregunta por un comportamiento viejo
+> y no aparece en las reglas vigentes de arriba. Nada de acá se vuelve a aplicar sin un pedido explícito.
+
+- «La Est. Madre entra con el puente `lk_bridge_vjwt` y pide el OTP si el mail no es el admin». Retirado en la v25.72.

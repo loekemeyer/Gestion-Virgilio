@@ -32020,3 +32020,26 @@ Sin SQL nuevo: la columna `gv_doc` y el índice son los de §3.v3006. Lo que cam
 - Consulta útil: `select tipo, count(*) filter (where gv_doc is not null) con_papel, count(*) total
   from public."Movimientos_Stock" where creado > now() - interval '7 days' group by 1 order by 3 desc;`
 - Rollback: el de §3.v3006 (la columna es nullable, el front deja de mandarla y nada se rompe).
+
+### §3.v3009 — la segunda mitad del problema 766: el reconciliador EN VIVO del PKC también repartía hacia atrás
+
+**13/10/2026, Giuliana.** A las 15:34 se cargaron los 14 traslados góndola → excedente del conteo de la
+estantería P y el cron 68 (ya con el fix v29.62) los respetó a las 15:41. A las 16:03-16:08 se pickeó la
+tanda **F48D** (654, 501, 315, 222 entre otros) y los cuatro volvieron a excedente **0**: cada PKC dispara
+`trg_pkc_reconciliar_rt` → **`reconciliar_stock_articulo_rt`**, que recalcula el artículo entero con la
+MISMA lógica vieja que tenía el cron (todas las tandas desde `etapa1_pkc_desde` contra el excedente de hoy).
+
+- Fix: el mismo bloque `ya_exc` / `exc_avail` neto / `least(f.picked, greatest(f.tomado, 0))` que en etapa1.
+  `sql/reconciliar_stock_articulo_rt_v2962.sql`. Backup de la definición vieja (md5 `85faf27c…`) en
+  `zz_backups."GV_Backup_ArtRt_def_20261013"`. Centinela **454**.
+- Probado en transacción abortada: 654 con +5 y `reconciliar_stock_articulo_rt('F48D','654')` → sigue en 5,
+  F48D 0, D33B −1 (sin cambios).
+- Recarga 2 de los 4 traslados (`client_id conteoP_20261013c_*`): 654 5 · 501 10 · 315 59 · 222 28.
+- **Posiciones del excedente (D7)**: 150 ajustes `ref 'CONTEO P 13/10 pos'`, neto **0 por código**: se vacía
+  cada ubicación vieja (`P22`, `P22 · LK`, `O2`, `N3`…) y se carga la dictada (`P01`…`P30`, dos dígitos), con
+  la columna sin ubicación en 0. 39 códigos. Donde el total del sistema no coincide con lo dictado
+  (066: 207 contra 269 · 590E 16/25 · 560 58/60 · 555 5/7 · 355 26/27) la posición lleva el total del
+  sistema, repartido proporcionalmente en 066 (P21 69 · P22 46 · P23 49 · P24 43).
+- Y el **504** (pedido aparte): N12 vaciado (−264), góndola 883 → 1104 (+221); queda sólo N06 370.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` · `select clave, excedente from public.vista_saldos_stock where clave in ('654','501','315','222');`
