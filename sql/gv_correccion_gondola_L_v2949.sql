@@ -1,4 +1,4 @@
--- v29.49 · PENDIENTE DEL «sí» DE LUIS (D1). NO EJECUTADO.
+-- v29.49 · EJECUTADO el 13/10/2026 con el «sí» de Luis (D4): 52 filas, góndola −188, a_facturar +188. Rollback: borrar client_id like 'v2949_corr_%'.
 -- Saca de góndola las cajas que el armado devolvió por error (pedidos con L / 809 corregido).
 -- v29.50: SÓLO F58A y F48A (armadas, sin facturar): terminado −N y a_facturar +N.
 -- Efecto: góndola −188 cajas (F58A 185 · F48A 3); a_facturar +188. Lo viejo y facturado NO se toca.
