@@ -342,7 +342,7 @@ rollback y pruebas en `sql/gv_tanda_frenada_v2661.sql` · `tests/arm-avance-serv
 | estado y TV | `vista_tanda_status`: PKF/APF = sigue en picking/armando. TV / Mon. Admin / monitor viejo: luz **⏸ frenada** (ámbar) |
 | puntaje | una tanda con freno de picking **no entra** en `gv_picking_puntaje_operario` hasta el reparto por operario (parte 3) |
 
-⚠ ~~El m³ de la tanda sigue acreditándose a quien da el **TP/TAP** final~~ → desde la **v26.67** (parte 3) se reparte por operario.
+⚠ Desde la **v26.67** (parte 3) el m³ de una tanda frenada se reparte por operario.
 Centinelas v26.62 ids 300-306 · `sql/gv_tanda_frenada_v2662.sql` (CREATE completos + rollback) · `tests/tanda-frenar.cjs`.
 
 **Parte 2b (v26.65) — fichaje, supervisor y aviso del día siguiente:**
@@ -369,7 +369,7 @@ Centinelas 307-310 · `sql/gv_tanda_frenada_v2665.sql` · `tests/tanda-frenar-2b
 | cuándo entra | la parte de un operario entra cuando **ÉL cierra su tramo ese día** (TP/TAP/PKF/APF): mismo criterio de siempre, el m³ entra al cerrar. Con el freno al fichar, todo tramo cierra en el día |
 | sin respuesta | como antes: la tanda entera al del TP/TAP |
 
-~~El puntaje 1-10 de picking sigue sin las tandas frenadas~~ → **retirado en la v26.74 (D17, abajo)**.
+El puntaje 1-10 de picking también reparte por tramos desde la v26.74 (D17, abajo).
 ⚠ Una corrida que cruza la medianoche sin FJ deja su parte del primer día sin contar (no hay cierre ese día): con el cron 129 no pasa.
 Centinelas 313-315 · `sql/gv_tanda_credito_v2667.sql` · `tests/tanda-credito.cjs` (verificado que falla contra la v26.65 y sin el guard de cierre de la TV).
 
@@ -559,3 +559,12 @@ vacías) · `node tests/arm-mesa-inicio.cjs` (corre la pantalla: el AP con mesa 
 encola AUI, el cuadro que explota **no** traba el asistente) · `node tests/mon-tv.cjs`.
 `sql/gv_armado_mesa_aui_v2990.sql` (rollback al pie).
 
+## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
+
+> Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
+> **No leer esta sección en el trabajo normal**: sólo cuando alguien pregunta por un comportamiento viejo
+> y no aparece en las reglas vigentes de arriba. Nada de acá se vuelve a aplicar sin un pedido explícito.
+
+- v26.64: «el m³ de la tanda sigue acreditándose a quien da el TP/TAP final». Retirado en la v26.67.
+
+- v26.67: «el puntaje 1-10 de picking sigue sin las tandas frenadas». Retirado en la v26.74 (D17).

@@ -420,9 +420,9 @@ Solapa **Plantel** de la PPP (`plantel.js`, `plantelHtml` / `plantelCalc`). Todo
 | Monitor → pestaña **Ritmo** | `ritmoCargar` / `ritmoRender` en `plantel.js`. Dentro de `monTabSwitch`: el kiosko de pared no la muestra |
 | **Plantel** | la hora de picking sale de la base (`semana.horas_pick`): lo que vence = minutos estimados de SUS tandas × F (F = horas reales del monitor ÷ estimado de las tandas pickeadas en la historia, 1,22 al 12/10); lo que entra, al promedio; el mayor |
 
-- ~~El modelo topea cada línea en 30 cajas~~ → desde la **v29.48** la caja por encima de 30 suma `caja_extra` (E85A 6 → 18 min, E84A 6 → 30 contra 32 reales).
+- Desde la **v29.48** la caja por encima de 30 suma `caja_extra` (E85A 6 → 18 min, E84A 6 → 30 contra 32 reales).
 - Al 12/10, 28 días: 144 tandas, esperado 62:44 h, real 56:35 h (111 %), monitor 80:32 h (la diferencia son pausas, huecos y cola).
-- ~~Armado no tiene modelo de dificultad todavía~~ → **hecho en la v29.48** (ver la regla de abajo).
+- Armado tiene modelo de dificultad desde la **v29.48** (regla de abajo).
 - `sql/gv_ritmo_picking_v2947.sql`, `tests/monitor-ritmo.cjs`, `tests/ppp-plantel.cjs` (f).
 
 ## ⚠ REGLA (Thomas, 2026-10-12, v29.48, D5 · D6 · D7): ARMADO por dificultad, Plantel con A Programar/Cuarentena y pallets en el picking
@@ -461,10 +461,7 @@ El dato **ya se registraba en tres lugares y no lo mostraba ninguna pantalla**:
   55 de 57 tandas (las 2 que faltan no tienen ninguna ubicación registrada).
 - **Una lectura rota no borra el chip**: si la RPC falla, la tanda se dibuja como antes.
 
-⚠ **RETIRADA la nota de que la mesa no se registra mientras arman** (decía que el AUB se emite al TERMINAR y
-que preguntarla al dar AP lo decidía Luis): desde la **v29.90 SÍ se registra** — el AP la pregunta y emite un
-**`AUI`** (regla al final de este archivo). Lo que sigue valiendo es que el **AUB** sale al TERMINAR (TAP), así
-que entre el AP y el TAP el dato vivo es el del AUI.
+⚠ **Desde la v29.90 la mesa SÍ se registra mientras arman** (`AUI` al dar AP, regla al final del archivo). El **AUB** sale al TERMINAR (TAP): entre AP y TAP el dato vivo es el del AUI.
 
 ⚠ **El AUB hoy viene por TANDA, no por NP.** Medido el 13/10: 130 filas por tanda (la última, de hoy) contra 408
 por NP cuya última es del 30/09 — o sea que `_stkFetchNpsByTanda` no le trae las NP a la tanda web y
@@ -479,3 +476,17 @@ que se calcula. Si se quiere ahí también, se agrega.
 `select * from public.gv_reglas_perdidas;` · `node tests/mon-tv.cjs` (4 chequeos nuevos, verificado que fallan
 contra el tv.html anterior) · `node tests/mon-admin.cjs`. `sql/gv_tanda_ubicacion_v2974.sql`.
 
+## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
+
+> Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
+> **No leer esta sección en el trabajo normal**: sólo cuando alguien pregunta por un comportamiento viejo
+> y no aparece en las reglas vigentes de arriba. Nada de acá se vuelve a aplicar sin un pedido explícito.
+
+- v29.47: «el modelo de picking topea cada línea en 30 cajas». Retirado en la v29.48 (`caja_extra`).
+
+- v29.47: «armado no tiene modelo de dificultad todavía». Hecho en la v29.48.
+
+⚠ **RETIRADA la nota de que la mesa no se registra mientras arman** (decía que el AUB se emite al TERMINAR y
+que preguntarla al dar AP lo decidía Luis): desde la **v29.90 SÍ se registra** — el AP la pregunta y emite un
+**`AUI`** (regla al final de este archivo). Lo que sigue valiendo es que el **AUB** sale al TERMINAR (TAP), así
+que entre el AP y el TAP el dato vivo es el del AUI.

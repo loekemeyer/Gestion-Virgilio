@@ -15,7 +15,7 @@ con L. **Nunca** recodificar 7xx→5xx ni "pasar a LK" un pedido de Chef. Inform
 como Loeke (con una L al final) y después va a ISIS de CH, no de LK"*** — un pedido de la página LK con sucursal de entrega en
 Tierra del Fuego sigue siendo NP **LK** (se pickea de la góndola Loeke), pero cada artículo lleva **L** (505L) y el Excel ISIS va
 al de **Chef** con el código de cliente de Chef del mismo CUIT (vista `v_pedidos_web` de LK: `isis_empresa`, `cod_isis`;
-`_facXlsArmar`). Los 10 clientes LK de TdF ya cruzan por CUIT. **Excepción: La Anónima (771) se vende por LK** (`gv_isis_override` en LK, por CUIT). ~~**Cencosud (Chef 2444) es el caso inverso: NP de Chef con artículos de Loeke sin L**~~ → **RETIRADO**: Cencosud lleva **L** (v21.09, y Tomás Gonzalez 02/10/2026, ver «LA L ES DE CENCOSUD Y DE TIERRA DEL FUEGO»); igual entra al checklist de ajustes ISIS (`gv_fac_ajustes_isis` v2, v13.79), que lo detecta por la L. Ser cliente de las dos empresas, solo, no es problema; **el cod
+`_facXlsArmar`). Los 10 clientes LK de TdF ya cruzan por CUIT. **Excepción: La Anónima (771) se vende por LK** (`gv_isis_override` en LK, por CUIT). **Cencosud (Chef 2444)** lleva **L** (v21.09, y Tomás Gonzalez 02/10/2026, ver «LA L ES DE CENCOSUD Y DE TIERRA DEL FUEGO»); igual entra al checklist de ajustes ISIS (`gv_fac_ajustes_isis` v2, v13.79), que lo detecta por la L. Ser cliente de las dos empresas, solo, no es problema; **el cod
 cliente no significa nada, sólo el CUIT vale** (v13.76). La regla v13.75/76 ("cliente con FC en LK → no se programa",
 `cliente_fc_lk`) fue un malentendido y está **apagada** (`doble_lk_dias = 0`); **también la de v13.72 ("mismo cliente por CUIT, mismo día en ISIS LK", `en_produccion_lk`; `doble_lk_mismo_dia = 0`, v13.82)**: *"ya expliqué que eso no corresponde"*. §3.az, §3.ba y §3.bb.
 **⚠ Y la CUARENTENA de esos pedidos se evalúa con el cliente de CHEF (v17.75, dueño 14/09: *"se marcan y se evalúan
@@ -28,7 +28,7 @@ por esta regla y NO hay que darlo de alta** (dueño, 14/09: *"Cencosud sube pedi
 subió pedidos por CH. No lo voy a dar de alta."*): no carga por la página, sus OC entran por **Krikos** y la Bandeja
 las manda directo al portal de **Chef** (`precios_super.cadena`: `cencosud` → `empresa='chef'`, `cod_cliente_chef=2444`,
 `cod_cliente_lk` nulo). Medido: 4.452 líneas del 2444 en `sales_lines` marcadas `chef` desde 2021-05-27, ninguna en LK.
-~~Su caso propio —NP de Chef con artículos de Loeke **sin** L—~~ (**retirado**: desde feb/2026 ISIS Chef le factura con L —031L, 816EL— y el pedido nace con L, ver v21.09) ya lo cubre `gv_fac_ajustes_isis` (v13.79): es el caso
+Su caso (NP de Chef con artículos de Loeke, **con** L desde feb/2026, v21.09) ya lo cubre `gv_fac_ajustes_isis` (v13.79): es el caso
 **inverso** al de Tierra del Fuego. `sql/gv_cliente_isis_v1775.sql`, §3.fp.
 
 ## ⚠ REGLA (Luis, 2026-09-22, v21.09): la L es de CENCOSUD y de TIERRA DEL FUEGO — de nadie más
@@ -323,3 +323,12 @@ cajas que fueron a etiquetar a Cervantes el 30/09 vuelven como 865E (se resuelve
 - **No se borra nada**: movimientos, facturas, Importados/OC_Maximos/GV_Lugar_Item (inactivos) quedan como historia. Los marcadores de la base dicen `v29.06-baja` (llave, no cambiar).
 - `sql/gv_codigo_baja_v2906.sql`, `tests/stk-ajuste-cod-inexistente.cjs`.
 
+## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
+
+> Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
+> **No leer esta sección en el trabajo normal**: sólo cuando alguien pregunta por un comportamiento viejo
+> y no aparece en las reglas vigentes de arriba. Nada de acá se vuelve a aplicar sin un pedido explícito.
+
+- v13.7x: «Cencosud (Chef 2444) es el caso inverso: NP de Chef con artículos de Loeke SIN L». Retirado por la v21.09 y Tomás Gonzalez (02/10): Cencosud lleva L.
+
+- «Cencosud: NP de Chef con artículos de Loeke SIN L». Retirado: desde feb/2026 ISIS Chef le factura con L (031L, 816EL) y el pedido nace con L (v21.09).

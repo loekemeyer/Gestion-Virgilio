@@ -483,8 +483,7 @@ que es exactamente el hueco entre ella y Proy u/mes que reclamó Luis.
 
 Medido al 29/09 en 1920 px: tabla **1.242 px** en una tarjeta de **1.274** (antes 1.760), Descripción
 **232 px**. El ancho lo pone `_cols` en JS y `_anchoMax` fija el `max-width` de la tarjeta después de
-dibujar. ⚠ La v23.95 decía lo contrario (*"el sobrante se lo lleva Descripción (col sin width)"*):
-**queda retirada**.
+dibujar.
 
 **Chequeo:** `node tests/pedimp-ancho-tabla.cjs` — mide el ancho REAL de la celda con la pantalla
 corriendo y que no quede ninguna `<col>` sin width; verificado que falla con Descripción en 700 px.
@@ -643,7 +642,7 @@ negativo para usos prácticos de importación"*.
   + GP2). `stock_total` / `stock_actual` / `stock_cajas` **no se tocaron** (los leen otros). El módulo de importación
   lee el neto: la cuenta de «a pedir», los meses y la pantalla muestran el negativo; la celda Stock lleva **🏭+N**.
 - Al 01/10: 22 códigos en negativo (583E −210, 969E −204…); 505C +21.605, 587C +20.377, 323E +600 (444 neto).
-- ~~**v26.99 (Thomas, 06/10): GRJ31 es un POOL COMPARTIDO.**~~ **RETIRADO en la v28.43 (Luis, 07/10: *"habíamos determinado que 100 % iba para el 838E"*)**: ver la regla «PIEZAS E INSUMOS COMPARTIDOS» más abajo. Texto viejo: Tanto 323E como 838E cuentan **GRJ31 (totalidad) + 323E terminado (totalidad) + 838E terminado (totalidad)**, los tres a factor 1 — así los dos ven el pool neteado por lo ya despachado como cualquiera de los dos (3000 − 600 − 396 = 2.004 para ambos). La leyenda del pop-up los lista a los tres (se arma sola de `GV_Importados_Equiv_GP2`). **El 323ES ya NO ve GRJ31** (*"no va más"*): se borró su fila `(323ES, GRJ31)`. Esto **RETIRA** la regla D13 (Luis, 01/10, 20/80 + 323ES 100%): Thomas la dio vuelta — no volver al 20/80. Que GRJ31 figure entero en 323E y en 838E a la vez es a propósito (cada ítem ve el pool compartido; no se suman entre sí para comprar). Backup de las 3 filas viejas en el chat de la sesión 01RNVK8H (323E/GRJ31/0,2 · 838E/GRJ31/0,8 · 323ES/GRJ31/1).
+- **GRJ31 va 100 % al 838E** (v28.43, Luis 07/10): ver «PIEZAS E INSUMOS COMPARTIDOS». El 323ES ya no ve GRJ31.
 - **v26.00 (Luis, D19):** un importado puede tener VARIOS componentes y se suman; los que GP2 todavía no tiene (Z47, Z44-M505C, GRJ33…) cuentan solos cuando se creen (cruce por `upper`). El pop-up los lista todos. ⚠ Si el terminado de GP2 (942E…) se manda a Virgilio, tiene que salir del inventario de GP2 o cuenta dos veces.
 - **v26.86 (Luis, 05/10): suma TAMBIÉN el componente de GP2 con el MISMO código** (323E en GP2 = el artículo terminado), factor 1, salvo que ya esté en `GV_Importados_Equiv_GP2` o el código sea dual. Bodegas = todo GP2 menos Virgilio (talleristas incluidos). Lateral `e_mismo`, centinela 323. `sql/gv_importados_gp2_mismo_codigo_v2686.sql`.
 - **v26.03 (Luis, 01/10, D23): también suma STOCK DE VIRGILIO de otro código que se convierte en el importado**
@@ -717,3 +716,12 @@ chinos y para avisar en la página que no tenemos stock"*.
   llena `gv_gp2_espejo_sync()` (cron `gv-gp2-espejo-sync`, c/10 min, reescribe sólo si cambió el md5). Luis: *"que los
   dos tengan acceso a los datos y que puedan hablar"*; el vínculo de códigos (D3) va después. `sql/gv_gp2_espejo_v2517.sql`.
 
+## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
+
+> Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
+> **No leer esta sección en el trabajo normal**: sólo cuando alguien pregunta por un comportamiento viejo
+> y no aparece en las reglas vigentes de arriba. Nada de acá se vuelve a aplicar sin un pedido explícito.
+
+- ~~**v26.99 (Thomas, 06/10): GRJ31 es un POOL COMPARTIDO.**~~ **RETIRADO en la v28.43 (Luis, 07/10: *"habíamos determinado que 100 % iba para el 838E"*)**: ver la regla «PIEZAS E INSUMOS COMPARTIDOS» más abajo. Texto viejo: Tanto 323E como 838E cuentan **GRJ31 (totalidad) + 323E terminado (totalidad) + 838E terminado (totalidad)**, los tres a factor 1 — así los dos ven el pool neteado por lo ya despachado como cualquiera de los dos (3000 − 600 − 396 = 2.004 para ambos). La leyenda del pop-up los lista a los tres (se arma sola de `GV_Importados_Equiv_GP2`). **El 323ES ya NO ve GRJ31** (*"no va más"*): se borró su fila `(323ES, GRJ31)`. Esto **RETIRA** la regla D13 (Luis, 01/10, 20/80 + 323ES 100%): Thomas la dio vuelta — no volver al 20/80. Que GRJ31 figure entero en 323E y en 838E a la vez es a propósito (cada ítem ve el pool compartido; no se suman entre sí para comprar). Backup de las 3 filas viejas en el chat de la sesión 01RNVK8H (323E/GRJ31/0,2 · 838E/GRJ31/0,8 · 323ES/GRJ31/1).
+
+- v23.95: «el sobrante del ancho de la tabla de Pedidos se lo lleva Descripción (col sin width)». Retirada por la v24.32: la tabla mide lo que suman sus columnas.

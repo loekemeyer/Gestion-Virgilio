@@ -51,7 +51,7 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
   picking (TV, Mon. Admin y el monitor viejo del index) acredita **m³ de la tanda × fracción pickeada** (`gv_picking_pickeado`,
   lectura, anon: último PKC por código, Σ reales×m³/caja ÷ Σ pedidas×m³/caja, tope 1; sin respuesta, m³ entero), y en el **puntaje**
   una línea confirmada con **0 cajas no cuenta** (ni línea, ni parada, ni altura: `where pk.re > 0` en `gv_picking_tanda_calc`; sigue
-  en los huecos, que miden tiempo). ~~**El armado no se prorratea.**~~ (retirado en la v26.55: ver abajo) Medido 60 días: 834 de 8.347 líneas en 0 (230 de 334 tandas),
+  en los huecos, que miden tiempo). Medido 60 días: 834 de 8.347 líneas en 0 (230 de 334 tandas),
   10,0 % del m³ pedido; por operario el m³/h baja 6,4 % (122) · 8,8 % (104) · 11,2 % (504) · **17,5 % (277)**. El pop-up de m³/h
   del Mon. Admin dice «1,2 de 1,5» cuando se prorrateó. `GV_Picking_Tanda` + `lineas_cero` · `cajas_ped` · `m3_frac`.
   `sql/gv_picking_no_pickeado_v2651.sql` (centinelas v26.51; `gv_picking_pickeado` entró a `scripts/reglas-protegidas.json`),
@@ -89,3 +89,10 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
   día termina con FJ, para que la cola quede en 0 y sigan midiendo lo suyo). CI 1698 cayó por el segundo: regla
   v21.53, se arregló en el mismo pedido.
 
+## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
+
+> Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
+> **No leer esta sección en el trabajo normal**: sólo cuando alguien pregunta por un comportamiento viejo
+> y no aparece en las reglas vigentes de arriba. Nada de acá se vuelve a aplicar sin un pedido explícito.
+
+- v26.51: «el armado no se prorratea». Retirado en la v26.55.

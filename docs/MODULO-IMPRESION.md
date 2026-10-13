@@ -3,16 +3,7 @@
 > Movido de `CLAUDE.md` el 2026-10-13 (poda de reglas, pedido de Luis) para que no cargue en cada sesión.
 > Es documentación operativa VIVA del módulo, no se resume: leer ENTERA antes de tocar este módulo.
 
-## ⛔ RETIRADO (Luis, 2026-10-02, v26.26): el PROGRAMA de impresión de la v26.12 ya NO existe
-
-**Luis:** *"me quedo con mi helper, sacá lo otro"*. Se sacaron del front la cola en la base (`gv_imp_encolar`), la
-pantalla 🧩 Impresoras (PC + impresora + automático por hoja), `tools/impresion/` (GV-Impresion.ps1) y sus tests
-(`imp-programa`, `imp-agente-ps`). **La impresión sin cuadro es SÓLO el helper local de abajo.** No volver a poner
-una cola de impresión en la base ni un programa que lea de ella. Los objetos de la base (`GV_Impresion_*`, `gv_imp_*`
-de impresión) **ya no existen**: Luis dijo «sí» al drop (D4, 02/10); desde la sesión no entró (`execute_sql` y
-`apply_migration` se colgaron a los 60 s sin llegar a Postgres) y **lo corrió él en el SQL Editor** el 02/10
-(`sql/gv_impresion_programa_drop_v2628.sql`; verificado: 0 funciones, 0 tablas, la clave en
-`zz_backups."GV_Backup_Impresion_Clave_20261002"` con RLS). Tenían 0 PC, 0 reglas y 0 hojas.
+> **La impresión sin cuadro es SÓLO el helper local.** No volver a poner una cola de impresión en la base ni un programa que lea de ella (el de la v26.12 se retiró: ver «Retirado» al pie).
 
 ## ⚠ REGLA (Luis, 2026-10-02, v26.24): el HELPER LOCAL de impresión (127.0.0.1:17777) — por dispositivo, en PDF
 
@@ -101,3 +92,20 @@ el helper, las PC con la estación prendida empezaron a abrir el cuadro de impre
 - `vista_cola_impresion` / `gv_vista_cola_impresion` quedan en la base sin lector del front.
 - Centinelas 311 y 312. `sql/gv_cola_impresion_lista_v2666.sql`, `tests/cola-impresion-np.cjs`, `tests/print-station.cjs`,
   bloque **O** de `tests/imp-helper-local.cjs` (verificado que los tres fallan con la regla rota).
+
+## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
+
+> Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
+> **No leer esta sección en el trabajo normal**: sólo cuando alguien pregunta por un comportamiento viejo
+> y no aparece en las reglas vigentes de arriba. Nada de acá se vuelve a aplicar sin un pedido explícito.
+
+### ⛔ RETIRADO (Luis, 2026-10-02, v26.26): el PROGRAMA de impresión de la v26.12 ya NO existe
+
+**Luis:** *"me quedo con mi helper, sacá lo otro"*. Se sacaron del front la cola en la base (`gv_imp_encolar`), la
+pantalla 🧩 Impresoras (PC + impresora + automático por hoja), `tools/impresion/` (GV-Impresion.ps1) y sus tests
+(`imp-programa`, `imp-agente-ps`). **La impresión sin cuadro es SÓLO el helper local de abajo.** No volver a poner
+una cola de impresión en la base ni un programa que lea de ella. Los objetos de la base (`GV_Impresion_*`, `gv_imp_*`
+de impresión) **ya no existen**: Luis dijo «sí» al drop (D4, 02/10); desde la sesión no entró (`execute_sql` y
+`apply_migration` se colgaron a los 60 s sin llegar a Postgres) y **lo corrió él en el SQL Editor** el 02/10
+(`sql/gv_impresion_programa_drop_v2628.sql`; verificado: 0 funciones, 0 tablas, la clave en
+`zz_backups."GV_Backup_Impresion_Clave_20261002"` con RLS). Tenían 0 PC, 0 reglas y 0 hojas.

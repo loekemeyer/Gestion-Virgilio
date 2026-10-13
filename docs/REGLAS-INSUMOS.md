@@ -289,12 +289,7 @@ marca**; lo único que queda es **a quién se le dio** (`ref`: Cervantes 42 · R
 destino del 30/06 al 07/08, de antes de que el campo fuera obligatorio). O sea el circuito es **asimétrico a
 propósito**: la entrada dice de qué empresa vino y la salida no dice para cuál se usó. **No proponer pedir la marca
 al entregar ni «cerrar el círculo» por empresa.**
-⚠⚠ **RETIRADA la D8 («las 45 Cajas de 546P no se tocan»): el 546P SE CONTÓ EN EL DEPÓSITO y se unificó**
-(Luis, 13/10, mismo día y después de la D8: *"fui yo. está ok, se hizo el conteo en el depo"*). A las 13:59 pasó a
-**una sola unidad, `Uni`** —sus grupos «Cajas» (−45) y «MC» (−60) se reexpresaron, refs `unificación: pasa 222 MC a
-Uni (bruto 1:1)` y `fix_recatalog_bastidor`— más el ajuste del conteo (`CONTEO 546P X13`, −8.640): **30.528 → 6.768
-Uni**. **No se perdió ningún movimiento**: las líneas se reexpresaron, no se borraron. Hoy el 546P tiene **0 filas en
-«Cajas» y 0 en «MC»**. Lo que vale es esto, no la D8.
+⚠ **El 546P se contó en el depósito el 13/10 y quedó en UNA sola unidad, `Uni`** (6.768 Uni; 0 filas en «Cajas» y «MC»). Lo que vale es eso.
 
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.32, D32): el stock de insumos de VIRGILIO se COPIA EN VIVO a GP2
 
@@ -345,3 +340,15 @@ Uni**. **No se perdió ningún movimiento**: las líneas se reexpresaron, no se 
 - El conteo de insumos del martes 13/10 corrige el stock. `sql/gv_insumos_nombre_gp2_v2934.sql`,
   `sql/gv_ri_catalogo_gp2_v2935.sql` (respaldo de nombres adentro), centinela 388, `tests/ins-ri-gp2-catalogo.cjs`.
 
+## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
+
+> Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
+> **No leer esta sección en el trabajo normal**: sólo cuando alguien pregunta por un comportamiento viejo
+> y no aparece en las reglas vigentes de arriba. Nada de acá se vuelve a aplicar sin un pedido explícito.
+
+⚠⚠ **RETIRADA la D8 («las 45 Cajas de 546P no se tocan»): el 546P SE CONTÓ EN EL DEPÓSITO y se unificó**
+(Luis, 13/10, mismo día y después de la D8: *"fui yo. está ok, se hizo el conteo en el depo"*). A las 13:59 pasó a
+**una sola unidad, `Uni`** —sus grupos «Cajas» (−45) y «MC» (−60) se reexpresaron, refs `unificación: pasa 222 MC a
+Uni (bruto 1:1)` y `fix_recatalog_bastidor`— más el ajuste del conteo (`CONTEO 546P X13`, −8.640): **30.528 → 6.768
+Uni**. **No se perdió ningún movimiento**: las líneas se reexpresaron, no se borraron. Hoy el 546P tiene **0 filas en
+«Cajas» y 0 en «MC»**. Lo que vale es esto, no la D8.

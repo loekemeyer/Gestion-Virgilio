@@ -129,21 +129,8 @@ a un camión que no va a esa zona, o parte un camión en dos.
 hay 5 tandas vivas con 2+ pedidos distintos del mismo cliente (E48D tiene **8** de Jazquel). Moverlos
 juntos "porque son del mismo cliente" es justamente lo que esta regla prohíbe.
 
-**Cómo convive con las otras dos reglas de cliente, que siguen valiendo:**
+**O sea: tanda por camión · agrupamiento por pedido.** Juntar al cliente en un día está DEROGADO (v21.87, «UN GRUPO DE ZONAS POR DÍA»).
 
-| regla | qué dice | por qué no choca |
-|---|---|---|
-| ~~Thomas: *"nunca +1 pedido de un cliente va separado en la PPP"*~~ | **DEROGADA (Luis, 23/09, v21.87)** | ver "UN GRUPO DE ZONAS POR DÍA" |
-| Luis v18.87: *"la tanda de un cliente se parte por CAMIÓN"* | mismo día, distinta tanda si la zona manda a otro camión | es esta misma regla aplicada al armado |
-
-O sea: **mismo día para el cliente · tanda por camión · agrupamiento por pedido.**
-
-⚠ **Y la alarma de "cliente en días distintos" (`gv_ppp_cliente_dos_dias`) salta SÓLO si esos pedidos
-podrían ir en el MISMO camión** (Luis, 23/09, v21.70). Caso Multi Bazar (LK 4042): 4 pedidos a Río
-Negro y Santa Cruz por expreso y a San Martín por reparto propio, en 3 camiones distintos — juntarlos
-en un día no ahorra un viaje y el 2/10 ya salían los 2 camiones de Capital. El corte es la etiqueta de
-`gv_ppp_web_camion` (Capital Sur / Capital Centro-Oeste / GBA Sur / GBA Oeste / GBA Norte). Las tres dicen lo
-mismo desde tres lados, y el principio rector es el que las ordena cuando parecen chocar.
 
 ## ⚠⚠ LA LÓGICA DE PROGRAMACIÓN, RESUMIDA POR LUIS (2026-09-19)
 
@@ -806,10 +793,6 @@ desastre"* · *"No puedo ir tantas veces a zona 3 y 4 y 5 y 6"*.
 | GBA Norte | Z6 + Z7 | N, P |
 | súper | cada uno el suyo | — |
 
-⚠⚠ **Z2 y Z3 son camiones DISTINTOS (Luis, 23/09, v21.91)** — *"¿cuál sería la lógica de tener
-separadas las zonas Z2 y Z3 si son lo mismo?"*. Se retira el "Capital Centro-Oeste = Z2 + Z3" de la
-v21.43. En `gv_ppp_web_camion` la ZONA manda sobre el sector para Z2 y Z3 (los sectores C..H siguen
-armando la tanda por cercanía, no deciden el camión). Centinela `Capital Oeste` en `GV_Reglas_Centinela`.
 ⚠⚠⚠ **REGLA VIGENTE (Luis, 23/09, v21.95) — se retiran la v21.91 y la v21.94 como "camiones distintos siempre":**
 - **Z2 y Z3 van en el MISMO camión si cada una suma < 1 m³ ese día** (web + ISIS; Retira no cuenta). Apenas una
   llega a 1 m³, esa va sola. Sirve para compensar zonas de poco volumen.
@@ -1088,3 +1071,29 @@ Centinela 359. `sql/gv_ppp_web_zona_retira_v2838.sql`.
   falla, la celda muestra sólo `y` (no un 0/…).
 - `sql/gv_np_fc_parseada_v2877.sql`, `tests/fc-parseada-x-de-y.cjs`.
 
+## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
+
+> Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
+> **No leer esta sección en el trabajo normal**: sólo cuando alguien pregunta por un comportamiento viejo
+> y no aparece en las reglas vigentes de arriba. Nada de acá se vuelve a aplicar sin un pedido explícito.
+
+**Cómo convive con las otras dos reglas de cliente, que siguen valiendo:**
+
+| regla | qué dice | por qué no choca |
+|---|---|---|
+| ~~Thomas: *"nunca +1 pedido de un cliente va separado en la PPP"*~~ | **DEROGADA (Luis, 23/09, v21.87)** | ver "UN GRUPO DE ZONAS POR DÍA" |
+| Luis v18.87: *"la tanda de un cliente se parte por CAMIÓN"* | mismo día, distinta tanda si la zona manda a otro camión | es esta misma regla aplicada al armado |
+
+O sea: **mismo día para el cliente · tanda por camión · agrupamiento por pedido.**
+
+⚠ **Y la alarma de "cliente en días distintos" (`gv_ppp_cliente_dos_dias`) salta SÓLO si esos pedidos
+podrían ir en el MISMO camión** (Luis, 23/09, v21.70). Caso Multi Bazar (LK 4042): 4 pedidos a Río
+Negro y Santa Cruz por expreso y a San Martín por reparto propio, en 3 camiones distintos — juntarlos
+en un día no ahorra un viaje y el 2/10 ya salían los 2 camiones de Capital. El corte es la etiqueta de
+`gv_ppp_web_camion` (Capital Sur / Capital Centro-Oeste / GBA Sur / GBA Oeste / GBA Norte). Las tres dicen lo
+mismo desde tres lados, y el principio rector es el que las ordena cuando parecen chocar.
+
+⚠⚠ **Z2 y Z3 son camiones DISTINTOS (Luis, 23/09, v21.91)** — *"¿cuál sería la lógica de tener
+separadas las zonas Z2 y Z3 si son lo mismo?"*. Se retira el "Capital Centro-Oeste = Z2 + Z3" de la
+v21.43. En `gv_ppp_web_camion` la ZONA manda sobre el sector para Z2 y Z3 (los sectores C..H siguen
+armando la tanda por cercanía, no deciden el camión). Centinela `Capital Oeste` en `GV_Reglas_Centinela`.
