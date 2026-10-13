@@ -1,4 +1,4 @@
-/* v29.74 (Luis, 13/10): «mas que candado, solo debería dar opciones de poner un codigo ya existente.
+/* v29.77 (Luis, 13/10): «mas que candado, solo debería dar opciones de poner un codigo ya existente.
    a medida que se escribe se sugiere el codigo».
 
    El campo Código de Ingreso a racks (modo Importación) pasa a SUGERIR códigos. El universo es el
@@ -51,8 +51,8 @@ grant execute on function public.gv_stock_cod_lista() to anon, authenticated, se
 /* centinelas (aplicados: ids 403 y 404) */
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
 select * from (values
-  ('gv_stock_cod_lista','funcion','GV_Codigo_Baja','v29.74: la lista de códigos que sugiere Ingreso a racks NO ofrece un código dado de baja (865ED -> 865E), igual que el candado gv_stock_cod_conocido.','Luis','v29.74'),
-  ('gv_stock_cod_lista','funcion','length\(c\) desc','v29.74: el código se devuelve como lo escriben los maestros (026, no 26): es como se escribe en Movimientos_Stock / GV_Lugar_Item / Importados / OC_Maximos.','Luis','v29.74')
+  ('gv_stock_cod_lista','funcion','GV_Codigo_Baja','v29.77: la lista de códigos que sugiere Ingreso a racks NO ofrece un código dado de baja (865ED -> 865E), igual que el candado gv_stock_cod_conocido.','Luis','v29.77'),
+  ('gv_stock_cod_lista','funcion','length\(c\) desc','v29.77: el código se devuelve como lo escriben los maestros (026, no 26): es como se escribe en Movimientos_Stock / GV_Lugar_Item / Importados / OC_Maximos.','Luis','v29.77')
 ) v(objeto, clase, patron, regla, quien_pidio, version)
  where not exists (select 1 from public."GV_Reglas_Centinela" c where c.objeto = v.objeto and c.patron = v.patron);
 -- chequeo: select * from public.gv_reglas_perdidas where objeto = 'gv_stock_cod_lista';   -- vacía = todo bien

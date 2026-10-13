@@ -270,6 +270,64 @@ explica (📦/📅 de «no es demora»), un estado que se lee de un vistazo, el 
 el operario ya tiene memorizado. La prueba es: si el emoji se saca y no se pierde información, se
 saca.
 
+## 🟥🟥🟥 REGLA RECTORA DE DISEÑO «GV-UI» (Luis, 2026-10-13, v29.75): UNA PANTALLA SE LEE DE UN VISTAZO
+
+**Luis, textual:** *"quiero que agarremos una filosofía de diseño visual / front / usabilidad
+moderna y que cortemos con la basura. Buscamos que sea rápidamente procesable visualmente
+cualquier pantalla de esta aplicación. Sin texto excesivo, claridad visual, directo al grano con
+la información más importante primero y bien simple."*
+
+**Vale para TODOS los repos y TODA pantalla nueva o que se toque** (copiar este bloque al
+`CLAUDE.md` del repo nuevo). No reemplaza la regla de espacio del 28/09 ni la de «MENOS EMOJIS»:
+las tres son la misma idea — **densidad alta, ruido cero** —. Ésta agrega la **jerarquía**.
+
+> ## **La pregunta de cada pantalla es: «¿qué tiene que saber el que la abre, en 2 segundos?».**
+> Eso va primero, grande y solo. Todo lo demás baja un nivel o se pliega.
+
+### Los 8 puntos
+
+1. **UN dato principal por pantalla, y es el texto más grande que se ve.** Si hay dos cosas
+   del mismo tamaño, no hay jerarquía: el ojo no sabe dónde parar. El título y el código de la
+   cosa (la tanda, el cliente, la OC) **no** son el dato principal: son el rótulo.
+2. **Tres niveles de tamaño y nada más**: el dato (38-46 px), lo que lo acompaña (14-19 px), lo
+   accesorio (11-13 px gris). Un cuarto tamaño es indecisión.
+3. **El veredicto antes que los números.** Arriba va UNA línea que dice qué pasa y qué hacer
+   («2 hallazgos fuertes: mirar de cerca»), no un párrafo que repite los números de abajo.
+   Máximo ~60 caracteres; si no entra en una línea, no es un veredicto.
+4. **Lo explicativo se pliega.** Glosarios, metodología, desgloses, «cómo se calcula» y la
+   letra chica van en un `<details>` cerrado. **Ningún bloque de texto largo se dibuja abierto.**
+   El que necesita el detalle lo abre; el otro no lo lee igual, sólo le tapa la pantalla.
+5. **El color significa.** Verde / rojo / ámbar sólo cuando el valor es bueno, malo o dudoso;
+   gris cuando no hay dato. Un color decorativo (fondos de marca, bordes de colores, botones
+   pintados) saca atención del que sí significa. Fondo claro, texto oscuro, una sola tinta fuerte.
+6. **Un rótulo son 1 o 2 palabras, sin la explicación al lado.** `rendimiento`, no
+   `rendimiento (esperado ÷ real)`. La explicación vive en el `<details>` del punto 4.
+7. **Una lista es una línea por cosa**, con un punto de color para la severidad, y un
+   «y N más» cuando pasa de 8. Nada de tarjeta por ítem ni bordes por todos lados.
+8. **Sin emojis decorativos** (regla del 06/10) y **sin unidad repetida**: va en el rótulo, no
+   en cada celda.
+
+### La pantalla de referencia
+
+**`analisis.js` (Análisis Productivo) ES el molde.** Al escribir una pantalla nueva se mira cómo
+está hecha ésa, no cómo estaba la vieja. Las clases que sirven de base (`an-hd`, `an-state`,
+`an-hero`, `an-fase .big`, `an-av`, `details/summary`, `an-kpi`) están comentadas ahí mismo.
+
+**Qué cambió, para entender la diferencia:** antes eran **7 tarjetas del mismo peso** (nada
+resaltaba), un párrafo de conclusión, **3 notas grises** de metodología siempre abiertas y los
+rótulos con la fórmula entre paréntesis adentro del tile. Hoy: rendimiento en 46 px → veredicto
+en una línea → hallazgos de a uno → todo lo demás plegado.
+
+⚠ **El texto que escribe la base no se muestra crudo.** Los avisos de `gv_analisis_tanda` vienen
+de un plpgsql sin tildes y con `codigo(s)`: el front los acentúa y los pluraliza (`_anTxt`). Es
+cosmético y no cambia ningún número, pero *«El picking dio por completo 1 codigo(s)»* en pantalla
+es exactamente la basura que esta regla viene a sacar.
+
+**Chequeo:** `node tests/analisis-productivo.cjs` — el bloque **(g)** mide los puntos 1, 3, 4 y 8
+sobre la pantalla corriendo: el dato principal es el texto más grande, el veredicto entra en una
+línea, no hay texto largo sin plegar y no hay emojis decorativos. Verificado que falla al achicar
+el dato principal. **Al escribir una pantalla nueva, se le copia ese bloque al test.**
+
 ## 📌 LEER PRIMERO: `docs/ESTADO-Y-PENDIENTES.md`
 
 **Foto del estado al 2026-09-13.** Qué falta de verdad está en la base
@@ -958,6 +1016,19 @@ código, comentarios ni mensajes de commit).
 
 - **`desactiva caveman`** = responder solo el **próximo mensaje** normal/completo, y después **volver solo** a caveman.
 - **`caveman desactivacion total`** = apagar caveman por completo (queda desactivado hasta que se reactive).
+
+⚠⚠ **Los dos hooks de caveman son TEXTO SUGERIDO, no un candado** (medido el 13/10): el `additionalContext` de
+`PreToolUse`/`PostToolUse` llega al modelo en cada llamada a herramienta y compite con el resto del contexto —
+incluidas las reglas de ESTE archivo que piden lo contrario (el SQL exacto antes de escribir, las decisiones Dn
+del cierre, «medir antes de opinar»). Cuando chocan, gana el archivo y la respuesta se pasa de tres líneas.
+
+⚠⚠ **NO se arma un hook `Stop` que mida la respuesta y la BLOQUEE** (Luis, 13/10: *"¿de qué sirve el stop si la
+generación ya se hizo y los tokens se gastaron? no hagas eso"*). Un bloqueo llega **después** de generar: paga el
+texto largo y la reescritura, o sea gasta el doble de lo que caveman intenta ahorrar. **No volver a proponerlo.**
+
+⚠ Y lo que de verdad pesa en este repo es el INPUT, no el output: `CLAUDE.md` son **9.076 líneas / ~204 mil
+tokens** y entra dos veces por sesión, contra los ~50 tokens que ahorra cada respuesta recortada. Toda discusión
+de ahorro que empiece por el estilo de la respuesta está mirando el lado chico.
 
 ## ⚠ REGLA de TONO (Luis, 2026-09-19): sin dramatismo
 
@@ -1725,6 +1796,15 @@ uno nuevo · AD adelante AT atrás · sí, ponelo en el mapa"*.
   (celdas de góndola) quedan en rojo ⚠ en la pestaña Insumos.
 - El Mapa de racks muestra los insumos (🧰, con la cantidad declarada en el módulo, en su unidad).
 - `Insumos_Ubicaciones_Unificadas` está muerta desde el 11/08: nadie la lee ni la escribe.
+- ⚠⚠ **`Insumos_Ubicaciones.cantidad` es DECORATIVA: no se carga a mano y no se corrige** (medido el 13/10, con
+  el conteo de 505C). **142 de 149 filas están en 0 o null** (112 códigos de 116), **ninguna función la lee** para
+  calcular algo —sólo las dos RPC que la escriben, `gv_insumo_ubicaciones_guardar` y `gv_insumo_posicion_guardar`—
+  y el front **omite el número cuando es 0** (`_stkInsUbicStr` en Stocks y el `🧰 insumo` del Mapa): nadie ve un
+  «0» en pantalla. El saldo real de un insumo sale SIEMPRE de `Movimientos_Stock` (deposito `insumos`, convertido
+  con `Insumos_Factores`), que es lo que leen el módulo, las compras y el espejo a GP2.
+  ⚠ **Cargarle el número a un código suelto es peor que dejarlo vacío**: lo vuelve el 5.º con dato entre 112 sin
+  dato, sin que nada lo reconcilie después — es el pozo de la copia que nadie poda (regla v23.00). Si algún día
+  esa columna tiene que valer, se llena sola desde el saldo, no a mano.
 - `sql/gv_insumos_ubicacion_v2279.sql` (rollback en la cabecera), `tests/ins-aceptar-ubic.cjs`.
 
 ### ⚠⚠ EL MAPA ES EL PUNTO PRINCIPAL — y avisa el stock sin lugar (Luis, 25/09, v22.82)
@@ -7777,9 +7857,9 @@ negativo para usos prácticos de importación"*.
   (Distribución)», Bolsas Plásticas «en Virgilio»): eso ya está en Virgilio y no se suma. `gv_gp2_inventario.parte`
   = cervantes / terceros / virgilio; `gv_gp2_stock_componente` saca `virgilio` (terceros sigue contando). Impacto al
   02/10: 0. `sql/gv_gp2_stock_solo_cervantes_v2605.sql`.
-- ⚠ **Hay DOS tablas de vínculo y NO son lo mismo:** `GV_Importados_Equiv_GP2` (GV, para SUMAR stock: varios
-  componentes y factor) y `GP2.importado_virgilio_componente` (GP2, para el AVISO de recepción: un componente por
-  código). Al 02/10 difieren en códigos (599E/599ES→GRJ32, 522E→GRJ33, 590ES→PINCEL590 sólo en la de GP2; 94xP vs
+- ⚠ **`GV_Importados_Equiv_GP2` NO es una equivalencia de códigos** (v29.74): dice qué piezas de Cervantes
+  **aportan** stock a un importado, 1→N con factor (942E ← Z47 + Z47-M505 + 942E). La equivalencia de códigos
+  vive en **`GP2.insumo_equivalencia`** y es otra pregunta: no se fusionan. Al 02/10 difieren en códigos (599E/599ES→GRJ32, 522E→GRJ33, 590ES→PINCEL590 sólo en la de GP2; 94xP vs
   94xE). Unificarlas queda para después (Luis, 02/10).
 - `gv_importados_ordenes` suma dos columnas AL FINAL: **`stock_gp2`** y **`stock_total_neto`** (sin el `greatest(…,0)`
   + GP2). `stock_total` / `stock_actual` / `stock_cajas` **no se tocaron** (los leen otros). El módulo de importación
@@ -7867,7 +7947,7 @@ el mismo molde (el mismo bloque está en el `CLAUDE.md` de `loekemeyer/Gestion-P
 | pieza | cómo |
 |---|---|
 | frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.aceptado_virgilio`, y los espejos de solo lectura `GP2.virgilio_insumo_stock` / `_ubicacion` / `virgilio_lugar` / `virgilio_insumo_categoria` |
-| códigos | GV habla en código de ARTÍCULO (323ES), GP2 en COMPONENTE (GRJ31). El vínculo vive en **`GP2.importado_virgilio_componente`** y **nunca se adivina** |
+| códigos | GV habla en código de ARTÍCULO (323ES), GP2 en COMPONENTE (GRJ31). El vínculo vive en **`GP2.insumo_equivalencia`** y **nunca se adivina** |
 | confirmar | el que recibe dice **Sí / No** donde trabaja, en la tarjeta del componente. ⚠ **Hoy avisa sólo lo que RECIBE CERVANTES** (Luis, 02/10: *"lo que recibe Cervantes avisa"*): lo que GP2 manda a Virgilio (`enviar_a_virgilio`, tablet y botón «→ Virgilio») no pide Sí/No en GV |
 | Sí | el MISMO camino que la carga manual (en GP2: `crear_recepcion_insumo` + control en kg pendiente) |
 | No | cada lado toca SÓLO su fila; la reacción la hace un trigger del otro lado y se ve **donde se cargó** |
@@ -7896,7 +7976,7 @@ de insumos de Virgilio en GP2 se rearma **desde cero y en blanco** cuando Luis l
   pierde: cruza cuando se da de alta el artículo en GP2.
 - **Alta de un importado en GP2 con su receta**: se va haciendo **a medida que haga falta, por SQL en el back, no desde el
   front** (Luis, 05/10). Pendientes al 05/10 (sin fila): 323E, 838E, 438E, 439E, 584E, 727E, 865E, 55289. Hecho: 599E.
-- **Mapeo componente ↔ artículo**: tabla **`GP2.importado_virgilio_componente`** (`cod_virgilio → componente_id`), un
+- **Mapeo componente ↔ artículo**: tabla **`GP2.insumo_equivalencia`** (`cod_virgilio → componente_id`), un
   insert por código. Es el vínculo del flujo de recepción de insumos importados; el espejo de entregas cruza por
   `GP2.articulo` directo.
 - **Chequeo:** `select count(*), min(fecha), max(fecha) from "GP2".virgilio_espejo_pend;` — lo que todavía no cruzó, con
@@ -8707,7 +8787,7 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
 - Lo sostiene la base: trigger `aa_gv_salida_cervantes_no_racks` → `SC_DESDE_RACKS` (centinela v29.13).
   `sql/gv_salida_cervantes_no_racks_v2913.sql`, `tests/sc-racks-unidad.cjs`.
 
-## ⚠ REGLA (Luis, 2026-10-13, v29.67 + v29.74, D2): en INGRESO A RACKS el CÓDIGO SE ELIGE — se sugiere mientras se escribe
+## ⚠ REGLA (Luis, 2026-10-13, v29.67 + v29.77, D2): en INGRESO A RACKS el CÓDIGO SE ELIGE — se sugiere mientras se escribe
 
 **Luis:** *"956E · va a terminar en AB10 · el operario lo puso mal · ponele candado"* y, después del candado:
 *"mas que candado, solo debería dar opciones de poner un codigo ya existente. a medida que se escribe se sugiere
@@ -8717,7 +8797,7 @@ el codigo"*. El 13/10 09:34 el legajo 104 escribió la **posición** `AB3` en el
 
 > ## **El campo Código del modo Importación BUSCA: el código sale de la LISTA, no del teclado.**
 
-| lo que escribe el operario | qué hace el módulo (v29.74) |
+| lo que escribe el operario | qué hace el módulo (v29.77) |
 |---|---|
 | parte del código o del **nombre** (`956`, `cuchara`) | **sugiere** los códigos que existen (🚢 = importado); hay que **tocar** el que corresponde — una coincidencia parcial no elige sola |
 | el código entero, exacto (`956E`, y `26` = `026`) | se elige solo: tipear el código completo sigue andando sin tocar la lista |
@@ -8757,7 +8837,7 @@ el codigo"*. El 13/10 09:34 el legajo 104 escribió la **posición** `AB3` en el
 - ⚠ **Con la lista puesta, `AB3` ya no puede quedar elegido tipeando** (no está en el universo): el aviso lo pinta
   el chequeo del texto tipeado (`_irCodEfe()` = el código elegido **o** lo que se está escribiendo) y el candado
   sólo se alcanza forzando el código (`irSetCod`). **Se prueban las dos capas.**
-- Centinelas 403 y 404 · `sql/gv_stock_cod_lista_v2974.sql` (rollback: `drop function public.gv_stock_cod_lista();`) ·
+- Centinelas 403 y 404 · `sql/gv_stock_cod_lista_v2977.sql` (rollback: `drop function public.gv_stock_cod_lista();`) ·
   `tests/ir-codigo-candado.cjs` (corre la pantalla; verificado que falla con **14 chequeos en rojo** contra la v29.73
   y con 10 contra la v29.66).
 
@@ -8862,7 +8942,7 @@ ninguna pantalla de compra.
 - Corre por el disparador `zz_gv_gp2_espejo_insumos` (cada movimiento de insumos; nunca frena la carga: el error va al log)
   y por el cron `gv-gp2-espejo-insumos` (:19 y :49). Alcance: cajas, fleje, parte_procesado, partes_crudo, plastico — los
   importados NO.
-- **Qué código va con qué componente lo dice `GP2.importado_virgilio_componente`** (54 cargadas el 09/10; el resto lo asigna
+- **Qué código va con qué componente lo dice `GP2.insumo_equivalencia`** (54 cargadas el 09/10; el resto lo asigna
   Thomas en GP2 → Stock General → Virgilio, D30). Un código sin equivalencia no se copia.
 - **D16 (Thomas): el celular del operario de Virgilio NO escribe en GP2.** Lo que pasa en GP2 (envío de bolsas a un inyector,
   consumo) lo carga el admin dentro de GP2. `gv_insumo_envio_inyector` queda sin grant y sin llamador.
@@ -8884,6 +8964,53 @@ ninguna pantalla de compra.
 - ⚠ **590E (Pincel Silicona) NO se espeja**: es categoría `importados` en Virgilio y los importados están fuera del alcance a
   propósito (tienen su propio circuito, `Importados_Stock_Parte` / `gv_importados_stock_insumos`).
 - `sql/gv_gp2_espejo_insumos_v2932.sql`.
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.74): LA TABLA DE EQUIVALENCIAS DE INSUMOS ES UNA — `GP2.insumo_equivalencia`
+
+**Luis:** *"tiene que haber una tabla de insumos que muestre la equivalencia entre un insumo de virgilio, de
+cervantes y el codigo ISIS que tienen. Punto."* · *"¿cómo catzo terminamos teniendo dos?"*
+
+> **Toda equivalencia de códigos de insumos vive en `GP2.insumo_equivalencia`** (`cod_virgilio` ·
+> `componente_id` → cod de Cervantes · `isis`). Legible: **`GP2.v_insumo_equivalencia`**. Se edita en
+> GP2 → Stock general → pestaña Virgilio. **No se crea otra, ni una columna que haga lo mismo.**
+
+Había dos, y la vieja **no era una tabla: era una COLUMNA** (`GP2.componente.codigo_virgilio`, 8 filas, sólo
+bolsas, de la v14.95). Por eso nadie la encontró el 30/09 cuando hizo falta un mapeo, y se creó la tabla al
+lado. Mismo pozo que el módulo de Matricería duplicado.
+
+⚠ **Y la columna nació mal, no se desalineó:** estaba cargada con abreviaturas del lado de Cervantes (`NV`,
+`NR`, `N25`, `PP`, `PS`, `PE`) que **nunca existieron en Virgilio** — los códigos de Virgilio son `NY Virgen`,
+`PP 2630`, `NY Recup`… desde el 02/07. Coincidían sólo `ABS` y `AI`.
+
+**Lo que costó, medido el 13/10:** `GP2.movimiento` tipo `envio_inyector` tenía **0 filas en toda su
+historia**, mientras en Virgilio salieron **86 bolsas (2.150 kg)** a inyectores entre el 25/08 y el 08/10
+(Rafael 57, Manolo 29). 7 de las 9 bolsas no matcheaban, así que `enviar_material_virgilio` **no se llamaba
+nunca y encima en silencio** (`_insGp2Mat` devolvía null y la fila salía del lote sin avisar). El espejo bajaba
+la 57 igual: los kg se evaporaban.
+
+⚠ **No hay desfase de stock que ajustar** (medido): el espejo del 09/10 fijó la 57 al saldo real de Virgilio
+(la **subió de 0 a 5.525 kg**: GP2 nunca había tenido stock de bolsas), y esas salidas ya estaban netas ahí.
+Lo que no existe es el **circuito del inyector: ni las salidas ni las devoluciones** (0 movimientos con las
+ubicaciones 58-61 en toda la historia). Cargar sólo las salidas dejaría a Rafael debiendo kg que ya devolvió
+inyectado: arrancarlo pide **un conteo de lo que cada inyector tiene hoy**, no un backfill.
+
+| pieza | qué cambió |
+|---|---|
+| `GP2.componente.codigo_virgilio` | **borrada** (backup `zz_backups."GV_Backup_CodigoVirgilio_20261013"`) |
+| `enviar_material_virgilio` · `recibir_oc_virgilio` | resuelven el componente por `insumo_equivalencia`; sin fila, **fallan ruidoso** |
+| `material_virgilio_bundle` · `oc_pendientes_virgilio` | devuelven el **código REAL** de Virgilio (el front de GV matchea con `_insK()`, upper+trim: no hubo que tocarlo) |
+| `recalcular_maximo_material` | «está en Virgilio» = tiene fila en la equivalencia |
+| `public.gv_gp2_inventario` | `codigo_virgilio` sale de la equivalencia — ⚠ con `CREATE OR REPLACE`, nunca `DROP CASCADE` (cuelgan `gv_gp2_stock_componente` y `gv_importados_ordenes`: ese cascade ya dejó Importados en 404 en la v16.20 y la v16.33) |
+| front (`index.html`) | **una bolsa sin equivalencia NO pasa en silencio**: con un inyector elegido, cualquier ítem que el bundle no reconozca frena con el confirm («¿registrar igual sólo en Virgilio?»). El criterio **no usa `insCatOf`**: si el catálogo de categorías no se leyó devuelve `""` para todo y el guard no frenaría nada |
+| `isis` | cargado desde `Insumos.isis`: **29 de 79**. Las bolsas tienen el ISIS igual al código de Cervantes (2455 = ABS); ⚠ **AI no**: componente 2465, ISIS 1135 — mirar si no es un error de carga en `Insumos` |
+
+⚠ **Queda sin cruzar `EBA`** (20 bolsas, celda Q34): no existe como componente en Cervantes. Hay que darlo de
+alta en GP2 (sector Bolsas Plásticas) o decir que no va.
+⚠ **`CAJA Nº 1` y `CAJA Nº 22` tienen el mismo ISIS (`0127`)** en `Insumos`: uno de los dos está mal.
+⚠ Los centinelas de las 3 funciones de **GP2** no entran en `GV_Reglas_Centinela` (sólo alcanza `public`):
+del lado de GP2 lo sostienen sus tests. En GV quedan los ids 388 y 406.
+
+`sql/gv_insumo_equivalencia_unica_v2974.sql` (rollback en la cabecera), `tests/ins-bolsa-sin-equivalencia.cjs`.
 
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
 

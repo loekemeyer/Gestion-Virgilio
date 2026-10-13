@@ -1,4 +1,4 @@
-/* v29.67 (D2: «ponele candado») + v29.74 (Luis, 13/10: «mas que candado, solo debería dar opciones de
+/* v29.67 (D2: «ponele candado») + v29.77 (Luis, 13/10: «mas que candado, solo debería dar opciones de
    poner un codigo ya existente. a medida que se escribe se sugiere el codigo») — el campo CÓDIGO del
    Ingreso a racks (modo Importación).
 

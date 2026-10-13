@@ -6420,7 +6420,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.74"></script>
+<script type="module" src="recepcion.js?v=29.77"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10732,7 +10732,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.74";
+const APP_VERSION = "v29.77";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27667,7 +27667,7 @@ function insDocCancel() {
    La materia prima plástica (PP, ABS, AI, NV, NR, N25, PE, PS: bolsas de 25 kg) la COMPRA GP2 y
    se guarda acá, en Virgilio. GP2 es el que manda (stock por inyector, OC, reposición); el ledger
    de Virgilio (Movimientos_Stock deposito='insumos') se sigue escribiendo igual que siempre.
-   Lo que se agrega, SÓLO cuando el insumo es una bolsa (su cod está en GP2.componente.codigo_virgilio):
+   Lo que se agrega, SÓLO cuando el insumo es una bolsa (su cod está en GP2.insumo_equivalencia, v29.74):
      EI (entregar): el destino es UN INYECTOR (lista cerrada que da GP2, con cuántas bolsas le
         faltan para sus OC) → rpc GP2.enviar_material_virgilio(cod_virgilio, bolsas, inyector, legajo).
      RI (recibir): se elige la OC de material de GP2 que llegó (rpc GP2.oc_pendientes_virgilio) y
@@ -27774,6 +27774,16 @@ function _insGp2Bolsas(gp2, it) {
 /* Avisa a GP2. Devuelve {ok, msg} — nunca tira: el llamador decide qué hacer con el fallo. */
 async function _insGp2Enviar(gp2, sel, legajo, remito) {
   const rows = sel.map(function (it) { const m = _insGp2Mat(gp2, it); if (!m) return null; const b = _insGp2Bolsas(gp2, it); return { it: it, cod: m.codigo_virgilio || m.cod_virgilio, bolsas: b }; }).filter(Boolean);
+  // v29.74 (Luis) — una bolsa que NO está en GP2.insumo_equivalencia no puede pasar en silencio:
+  // el kg sale de Virgilio, el espejo lo baja igual y NO queda en poder de ningún inyector (se evapora).
+  // Era el caso de las 7 bolsas que no matcheaban el mapeo viejo; hoy sólo falta EBA.
+  // El criterio NO pasa por insCatOf: si el catálogo de categorías no se pudo leer devuelve "" para
+  // todo y el guard no frenaría nada. Con un inyector elegido lo que se entrega son bolsas (v29.28),
+  // así que cualquier ítem que el bundle de GP2 no reconozca frena.
+  if (gp2.modo === "EI") {
+    const sinEq = sel.filter(function (it) { return !_insGp2Mat(gp2, it); });
+    if (sinEq.length) return { ok: false, msg: "No tiene equivalencia en Gestión Productiva: " + sinEq.map(function (it) { return it.cod; }).join(", ") + ".\nCargala en Stock general → Virgilio (código de Cervantes) antes de entregarla." };
+  }
   if (!rows.length) return { ok: true, msg: "" };
   const sinUni = rows.filter(function (r) { return r.bolsas == null || !(r.bolsas > 0); });
   if (sinUni.length) return { ok: false, msg: "GP2 sólo entiende Bolsas o Kg: " + sinUni.map(function (r) { return r.it.cod + " en " + (r.it.unidad || "?"); }).join(", ") };
@@ -30297,7 +30307,7 @@ function _irChkPedir() {
   if (_irChkT) { clearTimeout(_irChkT); _irChkT = null; }
   if (!_ir) return;
   if (_ir.modo === "nacional") { _ir.chk = null; return; }
-  const k = _irCodEfe();   // v29.74: en Importación el código sale de la LISTA; lo tipeado se chequea igual (AB3)
+  const k = _irCodEfe();   // v29.77: en Importación el código sale de la LISTA; lo tipeado se chequea igual (AB3)
   if (!k) { _ir.chk = null; return; }
   if (_IR_CHK[k]) { _ir.chk = _IR_CHK[k]; return; }
   _ir.chk = null;
@@ -30327,7 +30337,7 @@ async function _irCodGuard(codN) {
   if (chk.existe === false) return confirm("No existe el código " + codN + ".\n\n¿Lo creo y le cargo" + q);
   return confirm("No pude verificar si el código " + codN + " existe.\n\n¿Cargo igual" + q);
 }
-/* v29.74 (Luis, 13/10: «mas que candado, solo debería dar opciones de poner un codigo ya existente.
+/* v29.77 (Luis, 13/10: «mas que candado, solo debería dar opciones de poner un codigo ya existente.
    a medida que se escribe se sugiere el codigo») — el campo Código de Importación SUGIERE códigos que
    existen, en vez de aceptar texto libre. El universo es el MISMO que decide el candado de la v29.67
    (`gv_stock_cod_conocido`), listado por `gv_stock_cod_lista()`: así la pantalla no puede sugerir un
@@ -30390,7 +30400,7 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
     await loadArtNombres();
     const cxm = await irFetchCxM(plani);
     const saldos = await stockFetchSaldos().catch(function () { return {}; });   // v6.28: para el "nacional" (stock en a_guardar/excedente)
-    const cods = await irFetchCodigos();   // v29.74: los códigos que se pueden sugerir en Importación
+    const cods = await irFetchCodigos();   // v29.77: los códigos que se pueden sugerir en Importación
     const seen = {}, libres = [], ocupados = {};
     (plani || []).forEach(function (r) { const sec = String(r.sector || "").trim(); if (sec && String(r.estado) === "ocupado" && r.cod_art) ocupados[sec.toUpperCase()] = String(r.cod_art); });
     (plani || []).forEach(function (r) {
@@ -30435,7 +30445,7 @@ function irRender() {
     if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(codCanonSuf(_ir.cod)) + ' en ' + origTxt + '.</div>';
   } else {
     h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: elegí el <b>código</b> de la lista (escribí el código o el nombre y te lo sugiero), cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
-    // v29.74: el campo BUSCA entre los códigos que existen; el código se elige de la lista (o se escribe entero)
+    // v29.77: el campo BUSCA entre los códigos que existen; el código se elige de la lista (o se escribe entero)
     h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="🔎 código o nombre (ej. 956E)" value="' + escapeHtml(_ir.codPick || "") + '" oninput="irSetPick(this.value)"></div>';
     if (_ir.cod) h += '<div class="ir-desc">Elegido: <b>' + escapeHtml(codBase(_ir.cod)) + '</b> ' + escapeHtml(nombre || (_ir.codNuevo ? "(código nuevo, sin nombre)" : "")) + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
     if (chk) h += _irChkWarn(chk);
@@ -30461,7 +30471,7 @@ function irRender() {
   else h += '<button class="gv-anular" onclick="irAnular()">⛔ Anular ingreso</button>';
   _renderKeepFocus(body, h);
 }
-/* v29.74 — irSetCod ya no cuelga de ningún input (en Importación el código se elige de la lista con
+/* v29.77 — irSetCod ya no cuelga de ningún input (en Importación el código se elige de la lista con
    irPickCod): queda como setter programático. Si el código no está en el universo, se marca como
    «código nuevo», que es el mismo estado que deja el «usar igual» — así el candado lo pregunta. */
 function irSetCod(v) {
@@ -30487,7 +30497,7 @@ function irSetOrigen(o) { if (!_ir) return; _ir.origen = (o === "excedente" ? "e
 function irSetPick(v) {
   if (!_ir) return;
   _ir.codPick = String(v == null ? "" : v);
-  /* v29.74 — en Importación lo tipeado es la BÚSQUEDA: el código queda elegido sólo si coincide EXACTO
+  /* v29.77 — en Importación lo tipeado es la BÚSQUEDA: el código queda elegido sólo si coincide EXACTO
      con uno que existe (así tipear el código entero sigue andando sin tocar la lista) o si lo tocan en
      la lista. El «usar igual» (código nuevo) se mantiene mientras no cambie el texto. */
   if (_ir.modo !== "nacional") {
@@ -30517,7 +30527,7 @@ function irPickCod(codEnc) {
   else { _ir.codPick = codBase(cod); _irCxmAplicar(); _irChkPedir(); }
   irRender();
 }
-/* v29.74 — la salida: un importado que todavía no está en ningún maestro (el alta va por Importación →
+/* v29.77 — la salida: un importado que todavía no está en ningún maestro (el alta va por Importación →
    ➕ Agregar / modificar). No se ofrece si lo tipeado es una POSICIÓN de rack o un código de baja: eso
    lo frena el candado de la v29.67, que es el caso que originó todo (AB3). */
 function irCodNuevo() {
@@ -62547,7 +62557,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.74"></script>
+<script src="importacion.js?v=29.77"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65547,15 +65557,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.74"></script>
-<script src="hotsale.js?v=29.74"></script>
-<script src="estadisticas.js?v=29.74"></script>
-<script src="ads.js?v=29.74"></script>
-<script src="plantel.js?v=29.74"></script>
+<script src="cobranzas.js?v=29.77"></script>
+<script src="hotsale.js?v=29.77"></script>
+<script src="estadisticas.js?v=29.77"></script>
+<script src="ads.js?v=29.77"></script>
+<script src="plantel.js?v=29.77"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.74"></script>
+<script src="analisis.js?v=29.77"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.74"></script>
+<script src="ayuda.js?v=29.77"></script>
 
 </body>
 </html>

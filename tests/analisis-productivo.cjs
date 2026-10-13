@@ -1,13 +1,16 @@
-/* v29.64 — ANÁLISIS PRODUCTIVO POR TANDA (Luis, 13/10/2026). Corre la pantalla de verdad
+/* v29.75 — ANÁLISIS PRODUCTIVO POR TANDA (Luis, 13/10/2026). Corre la pantalla de verdad
    (analisis.js dentro de index.html) con las RPC mockeadas y mide:
      (a) el botón está en el panel del supervisor y abre la pantalla;
-     (b) la lista: una tarjeta por tanda, con el rendimiento en color y el ⚠ de los avisos duros;
-     (c) el detalle: avisos ordenados por severidad, tarjetas de ritmo y dificultad de picking y
-         armado, y la tabla código por código con «frente a la góndola» y «veces lo normal»;
+     (b) la lista: una tarjeta por tanda, con el rendimiento en color y el chip de avisos duros;
+     (c) el detalle: veredicto en una línea, avisos ordenados por severidad, el rendimiento de
+         picking y armado, y la tabla código por código con «frente a la góndola» y «veces lo normal»;
      (d) una lectura ROTA se dice, no se dibuja como «sin tandas» (regla de la v18, §lectura rota);
      (e) el botón del módulo de operarios aparece SÓLO si gv_analisis_acceso_ok devuelve true, y
          cuando aparece manda el legajo;
-     (f) el overlay no hereda el button{width:100%} global del index.
+     (f) el overlay no hereda el button{width:100%} global del index;
+     (g) el SISTEMA DE DISEÑO «GV-UI» (regla del CLAUDE.md), que esta pantalla sostiene:
+         el dato principal es el texto más grande de la pantalla · el veredicto es UNA línea ·
+         nada de lo explicativo se dibuja abierto (va en <details>) · sin emojis decorativos.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -102,25 +105,53 @@ const DET = {
     out.alerta = t[1] ? (t[1].querySelector(".al") || {}).textContent || "" : "";
     out.sinAlerta = t[0] ? !t[0].querySelector(".al") : false;
     out.lineasTarjeta = t[1] ? [...t[1].querySelectorAll(".l")].map((x) => x.textContent.trim()) : [];
-    out.rojoBajo = t[1] ? /rgb\(185, 28, 28\)/.test((t[1].querySelector(".l b:nth-of-type(2)") || {}).style ? window.getComputedStyle(t[1].querySelectorAll(".l b")[1]).color : "") : false;
+    out.rotulos = t[1] ? [...t[1].querySelectorAll(".l .q")].map((x) => x.textContent.trim()) : [];
+    out.rojoBajo = t[1] ? /rgb\(185, 28, 28\)/.test(window.getComputedStyle(t[1].querySelector(".l .r")).color) : false;
 
     // (c) detalle
     t[1].click(); await espera(120);
     out.avisos = [...document.querySelectorAll("#anOv .an-av")].map((x) => x.className.replace("an-av ", "") + "|" + x.textContent.slice(0, 22));
-    out.cards = [...document.querySelectorAll("#anOv .an-card span")].map((x) => x.textContent.replace(/<br>/g, " "));
-    out.secciones = [...document.querySelectorAll("#anOv .an-sec")].map((x) => x.textContent.trim().slice(0, 24));
+    out.avisoTexto = (document.querySelector("#anOv .an-av span:last-child") || {}).textContent || "";
+    out.cards = [...document.querySelectorAll("#anOv .an-kpi div span")].map((x) => x.textContent.trim());
+    out.secciones = [...document.querySelectorAll("#anOv summary")].map((x) => x.textContent.trim().slice(0, 28));
     out.cols = [...document.querySelectorAll("#anOv th")].map((x) => x.innerHTML.replace(/<br>/g, " ").replace(/\s+/g, " ").trim());
     const filas = [...document.querySelectorAll("#anOv tbody tr")];
     out.filas = filas.length;
     out.malas = filas.filter((f) => f.classList.contains("mala")).map((f) => f.cells[1].textContent);
     out.f1 = filas[0] ? [...filas[0].cells].map((c) => c.textContent.trim()) : [];
     out.volver = !!document.querySelector("#anOv .an-top button[onclick='anVolver()']");
-    out.concl = (document.querySelector("#anOv .an-concl") || {}).textContent || "";
+    out.concl = (document.querySelector("#anOv .an-state .v") || {}).textContent || "";
     out.mkBotones = document.querySelectorAll("#anOv .an-mk-b").length;
+
+    // (g) SISTEMA DE DISEÑO «GV-UI» — lo que esta pantalla tiene que sostener
+    const vis = (e) => e.offsetParent !== null || e === document.body;
+    const px = (e) => parseFloat(window.getComputedStyle(e).fontSize) || 0;
+    const hero = document.querySelector("#anOv .an-hero .big");
+    out.heroTxt = hero ? hero.textContent.trim() : "";
+    out.heroPx = hero ? px(hero) : 0;
+    // 1) el dato principal es el texto MÁS GRANDE que se ve
+    out.mayor = 0; out.mayorQ = "";
+    [...document.querySelectorAll("#anOv *")].forEach((e) => {
+      if (!vis(e) || !e.textContent.trim() || e.children.length) return;
+      const f = px(e);
+      if (f > out.mayor) { out.mayor = f; out.mayorQ = e.className + ":" + e.textContent.trim().slice(0, 14); }
+    });
+    // 2) el veredicto es UNA línea corta
+    out.veredictoLargo = out.concl.length;
+    // 3) nada explicativo abierto: ningún texto suelto largo fuera de <details>
+    out.sueltoLargo = [...document.querySelectorAll("#anOv .an-body *")]
+      .filter((e) => vis(e) && !e.children.length && !e.closest("details") && e.textContent.trim().length > 150)
+      .map((e) => e.textContent.trim().slice(0, 40));
+    // 4) el glosario existe y arranca PLEGADO
+    const gl = [...document.querySelectorAll("#anOv details")].find((d) => /Cómo se leen/.test(d.textContent));
+    out.glosario = !!gl && !gl.open;
+    // 5) sin emojis decorativos (regla «MENOS EMOJIS»): sólo los del dato
+    out.emojis = (document.querySelector("#anOv .an-body").textContent.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu) || []).join("");
+
     window.prompt = () => "no contó";
     await window.anMarcar("anomala"); await espera(60);
     out.marcado = out.pedidos.filter((x) => /gv_analisis_marcar/.test(x))[0] || "";
-    out.chipTrasMarcar = /ANÓMALA/.test((document.querySelector("#anOv .an-mk-t") || {}).textContent || "");
+    out.chipTrasMarcar = /ANÓMALA/.test((document.querySelector("#anOv .an-state") || {}).textContent || "");
 
     // (h) los filtros de la lista
     window.anVolver(); await espera(60);
@@ -168,12 +199,14 @@ const DET = {
   ok(r.alerta.indexOf("2") >= 0, "(b) F13C tendría que mostrar ⚠ 2, muestra «" + r.alerta + "»");
   ok(r.sinAlerta, "(b) F77A no tiene avisos y le puso el ⚠");
   ok(/Jhonny|Colombia/.test(r.lineasTarjeta.join(" ")), "(b) la tarjeta no nombra al operario");
-  ok(/🔨/.test(r.lineasTarjeta.join(" ")), "(b) falta la línea del armado en la tarjeta");
+  ok(r.rotulos.join("|").toUpperCase() === "PICK|ARM", "(b) la tarjeta no trae las dos fases rotuladas: " + JSON.stringify(r.rotulos));
   ok(r.avisos.length === 4 && /^alta/.test(r.avisos[0]), "(c) avisos: " + JSON.stringify(r.avisos));
-  ok(r.secciones.length === 4 && /Qu. se encontr/.test(r.secciones[0]) && /Picking/.test(r.secciones[1]) && /Armado/.test(r.secciones[2]),
-     "(c) secciones: " + JSON.stringify(r.secciones));
-  ok(/El picking lo hizo J. Colombia/.test(r.concl) && /dificultad alta/.test(r.concl) && /cosa\(s\) para mirar/.test(r.concl),
-     "(h) la conclusión no resume la tanda: «" + r.concl + "»");
+  ok(/códigos?/.test(r.avisoTexto) && !/\(s\)/.test(r.avisoTexto),
+     "(c) el aviso sale sin acentuar o con el «(s)» crudo de la base: «" + r.avisoTexto + "»");
+  ok(r.secciones.length === 4 && /Picking/.test(r.secciones[0]) && /Armado/.test(r.secciones[1]) &&
+     /C.digo por c.digo/.test(r.secciones[2]) && /C.mo se leen/.test(r.secciones[3]),
+     "(c) las secciones plegadas: " + JSON.stringify(r.secciones));
+  ok(/2 hallazgos fuertes/.test(r.concl), "(h) el veredicto no dice qué hacer: «" + r.concl + "»");
   ok(r.mkBotones === 2, "(h) la barra de marcar tendría que tener 2 botones sin marca, tiene " + r.mkBotones);
   ok(/anomala/.test(r.marcado) && /F13C/.test(r.marcado), "(h) 🚩 no llamó bien a gv_analisis_marcar: " + r.marcado);
   ok(r.chipTrasMarcar, "(h) después de marcar no quedó el cartel de anómala");
@@ -191,8 +224,16 @@ const DET = {
   ok(r.opVisible8 && r.opLegajo === "8", "(e) el botón no se mostró para el legajo habilitado");
   ok(r.pedidos.some((x) => /gv_analisis_tanda.*F13C/.test(x)), "(c) no pidió el detalle de la tanda");
   ok(r.btnAncho && parseFloat(r.btnAncho) < 300, "(f) el botón Cerrar salió de " + r.btnAncho + " (hereda el width:100% global)");
+  // (g) el sistema de diseño
+  ok(r.heroPx >= 34, "(g) el dato principal está chico: " + r.heroPx + "px (mínimo 34)");
+  ok(r.mayor <= r.heroPx, "(g) hay un texto MÁS GRANDE que el dato principal (" + r.mayor + "px en «" + r.mayorQ +
+     "» contra " + r.heroPx + "px del rendimiento)");
+  ok(r.veredictoLargo > 0 && r.veredictoLargo <= 64, "(g) el veredicto no entra en una línea: " + r.veredictoLargo + " caracteres");
+  ok(!r.sueltoLargo.length, "(g) hay texto explicativo largo SIN plegar: " + JSON.stringify(r.sueltoLargo));
+  ok(r.glosario, "(g) falta el glosario «Cómo se leen estos números», o arranca abierto");
+  ok(!r.emojis, "(g) emojis decorativos en el detalle: " + r.emojis);
   if (errs.length) fallos.push("errores de página: " + errs.join(" · "));
 
   if (fallos.length) { console.error("ANÁLISIS PRODUCTIVO — FALLA:\n  " + fallos.join("\n  ")); process.exit(1); }
-  console.log("analisis-productivo OK — lista, detalle, avisos, lectura rota y el botón del operario.");
+  console.log("analisis-productivo OK — lista, detalle, avisos, lectura rota, botón del operario y el sistema GV-UI.");
 })();
