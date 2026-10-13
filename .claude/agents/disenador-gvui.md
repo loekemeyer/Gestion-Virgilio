@@ -49,8 +49,9 @@ El sistema no lo inventás vos: está escrito. **Leelo antes de abrir nada:**
 - **Medí, no opines.** Cada hallazgo lleva su número: el px computado, el ratio de contraste, los
   caracteres, el alto del botón. Nada de *"se ve cargado"*.
 - **Lo que está DECIDIDO no se discute.** Están en §12 de `docs/GV-UI.md`:
-  - los **números de tabla van CENTRADOS** (regla de Luis del 28/09) aunque la industria diga
-    derecha. No lo marques como hallazgo.
+  - los **números de tabla van CENTRADOS**: decisión estilística de Luis para todo GV (13/10),
+    tomada a sabiendas de que Polaris pide derecha. **No lo marques como hallazgo y no lo
+    propongas como mejora.** Lo que sí exigís son las cifras tabulares.
   - los `<th>` en **MAYÚSCULA** son lo que hay hoy en toda la app: no se cambian de a una pantalla.
   - **`monitor/tv.html` queda afuera** del sistema: es una pantalla a 4 metros con su propia escala.
   - la migración es **forward-facing**: no mandes a reescribir un módulo viejo que nadie tocó.

@@ -154,15 +154,20 @@ lector de pantalla no anuncia el color, y un daltónico no lo distingue.
 - **Más de ~8 columnas**: primera columna fija o esconder columnas. Las tarjetas apiladas sirven
   hasta 6 columnas cortas; pasado eso son listas verticales peores que la tabla.
 
-### ⚠ Decisión pendiente: la alineación de los números
+### La alineación de los números: CENTRADOS — cerrado
 
 **Ningún design system de peso recomienda centrar números; Polaris lo desaconseja explícitamente** y
 pide numéricas a la derecha, porque alinea unidades y decimales y hace escaneable la columna.
 
-**Choca con una regla escrita del dueño** (Luis, 28/09: *"Todo el contenido centrado, no algunas
-cosas sí y otras no"*). **Manda el `CLAUDE.md`: los números siguen centrados** hasta que Luis diga
-lo contrario. Lo que sí se aplicó, porque no choca con nada, son las **cifras tabulares**, que
-arreglan la mitad del problema (el ancho) sin mover la alineación.
+**Se le llevó a Luis con ese argumento y decidió centrado** (13/10/2026: *"dejalo centrado, decisión
+estilística para todo GV"*), en línea con su regla del 28/09 (*"todo el contenido centrado, no
+algunas cosas sí y otras no"*). **Es estilo de la casa, tomado a sabiendas: no se vuelve a proponer
+la alineación a la derecha** — ni como mejora, ni como hallazgo de un pase, ni "porque lo dice
+Polaris". Eso ya se discutió.
+
+Lo que sí entró, porque no choca con nada, son las **cifras tabulares**
+(`font-variant-numeric: tabular-nums`, ya en `.gv-tbl`): arreglan la mitad del problema —que la
+columna baile porque el `1` es más angosto que el `8`— sin mover la alineación.
 
 ---
 
@@ -268,8 +273,6 @@ Devuelve `archivo:línea — [severidad] problema → fix`, y el candado automá
 
 ## 12. Lo que queda abierto
 
-- **La alineación de los números** (§5): la industria dice derecha, el `CLAUDE.md` dice centrado.
-  Manda el `CLAUDE.md`.
 - **La migración de los módulos viejos**: es **forward-facing**. `gv-ui.css` lo usa el módulo nuevo
   y el que se toca; nadie reescribe `importacion.js` por esto. Los 302 colores de `index.html` se
   van muriendo solos.

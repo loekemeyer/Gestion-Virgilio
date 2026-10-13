@@ -113,8 +113,14 @@ ok(tok["gv-tap"] === "44px", "(c) el blanco de toque tiene que ser 44px (WCAG 2.
 ok(tok["gv-row-compact"] === "32px" && tok["gv-row"] === "40px" && tok["gv-row-roomy"] === "48px",
    "(c) los altos de fila son 32 / 40 / 48");
 // la tabla del sistema trae cifras tabulares, o la columna de números baila
-ok(/\.gv-tbl[^{]*\{[^}]*tabular-nums/.test(css.replace(/\n/g, " ")),
-   "(c) .gv-tbl sin font-variant-numeric: tabular-nums");
+const css1 = css.replace(/\n/g, " ");
+ok(/\.gv-tbl[^{]*\{[^}]*tabular-nums/.test(css1), "(c) .gv-tbl sin font-variant-numeric: tabular-nums");
+/* Los números van CENTRADOS. Lo decidió Luis el 13/10 a sabiendas de que Polaris pide derecha:
+   es estilo de la casa. Este candado está para que ninguna sesión lo "mejore" sin que él lo pida. */
+ok(/\.gv-tbl td\s*\{[^}]*text-align:\s*center/.test(css1),
+   "(c) .gv-tbl td dejó de centrar: los números de GV van CENTRADOS (decisión de Luis, 13/10)");
+ok(!/\.gv-tbl[^{]*td[^{]*\{[^}]*text-align:\s*right/.test(css1),
+   "(c) apareció text-align:right en la tabla — ver docs/GV-UI.md §5: está cerrado");
 
 /* ── (d) la pantalla de referencia USA el sistema ────────────────────────────── */
 const an = lee("analisis.js");

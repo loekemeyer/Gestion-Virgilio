@@ -344,10 +344,12 @@ contra el fondo real de la app, no contra blanco):
 
 ### Lo que está DECIDIDO y no se vuelve a discutir
 
-- **Los números de tabla van CENTRADOS**, aunque Polaris y el resto de la industria pidan
-  alinearlos a la derecha: manda la regla de espacio de Luis del 28/09 (*"todo el contenido
-  centrado"*). Lo que **sí** se aplicó, porque no choca con nada, son las **cifras tabulares**
-  (`font-variant-numeric: tabular-nums`), que arreglan el ancho sin mover la alineación.
+- **Los números de tabla van CENTRADOS. Cerrado por Luis el 13/10/2026** (*"dejalo centrado,
+  decisión estilística para todo GV"*), sabiendo que Polaris y el resto de la industria piden
+  alinearlos a la derecha. **Es una decisión de estilo de la casa, no un descuido: no se vuelve a
+  proponer la alineación a la derecha, ni como mejora ni como hallazgo de un pase.** Lo que **sí**
+  entró, porque no choca con nada, son las **cifras tabulares** (`font-variant-numeric:
+  tabular-nums`): arreglan que la columna baile sin mover la alineación.
 - **Los `<th>` van en sentence case** («Desde el anterior», no «DESDE EL ANTERIOR»): Carbon lo
   cambió en su v10 y la lectura en mayúscula es ~10 % más lenta. **Ya es así en `.gv-tbl`**, o sea
   en la pantalla de referencia; las tablas viejas que todavía tienen `text-transform: uppercase`
