@@ -31834,7 +31834,6 @@ Objetos nuevos: `gv_picking_estimar(text[])` (anon, 1,45 s para las 37 pendiente
 - Rollback: `cron.alter_job(155, command := <el viejo, en la cabecera del sql>)`, poner `caja_extra` en 0 (y restar
   0,0061 × (cajas − cajas30) del caché), recrear `gv_ppp_plantel` desde `sql/gv_ritmo_picking_v2947.sql`.
 
-<<<<<<< HEAD
 ## §3.v3008 — el excedente cargado por un conteo no se reparte hacia atrás (Giuliana, 13/10/2026, problema 766; el marcador de la base y el .sql dicen v29.62: otra sesión se llevó los números hasta la v30.07)
 
 El conteo de la estantería P (13/10) cargó excedente en 26 códigos (ajustes `ref = 'CONTEO P 13/10'`) y la corrida
@@ -31856,7 +31855,6 @@ cambian exactamente esos 28 saldos (14 excedente +N, 14 góndola −N). Aplicado
 y dejaba 4 góndolas en negativo. Centinela: `least\(f\.picked, greatest\(f\.tomado, 0\)\)`.
 Backup de la definición anterior: `zz_backups."GV_Backup_Etapa1_def_20261013"` (md5 prosrc 7d6a3bb2…).
 `sql/reconciliar_pipeline_stock_etapa1_v2962.sql`.
-=======
 ### §3.v2982 — Recepción de insumos: el ORIGEN es una lista cerrada por categoría (Luis, 13/10/2026)
 
 - **Nuevo, nada existente tocado**: tabla `GV_Insumo_Origen_Excluido` (RLS on, sin escritura para anon/authenticated),
@@ -31951,4 +31949,33 @@ procesadas o las `IVBCM`/`IVBLM` de Brawin, otras medidas), así que se crearon:
   a 21 insumos): hay que darles celda desde el Mapa. Y **sin equivalencia en GP2**, así que no se espejan.
 - **Verificado**: saldo 122,1 y 128,4 Kg, unidad Kg, empresa Mixto, 0 posiciones, los dos en la alarma.
 - **Rollback**: borrar los dos movimientos por su `client_id` y las dos filas de `Insumos`.
->>>>>>> origin/main
+
+### §3.v3003 — La góndola de un código DISCONTINUADO se libera (Luis, 13/10/2026)
+
+**Pedido:** *"si una gondola esta asignada a un codigo discontinuo (o mejor dicho, cuando se dictamina que un
+codigo esta discontinuo…), esa gondola se tiene que liberar"* + *"hay articulos que conviven en una misma
+gondola… revisa que esto no rompa nada"*. Caso A64: el mapa lo tenía con el **548**, `OC_Maximos.activo = false`,
+sin stock, sin E.M. y sin pedidos; el cartel de la celda ya decía 565, que también está sin compra.
+
+**Nuevo, nada existente tocado salvo una vista:** `gv_cod_discontinuado(text)` (definer, el dictamen en UN lugar) ·
+vista `gv_gondola_discontinuada` (invoker; `anon` ve las 43 filas, igual que postgres) · tabla
+**`GV_Lugar_Liberado`** (RLS on, `anon`/`authenticated` sólo SELECT: el `insert` del grant por defecto se revocó) ·
+`gv_gondola_liberar` / `gv_gondola_reponer` / `gv_gondola_liberar_auto` (definer, supervisor) · trigger
+`zz_gv_disc_liberar_gondolas` sobre `Articulos_Discontinuados` · cron **158 `gv-gondola-liberar`** (`23 8 * * *`,
+05:23 ART, con anti-solape). **`gv_planimetria_celda`** se reemplazó agregando 3 columnas **al final**
+(`discontinuado`, `disc_accion`, `celda_liberable`) y se repuso `security_invoker`; su dependiente
+`gv_gondola_divergente` siguió en 18 filas.
+
+**Impacto medido (13/10)**: 689 items de góndola en 636 celdas · **43** ocupados por un código discontinuado
+(24 a mano, 19 sólo por OC) · 21 con cajas · 23 con demanda · **12 en cero** que el automático libera, dejando
+**4 celdas enteras libres** (A64, J40, J41, L59). Corrido de verdad en transacción abortada: items **689 → 677**,
+celdas libres **49 → 53**, A64 «548» → «(ninguno)»; **M32/755 FRENÓ** (*"todavia tiene 70.0 cajas en gondola
+(78.0 en total)"*); `gv_gondola_reponer` devolvió el 548 a A64; y el DICTAMEN del 337 dejó E15 con **sólo el 312**
+(la celda compartida pierde sólo al discontinuado).
+
+⚠ **`OC_Maximos.activo = false` en un SECUNDARIO no es «discontinuado»**: es «no se compra» (su proyección va al
+principal, v22.72, y su E.M. es 0 por construcción). El 574 es el que VENDE de su familia. Esos quedan en
+`secundario_revisar` y no se liberan solos: 3 de 43 (338, 574, 809).
+
+**Rollback** completo al pie de `sql/gv_gondola_discontinuado_v3003.sql` (incluye el `CREATE` de
+`gv_planimetria_celda` vigente). `GV_Lugar_Liberado` no se borra: es el backup de lo liberado.
