@@ -194,8 +194,9 @@ Tocá **📦** y **Enviar**. Hay **3 opciones**:
   (plásticos, flejes, cajas, partes…; los importados no se reciben acá). Después **de dónde recibís** y
   la **documentación** (Remito, Factura o los dos) y tocás **Enviar**. Adentro aparecen **todos los
   insumos del rubro con el nombre de GP2**, también los que nunca se recibieron en Virgilio: buscá el
-  tuyo por nombre o código, cargá la cantidad y **«✓ Registrar entrada»**. **«+ Agregar insumo nuevo»**
-  es sólo si de verdad no está en la lista. En **plásticos**, al entregar aparecen sólo las bolsas que
+  tuyo por nombre o código, cargá la cantidad y **«✓ Registrar entrada»**. **Sólo recibís lo que ya
+  está en la lista**: no se puede agregar un insumo nuevo. Si llegó algo que no figura, avisá a Stock
+  y Compras para que lo carguen. En **plásticos**, al entregar aparecen sólo las bolsas que
   se usan (con lugar en el Mapa); al recibir aparecen además las bolsas de GP2.
   Las bolsas se cargan sólo en **Bolsas** (abajo se ve cuántos kg son). En **cajas** aparecen las 11
   cajas (Caja Nº 1 … Nº 29); se cargan en **Cajas** o en **Paquetes** (cada paquete = 25 cajas). Al

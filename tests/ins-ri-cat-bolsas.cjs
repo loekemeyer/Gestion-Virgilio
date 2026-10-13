@@ -60,15 +60,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await showInsumoModal("RI", "104");
     const plaRI = _ins.items.filter(function (x) { return x.cat === "plastico"; }).map(function (x) { return x.cod; }).sort();
     const htmlRI = document.getElementById("insBody").innerHTML;
+    // v29.55 (Luis, 13/10): el operario NO da de alta un insumo al recibir — insNuevoOpen se planta
     insNuevoOpen("");
-    const htmlAlta = document.getElementById("insBody").innerHTML;
+    const altaBloqueada = _ins.nuevo === null;
     window._insGp2 = null;
     await showInsumoModal("EI", "104");
     const plaEI = _ins.items.filter(function (x) { return x.cat === "plastico"; }).map(function (x) { return x.cod; }).sort();
     const otrasEI = _ins.items.some(function (x) { return x.cod === "F10"; });
     // v29.28 (D9): «Envío a otros» NO ofrece bolsas plásticas
     out.e = JSON.stringify(plaRI) === JSON.stringify(["ABS", "PP 2630"]) && plaEI.length === 0 &&
-      otrasEI && !/ins-itbtn add/.test(htmlRI) && !/insNuevoPick\('cat','plastico'\)/.test(htmlAlta) && /insNuevoPick\('cat','fleje'\)/.test(htmlAlta);
+      otrasEI && !/ins-itbtn add/.test(htmlRI) && altaBloqueada;
     out.plaRI = plaRI; out.plaEI = plaEI;
     // (f) v29.28 (D9): eligió «Envío a inyectores» (aunque GP2 no devuelva la lista) → sólo bolsas
     insEnvioTipoGo("iny"); insUbicCancel(); window._insGp2 = null;
