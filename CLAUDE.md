@@ -1886,6 +1886,65 @@ cuenta (Stock → Capacidad «Importar» y «Borrar todo», y Despiece «Guardar
 los 12 dependientes quedaron en `zz_backups."GV_Backup_CapSector_defs_20260925"`. Lo sostiene
 `tests/cap-sector-vista.cjs`.
 
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.78): UN RACK SE PUEDE PARTIR — `Y25-1`, `Y25-2`, `Y25-3`…
+
+**Luis:** *"algunos racks tienen mucho espacio que estamos desaprovechando … si alguien guarda algo a un
+rack que ya esta ocupado por otro codigo, promptee para decir de que lado lo dejan … que separe ese rack
+en Izq y Der (basicamente, una subdivision de racks)"* · *"pongamos la posibilidad de, por ejemplo,
+Y25-1, Y25-2, Y25-3"*.
+
+> ## Un rack puede estar **DIVIDIDO en N partes** (1 a 9, numeradas de **izquierda a derecha**) y la
+> ## **DIRECCIÓN** de una parte es **`Y25-2`**. Sin partir (N = 1) la dirección sigue siendo `Y25`.
+
+**Antes de esto el sistema PROHIBÍA el segundo código** (`gv_rack_pos_chequear` devolvía `ocupado:<cod>` y
+frenaba el ingreso) y el conteo del Mapa **borraba** lo que hubiera en la posición que no fuera el código
+que se estaba guardando. Medido al 13/10: 258 racks activos, 89 posiciones con stock, **0 con dos códigos**.
+
+| la pregunta | la función | para qué |
+|---|---|---|
+| ¿cuál es EL RACK? | **`gv_rack_sector(txt)`** — pela la parte (`Y25-2` → `Y25`) | AGRUPAR y validar: es el **cuello único** por donde 18 funciones y 12 vistas siguen contando por rack **sin tocarlas** |
+| ¿cuál es la DIRECCIÓN? | **`gv_rack_pos(txt)`** | lo que se **ESCRIBE** en `Movimientos_Stock.ubicacion` |
+| ¿qué parte pide el texto? | `gv_rack_lado(txt)` → 1..9 (null si el rack no está partido) | |
+| ¿en cuántas partes está? | `gv_rack_subs(txt)` ← **`GV_Lugar.gv_sub`** | la subdivisión es **del RACK**, no del movimiento |
+| ¿falta decir la parte? | `gv_rack_falta_parte(txt)` · `gv_rack_dir(txt)` (todo junto, para el front) | |
+
+- **La parte viaja DENTRO del texto de la dirección**, así que **ninguna función cambió de firma**: entra por
+  el mismo argumento de siempre. Acepta `Y25-2`, `Y25 2`, `Y25/2`, `Y25 izq` (= 1) y `Y25 der` (= 2); se
+  muestra siempre el número.
+- **Partir / unir: `gv_rack_partir(sector, partes, parte_actual, motivo, legajo)`** — la llama **el operario**
+  desde Ingreso a racks cuando se topa con un rack ocupado (es lo que pidió Luis: que lo decida en el
+  momento, parado frente al rack), y el supervisor desde el Mapa (**✂ Partir**). Lo que ya estaba **sin
+  parte se muda a la parte que él indique**; unir frena si más de una parte tiene mercadería. Queda en
+  **`GV_Rack_Particion`**.
+- ⚠ **EL PUNTO QUE EVITA PERDER UNA CAJA:** en un rack partido **todo movimiento lleva la parte**
+  (trigger `aa_gv_racks_ajuste_sin_posicion` → **`RACKS_FALTA_PARTE`**). Sin eso las cajas quedan «en el
+  rack, sin parte»: el Mapa muestra una parte fantasma y Bajar de racks no sabe de dónde sacarlas.
+- ⚠ **`gv_rack_posicion_guardar` vacía SÓLO su parte** (`gv_rack_pos(m.ubicacion) = v_sec`). Con el criterio
+  por rack, contar la izquierda **borraba el stock de la derecha**: es el único lugar que podía destruir
+  stock ajeno.
+- ⚠ **`Racks_Planimetria.sector` pasa a ser la DIRECCIÓN** (+ columnas `rack`, `parte`, `partes`), y lo
+  mismo `gv_rack_celda` (+ `pos_rack`, `parte`, `partes`). Por eso el front casi no cambió: los chips de
+  Bajar de racks, las posiciones de Stocks → Ajustar y las celdas del Mapa ya tratan la posición como un
+  **string opaco**. Lo que necesita el RACK usa la columna `rack`. ⚠ El `id` de la vista es un hash que
+  **incluye la parte**, o dos partes del mismo código tendrían el mismo id y PostgREST devolvería una sola.
+- **Front**: Ingreso a racks ofrece **✂ en 2 / 3 / 4 partes** y pregunta en qué parte está lo que ya había
+  (`_irOcupadoHtml` / `irPartir`); si el rack ya está partido ofrece las partes libres. Bajar de racks y
+  Stocks → Ajustar / Fijar / Stock inicial piden la parte (`gv_rack_dir`); 📥 Recibir de Importación ofrece
+  una opción por parte. El Mapa dibuja **una celda por parte** y tiene ✂ Partir / unir.
+- ⚠ **Medido antes de aplicar nada: con 0 racks partidos todo se comporta EXACTAMENTE como antes** — la
+  huella de `gv_rack_sector` sobre los 2.645 textos de ubicación reales no cambió
+  (`c82ba953f63ab26f7de76c42abc2f05f`) y las dos vistas devolvieron las mismas filas y el mismo md5
+  (259 y 304). Es forward-facing por construcción: no hay nada que migrar.
+- Los insumos **no se parten** (siguen con su nomenclador `AD`/`AT`, que son filas propias de `GV_Lugar`).
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` (16 centinelas) ·
+`select sector, rack, parte, partes, cod_art, innercajas, estado from public."Racks_Planimetria" where partes > 1;` ·
+`select * from public."GV_Rack_Particion" order by id desc;` · `node tests/rack-subposicion.cjs`.
+`sql/gv_rack_subposicion_v2978.sql` (rollback en la cabecera y al final). ⚠ Los objetos de la base, los
+16 centinelas y los marcadores internos dicen **v29.78** (la versión con que se aplicaron): es la llave de
+idempotencia, **no cambiarla**; la app salió en la v29.94 porque otras sesiones se adelantaron.
+
 ## ⚠ REGLA: el CÓDIGO DE CLIENTE es por EMPRESA — nunca cruzar por código solo
 
 **Thomas, 2026-09-16:** *"¿contemplaste que los códigos de clientes de LK y CH son diferentes?
@@ -9663,20 +9722,25 @@ Cierra el agujero que la v29.74 dejó anotado: el **PUB** dice dónde dejó la t
 | **al EMPEZAR el armado (AP)** | **`AUI`** (v29.90) | **la mesa en la que la están armando** |
 | al terminar el armado (TAP) | `AUB` | el sector donde quedó el pedido |
 
-- El cuadro (`askArmadoMesa`) ofrece **Mesa 1**, **Mesa 2** y **✏️ Otro lugar…**, más **Después**. Lo emite
+- El cuadro (`askArmadoMesa`) ofrece **Mesa 1**, **Mesa 2** y **✏️ Otro lugar…** para escribirlo. Lo emite
   `emitArmadoMesa` con el molde de `emitPickUbic` (encola + manda, id único: si vuelve a tocar AP con otra
   mesa, manda la más reciente). `texto` = tanda, `descripcion` = mesa.
+- ⚠⚠ **LA MESA ES OBLIGATORIA: NO hay «Después» ni ningún escape** (Luis, 13/10: *"como que «Despues»? no es
+  una opcion eso ni debería serlo"*). El primer intento tenía ese botón y quedó **retirado**: o una mesa, o
+  «✏️ Otro lugar…». **No volver a ponerlo.**
 - **`ts_inicio` NULL a propósito**: NO abre tarea (el `abre` de las horas es una **lista blanca**:
   EP/AP/MGI/RKI/IRI/MDI/toggles) y no cierra ninguna. Es un evento de **DETALLE**, como PUB / AUB / PKG.
-- ⚠⚠ **NO frena el armado, y el cómo importa**: la pregunta va **al final** del bloque del AP, **después** de
-  `showCompletarWizard` y **SIN `await`** (`askArmadoMesa(texto).then(…)`), así que el cuadro sale **encima**
-  del asistente — que ya está abierto — y `send()` no espera a nadie. **Con `await` delante del asistente
+- ⚠⚠ **Obligatoria para el operario, pero NO frena el código, y el cómo importa**: la pregunta va **al final**
+  del bloque del AP, **después** de `showCompletarWizard` y **SIN `await`** (`askArmadoMesa(texto).then(…)`),
+  así que el cuadro sale **encima** del asistente — que ya está abierto — y `send()` no espera a nadie. En la
+  pantalla es obligatoria igual (el overlay tapa todo y no tiene salida), pero si el cuadro **no se dibuja**
+  el operario tiene el asistente abierto abajo en vez de quedar trabado. **Con `await` delante del asistente
   quedaba todo colgado de un toque**: tres tests que manejan un AP de verdad (`ap-resume`, `dos-en-curso`,
   `tanda-sin-articulos`) se quedaron esperando el cuadro para siempre, y en el celular un cuadro que no
   resuelve dejaba al operario sin el asistente de Completar. Retomar una tanda frenada emite un AP nuevo →
   vuelve a preguntar (puede ser otra mesa); **reabrir** el asistente («▶ Seguir armado») no pregunta nada.
-  ⚠ Al escribir un test que mande un AP por `send()`, stubear `window.askArmadoMesa` (devolver `null` =
-  «Después») para que el cuadro no quede abierto encima de la pantalla.
+  ⚠ Al escribir un test que mande un AP por `send()`, stubear `window.askArmadoMesa` (devolver `null`) para
+  que el cuadro no quede abierto encima de la pantalla.
 - **Forward-facing**: no hay un solo `AUI` en la historia y **no se backfillea**. El 15/09 de
   `tests/tools/vista-15.json` da idéntico (verificado, md5 `f5c7560f…`): sólo se movió la **huella**.
 
@@ -9694,6 +9758,40 @@ Cierra el agujero que la v29.74 dejó anotado: el **PUB** dice dónde dejó la t
   de **AB7 (armado)** a **Mesa 2 (armado_mesa)**.
 
 **Chequeo:** `select * from public.gv_reglas_perdidas;` y `select * from public.gv_huellas_cambiadas;` (las dos
-vacías) · `node tests/arm-mesa-inicio.cjs` (corre la pantalla: el AP con mesa encola AP+AUI, «Después» no
+vacías) · `node tests/arm-mesa-inicio.cjs` (corre la pantalla: el AP con mesa encola AP+AUI, sin contestar no se
 encola AUI, el cuadro que explota **no** traba el asistente) · `node tests/mon-tv.cjs`.
 `sql/gv_armado_mesa_aui_v2990.sql` (rollback al pie).
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.95): un `onclick` del HTML SE RESUELVE CONTRA `window` — no contra el scope del script
+
+**Luis, con la captura del cuadro «¿Quién sos?»:** *"aprieto luis y no entra"*.
+
+El panel por ROL (v29.92) dibujaba sus botones con handlers **inline**
+(`onclick="rolElegir('luis')"`), y todo ese bloque vive **adentro de la IIFE `initAuth`**
+del segundo `<script>` de `index.html` (líneas ~62957-66056). Un handler inline **no ve el
+scope del script: se resuelve contra `window`**, así que el click tiraba *"rolElegir is not
+defined"* y **no pasaba nada** — ni un cartel, ni un error a la vista.
+
+> **Si una función se usa en un `onclick` / `onchange` del HTML y se declaró dentro de esa
+> IIFE, hay que exponerla: `window.laFuncion = laFuncion;`** Es el mismo pozo de `window.sb`
+> (v23.98), y el archivo ya lo resuelve así en decenas de lugares (`window.pkFrenar`,
+> `window.cobrosRenderTab`, `window.histReintentar`…).
+
+| dónde vive la función | ¿hace falta exponerla? |
+|---|---|
+| el primer `<script>` (líneas 7081-62940), que **no** es IIFE | no: ya es global |
+| un `.js` propio cargado como script clásico (`ads.js`, `cobranzas.js`…) | no, salvo que esté en su propia IIFE |
+| **la IIFE `initAuth`** (segundo `<script>`) | **sí**, siempre |
+
+Expuestas para el panel por rol: `rolElegir`, `rolPickerAbrir`, `GV_ROL_ITEMS` (las filas del
+checklist llaman `GV_ROL_ITEMS[i].open()`).
+
+⚠⚠ **UN CANDADO ESTÁTICO NO VE ESTE BUG**: el `onclick` está y la función está. La única forma
+de medirlo es **clickear con la pantalla corriendo**. Lo sostiene
+`tests/rol-panel-click.cjs`, que aprieta «Luis» de verdad y además barre **todo** `onclick` del
+cuadro y del panel exigiendo que resuelva contra `window` (así un botón nuevo del bloque no
+vuelve a nacer muerto). ⚠ Ese barrido lleva un guard de *"¿encontré al menos uno?"*: sin él daba
+**verde con el bug puesto**, porque con el cuadro sin dibujar hay 0 onclicks y 0 faltantes.
+
+**Barrido del 13/10 sobre toda la IIFE** (funciones declaradas ahí y usadas en un handler
+inline sin exponer): **0 casos más**. El panel por rol era el único.

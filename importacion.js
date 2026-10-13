@@ -3059,11 +3059,21 @@ function _impRecLugares(l) {
   var c = _impRec.ctx, emp = _impRec.empresa;
   if (l.destino === "gondola") return (c.gondola || []).filter(function (g) { return !c.dual || !emp || g.empresa === emp; })
     .map(function (g) { return { v: g.sector, t: g.sector + (c.dual ? " (" + g.empresa + ")" : "") + " · cap " + (g.cajas_max == null ? "?" : g.cajas_max) + " cj" }; });
-  if (l.destino === "rack") return (c.racks || []).filter(function (r) { return r.estado !== "reservado"; })
-    .map(function (r) {
+  /* v29.78 (Luis, 13/10) — un rack DIVIDIDO ofrece una opción por parte (Y25-1, Y25-2…).
+     El detalle de qué hay en CADA parte no viene en el contexto (el chip es del rack entero):
+     si la parte elegida está tomada, la SIMULACIÓN lo avisa como «Rack ocupado» antes de escribir. */
+  if (l.destino === "rack") {
+    var out = [];
+    (c.racks || []).filter(function (r) { return r.estado !== "reservado"; }).forEach(function (r) {
       var e = r.estado === "libre" ? "libre" : r.estado === "mismo" ? "ya tiene este código (" + (r.cajas || 0) + " cj)" : "⚠ ocupado: " + r.cod + " (" + (r.cajas || 0) + " cj)";
-      return { v: r.sector, t: r.sector + " · " + r.empresa + " · " + e };
+      var n = Math.max(1, Number(r.partes) || 1);
+      if (n <= 1) { out.push({ v: r.sector, t: r.sector + " · " + r.empresa + " · " + e }); return; }
+      for (var k = 1; k <= n; k++) {
+        out.push({ v: r.sector + "-" + k, t: r.sector + "-" + k + " · " + r.empresa + " · parte " + k + " de " + n + " · el rack: " + e });
+      }
     });
+    return out;
+  }
   if (l.destino === "insumos") return (c.insumos_pos || []).map(function (p) { return { v: p.sector, t: p.sector + (p.insumos ? " · tiene " + p.insumos : " · vacía") }; });
   return [];
 }

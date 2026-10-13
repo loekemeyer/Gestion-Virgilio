@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=29.93">
+<link rel="stylesheet" href="gv-ui.css?v=29.95">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6422,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.93"></script>
+<script type="module" src="recepcion.js?v=29.95"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10755,7 +10755,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.93";
+const APP_VERSION = "v29.95";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11395,22 +11395,24 @@ function emitPickUbic(tanda, ubic, legajo) {
    se está armando (v29.74): el PUB dice dónde la dejó el picking y el AUB dónde quedó
    al TERMINAR, pero mientras arman no había nada. Se guarda en un evento aparte 'AUI'
    (texto=tanda, descripcion=mesa) y SIN ts_inicio: no abre tarea ni cuenta horas.
-   ⚠ NO frena el armado: la pregunta sale DESPUÉS de registrar el AP y tiene «Después»,
-   así que ningún camino deja al operario sin el asistente de Completar. Y es
-   forward-facing: lo ya armado no se toca ni se backfillea. */
+   ⚠ LA MESA ES OBLIGATORIA (Luis, 13/10: *"como que \"Despues\"? no es una opcion eso ni
+   debería serlo"*): el cuadro NO tiene escape — o una mesa, o «✏️ Otro lugar…». Igual NO
+   frena el código: sale DESPUÉS de registrar el AP y DESPUÉS de abrir el asistente, sin
+   await, así que si el cuadro no se dibuja el operario tiene el asistente abierto abajo.
+   Y es forward-facing: lo ya armado no se toca ni se backfillea. */
 const ARM_MESA_OPCIONES = ["Mesa 1", "Mesa 2"];
 function askArmadoMesa(tanda) {
   return new Promise(function (resolve) {
     if (!document.getElementById("auiCss")) {
       const s = document.createElement("style"); s.id = "auiCss";
-      s.textContent = "#auiModal{display:none;position:fixed;inset:0;z-index:1450;background:rgba(2,6,23,.78);overflow:auto;padding:14px;}#auiModal.show{display:flex;align-items:center;justify-content:center;}.aui-card{background:#f8fafc;max-width:430px;width:100%;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.aui-head{padding:14px 16px;background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;}.aui-title{font-size:17px;font-weight:800;}.aui-sub{font-size:12.5px;opacity:.92;margin-top:3px;}.aui-body{padding:14px;}.aui-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;}.aui-opt{padding:19px 6px;border:2px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px;font-weight:800;color:#0f172a;cursor:pointer;width:auto;margin:0;}.aui-opt:active{background:#faf5ff;border-color:#7c3aed;}.aui-otra{grid-column:1/-1;border-color:#fcd34d;background:#fffbeb;color:#92400e;font-size:15px;padding:15px 6px;}.aui-x{margin-top:12px;width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:800;font-size:14px;cursor:pointer;}";
+      s.textContent = "#auiModal{display:none;position:fixed;inset:0;z-index:1450;background:rgba(2,6,23,.78);overflow:auto;padding:14px;}#auiModal.show{display:flex;align-items:center;justify-content:center;}.aui-card{background:#f8fafc;max-width:430px;width:100%;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.aui-head{padding:14px 16px;background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;}.aui-title{font-size:17px;font-weight:800;}.aui-sub{font-size:12.5px;opacity:.92;margin-top:3px;}.aui-body{padding:14px;}.aui-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;}.aui-opt{padding:19px 6px;border:2px solid #cbd5e1;border-radius:12px;background:#fff;font-size:16px;font-weight:800;color:#0f172a;cursor:pointer;width:auto;margin:0;}.aui-opt:active{background:#faf5ff;border-color:#7c3aed;}.aui-otra{grid-column:1/-1;border-color:#fcd34d;background:#fffbeb;color:#92400e;font-size:15px;padding:15px 6px;}";
       document.head.appendChild(s);
     }
     let ov = document.getElementById("auiModal");
     if (!ov) { ov = document.createElement("div"); ov.id = "auiModal"; document.body.appendChild(ov); }
     function done(v) { ov.classList.remove("show"); ov.innerHTML = ""; resolve(v); }
     const opts = ARM_MESA_OPCIONES.map(function (o) { return '<button class="aui-opt" data-u="' + escapeHtml(o) + '">' + escapeHtml(o) + '</button>'; }).join("") + '<button class="aui-opt aui-otra" data-otra="1">✏️ Otro lugar…</button>';
-    ov.innerHTML = '<div class="aui-card"><div class="aui-head"><div class="aui-title">📍 ¿En qué mesa vas a armar ' + escapeHtml(String(tanda || "")) + '?</div><div class="aui-sub">Así el monitor dice dónde está la tanda mientras la armás.</div></div><div class="aui-body"><div class="aui-grid">' + opts + '</div><button class="aui-x">Después</button></div></div>';
+    ov.innerHTML = '<div class="aui-card"><div class="aui-head"><div class="aui-title">📍 ¿En qué mesa vas a armar ' + escapeHtml(String(tanda || "")) + '?</div><div class="aui-sub">Hay que elegir una: así el monitor dice dónde está la tanda mientras la armás.</div></div><div class="aui-body"><div class="aui-grid">' + opts + '</div></div></div>';
     ov.classList.add("show");
     ov.querySelectorAll(".aui-opt").forEach(function (b) { b.onclick = function () {
       if (b.getAttribute("data-otra")) {
@@ -11422,7 +11424,7 @@ function askArmadoMesa(tanda) {
         done(b.getAttribute("data-u"));
       }
     }; });
-    const x = ov.querySelector(".aui-x"); if (x) x.onclick = function () { done(null); };
+    /* sin botón de escape a propósito: la mesa es obligatoria (Luis, 13/10) */
   });
 }
 /* Emite el evento AUI (mesa donde se está armando). Mismo patrón que emitPickUbic:
@@ -26619,13 +26621,15 @@ async function _stkCodExisteConfirmar(cod, txtAccion) {
    Pasó 6 veces desde el 25/09. Ahora: posición obligatoria, validada contra el Mapa (gv_rack_sector), y al restar
    avisa si la posición no tiene esas cajas. Lo frena también el trigger gv_racks_ajuste_sin_posicion. */
 function _stkEsRacks(dep) { return dep === "racks" || dep === "racks_ch"; }
-async function _stkRackSectorDe(txt) {   // sector del Mapa · null = no es una posición · throw = no se pudo verificar
-  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_rack_sector", { method: "POST",
+/* v29.78: una sola RPC resuelve la DIRECCIÓN — gv_rack_dir devuelve {rack, pos, parte, partes, falta}.
+   `pos` es lo que se ESCRIBE en ubicacion (Y25 o Y25-2) y `falta` dice que el rack está dividido y
+   no se nombró la parte: sin eso el ajuste caería en «el rack, sin parte» (y lo frena el trigger). */
+async function _stkRackDirDe(txt) {   // {rack,pos,parte,partes,falta} · rack null = no es una posición · throw = no se pudo verificar
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_rack_dir", { method: "POST",
     headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({ p: String(txt || "") }) });
   if (!r.ok) throw new Error("HTTP " + r.status);
-  const s = await r.json();
-  return s ? String(s) : null;
+  return (await r.json()) || {};
 }
 async function _stkRackPosiciones(cod) {
   const m = String(cod).match(/^(.*\S)\s+(LK|CH)$/i), base = m ? m[1] : String(cod), emp = m ? m[2].toUpperCase() : null;
@@ -26647,10 +26651,15 @@ async function _stkRackPosElegir(cod, inputId, delta) {
     txt = (prompt("Racks: ¿en qué posición?\n\nPosiciones con " + cod + " en el sistema: " + lista + "\n\nEscribí la posición (ej. X22):") || "").trim();
     if (!txt) return null;
   }
-  let sector;
-  try { sector = await _stkRackSectorDe(txt); }
+  let dir;
+  try { dir = await _stkRackDirDe(txt); }
   catch (e) { alert("No pude verificar la posición «" + txt + "»: no se grabó nada. Probá de nuevo."); return null; }
-  if (!sector) { alert("«" + txt + "» no es una posición de rack del Mapa. No se grabó nada.\n\nPosiciones con " + cod + ": " + lista); return null; }
+  if (!dir || !dir.rack) { alert("«" + txt + "» no es una posición de rack del Mapa. No se grabó nada.\n\nPosiciones con " + cod + ": " + lista); return null; }
+  if (dir.falta) {   // v29.78: rack dividido → hay que decir en qué parte
+    alert(dir.rack + " está dividido en " + dir.partes + " partes: escribí la parte (" + dir.rack + "-1 … " + dir.rack + "-" + dir.partes + "). No se grabó nada.\n\nPosiciones con " + cod + ": " + lista);
+    return null;
+  }
+  const sector = String(dir.pos);
   const hit = pos.find(function (p) { return p.sector === sector; });
   const saldo = hit ? hit.cajas : 0;
   if (delta != null && delta < 0 && -delta > saldo + 1e-9) {
@@ -26781,14 +26790,17 @@ async function stockGuardarInicial() {
   if (_stkEsRacks(dep)) {
     const sinPos = rows.filter(function (r) { return !r._pos; }).map(function (r) { return r.cod_art; });
     if (sinPos.length) { alert("En Racks cada línea lleva la posición: CÓDIGO CANTIDAD POSICIÓN (ej. 606E 10 X22).\n\nSin posición: " + sinPos.join(", ") + "\n\nNo se grabó nada."); return; }
-    const malas = [];
+    const malas = [], sinParte = [];
     for (const r of rows) {
-      let s;
-      try { s = await _stkRackSectorDe(r._pos); }
+      let d;
+      try { d = await _stkRackDirDe(r._pos); }
       catch (e) { alert("No pude verificar las posiciones: no se grabó nada. Probá de nuevo."); return; }
-      if (!s) malas.push(r.cod_art + " → «" + r._pos + "»"); else r.ubicacion = s;
+      if (!d || !d.rack) malas.push(r.cod_art + " → «" + r._pos + "»");
+      else if (d.falta) sinParte.push(r.cod_art + " → " + d.rack + " (dividido en " + d.partes + ": poné " + d.rack + "-1 … " + d.rack + "-" + d.partes + ")");
+      else r.ubicacion = String(d.pos);
     }
     if (malas.length) { alert("Estas posiciones no son racks del Mapa:\n  " + malas.join("\n  ") + "\n\nNo se grabó nada."); return; }
+    if (sinParte.length) { alert("Estos racks están DIVIDIDOS y falta decir en qué parte:\n  " + sinParte.join("\n  ") + "\n\nNo se grabó nada."); return; }
   }
   rows.forEach(function (r) { delete r._pos; });
   if (!rows.length) { alert("No encontré líneas válidas. " + (esInsumo ? "Insumos: CÓDIGO ; DESCRIPCIÓN ; CANTIDAD ; MEDIDA ; SECTOR (o CÓDIGO CANTIDAD)." : "Formato: CÓDIGO CANTIDAD (una por línea).")); return; }
@@ -26950,7 +26962,7 @@ function stkUnits(cajas, cod, factors) {
    y arma el resumen "¿cuántos palets vacíos entran hoy?" + simulador de importación
    + lista de posiciones por liberarse (poca mercadería). Solo lectura (anon SELECT). */
 const SUPABASE_RACKS_PLANI_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Planimetria";
-async function racksFetchPlani() { return supaFetchAllSafe(SUPABASE_RACKS_PLANI_ENDPOINT, "select=sector,emp,cod_art,master_cajas,innercajas,estado"); }
+async function racksFetchPlani() { return supaFetchAllSafe(SUPABASE_RACKS_PLANI_ENDPOINT, "select=sector,emp,cod_art,master_cajas,innercajas,estado,rack,parte,partes"); }   // v29.78: rack/parte/partes — sector ES la DIRECCIÓN (Y25 o Y25-2)
 async function stkPlaniLoad() {
   if (!_stk) return;
   _stk.planiLoaded = "loading"; stkRender();
@@ -30048,7 +30060,7 @@ function rkbRender() {
       }).join("") + "</div>";
     }
     // v24.68 (Thomas, D23): sin posición no se registra; si el código no tiene posición en el Mapa, se escribe.
-    if (!(it.locs && it.locs.length)) locsHtml += '<div class="rkb-locs"><input class="rkb-pos" placeholder="Posición (ej AD05)" value="' + escapeHtml(it.sec || "") + '" oninput="rkbSetPos(' + i + ',this.value)"></div>';
+    if (!(it.locs && it.locs.length)) locsHtml += '<div class="rkb-locs"><input class="rkb-pos" placeholder="Posición (ej AD05 o AD05-2)" value="' + escapeHtml(it.sec || "") + '" oninput="rkbSetPos(' + i + ',this.value)"></div>';
     else if (!it.sec) locsHtml += '<div class="rkb-sug" style="color:#dc2626">⚠ Tocá de qué posición bajás.</div>';
     const room = rkbRoom(it);
     let gonHtml = "";
@@ -30077,7 +30089,7 @@ function rkbRoom(it) { return it.cap > 0 ? Math.max(0, it.cap - Math.max(0, it.g
    no hay lugar de góndola que medir ni excedente, y el conteo a ciegas es sólo del rack. */
 const RKB_DESTINO = "a_guardar";
 function rkbExc(it) { if (RKB_DESTINO === "a_guardar") return 0; return (it.cap > 0 && it.baja > 0) ? Math.max(0, _rkbInner(it) - rkbRoom(it)) : 0; }
-function rkbSetPos(i, v) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; it.sec = String(v || "").toUpperCase().replace(/\s+/g, ""); rkbRender(); }
+function rkbSetPos(i, v) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; it.sec = String(v || "").toUpperCase().replace(/\s+/g, ""); rkbRender(); }   // v29.78: la parte viaja en el texto (Y25-2)
 function rkbUsarRoom(i) {
   if (!_rkb) return; const it = _rkb.items[i]; if (!it) return;
   const room = rkbRoom(it), usaM = it.cxm > 0 && !it.manual;
@@ -30709,6 +30721,15 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
     const saldos = await stockFetchSaldos().catch(function () { return {}; });   // v6.28: para el "nacional" (stock en a_guardar/excedente)
     const cods = await irFetchCodigos();   // v29.77: los códigos que se pueden sugerir en Importación
     const seen = {}, libres = [], ocupados = {};
+    /* v29.78 (Luis, 13/10) — SUB-POSICIONES: `sector` de Racks_Planimetria ES la DIRECCIÓN (Y25 o Y25-2),
+       así que `ocupados` y `libres` ya vienen por parte. Lo único nuevo son dos mapas: en qué rack está
+       cada dirección y en cuántas partes está ese rack, para poder ofrecer PARTIRLO cuando está ocupado. */
+    const partesDe = {}, rackDe = {};
+    (plani || []).forEach(function (r) {
+      const sec = String(r.sector || "").trim().toUpperCase(); if (!sec) return;
+      const rk = String(r.rack || r.sector || "").trim().toUpperCase();
+      rackDe[sec] = rk; partesDe[rk] = Math.max(1, Number(r.partes) || 1);
+    });
     (plani || []).forEach(function (r) { const sec = String(r.sector || "").trim(); if (sec && String(r.estado) === "ocupado" && r.cod_art) ocupados[sec.toUpperCase()] = String(r.cod_art); });
     (plani || []).forEach(function (r) {
       const sec = String(r.sector || "").trim(); if (!sec) return;
@@ -30717,7 +30738,7 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
       if (!ocupados[secU]) libres.push(sec);
     });
     libres.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
-    _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, cods: cods, libres: libres, ocupados: ocupados, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", codNuevo: false, masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
+    _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, cods: cods, libres: libres, ocupados: ocupados, partesDe: partesDe, rackDe: rackDe, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", codNuevo: false, masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
     _ir.tsInicio = _irIni || Date.now(); if (!_irIni) { try { gvRacksTramo("IRI", _ir.legajo, _ir.tsInicio); } catch (_e) {} }   // v23.66: el tramo de racks arranca al abrir · v26.83: o sigue el abierto
     irRender();
   } catch (e) { const b = document.getElementById("irBody"); if (b) b.innerHTML = '<div class="ir-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -30761,7 +30782,7 @@ function irRender() {
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas (inner)</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div></div>';
   }
   h += '<div class="ir-fld"><div class="ir-lbl">Sector</div><input id="irSec" class="ir-inp" type="text" autocomplete="off" placeholder="ej. Y30" value="' + escapeHtml(_ir.sector) + '" oninput="irSetSec(this.value)"></div>';
-  if (sectorOcupadoOtro) h += '<div class="ir-warn">⚠ ' + escapeHtml(secU) + ' ya está ocupado por <b>' + escapeHtml(ocupadoPor) + '</b>. Elegí otro (o poné ese mismo código para sumar).</div>';
+  if (sectorOcupadoOtro) h += _irOcupadoHtml(secU, ocupadoPor);
   else if (ocupadoPor) h += '<div class="ir-ok2">➕ ' + escapeHtml(secU) + ' ya tiene ' + escapeHtml(ocupadoPor) + ' — se suma.</div>';
   h += '<div class="ir-libres">' + _ir.libres.slice(0, 14).map(function (s) { return '<button class="ir-chip' + (secU === s.toUpperCase() ? ' on' : '') + '" onclick="irSetSec(\'' + escapeHtml(s) + '\')">' + escapeHtml(s) + '</button>'; }).join("") + (_ir.libres.length > 14 ? '<span class="ir-more">+' + (_ir.libres.length - 14) + ' libres</span>' : (_ir.libres.length ? '' : '<span class="ir-more">sin sectores libres</span>')) + '</div>';
   h += '<div class="ir-fld"><div class="ir-lbl">Empresa</div><div class="ir-seg"><button class="ir-segb' + (_ir.emp === "LK" ? " on" : "") + '" onclick="irSetEmp(\'LK\')">LK · Loeke</button><button class="ir-segb' + (_ir.emp === "CH" ? " on" : "") + '" onclick="irSetEmp(\'CH\')">CH · Chef</button></div></div>';
@@ -30795,7 +30816,89 @@ function irSetM(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || 
 function irChgM(d) { if (!_ir) return; irSetM(Math.max(0, (Number(_ir.masters) || 0) + d)); }
 function irSetI(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || n < 0) n = 0; _ir.inner = n; irRender(); }
 function irChgI(d) { if (!_ir) return; irSetI(Math.max(0, (Number(_ir.inner) || 0) + d)); }
-function irSetSec(v) { if (!_ir) return; _ir.sector = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9]/g, ""); irRender(); }
+/* ═══ v29.78 (Luis, 13/10) — PARTIR UN RACK EN EL MOMENTO ═══════════════════════════
+   «si alguien guarda algo a un rack que ya esta ocupado por otro codigo, promptee para decir
+    de que lado lo dejan … que separe ese rack en Izq y Der (una subdivision de racks)» ·
+   «pongamos la posibilidad de, por ejemplo, Y25-1, Y25-2, Y25-3».
+   Las partes se numeran de IZQUIERDA a DERECHA y la dirección es «Y25-2»: el operario la
+   elige acá, parado frente al rack. Lo escribe gv_rack_partir (queda en GV_Rack_Particion).
+   ⚠ Lo que YA estaba sin parte se muda a la parte que él diga: si quedara sin parte, nadie
+   sabría de qué lado está (y el guard RACKS_FALTA_PARTE frenaría el próximo movimiento). */
+function _irRackDe(secU) { return (_ir && _ir.rackDe && _ir.rackDe[secU]) || String(secU || "").replace(/-\d$/, ""); }
+function _irPartesDe(secU) { const rk = _irRackDe(secU); return Math.max(1, Number((_ir && _ir.partesDe && _ir.partesDe[rk]) || 1)); }
+function _irPartesLibres(rk) {
+  const out = [];
+  Object.keys((_ir && _ir.rackDe) || {}).forEach(function (sec) {
+    if (_ir.rackDe[sec] !== rk) return;
+    if (_ir.ocupados[sec]) return;
+    out.push(sec);
+  });
+  return out.sort(function (a, b) { return a.localeCompare(b, undefined, { numeric: true }); });
+}
+function _irOcupadoHtml(secU, ocupadoPor) {
+  const rk = _irRackDe(secU), n = _irPartesDe(secU);
+  let h = '<div class="ir-warn">⚠ <b>' + escapeHtml(secU) + '</b> ya está ocupado por <b>' + escapeHtml(ocupadoPor) + '</b>.';
+  if (n > 1) {
+    const libres = _irPartesLibres(rk);
+    h += '<br>' + escapeHtml(rk) + ' está dividido en <b>' + n + ' partes</b>: '
+      + (libres.length ? 'elegí una libre → ' + libres.map(function (x) { return '<button class="ir-chip" onclick="irSetSec(\'' + escapeHtml(x) + '\')">' + escapeHtml(x) + '</button>'; }).join("")
+                       : 'no quedan partes libres. Elegí otra posición.');
+    h += '</div>';
+    return h;
+  }
+  h += '<br>Si lo dejás <b>al lado, en el mismo rack</b>, dividí ' + escapeHtml(rk) + ' y decime en qué parte queda cada cosa:'
+    + '<div class="ir-libres" style="margin-top:6px">'
+    + [2, 3, 4].map(function (k) { return '<button class="ir-chip" onclick="irPartir(' + k + ')">✂ en ' + k + ' partes</button>'; }).join("")
+    + '</div><div class="ir-hint" style="margin:4px 0 0">Se numeran de <b>izquierda a derecha</b> (' + escapeHtml(rk) + '-1, ' + escapeHtml(rk) + '-2…). O elegí otra posición.</div></div>';
+  return h;
+}
+async function irRecargarPlani() {
+  const plani = await racksFetchPlani();
+  const seen = {}, libres = [], ocupados = {}, partesDe = {}, rackDe = {};
+  (plani || []).forEach(function (r) {
+    const sec = String(r.sector || "").trim().toUpperCase(); if (!sec) return;
+    const rk = String(r.rack || r.sector || "").trim().toUpperCase();
+    rackDe[sec] = rk; partesDe[rk] = Math.max(1, Number(r.partes) || 1);
+    if (String(r.estado) === "ocupado" && r.cod_art) ocupados[sec] = String(r.cod_art);
+  });
+  (plani || []).forEach(function (r) {
+    const sec = String(r.sector || "").trim(); if (!sec) return;
+    const secU = sec.toUpperCase(); if (seen[secU]) return; seen[secU] = true;
+    if (typeof _racksZonaInsumo === "function" && _racksZonaInsumo(sec)) return;
+    if (!ocupados[secU]) libres.push(sec);
+  });
+  libres.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
+  if (!_ir) return;
+  _ir.libres = libres; _ir.ocupados = ocupados; _ir.partesDe = partesDe; _ir.rackDe = rackDe;
+  _ir.cxm = await irFetchCxM(plani).catch(function () { return _ir.cxm; });
+}
+async function irPartir(n) {
+  if (!_ir) return;
+  const secU = String(_ir.sector || "").trim().toUpperCase(), rk = _irRackDe(secU);
+  const ocup = _ir.ocupados[secU] || "";
+  if (!rk || !ocup) return;
+  const p = prompt("¿En qué parte está el " + ocup + " que YA hay en " + rk + "?\n\n" +
+    "Las partes se cuentan de IZQUIERDA a DERECHA: 1 es la de la izquierda" + (n === 2 ? ", 2 la de la derecha." : ", " + n + " la de la derecha.") +
+    "\n\nEscribí 1 a " + n + ":", "1");
+  if (p == null) return;
+  const k = Math.max(1, Math.min(n, parseInt(p, 10) || 0));
+  if (!k) return;
+  if (!confirm("Divido " + rk + " en " + n + " partes y dejo el " + ocup + " en " + rk + "-" + k + ".\n\n¿Dale?")) return;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_rack_partir", { method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_sector: rk, p_partes: n, p_parte_actual: k,
+        p_motivo: "Guardado a racks: entraba otro código al lado", p_legajo: String(_ir.legajo || "") }) });
+    const txt = await r.text();
+    if (!r.ok) { alert("No se pudo dividir " + rk + ":\n" + txt); return; }
+    await irRecargarPlani();
+    const libres = _irPartesLibres(rk);
+    _ir.sector = libres[0] || (rk + "-" + (k === 1 ? 2 : 1));
+    irRender();
+    alert("✓ " + rk + " quedó en " + n + " partes. El " + ocup + " está en " + rk + "-" + k + " y vos vas a " + _ir.sector + ".");
+  } catch (e) { alert("No se pudo dividir " + rk + ": " + (e.message || e)); }
+}
+function irSetSec(v) { if (!_ir) return; _ir.sector = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9-]/g, ""); irRender(); }   // v29.78: el guión de la parte (Y25-2)
 function irSetEmp(e) { if (!_ir) return; _ir.emp = (e === "CH") ? "CH" : "LK"; irRender(); }
 /* v6.28 — Ingreso a racks NACIONAL: mover stock existente (a_guardar/excedente) a racks. */
 function _irDisp(cod, origen) { if (!_ir || !_ir.saldos || !cod) return 0; const e = _ir.saldos[String(cod)]; if (!e) return 0; return Math.max(0, Number(e[origen === "excedente" ? "excedente" : "a_guardar"]) || 0); }
@@ -48754,7 +48857,8 @@ function pmapModo(m) {
 async function prkFetch() {
   // v22.77: Racks_Planimetria es una VISTA — la cantidad sale del libro de stock (ubicacion = sector).
   const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_rack_celda",
-    "select=sector,rack,orden,empresa,uso,cod,descripcion,master_cajas,innercajas,estado,fuente,motivo,revisar_id&order=rack.asc,sector.asc");
+    // v29.78: pos_rack/parte/partes — `sector` ES la DIRECCIÓN (Y25 o Y25-2)
+    "select=sector,rack,orden,empresa,uso,cod,descripcion,master_cajas,innercajas,estado,fuente,motivo,revisar_id,pos_rack,parte,partes&order=rack.asc,sector.asc");
   if ((filas && filas.length) || !_prk) _prk = filas || [];
   try {
     const rev = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Rack_Revisar",
@@ -48936,6 +49040,8 @@ function prkAbrir(sector) {
     '<div class="prk-btns">' +
       '<button class="planim-btn-save" onclick="prkGuardar(' + secJ + ',false)">💾 Guardar</button>' +
       (libre ? "" : '<button class="prk-vaciar" onclick="prkGuardar(' + secJ + ',true)">🗑 Vaciar posición</button>') +
+      '<button class="prk-vaciar" style="background:#e0f2fe;border-color:#7dd3fc;color:#075985" onclick="prkPartir(' + secJ + ')">' +
+        (Number(r.partes) > 1 ? '✂ Partes (' + Number(r.partes) + ')' : '✂ Partir') + '</button>' +
     '</div>' +
     '<div class="prk-nota">Guardar deja en el stock de racks lo que hay en ESTA posición (ajusta por la diferencia) y cierra lo que tenía «a contar».</div>' +
     prkInsHtml(sector, ins);
@@ -49008,6 +49114,38 @@ async function prkInsUbicarGuardar(cod, refId) {
   const body = { p_cod: cod, p_cantidad: q ? Number(q.value || 0) : 0 };
   if (refId != null) body.p_reemplaza_id = refId;
   await prkInsEscribir(sec, body, "✓ " + cod + " quedó en " + sec + ".");
+}
+/* v29.78 (Luis, 13/10) — PARTIR / UNIR un rack desde el Mapa. Las partes se numeran de
+   IZQUIERDA a DERECHA y la dirección de cada una es «Y25-2». Lo escribe gv_rack_partir, que
+   además muda lo que había sin parte a la parte que se indique (si quedara sin parte, nadie
+   sabría de qué lado está) y deja la fila en GV_Rack_Particion. */
+async function prkPartir(sector) {
+  const f = (_prk || []).filter(function (x) { return String(x.sector) === String(sector); })[0] || {};
+  const rack = String(f.pos_rack || sector).toUpperCase(), hoy = Math.max(1, Number(f.partes) || 1);
+  const txt = prompt("¿En cuántas partes está dividido " + rack + "?\n\n" +
+    "1 = un solo lugar (entero)\n2, 3… = partes numeradas de IZQUIERDA a DERECHA (" + rack + "-1, " + rack + "-2…)\n\n" +
+    "Ahora: " + hoy + (hoy === 1 ? " (entero)" : " partes"), String(hoy));
+  if (txt == null) return;
+  const n = Math.max(1, Math.min(9, parseInt(txt, 10) || 0));
+  if (!n || n === hoy) return;
+  let parte = null;
+  if (n > 1 && hoy <= 1) {
+    const ocup = (_prk || []).filter(function (x) { return String(x.pos_rack || x.sector).toUpperCase() === rack && x.cod && x.fuente !== "insumo"; })[0];
+    if (ocup) {
+      const p = prompt("¿En qué parte (1 a " + n + ") está el " + String(ocup.cod) + " que ya hay en " + rack + "?\n\n1 es la de la izquierda.", "1");
+      if (p == null) return;
+      parte = Math.max(1, Math.min(n, parseInt(p, 10) || 0));
+      if (!parte) return;
+    }
+  }
+  const mot = prompt("¿Por qué? (queda anotado en la bitácora)", n > 1 ? ("Dividido en " + n + " partes") : "Vuelve a ser un solo lugar");
+  if (!mot) return;
+  pmapCeldaStatus("Guardando…", true);
+  const r = await pmapRpc("gv_rack_partir", { p_sector: rack, p_partes: n, p_parte_actual: parte, p_motivo: mot });
+  if (!r.ok) { pmapCeldaStatus("No se pudo: " + r.err, false); return; }
+  await prkFetch(); pmapRender();
+  prkAbrir(n > 1 ? (rack + "-" + (parte || 1)) : rack);
+  pmapCeldaStatus("✓ " + rack + (n > 1 ? " quedó en " + n + " partes (" + rack + "-1 … " + rack + "-" + n + ")." : " volvió a ser un solo lugar."), true);
 }
 let _prkGuardando = false;
 async function prkGuardar(sector, vaciar) {
@@ -62954,7 +63092,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.93"></script>
+<script src="importacion.js?v=29.95"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63376,6 +63514,14 @@ function rolElegir(k) { _rolSet(k); var ov = document.getElementById("rolPickerO
 /* v29.93: este bloque vive dentro de una CLOSURE (como gsLoad/gsResolver), asi que una funcion
    llamada desde un onclick hay que exponerla o el boton queda MUERTO (tests/dead-handlers.cjs). */
 window.rolPickerAbrir = rolPickerAbrir; window.rolElegir = rolElegir;
+
+/* v29.95 (Luis, 13/10: *"aprieto luis y no entra"*): ⚠ TODO ESTO VIVE ADENTRO DE LA IIFE
+   `initAuth`, así que un `onclick="rolElegir('luis')"` del HTML NO lo encuentra — un handler
+   inline se resuelve contra WINDOW, no contra el scope del script. Es el mismo pozo de
+   `window.sb` (v23.98). Al agregar un botón con onclick a este bloque, exponer su función acá. */
+window.rolElegir = rolElegir;
+window.rolPickerAbrir = rolPickerAbrir;
+window.GV_ROL_ITEMS = GV_ROL_ITEMS;
 
 function rolPanelRender(k) {
   var cont = document.getElementById("rolPanel"); if (!cont) return;
@@ -66074,15 +66220,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.93"></script>
-<script src="hotsale.js?v=29.93"></script>
-<script src="estadisticas.js?v=29.93"></script>
-<script src="ads.js?v=29.93"></script>
-<script src="plantel.js?v=29.93"></script>
+<script src="cobranzas.js?v=29.95"></script>
+<script src="hotsale.js?v=29.95"></script>
+<script src="estadisticas.js?v=29.95"></script>
+<script src="ads.js?v=29.95"></script>
+<script src="plantel.js?v=29.95"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.93"></script>
+<script src="analisis.js?v=29.95"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.93"></script>
+<script src="ayuda.js?v=29.95"></script>
 
 </body>
 </html>

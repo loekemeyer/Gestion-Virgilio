@@ -9,7 +9,7 @@
 
    Lo que se mide, corriendo la pantalla de verdad:
      (a) con mesa elegida → se encola el AP **y** un AUI (texto=tanda, ts_inicio null)
-     (b) «Después» → se encola el AP y NINGÚN AUI, y el asistente se abre igual
+     (b) la MESA ES OBLIGATORIA: el cuadro no tiene escape, y si no contesta no hay AUI
      (c) si el cuadro explota, el AP queda y el asistente se abre igual (no rompe nada)
      (d) el cuadro de verdad: Mesa 1 / Mesa 2 / Otro lugar / Después, y el click resuelve
      (e) AUI está en COLA_AUTO (es un evento de DETALLE: no es una tarea del operario)
@@ -87,7 +87,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.a_abrio_asistente  = window.__abrio >= 1;
     out.a_armado_abierto   = !!(getLegajoState(LEG).armado || {}).active;
 
-    /* ============== (b) «Después»: AP sin AUI, y el asistente igual ============== */
+    /* ============== (b) sin contestar: AP sin AUI, y el asistente igual ============== */
     ev("askArmadoMesa = async function () { return null; };");
     prepararAP("Z66B");
     await send(); await tick();
@@ -115,8 +115,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.d_mesa1       = btns.some(x => x.textContent.trim() === "Mesa 1");
     out.d_mesa2       = btns.some(x => x.textContent.trim() === "Mesa 2");
     out.d_otro_lugar  = btns.some(x => /Otro lugar/.test(x.textContent));
-    out.d_despues     = !!document.querySelector("#auiModal .aui-x") &&
-                        /Despu/.test(document.querySelector("#auiModal .aui-x").textContent);
+    /* v29.90 (Luis): la mesa es OBLIGATORIA — no hay botón de escape ni «Después» */
+    out.d_sin_escape  = !document.querySelector("#auiModal .aui-x") && !/Después/.test(txt);
+    out.d_dice_obligatorio = /Hay que elegir una/.test(txt);
     const b2 = btns.filter(x => x.textContent.trim() === "Mesa 2")[0];
     if (b2) b2.click();
     out.d_devuelve_mesa = (await pr) === "Mesa 2";

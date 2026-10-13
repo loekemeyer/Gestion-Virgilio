@@ -909,6 +909,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== arm-mesa-inicio (v29.90: al empezar el armado se pregunta la MESA, evento AUI, sin frenar nada) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/arm-mesa-inicio.cjs
+
+echo "== rol-panel-click (v29.95: apretar un nombre en «¿Quién sos?» tiene que ENTRAR) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rol-panel-click.cjs
 echo "== cierre-cancelado-avisa (v19.22: cancelar el «donde dejas la tanda» avisa, no aborta en silencio) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cierre-cancelado-avisa.cjs
 
@@ -971,6 +974,9 @@ echo "== stk-codigo-inexistente (v21.76: un codigo que NO existe no se dibuja en
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-codigo-inexistente.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-ajuste-cod-inexistente.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-ajuste-racks-posicion.cjs
+
+echo "== rack-subposicion (v29.78: un rack se parte en Y25-1, Y25-2... y el ingreso promptea la parte) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rack-subposicion.cjs
 
 echo "== rv-cuadro-entero (v21.29: el Reporte diario entra entero, arranca en hoy y mide lapsos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rv-cuadro-entero.cjs
