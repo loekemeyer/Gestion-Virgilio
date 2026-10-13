@@ -1,4 +1,4 @@
--- v29.93 (Luis, 2026-10-13): EL MONITOR MUESTRA SOLO LEGAJOS QUE SE LOGUEARON
+-- v29.96 (Luis, 2026-10-13): EL MONITOR MUESTRA SOLO LEGAJOS QUE SE LOGUEARON
 -- OJO: los marcadores de la base y el centinela dicen v29.90 (la version con que se aplico,
 --      antes de que otra sesion se llevara ese numero): son la LLAVE, no se cambian.
 --

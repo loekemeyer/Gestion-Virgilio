@@ -5300,7 +5300,7 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
 
-## ⚠⚠ REGLA (Luis, 2026-10-13, v29.93): EN EL MONITOR SÓLO VAN LOS LEGAJOS QUE SE LOGUEARON
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.96): EN EL MONITOR SÓLO VAN LOS LEGAJOS QUE SE LOGUEARON
 
 **Luis, textual:** *"se habrá hecho como una prueba para ver visuales desde el admin, no deberían
 aparecer esas cosas en el monitor. solo legajos que se hayan logueado (trabajadores o entrevistas)"*.
@@ -5340,7 +5340,7 @@ aparecer esas cosas en el monitor. solo legajos que se hayan logueado (trabajado
 **Chequeo:** `select * from public.gv_monitor_horas_operario;` · `select * from public.gv_reglas_perdidas;` ·
 `select * from public.gv_huellas_cambiadas;` · `node tests/mon-solo-logueados.cjs` (corre la pantalla:
 el que no se logueó no sale, el que sí sale, y el fail-open; verificado que falla contra la v29.92) ·
-`node tests/mon-vs-vista.cjs`. `sql/gv_monitor_solo_logueados_v2993.sql`.
+`node tests/mon-vs-vista.cjs`. `sql/gv_monitor_solo_logueados_v2996.sql`.
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.90): en el MONITOR, el día dice CUÁNDO DEBIÓ ARMARSE
 
