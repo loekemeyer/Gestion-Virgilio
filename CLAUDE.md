@@ -8613,7 +8613,9 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
   (ABS, AI, EBA, NY c/Carga 25%, NY Recup, NY Virgen, PE Polie, PP 2630, PS PE). Una bolsa nueva aparece cuando se le da ubicación.
 - `tests/ins-ri-cat-bolsas.cjs`.
 
-## ⚠ REGLA (Luis, 2026-10-13, v29.56): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
+## ⚠ REGLA (Luis, 2026-10-13, v29.57): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
+
+(los comentarios del código, el `.sql` y la vista dicen **v29.56**: otra sesión se llevó ese número mientras se escribía esto.)
 
 **Luis:** *"se pide que se marque la empresa (LK o CH) cuando un operario recibe insumos. esto no debería afectar
 nada (mismo insumo físicamente, mismo lugar físico) pero debería quedar registro"*. Antes se pedía **sólo en cajas**
