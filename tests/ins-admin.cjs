@@ -395,11 +395,16 @@ catch (_e) {
     out.opVeInsumoDeLaCat = /Etiqueta chica/.test(document.getElementById("insBody").innerHTML);
     // la unidad permitida de la categoría es la que se preselecciona
     out.opUniDeLaCat = (_ins.items.filter(function (i) { return i.cod === "ET1"; })[0] || {}).unidad;   // "Rollos"
-    // v29.56 (Luis, 13/10): el operario ya NO da de alta un insumo al recibir — insNuevoOpen se planta
+    // v30.05 (Luis, 13/10): el alta VUELVE al recibir — el "+" esta dentro de la categoria
+    // (etiquetas no es cerrada) y la pantalla de alta abre; al ENTREGAR sigue plantandose.
+    out.opAltaEnCat = !!document.querySelector("#insBody .ins-itbtn.add");
+    insNuevoOpen("etiquetas");
+    out.opAltaRI = !!_ins.nuevo && _ins.nuevo.cat === "etiquetas";
+    insNuevoCancel();
     let altaAlerta = ""; const _alOp = window.alert; window.alert = function (m) { altaAlerta = String(m); };
+    await showInsumoModal("EI", "104");
     insNuevoOpen("");
-    out.opSinAltaRI = _ins.nuevo === null && /no se puede agregar un insumo/i.test(altaAlerta) &&
-      !document.querySelector("#insBody .ins-catbtn.add") && !document.querySelector("#insBody .ins-itbtn.add");
+    out.opSinAltaEI = _ins.nuevo === null && /no se puede agregar un insumo/i.test(altaAlerta);
     window.alert = _alOp;
     return out;
   });
@@ -433,7 +438,7 @@ catch (_e) {
     r.totalHayFiltros === true && r.totalFiltraCod === 1 &&
     r.totalFiltraSinCat >= 1 && r.totalSeActualiza === true && r.uniProhibidaBloquea === true &&
     r.opVeCatNueva === true && r.opVeRenombrada === true && r.opVeInsumoDeLaCat === true &&
-    r.opUniDeLaCat === "Rollos" && r.opSinAltaRI === true &&
+    r.opUniDeLaCat === "Rollos" && r.opAltaEnCat === true && r.opAltaRI === true && r.opSinAltaEI === true &&
     errs.length === 0;
   console.log("ins-admin:", JSON.stringify(r));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");

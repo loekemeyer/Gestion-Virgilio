@@ -9463,16 +9463,51 @@ El servidor lo numeró `TMP-0037` y los 144 Kg quedaron en un código que no exi
    el nombre y la ubicación inicial. `TMP-0037` **nunca se aceptó**: quedó pendiente desde las 09:09. Y no se podía
    — `insumo_identificar` **frena** un TMP contra un código en uso (*"una sugerencia del operario no se puede
    fusionar contra un insumo en uso"*), que es correcto: fusionar dos stocks lo decide una persona, no un botón.
-3. **La puerta ya está cerrada**: la **v29.56** (13/10 09:35, 26 minutos después) sacó el alta de un insumo nuevo
-   por el operario (`insNuevoOpen` arranca con un `alert` y un `return`). `TMP-0037` fue el último que entró por ahí
-   y el único TMP que quedaba vivo. **Lo que sigue abierto no es el código: es el LUGAR** — un código del catálogo
-   de GP2 (`gv_insumo_desde_gp2`) también se recibe sin posición, y queda en esa alarma.
+3. **El alta se cerró a las 09:35 y Luis la REABRIÓ el mismo día** (v30.05, abajo): la v29.56 había tapado
+   `insNuevoOpen` con un `alert`, y `TMP-0037` fue el último que entró por ahí. Hoy el botón está de vuelta **con
+   el aviso de parecidos** adelante. **Y lo que sigue abierto no es el código: es el LUGAR** — un código del
+   catálogo de GP2 (`gv_insumo_desde_gp2`) también se recibe sin posición, y queda en esa alarma.
 
 Los 144 Kg se fusionaron en `N°19` con el mecanismo de la casa (se renombra el `cod_art` del movimiento, el TMP
 sale del catálogo y queda en `Insumos_Historial`), **sin tocar la ubicación** (Luis: *"hay que ver dónde está"*).
 ⚠ Ojo con el efecto: `N°19` ya tenía R06AT, así que **el Mapa ahora dice R06AT y la alarma se apagó** — si no
 están ahí, lo corrige el conteo, no un aviso. Detalle, verificación y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
 §3.v3000. Lo sostiene `tests/stk-busca-decimal.cjs`.
+
+## ⚠⚠ REGLA (Luis, 2026-10-13, v30.05): el operario SÍ PUEDE crear un código nuevo al RECIBIR — con el aviso de parecidos
+
+**Luis, textual:** *"hay que darles la opción de poder crear códigos nuevos cuando reciben si no están en la lista
+(antes tenían un botón abajo que les permitía hacer eso no, ponéselos)"*.
+
+> **Se RETIRA la v29.56** (*"en Recepción de insumos el operario ya NO da de alta un código nuevo"*, de esta
+> misma mañana). El **«+ Agregar insumo»** vuelve a estar en la grilla de categorías y dentro de cada categoría.
+
+| dónde | alta |
+|---|---|
+| **RI (recibir)**, categoría común | **SÍ** — el botón en los dos lugares |
+| **RI**, categoría **CERRADA** (bolsas, cajas) | **NO**: su catálogo es conocido y completo (Thomas, v29.25/30). El botón no se dibuja y `insNuevoOpen` se planta si lo llaman a mano |
+| **EI (entregar)** | **NO**, como siempre: dar de alta algo al sacarlo sería sacar stock de algo que nunca entró |
+
+**Y el alta AVISA antes de crear.** Es la lección del `TMP-0037` (arriba): el operario escribió `13.6 x 0.8`
+teniendo el fleje en la lista como `N°19` (*13,6 x 0,8*) y se creó un código que no existía para nadie. Ahora
+`insNuevoOk` busca los parecidos **por los NÚMEROS del detalle** — sin importar coma ni punto ni el orden — y los
+muestra: *«⚠ Puede que ya exista: · N°19 — 13,6 x 0,8 · Fleje N° 19»*. Cancelando **no crea nada y deja la lista
+filtrada por ese número**; «crear igual» crea. **No bloquea**: lo que no puede es crearse en silencio teniendo el
+gemelo a la vista.
+
+⚠ **La identidad la sigue poniendo el servidor** (`nuevo_insumo_tmp` → `TMP-00NN`) y el código de verdad se lo
+pone un admin en Stock y Compras → Insumos. **Un TMP no se fusiona desde el front contra un código en uso**
+(`insumo_identificar` lo frena, y está bien): si de verdad son el mismo, lo resuelve una persona.
+
+⚠⚠ **El REMITO que la recepción pide NO se guarda en Virgilio.** `_insDocState` (n° de remito / factura y sus
+fechas) se usa para GP2 — bolsas contra su OC — y después se tira (`insDocCancel` lo pone en `null`): el
+movimiento no lo lleva en ninguna columna. Lo cargado a mano desde una sesión lo pone en `ref` (`Remito 38880`)
+y en la descripción, pero **lo que carga el operario desde el celular queda sin el remito**. Cerrarlo es un
+cambio aparte (una columna, o el `ref`), y **no está hecho**.
+
+**Chequeo:** `node tests/ins-alta-duplicado.cjs` (corre el alta de verdad: avisa con el candidato, cancelar no
+crea y deja el filtro, «crear igual» crea, y una medida que de verdad no está entra derecho) ·
+`node tests/ins-categorias.cjs` · `node tests/ins-ri-cat-bolsas.cjs` · `node tests/ins-admin.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.57): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
 

@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.04">
+<link rel="stylesheet" href="gv-ui.css?v=30.05">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6422,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.04"></script>
+<script type="module" src="recepcion.js?v=30.05"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -9411,7 +9411,7 @@ function showInstructivo() {
     { t: "🏭 Recepción", c: "RT · RR", x: "RT = recibí mercadería (entra a <b>“a guardar”</b>). RR = controlar los remitos cargados al camión." },
     { t: "🚚 Carga y control", c: "CC · CR", x: "CC = inicio/fin de la carga del camión. CR = control de remitos." },
     { t: "📥 Guardar a góndola", c: "MG", x: "Lo que está en <b>“a guardar”</b> lo pasás a góndola. Si la góndola está llena, marcás <b>Excedente</b> y su ubicación." },
-    { t: "📦 Insumos y Productos Movimiento", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. Recibís sólo lo que ya está en la lista: si llegó algo que no figura, avisá a Stock y Compras." },
+    { t: "📦 Insumos y Productos Movimiento", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. ¿El insumo no está? Entrás por Recibir y usás <b>“+ Agregar insumo”</b> (el código de verdad se lo pone Stock y Compras después)." },
     { t: "⏱ Pausas y otros", c: "AT · PB · Limp · Perm · PC · CT", x: "Marcá cuándo: atendés el timbre (AT), vas al baño (PB), limpiás (Limp), pedís permiso (Perm), parás a comer (PC) o hacés conteo (CT). Tocás al <b>empezar</b> y otra vez al <b>terminar</b>." }
   ];
   ov.innerHTML = '<div class="instr-card"><div class="instr-head"><span class="instr-title">❓ ¿Cómo se usa?</span><button class="instr-close" onclick="closeInstructivo()">Cerrar</button></div><div class="instr-body">' +
@@ -10773,7 +10773,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.04";
+const APP_VERSION = "v30.05";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -28360,9 +28360,12 @@ function insRender() {
         '</button>';
     }).join("") +
       (cnt[""] ? '<button class="ins-catbtn' + (cntQ[""] ? " hasq" : "") + '" onclick="insSetCat(\'?\')"><span class="ins-catem">❓</span><span class="ins-catnm">Sin categoría</span><span class="ins-catn">' + cnt[""] + '</span></button>' : "") +
-      // v29.56 (Luis, 13/10): el operario NO da de alta un insumo al recibir. Sólo recibe
-      // lo que ya está en la lista (o un componente del catálogo de GP2). El "+ Agregar
-      // insumo nuevo" se sacó: un código distinto lo define Stock y Compras, no el operario.
+      // v30.05 (Luis, 13/10): "hay que darles la opción de poder crear códigos nuevos cuando
+      // reciben si no están en la lista (antes tenían un botón abajo que les permitía hacer eso
+      // no, ponéselos)". Vuelve el "+ Agregar insumo", que la v29.56 había sacado: el operario
+      // no se puede quedar sin poder cargar lo que ya tiene en la mano. Antes de crear, el alta
+      // avisa si ya existe algo con esos números (ver insNuevoOk).
+      (isIn ? '<button class="ins-catbtn add" onclick="insNuevoOpen(\'\')"><span class="ins-catem">+</span><span class="ins-catnm">Agregar insumo</span><span class="ins-catn">nuevo</span></button>' : "") +
       '</div>';
     h += '<div class="ins-cbadge" style="margin-top:10px;">' + nOper + ' insumos en uso' + (cnt[""] ? ' · ' + cnt[""] + ' sin clasificar' : "") + '</div>';
   } else {
@@ -28416,7 +28419,9 @@ function insRender() {
           (it.qty > 0 ? '<span class="ins-itq' + (it.unidad ? "" : " falta") + '">' + it.qty + " " + escapeHtml(it.unidad || "¿unidad?") + '</span>' : "") +
           '</button>';
       }).join("") +
-        // v29.56 (Luis, 13/10): sin "+ Agregar insumo" dentro de la categoría al recibir.
+        // v30.05: y también dentro de la categoría. Las CERRADAS (bolsas y cajas) siguen sin
+        // alta: su catálogo es conocido y completo (Thomas, v29.25/30).
+        (cat && isIn && INS_CAT_CERRADA.indexOf(cat) < 0 ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
         '</div>';
     }
   }
@@ -28438,11 +28443,20 @@ function insRender() {
    admin desde Stock y Compras → Insumos (idea 5572). */
 function insNuevoOpen(cat) {
   if (!_ins) return;
-  // v29.56 (Luis, 13/10): el operario NO da de alta insumos. Recibe sólo lo que ya está
-  // en la lista; un código distinto lo define Stock y Compras. Guarda dura, por si algún
-  // camino viejo (una sesión guardada, un botón cacheado) todavía llama acá.
-  try { alert("No se puede agregar un insumo nuevo acá.\n\nRecibí lo que ya está en la lista. Si llegó algo que no figura, avisá a Stock y Compras para que lo carguen."); } catch (_e) {}
-  return;
+  // v30.05 (Luis, 13/10): el alta VUELVE — pero SÓLO al RECIBIR ("hay que darles la opción de
+  // poder crear códigos nuevos CUANDO RECIBEN"). Al ENTREGAR nunca hubo botón y la guarda queda:
+  // dar de alta algo al sacarlo sería sacar stock de algo que nunca entró.
+  if (_ins.mode !== "RI") {
+    try { alert("No se puede agregar un insumo nuevo acá.\n\nAl ENTREGAR sale sólo lo que ya está en la lista. Si llegó algo que no figura, cargá la RECEPCIÓN primero."); } catch (_e) {}
+    return;
+  }
+  // y tampoco en una categoría CERRADA (bolsas y cajas): su catálogo es conocido y completo
+  // (Thomas, v29.25/30). El botón ya no se dibuja ahí; esto frena el camino a mano.
+  if (INS_CAT_CERRADA.indexOf(cat) >= 0) {
+    const _c0 = insCatDef(cat);
+    try { alert("No se agregan insumos nuevos en " + (_c0 ? _c0.lbl : "esa categoría") + ".\n\nEstán todas en la lista. Si falta una, avisá a Stock y Compras."); } catch (_e) {}
+    return;
+  }
   _ins.nuevo = { cat: insCatDef(cat) ? cat : "", qty: "", uni: "", det: "" };
   _ins.qty = null;
   insRender();
@@ -28517,6 +28531,29 @@ function insNuevoOk() {
   // Sin código no hay clave natural: se dedupe por el DETALLE (normalizado). Si ya
   // hay uno escrito igual, no creo otro — lo abro para que sume sobre ese.
   const _norm = function (x) { return String(x || "").trim().toLowerCase().replace(/\s+/g, " "); };
+  /* v30.05 — lo que mordió el 13/10: el operario escribió "13.6 x 0.8" y ese fleje YA existía
+     como `N°19` ("13,6 x 0,8 · Fleje N° 19"), así que se creó un TMP y 144 Kg quedaron en un
+     código que no existe para nadie. Antes de crear se buscan los parecidos por los NÚMEROS del
+     detalle — sin importar coma/punto ni el orden — y se ofrecen. NO bloquea: si de verdad es
+     otro, se crea igual; lo que no puede es crearse en silencio teniendo el gemelo en la lista. */
+  const _nums = function (x) { return String(x || "").toLowerCase().replace(/(\d),(\d)/g, "$1.$2").match(/\d+(?:\.\d+)?/g) || []; };
+  const nd = _nums(det);
+  if (nd.length) {
+    const cands = _ins.items.filter(function (it) {
+      if (!it.cod || _insEsTmp(it)) return false;
+      const ni = _nums((it.nombre || "") + " " + it.cod);
+      return nd.every(function (x) { return ni.indexOf(x) >= 0; });
+    }).slice(0, 6);
+    if (cands.length) {
+      let sigue = false;
+      try {
+        sigue = confirm("⚠ Puede que ya exista:\n\n" +
+          cands.map(function (it) { return "  · " + it.cod + (it.nombre ? " — " + it.nombre : ""); }).join("\n") +
+          "\n\nSi es uno de ésos, cancelá y tocalo en la lista (te la dejo filtrada).\n\n¿Crear igual uno NUEVO?");
+      } catch (_e) { sigue = true; }
+      if (!sigue) { _ins.nuevo = null; _ins.filtro = String(nd[0] || ""); insRender(); return; }
+    }
+  }
   const ya = _ins.items.filter(function (it) { return _norm(it.nombre) === _norm(det); })[0];
   if (ya) {
     alert("Ya hay un insumo con ese detalle. Te lo abro para que pongas la cantidad.");
@@ -63347,7 +63384,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.04"></script>
+<script src="importacion.js?v=30.05"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -66493,15 +66530,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.04"></script>
-<script src="hotsale.js?v=30.04"></script>
-<script src="estadisticas.js?v=30.04"></script>
-<script src="ads.js?v=30.04"></script>
-<script src="plantel.js?v=30.04"></script>
+<script src="cobranzas.js?v=30.05"></script>
+<script src="hotsale.js?v=30.05"></script>
+<script src="estadisticas.js?v=30.05"></script>
+<script src="ads.js?v=30.05"></script>
+<script src="plantel.js?v=30.05"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.04"></script>
+<script src="analisis.js?v=30.05"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.04"></script>
+<script src="ayuda.js?v=30.05"></script>
 
 </body>
 </html>
