@@ -581,3 +581,6 @@ encola AUI, el cuadro que explota **no** traba el asistente) · `node tests/mon-
   el cupo queda `activo = false`. Sirve para cualquier otro par: es un `insert` en la tabla del cupo.
 - Lo que ya estaba cargado al 13/10 no se toca (forward-facing). `sql/gv_pick_sustituto_cupo_809_v3024.sql`.
 - Chequeo: `select * from public."GV_Pick_Sustituto_Cupo"; select * from public."GV_Pick_Sustituto_Uso";`
+- **Pendientes sin pickear, del más reciente al más viejo (Luis, 13/10, "para liquidarlo")**: cupo bajado a **8**
+  (9 en M16 − 1 que ya pide CH 0066 como 809). Asignado **CH 0064 (F48O) 2 cajas → 809**. CH 0063 (F48M, 8 cajas)
+  no entra entera en las 6 que quedan; las 6 esperan la próxima línea que entre. Las demás NP con 809E ya están pickeadas.
