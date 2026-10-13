@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.00">
+<link rel="stylesheet" href="gv-ui.css?v=30.01">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6422,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.00"></script>
+<script type="module" src="recepcion.js?v=30.01"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10772,7 +10772,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.00";
+const APP_VERSION = "v30.01";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30778,13 +30778,16 @@ function irRender() {
   const codMal = !nac && _irChkMal(chk);
   const origTxt = _ir.origen === "excedente" ? "excedente" : "a guardar";
   const disp = nac ? _irDisp(_ir.cod, _ir.origen) : 0;
-  // v6.28: toggle Importación (stock nuevo) / Nacional (mover stock existente a racks)
+  /* v6.28: dos modos. v29.100 (Luis, 13/10: «no hay una forma clara para mandar mercadería de A
+     guardar a Racks … Importado y nacional se tiene que renombrar a "Ingreso directo" o "Desde A
+     guardar"»): los botones se llaman por lo que HACEN, no por el origen de la mercadería. Los
+     valores internos (import/nacional) NO cambian: los usan racks_plani_ingreso y _nacional. */
   let h = '<div class="ir-fld"><div class="ir-seg">'
-    + '<button class="ir-segb' + (!nac ? " on" : "") + '" onclick="irSetModo(\'import\')">📦 Importación</button>'
-    + '<button class="ir-segb' + (nac ? " on" : "") + '" onclick="irSetModo(\'nacional\')">🏠 Nacional</button>'
+    + '<button class="ir-segb' + (!nac ? " on" : "") + '" onclick="irSetModo(\'import\')">📦 Ingreso directo</button>'
+    + '<button class="ir-segb' + (nac ? " on" : "") + '" onclick="irSetModo(\'nacional\')">📥 Desde A guardar</button>'
     + '</div></div>';
   if (nac) {
-    h += '<div class="ir-hint">Mové a racks stock que <b>YA tenés</b> (no crea stock nuevo): elegí <b>origen</b>, <b>código</b> con stock, <b>cajas</b> y el <b>sector</b>. Descuenta del origen y ocupa la celda.</div>';
+    h += '<div class="ir-hint"><b>Mercadería que ya está en el depósito</b> y la ponés en un rack. Mové a racks stock que <b>YA tenés</b> (no crea stock nuevo): elegí <b>origen</b>, <b>código</b> con stock, <b>cajas</b> y el <b>sector</b>. Descuenta del origen y ocupa la celda.</div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Origen del stock</div><div class="ir-seg">'
       + '<button class="ir-segb' + (_ir.origen === "a_guardar" ? " on" : "") + '" onclick="irSetOrigen(\'a_guardar\')">A guardar</button>'
       + '<button class="ir-segb' + (_ir.origen === "excedente" ? " on" : "") + '" onclick="irSetOrigen(\'excedente\')">Excedente</button>'
@@ -30795,11 +30798,12 @@ function irRender() {
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas a mover' + (_ir.cod ? ' (máx ' + Math.round(disp) + ')' : '') + '</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div>';
     if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(codCanonSuf(_ir.cod)) + ' en ' + origTxt + '.</div>';
   } else {
-    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: elegí el <b>código</b> de la lista (escribí el código o el nombre y te lo sugiero), cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
+    h += '<div class="ir-hint"><b>Mercadería que entra al depósito ahora</b> (crea stock nuevo). Si las cajas YA están en <b>A guardar</b>, usá «📥 Desde A guardar» o las contás dos veces. Cargá lo que llegó, <b>un palet por vez</b>: elegí el <b>código</b> de la lista (escribí el código o el nombre y te lo sugiero), cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock, y <b>avisa al módulo de Importación</b>, que lo descuenta del pedido en viaje (no tenés que elegir el pedido).</div>';
     // v29.77: el campo BUSCA entre los códigos que existen; el código se elige de la lista (o se escribe entero)
     h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="🔎 código o nombre (ej. 956E)" value="' + escapeHtml(_ir.codPick || "") + '" oninput="irSetPick(this.value)"></div>';
     if (_ir.cod) h += '<div class="ir-desc">Elegido: <b>' + escapeHtml(codBase(_ir.cod)) + '</b> ' + escapeHtml(nombre || (_ir.codNuevo ? "(código nuevo, sin nombre)" : "")) + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
     if (chk) h += _irChkWarn(chk);
+    h += _irAvisoAGuardar();   // v29.100: si esas cajas YA están en A guardar, no es un ingreso directo
     h += _irListaImp();
     h += '<div class="ir-row2"><div class="ir-fld"><div class="ir-lbl">Masters</div><div class="ir-stp"><button class="ir-sb" onclick="irChgM(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.masters) || 0) + '" oninput="irSetM(this.value)"><button class="ir-sb" onclick="irChgM(1)">+</button></div></div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas (inner)</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div></div>';
@@ -30924,6 +30928,47 @@ async function irPartir(n) {
 function irSetSec(v) { if (!_ir) return; _ir.sector = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9-]/g, ""); irRender(); }   // v29.78: el guión de la parte (Y25-2)
 function irSetEmp(e) { if (!_ir) return; _ir.emp = (e === "CH") ? "CH" : "LK"; irRender(); }
 /* v6.28 — Ingreso a racks NACIONAL: mover stock existente (a_guardar/excedente) a racks. */
+/* v29.100 (Luis, 13/10) — EL ERROR QUE ESTO VIENE A EVITAR: el 13/10 el 934E (1 master, 12 cajas)
+   y el 606E (10) entraron por «Ingreso directo» cuando esas cajas ya estaban en A guardar, así que
+   el stock quedó contado DOS veces (A guardar 12 + racks 12) y nadie se enteró hasta que Luis lo vio
+   en Stocks. El aviso no frena: ofrece el camino correcto con un toque. */
+function _irSaldoAGuardar(cod) {
+  if (!_ir || !_ir.saldos || !cod) return null;
+  const k = _ocgNorm(cod);
+  let ag = 0, ex = 0, hit = false;
+  Object.keys(_ir.saldos).forEach(function (key) {
+    if (_ocgNorm(String(key).replace(/\s+(LK|CH)$/i, "")) !== k) return;
+    const e = _ir.saldos[key] || {};
+    ag += Number(e.a_guardar) || 0; ex += Number(e.excedente) || 0; hit = true;
+  });
+  if (!hit) return null;
+  return { a_guardar: Math.max(0, ag), excedente: Math.max(0, ex) };
+}
+function _irAvisoAGuardar() {
+  if (!_ir || _ir.modo === "nacional" || !_ir.cod) return "";
+  const s = _irSaldoAGuardar(_ir.cod); if (!s) return "";
+  const ag = Math.round(s.a_guardar), ex = Math.round(s.excedente);
+  if (ag < 1 && ex < 1) return "";
+  const org = ag >= 1 ? "a_guardar" : "excedente";
+  const txt = ag >= 1 ? ag + " caja" + (ag === 1 ? "" : "s") + " en <b>A guardar</b>"
+                      : ex + " caja" + (ex === 1 ? "" : "s") + " en <b>Excedente</b>";
+  return '<div class="ir-warn">⚠ Este código ya tiene ' + txt + '.<br>'
+    + 'Si <b>son esas mismas cajas</b>, esto NO es un ingreso directo: se contarían dos veces.'
+    + '<button class="ir-chip on" style="display:block;margin-top:8px" onclick="irDesdeAGuardar()">📥 Moverlas desde ' + (org === "excedente" ? "Excedente" : "A guardar") + '</button></div>';
+}
+function irDesdeAGuardar() {
+  if (!_ir) return;
+  const cod = _ir.cod, s = _irSaldoAGuardar(cod);
+  const org = (s && Math.round(s.a_guardar) >= 1) ? "a_guardar" : "excedente";
+  const sec = _ir.sector;
+  irSetModo("nacional"); _ir.origen = org; _ir.sector = sec;
+  const k = _ocgNorm(cod);
+  const key = Object.keys(_ir.saldos || {}).filter(function (x) {
+    return _ocgNorm(String(x).replace(/\s+(LK|CH)$/i, "")) === k && (Number((_ir.saldos[x] || {})[org]) || 0) > 0;
+  })[0];
+  if (key) { _ir.cod = key; _ir.codPick = key; }
+  irRender();
+}
 function _irDisp(cod, origen) { if (!_ir || !_ir.saldos || !cod) return 0; const e = _ir.saldos[String(cod)]; if (!e) return 0; return Math.max(0, Number(e[origen === "excedente" ? "excedente" : "a_guardar"]) || 0); }
 function irSetModo(m) { if (!_ir) return; _ir.modo = (m === "nacional" ? "nacional" : "import"); _ir.cod = ""; _ir.codPick = ""; _ir.codNuevo = false; _ir.masters = 0; _ir.inner = 0; _ir.chk = null; irRender(); }
 function irSetOrigen(o) { if (!_ir) return; _ir.origen = (o === "excedente" ? "excedente" : "a_guardar"); _ir.cod = ""; _ir.inner = 0; irRender(); }
@@ -63115,7 +63160,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.00"></script>
+<script src="importacion.js?v=30.01"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -66261,15 +66306,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.00"></script>
-<script src="hotsale.js?v=30.00"></script>
-<script src="estadisticas.js?v=30.00"></script>
-<script src="ads.js?v=30.00"></script>
-<script src="plantel.js?v=30.00"></script>
+<script src="cobranzas.js?v=30.01"></script>
+<script src="hotsale.js?v=30.01"></script>
+<script src="estadisticas.js?v=30.01"></script>
+<script src="ads.js?v=30.01"></script>
+<script src="plantel.js?v=30.01"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.00"></script>
+<script src="analisis.js?v=30.01"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.00"></script>
+<script src="ayuda.js?v=30.01"></script>
 
 </body>
 </html>

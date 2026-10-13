@@ -9110,6 +9110,48 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
 - Lo sostiene la base: trigger `aa_gv_salida_cervantes_no_racks` → `SC_DESDE_RACKS` (centinela v29.13).
   `sql/gv_salida_cervantes_no_racks_v2913.sql`, `tests/sc-racks-unidad.cjs`.
 
+## ⚠⚠ REGLA (Luis, 2026-10-13, v30.01): los modos de INGRESO A RACKS son «Ingreso directo» y «Desde A guardar»
+
+**Luis:** *"el problema es que no hay una forma clara para mandar mercadería de A guardar a Racks"* ·
+*"Importado y nacional se tiene que renombrar a «Ingreso directo» o «Desde A guardar»"*.
+
+> ## **El modo se llama por lo que HACE, no por el origen de la mercadería.**
+> **📦 Ingreso directo** = entra al depósito ahora, **crea stock nuevo**. · **📥 Desde A guardar** =
+> ya está en el depósito, **lo mueve** (descuenta de A guardar o de Excedente).
+
+| | antes | ahora |
+|---|---|---|
+| botones | 📦 Importación · 🏠 Nacional | **📦 Ingreso directo · 📥 Desde A guardar** |
+| valor interno | `import` / `nacional` | **igual** (lo usan `racks_plani_ingreso` y `racks_plani_ingreso_nacional`): no se toca |
+
+- **Y avisa**: en «Ingreso directo», un código que YA tiene cajas en A guardar (o en Excedente) saca
+  *«⚠ Este código ya tiene N cajas en A guardar. Si son esas mismas cajas, esto NO es un ingreso
+  directo: se contarían dos veces»* con el botón **📥 Moverlas desde A guardar**, que pasa al otro
+  modo con el código y el origen puestos. **No frena**: lo decide el operario (`_irAvisoAGuardar`,
+  `irDesdeAGuardar`; el saldo sale de `_ir.saldos`, que ya se carga al abrir el módulo).
+
+**Lo que costó, el 13/10:** el **934E** (1 master, 12 cajas, Y07, 14:40) y el **606E** (10 cajas,
+X22, 10:00) se cargaron por Importación cuando esas cajas ya estaban en A guardar: racks sumó y
+A guardar quedó igual, o sea **el stock contado dos veces**, y nada avisó — lo vio Luis en Stocks.
+Corregido con un ajuste (`CORR IR 146592538`, A guardar 934E −12 → 0; racks queda en 180, que es lo
+que hay). El movimiento de racks NO se toca: la mercadería está en Y07.
+
+**Cómo se encuentra otro igual** — un IR que no descontó nada y dejó saldo vivo en A guardar:
+
+```sql
+select m.id, m.creado, m.cod_art, m.delta, m.ref, m.legajo
+  from public."Movimientos_Stock" m
+ where m.deposito = 'racks' and m.tipo = 'ingreso' and m.ref like 'ingreso a racks %'
+   and m.creado >= now() - interval '30 days'
+   and exists (select 1 from public."Movimientos_Stock" x
+                where x.deposito = 'a_guardar' and upper(btrim(x.cod_art)) = upper(btrim(m.cod_art))
+                group by 1 having sum(x.delta) > 0)
+ order by m.creado desc;
+```
+
+**Chequeo:** `node tests/ir-codigo-candado.cjs` (bloque **H**: el aviso, que no frena, que el botón
+cambia de modo con el código puesto, y los dos rótulos nuevos; verificado que falla contra la v30.00).
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.67 + v29.77 + v29.78, D2): en INGRESO A RACKS el CÓDIGO SE ELIGE — se sugiere mientras se escribe
 
 **Luis:** *"956E · va a terminar en AB10 · el operario lo puso mal · ponele candado"* y, después del candado:
