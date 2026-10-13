@@ -7743,6 +7743,14 @@ chinos y para avisar en la página que no tenemos stock"*.
   con `aceptado` = ya tiene código real (no `TMP-`). La escribe `gv_gp2_aceptado_sync()` (cron `gv-gp2-aceptado-sync`,
   cada 10 min, poda lo que desaparece). Al 30/09: 24 filas, 7 aceptadas, 17 con TMP. **323ES quedó Mixto.**
   `sql/gv_gp2_aceptado_virgilio_v2515.sql`.
+- **v29.60 (Luis, 13/10): y VE LAS CATEGORÍAS DE INSUMOS** — cuarta tabla espejo, **`GP2.virgilio_insumo_categoria`**
+  (clave, nombre, emoji, orden, activa), bloque 4 de `gv_gp2_espejo_sync`. Con eso GP2 → Stock general → pestaña
+  **Virgilio** filtra «Insumos de Virgilio sin asignar» por **las mismas categorías de acá**, con sus nombres
+  (`virgilio_insumos_sin_match_bundle` devuelve `categorias` y cada fila su `cat_nombre`). ⚠ **El nombre de una
+  categoría no se escribe en el front de GP2**: su mapa a mano (`VINS_RUBRO`) estaba desfasado en **4 de 6** —
+  decía «Plásticos» por «Bolsas plásticas», «Flejes» por «Flejes y alambres», y no conocía «Sector Crudo» ni
+  «Sector Procesado». Al agregar una categoría en `Insumos_Categorias`, GP2 la ve sola en ≤ 10 min.
+  `sql/gv_gp2_espejo_categorias_v2960.sql` · GP2 `db/migracion_virgilio_categorias_20261013.sql`, CONOCIMIENTO 4kn.
 - **v25.17 (Luis, 30/09, D5): GP2 ve el stock de insumos y el Mapa de Virgilio**, en tres tablas de **solo lectura** del
   schema GP2 (así no rompe su Regla 0): `virgilio_insumo_stock`, `virgilio_insumo_ubicacion` y `virgilio_lugar`. Las
   llena `gv_gp2_espejo_sync()` (cron `gv-gp2-espejo-sync`, c/10 min, reescribe sólo si cambió el md5). Luis: *"que los
@@ -7756,7 +7764,7 @@ el mismo molde (el mismo bloque está en el `CLAUDE.md` de `loekemeyer/Gestion-P
 
 | pieza | cómo |
 |---|---|
-| frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.aceptado_virgilio`, y los espejos de solo lectura `GP2.virgilio_insumo_stock` / `_ubicacion` / `virgilio_lugar` |
+| frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.aceptado_virgilio`, y los espejos de solo lectura `GP2.virgilio_insumo_stock` / `_ubicacion` / `virgilio_lugar` / `virgilio_insumo_categoria` |
 | códigos | GV habla en código de ARTÍCULO (323ES), GP2 en COMPONENTE (GRJ31). El vínculo vive en **`GP2.importado_virgilio_componente`** y **nunca se adivina** |
 | confirmar | el que recibe dice **Sí / No** donde trabaja, en la tarjeta del componente. ⚠ **Hoy avisa sólo lo que RECIBE CERVANTES** (Luis, 02/10: *"lo que recibe Cervantes avisa"*): lo que GP2 manda a Virgilio (`enviar_a_virgilio`, tablet y botón «→ Virgilio») no pide Sí/No en GV |
 | Sí | el MISMO camino que la carga manual (en GP2: `crear_recepcion_insumo` + control en kg pendiente) |
@@ -8633,6 +8641,51 @@ quedó viva. Pasó 6 veces desde el 25/09 (desde la v22.77 el stock de racks viv
   (ABS, AI, EBA, NY c/Carga 25%, NY Recup, NY Virgen, PE Polie, PP 2630, PS PE). Una bolsa nueva aparece cuando se le da ubicación.
 - `tests/ins-ri-cat-bolsas.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-13, v29.57): al RECIBIR un insumo se marca DE QUÉ EMPRESA viene — y no parte el stock
+
+(los comentarios del código, el `.sql` y la vista dicen **v29.56**: otra sesión se llevó ese número mientras se escribía esto.)
+
+**Luis:** *"se pide que se marque la empresa (LK o CH) cuando un operario recibe insumos. esto no debería afectar
+nada (mismo insumo físicamente, mismo lugar físico) pero debería quedar registro"*. Antes se pedía **sólo en cajas**
+(v29.31, Thomas D26).
+
+- El pop-up de cantidad de **Recibir insumos** pide la **Marca** en TODA categoría, obligatoria (el botón «Listo»
+  queda deshabilitado y `insEnviar` frena). **Cajas**: Loeke / Chef. **El resto**: Loeke / Chef / **Mixto** (las dos).
+  Al **entregar** (EI) no se pide. `INS_MARCAS`, `_insMarcasDe`, `_insMarcaHtml`.
+- **La marca NO parte el stock**: el movimiento sigue siendo el mismo insumo en el mismo lugar y con
+  **`empresa = 'Mixto'`** (lo fuerza `gv_insumo_unidad_base`, regla v24.89 — medido: 446 de 446 movimientos). Queda
+  escrita en la **descripción** (`· marca Loeke`), como ya hacía cajas.
+- Consultable en **`gv_insumo_recepcion_marca`** (una fila por recepción, con `marca`, categoría, unidad y origen):
+  si el dato sólo vive en un string de la descripción no se puede agrupar.
+- ⚠ **Al agregar un dato que acompaña un movimiento de insumos sin cambiar el saldo, va en la descripción, nunca en
+  `empresa`**: esa columna la pisa el trigger y la leen el espejo a GP2 y los lectores de stock.
+- `sql/gv_insumo_marca_empresa_v2956.sql`, `tests/ins-marca-empresa.cjs` (verificado que falla contra la v29.55).
+
+### ⚠ Y los saldos de insumos en unidad VIEJA (MC) son de antes de la v24.69
+
+`gv_insumo_unidad_base` convierte a la unidad base, pero es **BEFORE INSERT solamente**: las 18 líneas cargadas en
+MC antes de esa versión (546P 10 · H201Part 5 · 439E 1 · 505C 1 · 590E 1; la última del **25/08**) quedaron así, y
+`vista_saldos_insumos_x_unidad` **agrupa por unidad** → esos códigos muestran dos saldos (Uni positivo + MC negativo).
+**No es un bug vivo**: `gv_importados_stock_insumos` los convierte con el factor y da el número correcto (505C
+**98.000** · 439E **312** · 590E **0**, `sin_factor` en 0). Los 5 saldos negativos de insumos son exactamente esas
+unidades viejas, todos de categoría `importados`: **cero negativos en las categorías del operario**.
+
+⚠⚠ **NO se normalizan: quedan así** (Luis, 13/10, D9: *"dejalo"*). El UPDATE que las reexpresaría está escrito en
+`sql/gv_insumo_marca_empresa_v2956.sql` y **no se aplicó**: es cosmético (que cada código muestre un solo número) y
+no cambia ninguna cuenta, así que no vale pisar 18 filas de `Movimientos_Stock`. **No volver a proponerlo.** Y si
+alguien lo intenta: un INSERT compensatorio NO sirve — la línea nueva con unidad `MC` la convierte el trigger y el
+saldo MC sigue ahí; el único camino es el UPDATE de las filas viejas, que no dispara ese trigger.
+
+⚠⚠ **La SALIDA de insumos NO lleva empresa, y no se le agrega** (Luis, 13/10, D10: *"no, solo el registro de la
+entrada es importante"*). Medido sobre las 92 entregas (30/06 al 08/10): **92 de 92 con `empresa = 'Mixto'` y 0 con
+marca**; lo único que queda es **a quién se le dio** (`ref`: Cervantes 42 · Rafael 8 · Manolo 3 · Bryan 1, más 33 sin
+destino del 30/06 al 07/08, de antes de que el campo fuera obligatorio). O sea el circuito es **asimétrico a
+propósito**: la entrada dice de qué empresa vino y la salida no dice para cuál se usó. **No proponer pedir la marca
+al entregar ni «cerrar el círculo» por empresa.**
+⚠ **Las 45 «Cajas» de 546P no se tocan** (Luis, 13/10, D8: *"dejalo"*): esa unidad no tiene factor en
+`Insumos_Factores` y no se inventa. Y 546P no está mapeado a ningún importado, así que su stock hoy no lo lee
+ninguna pantalla de compra.
+
 ## ⚠ REGLA (v29.24, 09/10): el REPLAY de Terminar Día no re-manda los items SÓLO de Historial (`h_*`)
 
 - `bulkSendDayReplay` re-manda el Historial del día con `client_id = item.id`. Las tareas de módulo (guardado MG, bajar/ingreso
@@ -8761,3 +8814,34 @@ identificar cuando son eventos duplicados"*. Trigger **`ab_gv_evento_duplicado`*
 - Probado como anon en transacción abortada: copias h_rkb / h_mg y R1 con otro id descartadas (3 al log), uno legítimo entra.
 - Rollback: `alter table public."Registros_Produccion_Virgilio" disable trigger ab_gv_evento_duplicado;`
   El marcador interno dice `v29.25-evdup` (llave). Centinela `gv_evento_duplicado`. `sql/gv_evento_duplicado_v2950.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.58): en BAJAR DE RACKS la capacidad del DUAL es POR EMPRESA — y sin capacidad se ordena por E.M.
+
+El orden por urgencia de Bajar de racks (v25.89, `(góndola + A guardar − pedido) ÷ capacidad`, menor primero)
+tenía dos agujeros, medidos el 13/10 sobre los 57 códigos con stock en racks:
+
+1. **El dual iba último.** `vista_saldos_stock` emite la clave CON sufijo (`437E LK`) y `ocgFetchCapacidad` indexa
+   el código **pelado** (`437E`): no matcheaba, `prio = Infinity`. Eran 3 filas vivas (437E LK con **225 cajas en
+   racks**, 438E LK 78, 809E CH 336) con la góndola a medio llenar. La capacidad por empresa **ya estaba** en
+   `Capacidad_Sector` (437E: LK 120 / CH 48): faltaba cruzar **(cod, empresa)**. Lo hacen `rkbFetchCapacidad()`
+   (devuelve `pelada` y `porEmp`, nunca pegadas) y **`_rkbCapDe(cod, capObj)`**. Para un código no dual da
+   exactamente lo mismo que antes.
+2. **Sin `cajas_max` cargada van al final, y entre ésos manda la ESTADÍSTICA MADRE** (`gv_proyeccion_articulo`,
+   mayor a menor): sin capacidad no hay hueco que medir, así que primero lo que más se vende. Al 13/10 son 3
+   (**505I con 1.475 cajas en racks** y la góndola en 0 — su celda del Mapa no tiene capacidad —, 938E 228 sin
+   celda, AB3 60) y **ninguno está en `gv_proyeccion_articulo`**, así que hoy la E.M. de los tres es 0 y
+   desempata el código: el orden entre ellos sólo cambia cuando alguno tenga venta.
+
+⚠ **El ratio mide «qué tan vacía está la celda», no cuántas cajas entran.** El 606E queda 6.º con prio 0,00
+teniendo **218 de hueco** y 120 en racks, detrás del 361E (hueco 41, cap 32). **Luis lo decidió así el 13/10** (*"está bien que pese un pedido de esa forma, dejalo así"*): el
+objetivo es que ninguna celda se quede sin mercadería para el picking, y el pedido pesa sobre el tamaño de SU
+celda. **No volver a proponer el orden por hueco en cajas** (`min(cap − góndola − A guardar + pedido, racks)`),
+que es la otra lectura y quedó descartada.
+
+⚠⚠ **El MISMO cruce pelado sigue en Guardado a Góndola y en «¿Qué bajar primero?»** (`showMGModal` y
+`showGuardarOrden`, las dos con `capMap[_ocgNorm(a.cod)]`). Ahí el dual queda con `cap = 0`, y en «¿Qué bajar
+primero?» el filtro `x.it.cap > 0` **lo saca de la lista**. No se tocó: en MG la empresa viaja en la fila
+(`a.emp`), así que el arreglo es de una línea pero cambia qué filas se ven. Queda a decisión de Luis.
+
+**Chequeo:** `node tests/rkb-orden-urgencia.cjs` — corre la pantalla y mide el orden y que el 437E LK tome **120**
+(el de LK), no los 168 de las dos empresas sumadas. Verificado que falla contra el index anterior.
