@@ -1224,6 +1224,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== analisis-productivo (v29.64: Análisis Productivo por tanda; analisis.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/analisis-productivo.cjs
+
+echo "== pk-gondola-sugerida (v29.69: el código sin góndola → se le pregunta al operario) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-gondola-sugerida.cjs
 echo "== ppp-plantel (v29.46: PPP → Plantel de la semana, horas de picking/armado/fijas → personas; plantel.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-plantel.cjs
 echo "== monitor-ritmo (v29.47: Monitor → Ritmo de picking, estimado por dificultad vs real; plantel.js) =="

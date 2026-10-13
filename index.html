@@ -127,6 +127,17 @@ button {
 #cgAside button { width: auto; margin: 0; padding: 3px 14px; font-size: 16px; border-radius: 6px; border: 1px solid #cbd5e1; background: #f8fafc; cursor: pointer; }
 #cgAside button.cg-ok { color: #15803d; } #cgAside button.cg-no { color: #b91c1c; }
 @media (max-width: 1599px) { #cgAside { position: static; width: auto; max-width: 520px; max-height: none; margin: 0 auto 12px; } }
+#gsAside { position: fixed; right: 30px; top: 137px; width: 235px; max-height: calc(100vh - 160px); overflow: auto;
+  background: #fff; border: 2px solid #dc2626; border-radius: 10px; padding: 8px; box-sizing: border-box; text-align: center; z-index: 5; }
+#gsAside .gs-h { font-weight: 800; font-size: 13.5px; color: #1d4ed8; margin-bottom: 6px; line-height: 1.2; }
+#gsAside .gs-it { border-top: 1px solid #e2e8f0; padding: 6px 0; }
+#gsAside .gs-l1 { font-size: 15px; font-weight: 800; }
+#gsAside .gs-l2 { font-size: 12.5px; color: #334155; }
+#gsAside .gs-l3 { font-size: 11px; color: #64748b; }
+#gsAside .gs-btns { display: flex; gap: 6px; justify-content: center; margin-top: 4px; }
+#gsAside button { width: auto; margin: 0; padding: 3px 14px; font-size: 16px; border-radius: 6px; border: 1px solid #cbd5e1; background: #f8fafc; cursor: pointer; }
+#gsAside button.gs-ok { color: #15803d; } #gsAside button.gs-no { color: #1d4ed8; }
+@media (max-width: 1599px) { #gsAside { position: static; width: auto; max-width: 520px; max-height: none; margin: 0 auto 12px; } }
 .sup-secondary .sup-action-btn { min-height: 78px; padding: 9px 6px; font-size: 12.5px; gap: 5px;
   background: #51688f; border-radius: 11px; }
 .sup-secondary .sup-action-btn:hover { background: #44597a; }
@@ -4592,6 +4603,14 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pk-done-t{ font-size: 22px; font-weight: bold; color: #0f172a; }
 .pk-done-s{ font-size: 15px; color: #64748b; }
 /* idea 3798 — card del conteo cíclico de góndola (en el done del picking) */
+.pk-sin-gond { background:#fff7ed; border:1px solid #fdba74; color:#9a3412; border-radius:10px;
+  padding:8px 10px; margin-top:8px; font-size:13.5px; font-weight:700; text-align:center; line-height:1.3; }
+.pk-gond-h { font-size:21px; font-weight:900; text-align:center; margin:14px 0 6px; }
+.pk-gond-s { font-size:14.5px; color:#334155; text-align:center; line-height:1.35; margin-bottom:12px; }
+.pk-gond-row { display:flex; gap:8px; align-items:stretch; margin-bottom:10px; }
+.pk-gond-inp { flex:1; width:auto; margin:0; font-size:30px; font-weight:900; text-align:center;
+  text-transform:uppercase; border:2px solid #cbd5e1; border-radius:12px; padding:8px; }
+.pk-gond-btn { flex:0 0 42%; margin:0; }
 .pk-conteo{ width:100%; box-sizing:border-box; background:#fffbeb; border:1.5px solid #fcd34d; border-radius:13px; padding:12px 13px; text-align:left; }
 .pk-conteo.done{ background:#f0fdf4; border-color:#86efac; color:#166534; font-weight:700; text-align:center; }
 .pk-conteo-h{ font-size:14.5px; font-weight:800; color:#92400e; }
@@ -6519,6 +6538,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div class="app-brand">Gestion <span class="app-brand-hi">Virgilio</span></div>
     <h1 class="sup-title">Administración</h1>
     <div id="cgAside" style="display:none;"></div>
+    <!-- v29.69 (Luis, 13/10): góndolas que informó el operario en el picking, para dar de alta en el Mapa -->
+    <div id="gsAside" style="display:none;"></div>
     <!-- GRANDES: uso diario (orden definido por el usuario). "Stock y Compras" = Stocks + OC en un solo botón. -->
     <div class="sup-actions sup-primary">
       <button class="sup-action-btn" onclick="openFacturacion()" style="position:relative;"><span class="sup-ico">📋</span><span>Facturación</span><span id="facBadge" class="dp-badge" style="display:none;" title="Pedidos listos para facturar (picking + separado terminados, todavía sin facturar)"></span></button>
@@ -10562,7 +10583,7 @@ async function trySendOneReport(payload, timeoutMs) {
     // y el merge-duplicates no se aplica → 409).
     // FJ y PKC usan client_id determinístico + merge-duplicates (upsert): reenviar
     // o corregir actualiza la fila en vez de fallar con 409 / duplicar.
-    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC" || payload.opcion === "CCN" || payload.opcion === "PSP" || payload.opcion === "CRN" || payload.opcion === "CRA" || payload.opcion === "CCR" || payload.opcion === "PPE");
+    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC" || payload.opcion === "CCN" || payload.opcion === "PSP" || payload.opcion === "PKG" || payload.opcion === "CRN" || payload.opcion === "CRA" || payload.opcion === "CCR" || payload.opcion === "PPE");
     const url    = isUpsert
       ? SUPABASE_TABLE_ENDPOINT + "?on_conflict=client_id"
       : SUPABASE_TABLE_ENDPOINT;
@@ -12879,6 +12900,7 @@ function pkSave() {
       day: getTodayKey(), tanda: _pk.tanda, legajo: _pk.legajo,
       items: _pk.items, idx: _pk.idx, results: _pk.results, mode: _pk.mode,
       forced: _pk.forced || {}, cid: _pk.cid || {},   // v26.62
+      gondDone: _pk.gondDone || {},   // v29.69
       app: (typeof APP_VERSION !== "undefined" ? APP_VERSION : "")   // v18.53 — con qué versión se armó esta lista
     }));
   } catch (_e) { /* localStorage lleno / privado: no rompe el picking */ }
@@ -12959,7 +12981,7 @@ function pkResume(legajo) {
   m.querySelector(".tanda-modal-title").textContent = "Picking — Tanda " + saved.tanda;
   _pk = { tanda: saved.tanda, legajo: saved.legajo, items: saved.items,
           idx: saved.idx || 0, results: saved.results || {}, mode: saved.mode || "item",
-          forced: saved.forced || {}, cid: saved.cid || {} };   // v26.62
+          forced: saved.forced || {}, cid: saved.cid || {}, gondDone: saved.gondDone || {} };   // v26.62 · v29.69
   m.classList.add("show");
   pkRender();
 }
@@ -13716,6 +13738,7 @@ function pkRender() {
   // v21.73 (Marianela 23/09): 55215/55219/55289 van en UNIDADES en todo el sistema (uxb 1).
   const _pkUni = pkEsUnidad(rec);
   const _pkUd = _pkUni ? "unidades" : "cajas";
+  if (_pk.mode === "gond") { body.innerHTML = pkGondCardHtml(it); setTimeout(function () { const i = document.getElementById("pkGondInp"); if (i) i.focus(); }, 40); return; }
   if (_pk.mode === "fInput") {
     body.innerHTML = `<div class="pk-flow">${nav}
       ${bigRow}
@@ -13738,6 +13761,7 @@ function pkRender() {
     ${bigRow}
     ${dualTag}
     <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> ${_pkUd}${it.isExc ? " <span class='pk-cajas-exc'>(en el excedente)</span>" : (it.excHint ? ` <span class='pk-cajas-exc'>(hay ${pkFmt(it.excHint)} en excedente ${escapeHtml(String(it.excUbic || "").replace(/-/g, ""))} — al final)</span>` : (it.hasManualExc ? ` <span class='pk-cajas-exc'>(+ excedente @ ${escapeHtml(it.manualExcUbic || "")}, al final)</span>` : ""))}</div>
+    ${pkSinGondola(it) ? `<div class="pk-sin-gond">📍 Este código <b>no tiene góndola en el Mapa</b>. Cuando lo confirmes te preguntamos de dónde lo sacaste.</div>` : ``}
     ${it.forcedGond ? `<div class="pk-forced-note">🟢 Estás retirando de <b>góndola</b> (había excedente) — se avisó al supervisor</div>` : ``}
     ${it.orig ? (it.orig.mixed
       ? `<div class="pk-orig mix">⚠ <b>Mezcla Loeke/Chef</b> — <b>Loeke ×${pkFmt(it.orig.nL)}</b> en ${escapeHtml(it.orig.loekeRango)} · <b>Chef ×${pkFmt(it.orig.nC)}</b> en ${escapeHtml(it.orig.chefRango)}</div>`
@@ -13926,6 +13950,7 @@ function pkOk() {
   _pk.results[it.key] = it.esp;
   pkSendDetail(rec, it.esp, it.esp);
   try { pkmConf("ok", it, it.esp); } catch (_e) {}
+  if (pkGondPreguntar(it)) { _pk.mode = "gond"; pkRender(); return; }   // v29.69
   pkAdvance();
 }
 /* Sin stock: no había NADA de este código → registra 0 y avanza (faltante completo,
@@ -14060,8 +14085,79 @@ function pkConfirmF() {
   _pk.results[it.key] = real;
   pkSendDetail(rec, it.esp, real);
   try { pkmConf("faltan", it, real); } catch (_e) {}
+  if (real > 0 && pkGondPreguntar(it)) { _pk.mode = "gond"; pkRender(); return; }   // v29.69: si no agarró nada, no hay góndola que informar
   pkAdvance();
 }
+/* ═══ v29.69 (Luis, 13/10): EL CÓDIGO QUE NO TIENE GÓNDOLA EN EL MAPA ═══════════════════════
+   "si el modulo de pickeo los promptea a pickear un codigo para el que no tiene registro de
+    lugar y el que pickea lo agarra, debería preguntarle de que gondola lo agarro y debería
+    aparecerle la sugerencia al admin para ajustar gondolas de la misma forma que le aparece
+    para ajustar stock."
+   Medido el 13/10 sobre 60 días: 25 códigos sin celda en el Mapa, 131 líneas de picking
+   (231/232/233, 567, 565, 998E…) — unas 2 por día, así que el aviso no es ruido.
+   La pregunta va DESPUÉS de registrar el pick (el PKC se manda igual): si el celular muere en
+   el medio, lo pickeado no se pierde. El operario puede saltearla; no frena nada.
+   Evento PKG (sin ts_inicio, no abre tarea): texto = "COD|lo que escribió|TANDA".
+   La resuelve el supervisor en la landing (gv_gondola_sugerida_pendientes / _resolver). */
+function pkSinGondola(it) {
+  if (!it || it.isExc || it.skip) return false;
+  const sec = String(it.sector || "").replace(/[—\-\s]/g, "").trim();
+  return sec === "";
+}
+function pkGondPreguntar(it) {
+  if (!_pk || !pkSinGondola(it)) return false;
+  const k = String(it.key || it.art);
+  return !(_pk.gondDone && _pk.gondDone[k]);
+}
+function pkGondCardHtml(it) {
+  const rec = (it.dual && it.pick) ? it.pick : it.art;
+  return '<div class="pk-flow">' +
+    '<div class="pk-gond-h">📍 ¿De qué góndola lo sacaste?</div>' +
+    '<div class="pk-gond-s">El <b>' + escapeHtml(_padCod(codBase(rec))) + '</b> no tiene lugar cargado en el Mapa. ' +
+      'Anotá la celda de donde lo levantaste (por ejemplo <b>F9</b> o <b>M13</b>) y el supervisor la da de alta. ' +
+      'Lo que pickeaste ya quedó registrado.</div>' +
+    '<div class="pk-gond-row"><input id="pkGondInp" class="pk-gond-inp" type="text" inputmode="text" autocapitalize="characters" placeholder="F9" maxlength="6">' +
+      '<button class="pk-btn pk-ok pk-gond-btn" onclick="pkGondSubmit()">✓ Anotar</button></div>' +
+    '<button class="pk-btn pk-cancel" onclick="pkGondSkip()">No sé / seguir sin anotar</button>' +
+    '</div>';
+}
+function pkGondSubmit() {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const inp = document.getElementById("pkGondInp");
+  const v = inp ? String(inp.value || "").toUpperCase().trim() : "";
+  if (!v) { try { if (inp) inp.focus(); } catch (_e) {} return; }
+  const it = _pk.items[_pk.idx];
+  pkEmitGondola((it.dual && it.pick) ? it.pick : it.art, v);
+  pkGondSkip();
+}
+function pkGondSkip() {
+  if (!_pk || _pk.idx >= _pk.items.length) { if (_pk) { _pk.mode = "item"; pkRender(); } return; }
+  const it = _pk.items[_pk.idx];
+  if (!_pk.gondDone) _pk.gondDone = {};
+  _pk.gondDone[String(it.key || it.art)] = true;
+  _pk.mode = "item";
+  pkAdvance();
+}
+/* Evento PKG: "COD|lo que escribió|TANDA". Dedup por pkg_<legajo>_<tanda>_<cod>. */
+function pkEmitGondola(art, sector) {
+  try {
+    const leg = String((_pk && _pk.legajo) || "").trim();
+    const tnd = String((_pk && _pk.tanda) || "").trim().toUpperCase().replace(/\|/g, "");
+    const cod = String(art).toUpperCase().replace(/\|/g, "");
+    const sec = String(sector).toUpperCase().replace(/\|/g, "").slice(0, 12);
+    const payload = {
+      legajo: leg, opcion: "PKG", descripcion: "Góndola informada en picking",
+      texto: cod + "|" + sec + "|" + tnd,
+      ts: Date.now(),
+      id: ("pkg_" + leg + "_" + tnd + "_" + cod).replace(/[^a-zA-Z0-9_\-]/g, ""),
+      ts_inicio_iso: null
+    };
+    enqueueReport(payload);
+    if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+    try { updatePendingIndicator(); } catch (_e) {}
+  } catch (_e) { /* best-effort: nunca rompe el picking */ }
+}
+
 function pkClose() { _pk = null; closeTandaModal(); }
 
 /* ===== v7.13 — ANULAR PICKING =====
@@ -34202,7 +34298,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
      picking/armado de ESA tanda. Un evento automatico (PKC, ENT, TAL, GST, MGR, *X...) no corta la cola; un
      tramo que ya estaba abierto al cerrar (ts_inicio antes del TP/TAP) la deja en 0; una bajada de racks sin
      tramo la corta (ese tramo ya cuenta como racks); un segundo TP/TAP de la MISMA tanda no la corta. */
-  const COLA_AUTO = new Set(["PUB","AUB","PKC","ENT","RSP","ROC","RAG","FGU","FSS","IMPT","TAL","GST","MGR","PKM","SSG","PSP","NPD","PKAX"]);
+  const COLA_AUTO = new Set(["PUB","AUB","PKC","ENT","RSP","ROC","RAG","FGU","FSS","IMPT","TAL","GST","MGR","PKM","SSG","PSP","PKG","NPD","PKAX"]);
   const _colaEvs = new Map(), _colaRk = new Map();
   for (const ev of events) {
     const leg = String(ev.legajo || "").trim();
@@ -62611,6 +62707,74 @@ async function cgResolver(i, ajustar) {
 }
 window.cgLoad = cgLoad; window.cgResolver = cgResolver;   // los onclick del cuadro viven en el global
 
+/* v29.69 (Luis, 13/10): GÓNDOLAS QUE INFORMÓ EL OPERARIO EN EL PICKING.
+   Si el picking le muestra un código que no tiene celda en el Mapa y el operario lo levanta igual,
+   la app le pregunta de dónde lo sacó (evento PKG). Acá el supervisor la da de alta, igual que
+   ajusta el stock con los conteos: ✓ = gv_lugar_item_guardar(sector, cod) · ✕ = se descarta.
+   Una lectura ROTA se dice, no se dibuja como «no hay nada». */
+let _gsRows = [];
+async function gsLoad() {
+  const box = document.getElementById("gsAside"); if (!box) return;
+  const sbx = window.sb;
+  if (!sbx || typeof sbx.rpc !== "function") { if (!gsLoad._re) { gsLoad._re = 1; setTimeout(gsLoad, 2500); } return; }
+  let r;
+  try { r = await sbx.rpc("gv_gondola_sugerida_pendientes"); } catch (e) { r = { error: e }; }
+  if (r && r.error) {
+    box.style.display = "";
+    box.innerHTML = '<div class="gs-h">Góndolas informadas</div><div class="gs-l3">No se pudieron leer.</div>';
+    return;
+  }
+  _gsRows = (r && r.data) || [];
+  gsRender();
+}
+function gsRender() {
+  const box = document.getElementById("gsAside"); if (!box) return;
+  if (!_gsRows.length) { box.style.display = "none"; box.innerHTML = ""; return; }
+  box.style.display = "";
+  box.innerHTML = '<div class="gs-h">Góndolas sin cargar en el Mapa (' + _gsRows.length + ')</div>' +
+    _gsRows.map(function (x, i) {
+      const f = x.ts ? new Date(x.ts) : null;
+      const cuando = f ? (String(f.getDate()).padStart(2, "0") + "/" + String(f.getMonth() + 1).padStart(2, "0") + " " + String(f.getHours()).padStart(2, "0") + ":" + String(f.getMinutes()).padStart(2, "0")) : "";
+      const sec = x.sector_ok ? escapeHtml(x.sector) : ('<span style="color:#b91c1c">' + escapeHtml(x.sector_dicho || "?") + ' ✕</span>');
+      return '<div class="gs-it">' +
+        '<div class="gs-l1">' + escapeHtml(_padCod(x.cod_base || x.cod || "")) + ' → ' + sec + '</div>' +
+        '<div class="gs-l2">' + escapeHtml(x.descripcion || "") + '</div>' +
+        '<div class="gs-l3">' + escapeHtml(x.nombre || ("leg. " + (x.legajo || "?"))) + ' · ' + cuando + (x.tanda ? " · " + escapeHtml(x.tanda) : "") +
+          (Number(x.cajas) ? " · levantó " + Math.round(Number(x.cajas)) + " cj" : "") + '</div>' +
+        (x.ocupada_por ? '<div class="gs-l3" style="color:#b45309">⚠ esa celda hoy tiene ' + escapeHtml(x.ocupada_por) + '</div>' : '') +
+        (x.tiene_gondola ? '<div class="gs-l3" style="color:#b45309">⚠ el código ya tiene celda en el Mapa</div>' : '') +
+        '<div class="gs-btns"><button class="gs-ok" title="Dar de alta esa celda para el código" onclick="gsResolver(' + i + ',true)">✓</button>' +
+        '<button class="gs-no" title="Descartar (no toca el Mapa)" onclick="gsResolver(' + i + ',false)">✕</button></div>' +
+        '</div>';
+    }).join("");
+}
+async function gsResolver(i, aceptar) {
+  const x = _gsRows[i]; if (!x) return;
+  let sector = x.sector || "", cajas = null;
+  if (aceptar) {
+    sector = (prompt("¿En qué celda va el " + (x.cod_base || x.cod) + "?\n(el operario anotó «" + (x.sector_dicho || "") + "»)", x.sector || x.sector_dicho || "") || "").trim();
+    if (!sector) return;
+    const c = prompt("¿Cuántas cajas entran en " + sector.toUpperCase() + "? (vacío = sin capacidad cargada)", "");
+    if (c === null) return;
+    cajas = String(c).trim() === "" ? null : Number(String(c).replace(",", "."));
+    if (cajas != null && !(cajas >= 0)) { alert("La capacidad tiene que ser un número."); return; }
+  } else if (!confirm("Descartar la góndola que informó el operario para " + (x.cod_base || x.cod) + "? El Mapa no se toca.")) return;
+  let r;
+  try {
+    r = await window.sb.rpc("gv_gondola_sugerida_resolver",
+      { p_cid: x.client_id, p_aceptar: !!aceptar, p_sector: aceptar ? sector : null, p_cajas_max: cajas });
+  } catch (e) { r = { error: e }; }
+  if (r && r.error) { alert("No se pudo: " + (r.error.message || r.error) + "\nNo se tocó nada, probá de nuevo."); return; }
+  if (r && r.data && r.data.ok === false && r.data.motivo !== "ya_resuelto") {
+    alert(r.data.motivo === "sector_no_existe"
+      ? "Esa celda no existe en el Mapa. Dala de alta primero en Stock → Mapa de góndolas."
+      : "No se pudo: " + r.data.motivo);
+    return;
+  }
+  gsLoad();
+}
+window.gsLoad = gsLoad; window.gsResolver = gsResolver;
+
 function showSupervisor(email) {
   window.__isSupervisor = true;
   $("authBlock").classList.add("hidden");
@@ -62638,6 +62802,7 @@ function showSupervisor(email) {
   try { ppLoadBadge(); } catch (_e) {}   // v10.48: badge Pasaje de Papeles (pendientes de enviar)
   try { if (typeof adsLoadBadge === "function") adsLoadBadge(); } catch (_e) {}   // v27.20: badge violeta ADS (talleristas debajo del umbral)
   try { cgLoad(); } catch (_e) {}   // v28.58: conteos de góndola del picking que difieren
+  try { gsLoad(); } catch (_e) {}   // v29.69: góndolas que informó el operario en el picking
   try { if (typeof impIrLoadBadge === "function") impIrLoadBadge(); } catch (_e) {}   // v29.11: badge 📥 Recibido por operarios (Importación)
   try { colaImpLoadBadge(); } catch (_e) {}   // v11.60: badge Cola de impresión NP (armadas sin imprimir; rojo si +24h)
   try { expIsisLoadBadge(); } catch (_e) {}   // badge Agregar Expreso ISIS (expresos que eligió el cliente en la página)

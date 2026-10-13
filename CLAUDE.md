@@ -5106,6 +5106,55 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
 
+## ⚠ REGLA (Luis, 2026-10-13, v29.69): el código SIN GÓNDOLA en el Mapa se lo PREGUNTA AL OPERARIO
+
+**Luis:** *"si el modulo de pickeo los promptea a pickear un codigo para el que no tiene registro de
+lugar (en que gondola esta) y el que pickea lo agarra, debería preguntarle de que gondola lo agarro
+y debería aparecerle la sugerencia al admin para ajustar gondolas de la misma forma que le aparece
+para ajustar stock."*
+
+Mismo circuito que el conteo de góndola del picking (CG, v28.58):
+
+| paso | qué pasa |
+|---|---|
+| picking | el paso de un código sin celda en `GV_Lugar_Item` sale con el aviso **📍 no tiene góndola en el Mapa**; al confirmar («✓ Puse» o «Faltan» con 1+ caja) pregunta **«¿De qué góndola lo sacaste?»** |
+| evento | **PKG** = `COD|lo que escribió|TANDA`, sin `ts_inicio` (no abre tarea). Dedup `pkg_<legajo>_<tanda>_<cod>` |
+| landing del admin | cuadro **«Góndolas sin cargar en el Mapa»** (`#gsAside`, a la derecha; el de conteos queda a la izquierda) con el código, la celda, quién y cuándo, si esa celda ya tiene otro código y si el código ya tiene celda |
+| ✓ | `gv_gondola_sugerida_resolver` → **`gv_lugar_item_guardar`**: da de alta la celda (pide capacidad; vacío = sin capacidad). **✕** descarta y el Mapa no se toca |
+
+⚠ **La pregunta va DESPUÉS de registrar el pick**: el PKC se manda igual, así que si el celular muere
+en la pregunta lo pickeado no se pierde. Y se puede saltear («No sé»): **no frena el picking**, y no
+vuelve a preguntar por ese código en esa tanda (se guarda en el avance, sobrevive a reabrirlo).
+
+⚠ **Lo que el operario escribe NO se inventa**: `gv_gondola_sector` devuelve sólo una celda que
+existe en `GV_Lugar` (`f9` → **F09**, `m 13` → **M13**); lo que no matchea queda como «dicho» y el
+cuadro lo muestra en rojo para que el supervisor lo corrija a mano.
+
+**Cuánto es**, medido el 13/10 sobre 60 días: **25 códigos sin celda y 131 líneas de picking**
+(231/232/233, 567, 565, 998E…), unas 2 por día. No es ruido.
+
+⚠ **Al agregar un evento de detalle como PKG hay que sumarlo a `COLA_AUTO` y a los `isUpsert` de
+`index.html`**, o la cola lo trata como una tarea del operario.
+
+### D3 (Luis): en el Análisis Productivo se MARCAN los anómalos — y sólo en pantalla
+
+*"solo en pantalla, hace que sea mas claro el detalle, descripcion, analisis y que haya algo para
+marcar los anomalos"*. **Nada de Telegram.**
+
+- Arriba del detalle va una **conclusión en una frase** (`_anConclusion`, armada con lo que ya trajo
+  la base): *"El picking lo hizo X en 1:04, un 61 % MÁS de lo esperado para una tanda de dificultad
+  alta… Hay 2 cosas para mirar de cerca"*. Los avisos van bajo el rótulo **«Qué se encontró»**.
+- Barra con **🚩 Anómala · ✓ Revisada · ✕ Sacar marca** (con nota). Vive en `GV_Analisis_Marca`
+  (`gv_analisis_marcar` / `gv_analisis_marcas`), una fila por tanda, y la puede poner el supervisor
+  o un legajo habilitado.
+- En la lista: chip 🚩/✓ y los filtros **Todas · Con avisos · 🚩 Marcadas**.
+- ⚠ Las marcas se leen **aparte** de la lista: si esa lectura falla, la pantalla se ve igual (sin los
+  banderines), y no hubo que tocar `gv_analisis_tanda`, que tiene centinela.
+
+**Chequeo:** `select * from public.gv_gondola_sugerida_pendientes();` ·
+`select public.gv_gondola_sector('f9');` → `F09` · `node tests/pk-gondola-sugerida.cjs` ·
+`node tests/analisis-productivo.cjs`. `sql/gv_gondola_sugerida_v2969.sql`.
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.68): ANÁLISIS PRODUCTIVO por tanda — y el s/caja del PKC NO es un detector
 
 Botón **📈 Análisis Productivo** en el panel del supervisor y en la botonera del operario (ahí **sólo** para

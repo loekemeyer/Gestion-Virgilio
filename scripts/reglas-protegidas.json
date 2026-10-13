@@ -337,6 +337,11 @@
       "quien": "Thomas"
     },
     {
+      "objeto": "gv_gondola_sugerida_resolver",
+      "regla": "El si del supervisor a una gondola informada en el picking DA DE ALTA la celda en el Mapa.",
+      "quien": "Luis 13/10/2026"
+    },
+    {
       "objeto": "gv_importado_guardar",
       "regla": "alta/modificación de un importado: no pisa un (código, empresa) existente, deja el ajuste de 0 cajas para que figure en Stocks y escribe su caja en GV_UxB",
       "quien": "Luis"

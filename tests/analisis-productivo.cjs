@@ -72,6 +72,8 @@ const DET = {
       if (modo === "roto") return { data: null, error: { message: "canceling statement due to statement timeout" } };
       if (n === "gv_analisis_lista") return { data: LISTA, error: null };
       if (n === "gv_analisis_tanda") return { data: DET, error: null };
+      if (n === "gv_analisis_marcas") return { data: {}, error: null };
+      if (n === "gv_analisis_marcar") return { data: { ok: true }, error: null };
       return { data: null, error: { message: "?" } };
     } };
 
@@ -102,6 +104,22 @@ const DET = {
     out.malas = filas.filter((f) => f.classList.contains("mala")).map((f) => f.cells[1].textContent);
     out.f1 = filas[0] ? [...filas[0].cells].map((c) => c.textContent.trim()) : [];
     out.volver = !!document.querySelector("#anOv .an-top button[onclick='anVolver()']");
+    out.concl = (document.querySelector("#anOv .an-concl") || {}).textContent || "";
+    out.mkBotones = document.querySelectorAll("#anOv .an-mk-b").length;
+    window.prompt = () => "no contó";
+    await window.anMarcar("anomala"); await espera(60);
+    out.marcado = out.pedidos.filter((x) => /gv_analisis_marcar/.test(x))[0] || "";
+    out.chipTrasMarcar = /ANÓMALA/.test((document.querySelector("#anOv .an-mk-t") || {}).textContent || "");
+
+    // (h) los filtros de la lista
+    window.anVolver(); await espera(60);
+    out.filtroTodas = document.querySelectorAll("#anOv .an-t").length;
+    window.anFiltro("avisos"); await espera(40);
+    out.filtroAvisos = document.querySelectorAll("#anOv .an-t").length;
+    window.anFiltro("marcadas"); await espera(40);
+    out.filtroMarcadas = document.querySelectorAll("#anOv .an-t").length;
+    window.anFiltro("todas"); await espera(40);
+    _an.tanda = "F13C"; _an.det = DET; _anRender(); await espera(40);
 
     // (f) el botón Cerrar no hereda el width:100% global
     const cer = [...document.querySelectorAll("#anOv .an-top button")].pop();
@@ -138,8 +156,15 @@ const DET = {
   ok(/Jhonny|Colombia/.test(r.lineasTarjeta.join(" ")), "(b) la tarjeta no nombra al operario");
   ok(/🔨/.test(r.lineasTarjeta.join(" ")), "(b) falta la línea del armado en la tarjeta");
   ok(r.avisos.length === 4 && /^alta/.test(r.avisos[0]), "(c) avisos: " + JSON.stringify(r.avisos));
-  ok(r.secciones.length === 3 && /Picking/.test(r.secciones[0]) && /Armado/.test(r.secciones[1]),
+  ok(r.secciones.length === 4 && /Qu. se encontr/.test(r.secciones[0]) && /Picking/.test(r.secciones[1]) && /Armado/.test(r.secciones[2]),
      "(c) secciones: " + JSON.stringify(r.secciones));
+  ok(/El picking lo hizo J. Colombia/.test(r.concl) && /dificultad alta/.test(r.concl) && /cosa\(s\) para mirar/.test(r.concl),
+     "(h) la conclusión no resume la tanda: «" + r.concl + "»");
+  ok(r.mkBotones === 2, "(h) la barra de marcar tendría que tener 2 botones sin marca, tiene " + r.mkBotones);
+  ok(/anomala/.test(r.marcado) && /F13C/.test(r.marcado), "(h) 🚩 no llamó bien a gv_analisis_marcar: " + r.marcado);
+  ok(r.chipTrasMarcar, "(h) después de marcar no quedó el cartel de anómala");
+  ok(r.filtroMarcadas === 1 && r.filtroAvisos === 1 && r.filtroTodas === 2,
+     "(h) los filtros: marcadas=" + r.filtroMarcadas + " avisos=" + r.filtroAvisos + " todas=" + r.filtroTodas);
   ok(r.cards.join(" ").indexOf("rendimiento") >= 0 && r.cards.join(" ").indexOf("dificultad") >= 0,
      "(c) faltan las tarjetas de rendimiento y dificultad: " + JSON.stringify(r.cards));
   ok(r.cols.join("|").indexOf("Frente a la góndola") >= 0, "(c) falta la columna «Frente a la góndola»: " + JSON.stringify(r.cols));
