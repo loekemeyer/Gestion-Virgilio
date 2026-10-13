@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.14">
+<link rel="stylesheet" href="gv-ui.css?v=30.15">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.14"></script>
+<script type="module" src="recepcion.js?v=30.15"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10798,7 +10798,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.14";
+const APP_VERSION = "v30.15";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -63547,7 +63547,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.14"></script>
+<script src="importacion.js?v=30.15"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63934,7 +63934,7 @@ const GV_SUP_ROLES = {
 };
 const GV_AREA_NOMBRE = { admin: "Administración general", ventas: "Ventas", impo: "Importaciones · Comex · Cobranzas", impresion: "Impresión de notas" };
 const GV_ROL_ITEMS = [
-  /* v30.14 (Luis 13/10): un SALDO NEGATIVO en stock va primero y claro en Ventas y Admin.
+  /* v30.15 (Luis 13/10): un SALDO NEGATIVO en stock va primero y claro en Ventas y Admin.
      Mismo criterio que el badge de «Stock y Compras» (`stock_neg` de `gv_rol_panel`). */
   { id: "stock_neg", areas: ["admin", "ventas"], label: "Códigos con stock negativo",          cnt: function (d) { return d.stock_neg; },                          open: function () { openStockAdmin(); },         hint: "Stock y Compras", hintd: function (d) { return d.stock_neg_cods ? ("Código " + d.stock_neg_cods + (d.stock_neg > 6 ? " y más" : "") + " \u00B7 Stock y Compras") : ""; } },
   { id: "sin_zona",  areas: ["admin", "ventas"], label: "Pedidos sin zona",                          cnt: function (d) { return d.sin_zona_ped; },                       open: function () { openPPP(); },                hint: "Asignales zona en «A Programar»" },
@@ -66776,15 +66776,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.14"></script>
-<script src="hotsale.js?v=30.14"></script>
-<script src="estadisticas.js?v=30.14"></script>
-<script src="ads.js?v=30.14"></script>
-<script src="plantel.js?v=30.14"></script>
+<script src="cobranzas.js?v=30.15"></script>
+<script src="hotsale.js?v=30.15"></script>
+<script src="estadisticas.js?v=30.15"></script>
+<script src="ads.js?v=30.15"></script>
+<script src="plantel.js?v=30.15"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.14"></script>
+<script src="analisis.js?v=30.15"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.14"></script>
+<script src="ayuda.js?v=30.15"></script>
 
 </body>
 </html>

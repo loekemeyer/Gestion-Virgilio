@@ -1,2 +1,0 @@
--- v30.14 (Luis 13/10): gv_rol_panel suma stock_neg y stock_neg_cods (códigos con algún saldo negativo).
--- Aplicado por MCP el 13/10/2026. Ver pg_get_functiondef('public.gv_rol_panel'::regproc) para la viva.
