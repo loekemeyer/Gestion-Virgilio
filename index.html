@@ -49268,12 +49268,12 @@ function pscpCellHtml(r) {
   let cuerpo, tip = sec;
   if (libre) { cuerpo = '<span class="pmap-cod">libre</span>'; tip += " · celda libre"; }
   else {
+    /* v30.04 (Luis: "no importa SP o SC, ese sector tiene de los dos … no te compliques mas que
+       eso"): la celda NO se rotula por sector. Es IN-<letra><número> y punto. */
     const st = Number(r.stock);
     cuerpo = '<span class="pmap-cod">' + escapeHtml(String(r.cod || "—")) + '</span>' +
-             '<span class="prk-mc">' + escapeHtml(r.sec_gp2 || "?") +
-               (isNaN(st) ? "" : ' · ' + pmapNum(st) + (r.unidad ? " " + escapeHtml(r.unidad) : "")) + '</span>';
+             (isNaN(st) ? "" : '<span class="prk-mc">' + pmapNum(st) + (r.unidad ? " " + escapeHtml(r.unidad) : "") + '</span>');
     tip += " · " + String(r.cod || "") + (r.descripcion ? " — " + r.descripcion : " (no está en Insumos)") +
-           (r.sec_gp2 ? " · " + (r.sec_gp2 === "SC" ? "Sector Crudo" : "Sector Procesado") : "") +
            (isNaN(st) ? "" : " · " + st + " " + (r.unidad || "") + " en stock");
   }
   if (r._mas && r._mas.length) {
@@ -49307,18 +49307,15 @@ function pscpRender() {
   }).join("");
   const rows = pscpGrupos(_pscp.filter(function (r) { return String(r.col || "").toUpperCase() === _pscpC; }))
     .sort(function (a, b) { return (Number(a.fila) || 0) - (Number(b.fila) || 0); });
-  const sc = rows.filter(function (r) { return r.sec_gp2 === "SC"; }).length,
-        sp = rows.filter(function (r) { return r.sec_gp2 === "SP"; }).length,
-        lib = rows.filter(function (r) { return r.estado === "libre"; }).length;
-  let h = '<div class="pmap-head">Columna <b>' + escapeHtml(_pscpC) + '</b> · ' + rows.length + ' celdas · ' +
-          sc + ' Sector Crudo · ' + sp + ' Sector Procesado' + (lib ? ' · ' + lib + ' libres' : "") + '</div>';
+  const lib = rows.filter(function (r) { return r.estado === "libre"; }).length;
+  let h = '<div class="pmap-head">Columna <b>' + escapeHtml(_pscpC) + '</b> · ' + rows.length + ' celdas' +
+          (lib ? ' · ' + lib + ' libres' : "") + '</div>';
   h += '<div class="pmap-wrap"><div class="pmap-cols">' + rows.map(pscpCellHtml).join("") + '</div></div>';
   box.innerHTML = h;
   if (leg) {
     const it = function (cls, txt, c) { return '<span><i class="pmap-sw ' + cls + '"></i>' + txt + ' <b>' + c + '</b></span>'; };
-    const tSc = _pscp.filter(function (r) { return r.sec_gp2 === "SC"; }).length,
-          tSp = _pscp.filter(function (r) { return r.sec_gp2 === "SP"; }).length;
-    leg.innerHTML = it("", "Sector Crudo (SC)", tSc) + it("", "Sector Procesado (SP)", tSp) +
+    leg.innerHTML = it("", "piezas anotadas", _pscp.filter(function (r) { return r.cod; }).length) +
+                    it("pmap-libre", "celda libre", _pscp.filter(function (r) { return r.estado === "libre"; }).length) +
                     '<span>el stock de cada pieza lo lleva <b>GP2</b> (Cervantes): acá se dice DÓNDE está</span>';
   }
   pmapSetStatus(cs.length + " columnas · " + _pscp.length + " piezas anotadas en " +
@@ -49338,9 +49335,8 @@ function pscpAbrir(sector) {
   _pmapCelda = sector; pmapCeldaStatus("");
   tit.textContent = "Celda " + sector;
   const S = JSON.stringify(String(sector)).replace(/"/g, "&quot;");
-  let h = '<div class="prk-det"><b>' + escapeHtml(String(sector)) + '</b> — Sector ' +
-    (fs[0] && fs[0].sec_gp2 === "SC" ? "Crudo" : (fs[0] && fs[0].sec_gp2 === "SP" ? "Procesado" : "Crudo / Procesado")) +
-    '. Acá NO van cajas de artículo: son piezas de Cervantes. El saldo de cada una lo lleva GP2; esto dice dónde está.</div>' +
+  let h = '<div class="prk-det"><b>' + escapeHtml(String(sector)) + '</b> — acá NO van cajas de artículo: ' +
+    'son piezas de Cervantes. El saldo de cada una lo lleva GP2; esto dice dónde está.</div>' +
     '<div class="prk-ins"><b>Piezas en esta celda</b>';
   if (!fs.length) h += '<div class="prk-nota" style="margin-top:4px">Ninguna.</div>';
   fs.forEach(function (x, k) {

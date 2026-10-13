@@ -52,11 +52,11 @@
 -- ⚠ Insumos_Ubicaciones.cantidad sigue siendo DECORATIVA (regla del 13/10): el saldo real de
 --   un insumo sale siempre de Movimientos_Stock (deposito insumos + Insumos_Factores).
 --
--- ⚠ QUEDA PENDIENTE y necesita el «sí» de Luis: gv_rack_celda tiene regla protegida
---   (centinela «El Mapa muestra una celda por DIRECCION») y su rama de insumos trae las
---   celdas de SC/SP sin mirar el tipo, así que en la solapa Racks aparecen 63 filas
---   'sin_lugar'. Hoy lo tapa el FRONT (prkRacks saltea sector ~ '^IN[-\s]'); el parche de la
---   vista está al final de este archivo, comentado.
+-- ⚠ gv_rack_celda: su rama de insumos traía gv_insumo_ubicacion SIN mirar el tipo del lugar, así
+--   que las 63 filas de la grilla salían como 'sin_lugar' en la solapa Racks. Parcheada con el «sí»
+--   de Luis (13/10, "d1 dale") en el PASO 3. La regla protegida que toca ("una celda por DIRECCION:
+--   un rack partido se ve como sus N partes") SIGUE EN PIE: el parche sólo acota esa rama a los
+--   lugares que SON rack. Medido: el md5 de las 243 filas que NO son IN-* quedó idéntico.
 --
 -- Medido después de aplicar: scp=55 · rack=207 · gondola=685 ·
 --   gv_insumo_ubicacion estado ok = 148 (antes 145) · sin_lugar = 2 (los dos «medio») ·
@@ -220,23 +220,53 @@ end $fn$;
 -- select * from public.gv_reglas_perdidas;   -- vacía
 -- node tests/pmap-scp.cjs
 
--- ----------------------------------------------------- PENDIENTE: el «sí» para gv_rack_celda
--- La rama de insumos de gv_rack_celda trae gv_insumo_ubicacion sin mirar el tipo del lugar, así
--- que las 63 filas de SC/SP salen como 'sin_lugar' en la solapa Racks. El parche (idempotente,
--- sobre la definición VIVA) es acotar esa rama a los lugares que SON rack:
+-- ------------------------------------------------- PASO 3: gv_rack_celda deja de ver la grilla
+-- REGLA_CONFIRMADA_POR_USUARIO (Luis, 13/10: "d1 dale")
+create or replace function public.gv_scp_instalar_3() returns text
+language plpgsql security definer set search_path to 'public' as $fn$
+declare d text;
+begin
+  d := pg_get_viewdef('public.gv_rack_celda'::regclass, true);
+  if position('v29.98-scp' in d) > 0 then return 'ya estaba'; end if;
+  if position('FROM gv_insumo_ubicacion u' in d) = 0 then raise exception 'gv_rack_celda: no encuentro el FROM de gv_insumo_ubicacion'; end if;
+  d := replace(d, 'FROM gv_insumo_ubicacion u' || chr(10) || '          WHERE u.sector IS NOT NULL AND NOT',
+                  'FROM gv_insumo_ubicacion u' || chr(10) ||
+                  '          WHERE u.sector IS NOT NULL AND (EXISTS ( SELECT 1 /* v29.98-scp: la celda de SC/SP no es un rack */' || chr(10) ||
+                  '                   FROM "GV_Lugar" lr WHERE lr.sector = u.sector AND lr.tipo = ''rack''::text)) AND NOT');
+  if position('v29.98-scp' in d) = 0 then raise exception 'gv_rack_celda: el parche no entro'; end if;
+  execute 'create or replace view public.gv_rack_celda as ' || d;
+  execute 'alter view public.gv_rack_celda set (security_invoker = true)';
+  return 'parcheada';
+end $fn$;
+
+-- Medido: antes 306 filas (243 + las 63 de la grilla) · después 243, y el md5 de esas 243 es el
+-- MISMO antes y después (1fa3902570ddd031e2c2e37b141f9969). 0 racks partidos se movieron.
+
+-- --------------------------------------------- PASO 4: la limpieza (Luis, 13/10: "d3 limpia")
+-- Luis sobre «medio»: "medio no se que es ni que debería ser, no va para mi, es como que algo no
+-- tenga lugar" → esas filas salen y las dos piezas pasan a la alerta de «insumo sin posición» del
+-- Mapa, que es donde se ven.
+--   A) 38 filas cuyo CÓDIGO no existe en Insumos y que tienen un gemelo VÁLIDO en la MISMA celda:
+--      29 el fleje sin el N° (63 junto a N°63), 4 el fleje con su código ISIS (1645 = N°35,
+--      2565 = N°36, 2615 = N°18, 2745 = N°37), 8 la pieza con un punto de más (DISC.1 / DISC. 4)
+--      y 5 basura (-, --, ---, ----, N|24). Las 38 en cantidad 0 → no se pierde un solo dato.
+--   B) 2 filas de «medio» (las piezas A1 y H1).
+--   C) 30 filas pasan al nombre CANÓNICO (N7 → N07, R1AD → R01AD, V9 AT → V09AT, AF1 → AF01,
+--      Z2 → Z02), que es lo que ya escriben las dos RPC.
+-- Resultado medido: 150 → 110 filas · las 110 resuelven · 0 con código fantasma · 0 fuera del
+-- nombre canónico · la alerta del Mapa pasó a 19 insumos con stock y sin posición (entre ellos
+-- A1 con 7 cajones y H1 con 10). Backup completo en zz_backups."GV_Backup_InsUbic_20261013".
 --
---   d := pg_get_viewdef('public.gv_rack_celda'::regclass, true);
---   d := replace(d, 'FROM gv_insumo_ubicacion u'||chr(10)||'          WHERE u.sector IS NOT NULL AND NOT',
---                   'FROM gv_insumo_ubicacion u'||chr(10)||
---                   '          WHERE u.sector IS NOT NULL AND (EXISTS (SELECT 1 /* v29.98-scp */ FROM "GV_Lugar" lr'||
---                   ' WHERE lr.sector = u.sector AND lr.tipo = ''rack'')) AND NOT');
---   execute 'create or replace view public.gv_rack_celda as ' || d;
---   alter view public.gv_rack_celda set (security_invoker = true);
+--   select jsonb_pretty(public.gv_scp_limpiar(true));   -- qué haría, con el detalle fila por fila
+--   select public.gv_scp_limpiar(false);                -- lo aplica (sólo supervisor)
 --
--- La regla protegida que toca («El Mapa muestra una celda por DIRECCION: un rack partido se ve
--- como sus N partes») SIGUE EN PIE: el parche no cambia las partes, sólo saca de la solapa Racks
--- una celda que no es un rack. Hace falta el «sí» de Luis y el comentario
--- -- REGLA_CONFIRMADA_POR_USUARIO.
+-- El cuerpo de gv_scp_limpiar quedó en la base; se vuelve a traer con
+-- select pg_get_functiondef('public.gv_scp_limpiar(boolean)'::regprocedure);
+-- y se revierte con
+-- insert into public."Insumos_Ubicaciones" select * from zz_backups."GV_Backup_InsUbic_20261013"
+--   on conflict (id) do update set cod = excluded.cod, sector = excluded.sector,
+--   cantidad = excluded.cantidad, capacidad = excluded.capacidad, unidad = excluded.unidad,
+--   notas = excluded.notas;
 
 -- ------------------------------------------------------------------------------- ROLLBACK
 create or replace function public.gv_scp_revertir() returns text

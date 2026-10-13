@@ -1838,9 +1838,13 @@ y SP. Sector SC y SP usa un nomenclador similar al de gondolas y racks y puede q
 agrega al mapa este sector"* · *"una vez hecho fijate que vincule bien con insumos y con todo lo que
 tenga que vincular bien … y una vez tengamos la base bien armada, limpiamos todo"*.
 
-> ## **El prefijo es UNO para toda la grilla, no uno por sector.** La grilla está **INTERCALADA**:
-> ## `G1`-`G4` son SC y `G5`-`G6` SP; `L1`-`L4` SP y `L5`-`L6` SC; `H1` SP y `H2`-`H7` SC. Un
-> ## prefijo `SC-` / `SP-` habría que renombrarlo cada vez que una pieza cambia de celda.
+> ## **ES UN SOLO SECTOR Y NO SE PARTE: `IN-<letra><número>`, y nada más que eso.**
+> **Luis, 13/10:** *"no importa SP o SC, ese sector tiene de los dos. todo ese sector es
+> IN-\*Letra\*\*Numero\*, no te compliques mas que eso"*. La grilla está **INTERCALADA** —`G1`-`G4`
+> tiene piezas de SC y `G5`-`G6` de SP; `L1`-`L4` SP y `L5`-`L6` SC; `H1` SP y `H2`-`H7` SC—, así
+> que **un prefijo `SC-` / `SP-` habría que renombrarlo cada vez que una pieza cambia de celda**.
+> SC y SP son **de qué es la PIEZA** (su categoría de Insumos), no de qué es la CELDA: el Mapa
+> **no rotula la celda por sector** y el encabezado no los cuenta aparte.
 
 | pieza | qué es |
 |---|---|
@@ -1864,19 +1868,31 @@ tenga que vincular bien … y una vez tengamos la base bien armada, limpiamos to
   sin filtrar tipo, así que GP2 ve las 55 celdas solo (medido: `GP2.virgilio_lugar` tipo `scp` = 55).
 - **Y de paso se arreglaron 3 insumos** que estaban en rojo: `gv_insumo_ubicacion` pasó de **145 a
   148** posiciones resueltas. Quedan **2** sin lugar, y son las dos de **`medio`**.
-- ⚠ **`medio` NO se tocó a propósito**: no sé si es una celda de verdad o un apunte. Tiene las piezas
-  `A1` (Mgo Plano 501 Pint., SP) y `H1` (Manija Redonda p/cromar, SC) y sigue en rojo en la pestaña
-  Insumos — que es donde se ve. **No inventarle un nombre**: lo define Luis.
-- ⚠ **PENDIENTE del «sí» de Luis**: la rama de insumos de **`gv_rack_celda`** trae
-  `gv_insumo_ubicacion` sin mirar el tipo del lugar, así que las 63 filas de SC/SP salen
-  `sin_lugar` en la solapa Racks. Hoy lo tapa el FRONT (`prkRacks` saltea `^IN[-\s]`); el parche de
-  la vista está escrito y comentado al final del `.sql`. Toca una **regla protegida** (*"El Mapa
-  muestra una celda por DIRECCIÓN"*), que **sigue en pie**: el parche no cambia las partes, sólo
-  saca de la solapa Racks una celda que no es un rack.
+- ⚠⚠ **`medio` NO ES UN LUGAR y no se le inventa uno** (Luis, 13/10: *"medio no se que es ni que
+  debería ser, no va para mi, es como que algo no tenga lugar"*). Sus dos filas salieron, y las piezas
+  **`A1`** (Mgo Plano 501 Pint., 7 cajones) y **`H1`** (Manija Redonda p/cromar, 10 cajones) pasaron
+  a la alerta **«insumo con stock y sin posición»** del Mapa, que es donde se ven y donde se las
+  ubica con un click. **Si vuelve a aparecer un `medio`, es eso: algo sin lugar.**
+- ⚠ **`gv_rack_celda` ya no ve la grilla** (Luis, 13/10: *"d1 dale"*). Su rama de insumos traía
+  `gv_insumo_ubicacion` **sin mirar el tipo del lugar**, así que las 63 filas de SC/SP salían como
+  `sin_lugar` en la solapa Racks — la vista no sabía que esas celdas habían dejado de ser racks. El
+  parche le agrega `exists (… GV_Lugar lr where lr.sector = u.sector and lr.tipo = 'rack')`. La
+  **regla protegida** que toca (*"una celda por DIRECCIÓN: un rack partido se ve como sus N partes"*)
+  **sigue en pie**: no cambia nada de las partes. Medido: de 306 filas a 243 y el **md5 de esas 243
+  es el mismo antes y después**; `prkRacks` del front saltea `^IN[-\s]` como segunda red.
+- ⚠⚠ **Y se LIMPIÓ `Insumos_Ubicaciones`** (Luis: *"d3 limpia"*): **150 → 110 filas**, las 110
+  resuelven, **0 con código fantasma** y **0 fuera del nombre canónico**. Salieron las **38** que no
+  matcheaban ningún código de `Insumos` y tenían su gemelo válido en la misma celda (29 el fleje sin
+  el `N°`, 4 con su código ISIS, 8 la pieza con un punto de más, 5 basura `-` `--` `---` `----`
+  `N|24`; las 38 en cantidad 0) y las **2 de `medio`**; **30** pasaron al nombre canónico
+  (`N7` → `N07`, `R1AD` → `R01AD`, `V9 AT` → `V09AT`, `AF1` → `AF01`, `Z2` → `Z02`).
+  Backup: `zz_backups."GV_Backup_InsUbic_20261013"` · `select jsonb_pretty(public.gv_scp_limpiar(true));`
+  dice qué haría, fila por fila.
 
 **Chequeo:** `select public.gv_scp_sector('A1'), public.gv_rack_sector('A1'), public.gv_insumo_sector('R1Ad');`
 → `IN-A1`, **NULL**, `R01AD` · `select count(*) from public.gv_scp_celda;` (63 en 55 celdas) ·
-`select * from public.gv_reglas_perdidas;` · `node tests/pmap-scp.cjs`.
+`select * from public.gv_reglas_perdidas;` · `select count(*) from public."Insumos_Ubicaciones";` (110,
+todas resueltas y con el nombre canónico) · `node tests/pmap-scp.cjs`.
 `sql/gv_sector_scp_v2998.sql` (rollback: `select public.gv_scp_revertir();`), 5 centinelas.
 ⚠ Los objetos de la base, los 5 centinelas, el `.sql` y los comentarios del código dicen **v29.98**
 (la versión con que se aplicaron): es la llave de idempotencia, **no cambiarla**; la app salió en la

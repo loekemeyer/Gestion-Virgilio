@@ -5,7 +5,8 @@
    Lo que se verifica:
    (a) el Mapa tiene los TRES modos y sigue arrancando en Góndolas;
    (b) SC y SP lee gv_scp_celda (no las tablas) y dibuja una solapa por COLUMNA, con la celda
-       sin el prefijo IN- y la pieza con su sector (SC/SP) y su stock;
+       sin el prefijo IN- y la pieza con su stock. ⚠ NO se rotula SC ni SP (Luis, 13/10: "no importa
+       SP o SC, ese sector tiene de los dos … todo ese sector es IN-<Letra><Numero>");
    (c) una celda con dos piezas las muestra juntas (+N) y una libre dice "libre";
    (d) buscar salta a la columna que tiene la pieza y la resalta;
    (e) tocar una celda abre su editor y Quitar va por gv_insumo_posicion_guardar
@@ -124,16 +125,20 @@ const RACKS = [
   chk(/gv_scp_celda/.test(String(urlScp)), "(b) lee la vista gv_scp_celda");
   chk(out.cols.join(",") === "A,G", "(b) una solapa por columna: " + out.cols.join(","));
   chk(out.colOn === "A", "(b) arranca en la primera columna");
-  chk(/Sector Crudo/.test(out.head) && /Sector Procesado/.test(out.head), "(b) el encabezado cuenta SC y SP");
+  chk(/Columna/.test(out.head) && /3 celdas/.test(out.head) && /1 libres/.test(out.head) &&
+      !/Sector (Crudo|Procesado)/.test(out.head),
+      "(b) el encabezado cuenta celdas y libres, SIN partir por SC/SP: " + out.head);
   const a1 = out.celdas.filter((c) => c.sec === "A1")[0];
   chk(a1 && a1.cod === "C15", "(b) la celda A1 muestra su pieza (sin el prefijo IN-)");
-  chk(a1 && /SP/.test(a1.txt) && /1\.200|1200/.test(a1.txt), "(b) la pieza lleva su sector y su stock");
+  chk(a1 && /1\.200|1200/.test(a1.txt) && !/\bSP\b/.test(a1.txt),
+      "(b) la pieza lleva su stock y NINGÚN rótulo SC/SP (Luis: «no importa SP o SC»)");
   chk(a1 && /Sacacorcho/.test(a1.tip), "(b) el tooltip trae la descripción");
   const a2 = out.celdas.filter((c) => c.sec === "A2")[0];
   chk(a2 && /\+1/.test(a2.txt) && /DISC\.1/.test(a2.txt), "(c) una celda con dos piezas las muestra juntas");
   const a4 = out.celdas.filter((c) => c.sec === "A4")[0];
   chk(a4 && /libre/.test(a4.cod), "(c) la celda vacía dice libre");
-  chk(/GP2|Cervantes/.test(out.leg), "(c) la leyenda dice que el stock lo lleva GP2");
+  chk(/GP2|Cervantes/.test(out.leg) && !/Sector (Crudo|Procesado)/.test(out.leg),
+      "(c) la leyenda dice que el stock lo lleva GP2 y no parte por SC/SP");
   chk(out.trasBuscar === "G", "(d) buscar salta a la columna de la pieza");
   chk(out.resaltadas >= 1, "(d) y la resalta");
   chk(out.modal && /IN-A2/.test(out.modalTit), "(e) tocar la celda abre su editor");
