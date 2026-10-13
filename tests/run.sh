@@ -130,6 +130,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 node tests/monitor-viejo-sin-puerta.cjs
 node tests/fc-parseada-x-de-y.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-sup-no-operario.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-solo-logueados.cjs
 echo "== mon-admin (Mon. Admin: generado desde tv.html, tablero interactivo con pop-ups) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-admin.cjs
 # v26.70 (Luis, D28/D29): una lectura rota de lo facturado o lo cargado no es un cero (cartel falso) y la tanda no se pisa con el m³

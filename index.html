@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=29.92">
+<link rel="stylesheet" href="gv-ui.css?v=29.93">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6422,7 +6422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.92"></script>
+<script type="module" src="recepcion.js?v=29.93"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10755,7 +10755,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.92";
+const APP_VERSION = "v29.93";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34476,14 +34476,27 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     "?tipo=eq.baja_racks&deposito=in.(racks,racks_ch)" +
     "&ts=gte." + encodeURIComponent(dayStartIso) + "&ts=lte." + encodeURIComponent(dayEndIso) +
     "&order=ts.asc&limit=5000&select=legajo,ts";
-  const [r, rf, rfj, nombres, historic, rkMov] = await Promise.all([
+  /* v29.90 (Luis, 13/10): quiénes ENTRARON a la app ese día (cualquier método de login).
+     Es la MISMA fuente que el CTE `login_dia` de gv_monitor_horas_operario_dia, así que el
+     front y la vista filtran igual. Best-effort: si falla, el Set queda vacío y NO se filtra
+     a nadie (una lectura rota no es "nadie se logueó"). */
+  const logUrl = SUPABASE_URL + "/rest/v1/rpc/gv_monitor_logueados" +
+    "?p_desde=" + encodeURIComponent(dayStartIso) +
+    "&p_hasta=" + encodeURIComponent(new Date(new Date(`${dayKey}T00:00:00-03:00`).getTime() + 24*3600*1000).toISOString());
+  const [r, rf, rfj, nombres, historic, rkMov, logRows] = await Promise.all([
     fetch(evUrl,    { headers }),
     fetch(fichUrl,  { headers }),
     fetch(fjPrevUrl,{ headers }),
     getEmpleadosNombres(),
     getHistoricMap(),
-    fetch(rkUrl, { headers }).then(function (x) { return x.ok ? x.json() : []; }).catch(function () { return []; })
+    fetch(rkUrl, { headers }).then(function (x) { return x.ok ? x.json() : []; }).catch(function () { return []; }),
+    fetch(logUrl, { headers }).then(function (x) { return x.ok ? x.json() : []; }).catch(function () { return []; })
   ]);
+  const _logueados = new Set();
+  (Array.isArray(logRows) ? logRows : []).forEach(function (x) {
+    const l = String((x && (x.legajo != null ? x.legajo : x)) || "").trim();
+    if (l) _logueados.add(l);
+  });
   if (!r.ok)  throw new Error("Eventos HTTP " + r.status);
   if (!rf.ok) throw new Error("Fichadas HTTP " + rf.status);
   // FJ del día anterior por operario (el último de ese día). best-effort:
@@ -35075,6 +35088,11 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     const _frP = p.pickFrTandas || new Set(), _frA = p.armFrTandas || new Set();
     if (p.pickedTandas.size === 0 && p.armedTandas.size === 0 && _frP.size === 0 && _frA.size === 0
         && p.ccTandas.size === 0 && p.movMs === 0 && p.otrosProdMs === 0 && !p.abiertoProdMs) continue;
+    /* v29.90 (Luis, 13/10): en el monitor sólo van los legajos que SE LOGUEARON ese día
+       (trabajador o entrevista). Un evento suelto desde el admin no es un operario en jornada.
+       Mismo criterio que gv_monitor_horas_operario_dia. Fail-open: con el Set vacío (lectura
+       rota, o día sin logins registrados — o sea antes del 30/09) no se filtra a nadie. */
+    if (_logueados.size > 0 && !_logueados.has(String(leg).trim())) continue;
     // v26.67: de una tanda frenada, sólo la parte de ESTE legajo en ESTE día (gvCreditoDe); el resto, entera
     [["picking", p.pickedDetail], ["armado", p.armedDetail]].forEach(function (fd) {
       const visto = new Set();
@@ -62936,7 +62954,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.92"></script>
+<script src="importacion.js?v=29.93"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63355,6 +63373,9 @@ function rolPickerAbrir() {
   ov.style.display = "flex";
 }
 function rolElegir(k) { _rolSet(k); var ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none"; rolPanelRender(k); }
+/* v29.93: este bloque vive dentro de una CLOSURE (como gsLoad/gsResolver), asi que una funcion
+   llamada desde un onclick hay que exponerla o el boton queda MUERTO (tests/dead-handlers.cjs). */
+window.rolPickerAbrir = rolPickerAbrir; window.rolElegir = rolElegir;
 
 function rolPanelRender(k) {
   var cont = document.getElementById("rolPanel"); if (!cont) return;
@@ -66053,15 +66074,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.92"></script>
-<script src="hotsale.js?v=29.92"></script>
-<script src="estadisticas.js?v=29.92"></script>
-<script src="ads.js?v=29.92"></script>
-<script src="plantel.js?v=29.92"></script>
+<script src="cobranzas.js?v=29.93"></script>
+<script src="hotsale.js?v=29.93"></script>
+<script src="estadisticas.js?v=29.93"></script>
+<script src="ads.js?v=29.93"></script>
+<script src="plantel.js?v=29.93"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=29.92"></script>
+<script src="analisis.js?v=29.93"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.92"></script>
+<script src="ayuda.js?v=29.93"></script>
 
 </body>
 </html>

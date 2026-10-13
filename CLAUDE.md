@@ -5241,6 +5241,48 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
 
+## ⚠⚠ REGLA (Luis, 2026-10-13, v29.93): EN EL MONITOR SÓLO VAN LOS LEGAJOS QUE SE LOGUEARON
+
+**Luis, textual:** *"se habrá hecho como una prueba para ver visuales desde el admin, no deberían
+aparecer esas cosas en el monitor. solo legajos que se hayan logueado (trabajadores o entrevistas)"*.
+
+> **Un evento suelto no hace a un operario.** Para figurar en el monitor hay que haber ENTRADO a la
+> app ese día (`GV_Dispositivo_Login`, `tipo = 'operario'`), **con cualquier método**.
+
+| pieza | qué hace |
+|---|---|
+| `gv_monitor_horas_operario_dia` (CTE **`login_dia`**) | la fuente: TV, 📺 Vista TV y Mon. Admin lo heredan por `gv_monitor_horas_operario` |
+| **`gv_monitor_logueados(desde, hasta)`** | la misma pregunta para el front (lectura, anon, ventana ≤ 8 días) |
+| `index.html` `fetchMonitorDayStats` | la lee y filtra igual, así el monitor del index y la vista siguen ≡ |
+
+- **CUALQUIER método de login, no el de llegada.** `gv_monitor_ingresos` (v27.68) corta por
+  `clave_tv` / `nombre` porque contesta *"¿a qué hora llegó?"*; acá la pregunta es *"¿entró?"*.
+  Medido: con el criterio de llegada se caían **7 días-operario reales** que entraron con
+  `sesion_guardada` (30/09 leg 104/8/94 · 02/10 leg 277 · 06/10 leg 191/237 · 08/10 leg 277).
+- **FAIL-OPEN, y por eso no hay fecha de corte**: si ese día no hay NINGÚN login registrado, no se
+  filtra a nadie. `GV_Dispositivo_Login` empezó el **30/09**, así que sin esa cláusula todos los
+  días anteriores quedaban vacíos (y el fixture del 15/09 roto). Sirve igual el día que la
+  registración de ingresos se caiga: se ve de más, nunca de menos.
+- **El filtro es la salida de un legajo de prueba, no su anulación.** El caso que lo originó: el
+  legajo **1** apareció «en jornada» el 13/10 por **un** `RI` suelto hecho desde el admin. Se anuló
+  (`RI` → `RIX`, backup `zz_backups."GV_Backup_RegLeg1_20261013"`) **y el monitor lo seguía
+  mostrando**: el CTE `base` de la vista filtra `''`, `'0'` y `sup:*`, pero **NO saca las opciones
+  terminadas en `X`**. Lo que lo saca es esta regla.
+- ⚠ **El legajo 1 sigue contando en el monitor** cuando SÍ se loguea (v27.63, Thomas D13): esto no
+  lo excluye, le pide haber entrado.
+- ⚠ **El patrón del centinela es `login_dia`, no el marcador `v29.90-login`**: ése vive en un
+  comentario y el centinela los saca antes de buscar (regla v21.82) — probado, daba «LA REGLA SE
+  PERDIÓ» con la regla puesta. `GV_Dispositivo_Login` tampoco sirve: aparece 2 veces y la otra es
+  la regla v27.54. Centinela 422, huella re-congelada.
+- ⚠ **Los marcadores de la base, el centinela y los comentarios del front dicen `v29.90`**: es la
+  versión con la que se aplicó, antes de que otra sesión se llevara ese número. **Es la llave, no
+  se cambia.**
+
+**Chequeo:** `select * from public.gv_monitor_horas_operario;` · `select * from public.gv_reglas_perdidas;` ·
+`select * from public.gv_huellas_cambiadas;` · `node tests/mon-solo-logueados.cjs` (corre la pantalla:
+el que no se logueó no sale, el que sí sale, y el fail-open; verificado que falla contra la v29.92) ·
+`node tests/mon-vs-vista.cjs`. `sql/gv_monitor_solo_logueados_v2993.sql`.
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.90): en el MONITOR, el día dice CUÁNDO DEBIÓ ARMARSE
 
 **Luis, textual:** *"quiero que en el monitor, en el día figure así: «Mié 14/10 (debió armarse Vie 9)»
