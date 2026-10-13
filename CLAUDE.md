@@ -8715,3 +8715,20 @@ F48A 3 cajas de góndola de más (ya salieron o están en el pallet), y el factu
   topa el ajuste `npd_…` de Pickeados con el faltante que el PKC ya registró (F58A/102E quedaba en −5).
 - Lo pasado NO se corrige solo (los pares ya separados están balanceados): la corrección de datos pide el «sí».
 - Centinelas 394-396. `sql/gv_etapa2_codigo_l_correccion_v2949.sql`, `sql/gv_npd_tope_faltante_picking_v2949.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-13, v29.50, D3): el SERVIDOR reconoce un EVENTO DUPLICADO aunque llegue con OTRO client_id
+
+Luis: *"no habría problema con que los mande de vuelta. el punto es que el server debería procesarlo correctamente e
+identificar cuando son eventos duplicados"*. Trigger **`ab_gv_evento_duplicado`** (BEFORE INSERT en
+`Registros_Produccion_Virgilio`, después de `aa_gv_registro_entrevista_a_empleado`) → `gv_evento_duplicado()`:
+
+- **R1 mismo tramo**: mismo legajo, `ts_inicio` y `ts_cliente` a menos de 2 s de un evento vivo (no termina en X) con otro
+  `client_id` → es el mismo cierre de tarea. Medido 60 días: 3 pares entre eventos «buenos» y los 3 eran duplicados.
+- **R2 copia del Historial**: `client_id` h_* con un evento vivo del mismo legajo a menos de 2 s (el guardado cierra con
+  MGC, sin `ts_inicio`). Sin gemelo ENTRA: es el único dato.
+- Lo descartado queda entero en **`GV_Evento_Duplicado`** (motivo + gemelo): `select * from public."GV_Evento_Duplicado" order by id desc;`
+- Los 55 h_* del 02/10 al 09/10 se anularon (RKBX/MDTX/INSX/IRTX y **MGXX**: `MGX` ya es «guardado fuera de lista» y lo
+  cuenta `generar_reporte_agentes`, así que al anular un MG se usa MGXX). Backups `zz_backups."GV_Backup_RegH_Replay_*"`.
+- Probado como anon en transacción abortada: copias h_rkb / h_mg y R1 con otro id descartadas (3 al log), uno legítimo entra.
+- Rollback: `alter table public."Registros_Produccion_Virgilio" disable trigger ab_gv_evento_duplicado;`
+  El marcador interno dice `v29.25-evdup` (llave). Centinela `gv_evento_duplicado`. `sql/gv_evento_duplicado_v2950.sql`.
