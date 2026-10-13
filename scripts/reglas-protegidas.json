@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-13 (regenerado entero desde GV_Reglas_Centinela al resolver el conflicto de merge de la v30.08; + v29.62 reconciliar_pipeline_stock_etapa1); + v29.62 reconciliar_stock_articulo_rt",
+  "_generado": "2026-10-13 (regenerado desde GV_Reglas_Centinela; + v29.62 reconciliar_stock_articulo_rt (454), gv_recepcion_pagos_vencida (453), gv_planimetria_celda (451))",
   "reglas": [
     {
       "objeto": "Racks_Planimetria",
@@ -924,6 +924,11 @@
     {
       "objeto": "gv_racks_ajuste_sin_posicion",
       "regla": "Un ajuste de racks desde el panel (legajo 0) sin posición de rack del Mapa no se graba",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_recepcion_pagos_vencida",
+      "regla": "El aviso a Pagos es por DEADLINE (siguiente dia habil, misma hora), no por cada remito: se retiro a proposito en v18.81.",
       "quien": "Luis"
     },
     {
