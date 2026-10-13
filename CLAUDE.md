@@ -9482,6 +9482,46 @@ sale del catálogo y queda en `Insumos_Historial`), **sin tocar la ubicación** 
 están ahí, lo corrige el conteo, no un aviso. Detalle, verificación y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
 §3.v3000. Lo sostiene `tests/stk-busca-decimal.cjs`.
 
+## ⚠⚠ REGLA (Luis, 2026-10-13, v30.06): el REMITO de una recepción NO SE PIERDE — columna `gv_doc`
+
+(el comentario de la columna, el `.sql` y los textos del código dicen **v30.06**: es la versión con la que se
+aplicó. Salió publicada con la v30.09 porque otras sesiones se llevaron los números en el medio.)
+
+**Luis, textual:** *"que no se pierda dios mio, como que se pierde? como columna es lo más elegante, no?"*.
+
+> **El papel va en el MOVIMIENTO: `Movimientos_Stock.gv_doc`** (jsonb)
+> `{tipo, remito, fecha_remito, factura, fecha_factura, proveedor}` — **las mismas claves en TODAS las filas de
+> esa recepción**, porque es UN papel. Se lee por `gv_insumo_recepcion_marca` (`remito`, `factura`, `doc_tipo`).
+
+**Lo que estaba roto, medido:** la recepción pedía el remito en el paso de documentación y `_insDocState` —el
+estado de ese formulario— lo borraba `insDocCancel` al cerrar el modal, dos líneas antes de abrir la lista. El
+movimiento nunca lo llevó. **Y había un segundo agujero peor**: `insEnviar` leía el remito de ese mismo objeto
+para pasárselo a GP2 (`_insGp2Enviar`), así que **las OC de bolsas se recibían con el remito vacío**. Los dos se
+arreglan con lo mismo: `insDocOk` copia el papel a **`window._insDoc`**, que vive hasta que la recepción se
+manda o se anula.
+
+| pieza | qué hace |
+|---|---|
+| `insDocOk` | guarda el papel en `window._insDoc` (sólo lo que tiene algo) |
+| `insConfirmar` | arma `doc` y lo pone en **cada** row (`row.gv_doc`); se lo pasa a GP2; al terminar limpia `_insDoc` |
+| `insAnular` | limpia `_insDoc`: el papel de una recepción anulada no se arrastra a la siguiente |
+| columna | `alter table … add column gv_doc jsonb` — **nullable, prefijo `gv_`, sin default y sin backfill**, como manda la regla de las tablas compartidas con Producción Virgilio. Índice de expresión sobre `gv_doc->>'remito'` |
+
+⚠ **Es jsonb y no cuatro columnas** a propósito: son 5 datos del mismo papel sobre una tabla de 80 mil filas, y
+el que se busca (el número de remito) tiene su índice. Al agregar un dato del papel se agrega una clave, no una
+columna.
+
+⚠ **Forward-facing**: lo recibido antes de hoy queda con `gv_doc` nulo — no se inventa el remito de una
+recepción vieja. La lectura devuelve `remito` nulo ahí.
+
+⚠ `create or replace view` **borra las `reloptions`**: el `security_invoker = true` de
+`gv_insumo_recepcion_marca` se repone en el mismo bloque (verificado como `anon`).
+
+**Chequeo:** `node tests/ins-remito-guardado.cjs` (corre la recepción de verdad y mide el POST: el papel en las
+dos filas, con su fecha y su tipo; sin papel no escribe `gv_doc`; anular no lo deja colgado) ·
+`select cod_art, origen, marca, remito from public.gv_insumo_recepcion_marca order by id desc limit 5;`
+`sql/gv_mov_stock_gv_doc_v3006.sql`, §3.v3006.
+
 ## ⚠⚠ REGLA (Luis, 2026-10-13, v30.05): el operario SÍ PUEDE crear un código nuevo al RECIBIR — con el aviso de parecidos
 
 **Luis, textual:** *"hay que darles la opción de poder crear códigos nuevos cuando reciben si no están en la lista
