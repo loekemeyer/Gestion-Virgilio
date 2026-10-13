@@ -5382,7 +5382,7 @@ preguntarse si ahí no falta Retira.**
 **Chequeo:** `select * from public.gv_ppp_web_forzado_sin_tanda();` — lo que el armador tiene que
 tomar sí o sí · `select * from public.gv_reglas_perdidas;`.
 
-## ⚠⚠ REGLA (Luis, 2026-10-13, v30.10): LA GÓNDOLA DE UN CÓDIGO DISCONTINUADO SE LIBERA
+## ⚠⚠ REGLA (Luis, 2026-10-13, v30.13): LA GÓNDOLA DE UN CÓDIGO DISCONTINUADO SE LIBERA
 
 **Luis, con el A64 en la mano:** *"figura en el mapa de gondolas que esta asignado al 548 pero ese es un
 código discontinuo. ahora tiene un cartel de que va 565 pero tambien esta discontinuo. La idea es muy
@@ -5428,7 +5428,7 @@ un código discontinuado** (24 a mano, 19 sólo por OC) · **21 con cajas** (587
 `select * from public.gv_reglas_perdidas;` · `node tests/pmap-discontinuado.cjs` (corre la pantalla;
 verificado que falla contra el index anterior). `sql/gv_gondola_discontinuado_v3003.sql` (rollback al pie),
 centinelas 447-451. ⚠ Los objetos de la base, los 5 centinelas y los marcadores internos dicen **v30.03**
-(la versión con que se aplicaron): es la llave de idempotencia, **no cambiarla**; la app salió en la v30.10
+(la versión con que se aplicaron): es la llave de idempotencia, **no cambiarla**; la app salió en la v30.13
 porque otras sesiones se adelantaron.
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.69): el código SIN GÓNDOLA en el Mapa se lo PREGUNTA AL OPERARIO

@@ -31855,10 +31855,7 @@ cambian exactamente esos 28 saldos (14 excedente +N, 14 góndola −N). Aplicado
 y dejaba 4 góndolas en negativo. Centinela: `least\(f\.picked, greatest\(f\.tomado, 0\)\)`.
 Backup de la definición anterior: `zz_backups."GV_Backup_Etapa1_def_20261013"` (md5 prosrc 7d6a3bb2…).
 `sql/reconciliar_pipeline_stock_etapa1_v2962.sql`.
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/main
 ### §3.v2982 — Recepción de insumos: el ORIGEN es una lista cerrada por categoría (Luis, 13/10/2026)
 
 - **Nuevo, nada existente tocado**: tabla `GV_Insumo_Origen_Excluido` (RLS on, sin escritura para anon/authenticated),
@@ -31954,7 +31951,6 @@ procesadas o las `IVBCM`/`IVBLM` de Brawin, otras medidas), así que se crearon:
 - **Verificado**: saldo 122,1 y 128,4 Kg, unidad Kg, empresa Mixto, 0 posiciones, los dos en la alarma.
 - **Rollback**: borrar los dos movimientos por su `client_id` y las dos filas de `Insumos`.
 
-<<<<<<< HEAD
 ### §3.v3003 — La góndola de un código DISCONTINUADO se libera (Luis, 13/10/2026)
 
 **Pedido:** *"si una gondola esta asignada a un codigo discontinuo (o mejor dicho, cuando se dictamina que un
@@ -31984,7 +31980,6 @@ principal, v22.72, y su E.M. es 0 por construcción). El 574 es el que VENDE de 
 
 **Rollback** completo al pie de `sql/gv_gondola_discontinuado_v3003.sql` (incluye el `CREATE` de
 `gv_planimetria_celda` vigente). `GV_Lugar_Liberado` no se borra: es el backup de lo liberado.
-=======
 ### §3.v3006 — El remito de una recepción de insumos queda en `Movimientos_Stock.gv_doc` (Luis, 13/10/2026)
 
 **Nuevo**: columna **`gv_doc jsonb`** en `Movimientos_Stock` (nullable, prefijo `gv_`, sin default y sin
@@ -32025,4 +32020,3 @@ Sin SQL nuevo: la columna `gv_doc` y el índice son los de §3.v3006. Lo que cam
 - Consulta útil: `select tipo, count(*) filter (where gv_doc is not null) con_papel, count(*) total
   from public."Movimientos_Stock" where creado > now() - interval '7 days' group by 1 order by 3 desc;`
 - Rollback: el de §3.v3006 (la columna es nullable, el front deja de mandarla y nada se rompe).
->>>>>>> origin/main
