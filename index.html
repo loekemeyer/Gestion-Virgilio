@@ -6401,7 +6401,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=29.55"></script>
+<script type="module" src="recepcion.js?v=29.56"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -9345,7 +9345,7 @@ function showInstructivo() {
     { t: "🏭 Recepción", c: "RT · RR", x: "RT = recibí mercadería (entra a <b>“a guardar”</b>). RR = controlar los remitos cargados al camión." },
     { t: "🚚 Carga y control", c: "CC · CR", x: "CC = inicio/fin de la carga del camión. CR = control de remitos." },
     { t: "📥 Guardar a góndola", c: "MG", x: "Lo que está en <b>“a guardar”</b> lo pasás a góndola. Si la góndola está llena, marcás <b>Excedente</b> y su ubicación." },
-    { t: "📦 Insumos y Productos Movimiento", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. ¿El insumo no está? Entrás por Recibir y usás <b>“+ Agregar insumo nuevo”</b>." },
+    { t: "📦 Insumos y Productos Movimiento", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. Recibís sólo lo que ya está en la lista: si llegó algo que no figura, avisá a Stock y Compras." },
     { t: "⏱ Pausas y otros", c: "AT · PB · Limp · Perm · PC · CT", x: "Marcá cuándo: atendés el timbre (AT), vas al baño (PB), limpiás (Limp), pedís permiso (Perm), parás a comer (PC) o hacés conteo (CT). Tocás al <b>empezar</b> y otra vez al <b>terminar</b>." }
   ];
   ov.innerHTML = '<div class="instr-card"><div class="instr-head"><span class="instr-title">❓ ¿Cómo se usa?</span><button class="instr-close" onclick="closeInstructivo()">Cerrar</button></div><div class="instr-body">' +
@@ -10705,7 +10705,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v29.55";
+const APP_VERSION = "v29.56";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27954,10 +27954,9 @@ function insRender() {
         '</button>';
     }).join("") +
       (cnt[""] ? '<button class="ins-catbtn' + (cntQ[""] ? " hasq" : "") + '" onclick="insSetCat(\'?\')"><span class="ins-catem">❓</span><span class="ins-catnm">Sin categoría</span><span class="ins-catn">' + cnt[""] + '</span></button>' : "") +
-      // "+" junto a las categorías: llegó algo que no está en ninguna lista. Sólo en
-      // RECEPCIÓN: en una entrega no se puede sacar algo que no existe, y si existe
-      // tiene que estar registrado.
-      (isIn ? '<button class="ins-catbtn add" onclick="insNuevoOpen(\'\')"><span class="ins-catem">+</span><span class="ins-catnm">Agregar insumo</span><span class="ins-catn">nuevo</span></button>' : "") +
+      // v29.56 (Luis, 13/10): el operario NO da de alta un insumo al recibir. Sólo recibe
+      // lo que ya está en la lista (o un componente del catálogo de GP2). El "+ Agregar
+      // insumo nuevo" se sacó: un código distinto lo define Stock y Compras, no el operario.
       '</div>';
     h += '<div class="ins-cbadge" style="margin-top:10px;">' + nOper + ' insumos en uso' + (cnt[""] ? ' · ' + cnt[""] + ' sin clasificar' : "") + '</div>';
   } else {
@@ -27988,7 +27987,7 @@ function insRender() {
           (it.qty > 0 ? '<span class="ins-itq' + (it.unidad ? "" : " falta") + '">' + it.qty + " " + escapeHtml(it.unidad || "¿unidad?") + '</span>' : "") +
           '</button>';
       }).join("") +
-        (cat && isIn && INS_CAT_CERRADA.indexOf(cat) < 0 ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
+        // v29.56 (Luis, 13/10): sin "+ Agregar insumo" dentro de la categoría al recibir.
         '</div>';
     }
   }
@@ -28010,9 +28009,11 @@ function insRender() {
    admin desde Stock y Compras → Insumos (idea 5572). */
 function insNuevoOpen(cat) {
   if (!_ins) return;
-  // Guarda dura: dar de alta un insumo sólo tiene sentido recibiendo. En una entrega
-  // el insumo tiene que existir de antes.
-  if (_ins.mode !== "RI") { try { alert("En una entrega no se puede dar de alta un insumo.\n\nSi lo estás sacando es porque ya está: buscalo en su categoría. Si no aparece, se carga al recibirlo."); } catch (_e) {} return; }
+  // v29.56 (Luis, 13/10): el operario NO da de alta insumos. Recibe sólo lo que ya está
+  // en la lista; un código distinto lo define Stock y Compras. Guarda dura, por si algún
+  // camino viejo (una sesión guardada, un botón cacheado) todavía llama acá.
+  try { alert("No se puede agregar un insumo nuevo acá.\n\nRecibí lo que ya está en la lista. Si llegó algo que no figura, avisá a Stock y Compras para que lo carguen."); } catch (_e) {}
+  return;
   _ins.nuevo = { cat: insCatDef(cat) ? cat : "", qty: "", uni: "", det: "" };
   _ins.qty = null;
   insRender();
@@ -62218,7 +62219,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=29.55"></script>
+<script src="importacion.js?v=29.56"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65148,13 +65149,13 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=29.55"></script>
-<script src="hotsale.js?v=29.55"></script>
-<script src="estadisticas.js?v=29.55"></script>
-<script src="ads.js?v=29.55"></script>
-<script src="plantel.js?v=29.55"></script>
+<script src="cobranzas.js?v=29.56"></script>
+<script src="hotsale.js?v=29.56"></script>
+<script src="estadisticas.js?v=29.56"></script>
+<script src="ads.js?v=29.56"></script>
+<script src="plantel.js?v=29.56"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=29.55"></script>
+<script src="ayuda.js?v=29.56"></script>
 
 </body>
 </html>

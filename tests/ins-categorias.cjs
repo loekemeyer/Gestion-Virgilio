@@ -10,8 +10,8 @@
      · Atrás vuelve a las categorías conservando lo cargado (se manda todo junto)
      · buscar desde la pantalla 1 mira TODO (incluso lo a depurar)
      · la unidad por defecto sale de la categoría salvo que ya haya saldo en una sola
-     · el alta nace con categoría y abre el pop-up
-     · «Agregar insumo» SÓLO en Recepción (RI): en una entrega no se da de alta nada
+     · v29.56 (Luis, 13/10): el operario NO da de alta un insumo — ni en RI ni en EI.
+       No hay "+ Agregar insumo" en ningún lado e insNuevoOpen se planta siempre.
    Sin red (fetch mockeado). */
 const path = require("path");
 let chromium;
@@ -148,14 +148,13 @@ catch (_e) {
     out.nDep = nItems();                                                    // 1
     insBack();
 
-    // 9b) En ENTREGA no hay "+" en ningún lado, y la función se planta aunque la
-    //     llamen a mano: entregar algo que no existe no tiene sentido, y si existe
-    //     tiene que estar registrado.
+    // 8) En ENTREGA no hay "+" en ningún lado, y la función se planta aunque la
+    //    llamen a mano.
     insBack();
     out.sinMasEnEI = !document.querySelector("#insBody .ins-catbtn.add");
     let alertEI = ""; const _alEI = window.alert; window.alert = function (m) { alertEI = String(m); };
     insNuevoOpen("");
-    out.eiRechazaAlta = _ins.nuevo === null && /no se puede dar de alta/i.test(alertEI);
+    out.eiRechazaAlta = _ins.nuevo === null && /no se puede agregar un insumo/i.test(alertEI);
     window.alert = _alEI;
 
     // 8d) Sin unidad NO se manda: iría como "Uni" y partiría el saldo (lo que pasó con PP)
@@ -176,76 +175,33 @@ catch (_e) {
     window.alert = function () {};
     insConfirmar();
     window.stockMove = _sm;
-    out.movN = mov ? mov.length : 0;                                        // 1 (sólo el 22: el alta corre después)
+    out.movN = mov ? mov.length : 0;                                        // 1 (sólo el 22)
     out.movUbic = mov && mov[0] ? mov[0].ubicacion : null;                  // "V2 Ad"
     // "kg" en minúscula: el 22 ya tiene saldo en esa unidad y la idea 7382 manda sobre
     // el default de la categoría — no le cambiamos la unidad a un saldo que ya existe.
     out.movUni = mov && mov[0] ? mov[0].unidad : null;                      // "kg"
     out.movDelta = mov && mov[0] ? mov[0].delta : null;                     // -3 (EI)
 
-    // 10) ALTA DE INSUMO NUEVO — en RECEPCIÓN sí está el "+", en la grilla de categorías
+    // 10) v29.56 (Luis, 13/10): el operario YA NO DA DE ALTA un insumo al RECIBIR.
+    //     No hay "+ Agregar insumo" en la grilla de categorías ni dentro de una categoría,
+    //     y si algún camino viejo llama a insNuevoOpen, se planta con el aviso.
     await showInsumoModal("RI", "104");
     const ppRI = _ins.items.filter(function (it) { return it.cod === "PP"; })[0];
     out.uniPP = ppRI ? ppRI.unidad : null;   // "Bolsas" (saldo en 1 sola unidad)
-    out.riTieneAlta = !!document.querySelector("#insBody .ins-catbtn.add");
-    document.querySelector("#insBody .ins-catbtn.add").click();
-    out.altaAbre = !!document.getElementById("insNvDet") && !!document.getElementById("insNvQty");
-    out.altaTitulo = (document.querySelector("#insBody .ins-bar-t") || {}).textContent;
-    // el Detalle va ANTES que todo lo demás
-    const lbls = Array.prototype.map.call(document.querySelectorAll("#insBody .ins-nvl"), function (e) { return e.textContent.split("—")[0].trim(); });
-    out.ordenCampos = lbls.join(" | ");   // "Detalle | Elegí la categoría | Cantidad | Unidad"
-    // "Sin categoría clara" es una opción más
-    out.haySinCatClara = /Sin categoría clara/.test(document.getElementById("insBody").textContent);
-    // unidades que ya usamos en otros lados (Bolsas/MC/Cajas, no sólo Uni/Paquetes/Kg)
-    const uniTxt = Array.prototype.map.call(document.querySelectorAll("#insBody .ins-uchip"), function (e) { return e.textContent.trim(); });
-    out.uniOfrecidas = ["Uni", "Kg", "Bolsas", "Paquetes", "MC", "Cajas"].every(function (u) { return uniTxt.indexOf(u) >= 0; });
-    // elegir categoría propone su unidad sola
-    insNuevoPick("cat", "plastico");
-    out.altaUniAuto = _ins.nuevo.uni;                                       // "Bolsas"
-    document.getElementById("insNvQty").value = "7";
-    document.getElementById("insNvDet").value = "Bolsa gris sin etiqueta";
-    insNuevoOk();
-    await new Promise(function (r) { setTimeout(r, 30); });   // la identidad la asigna el servidor
-    const nue = _ins.items.filter(function (it) { return it.nombre === "Bolsa gris sin etiqueta"; })[0];
-    // la IDENTIDAD la pone el sistema (TMP-NNNN), no el texto del detalle
-    out.altaCod = nue ? nue.cod : null;                                     // "TMP-0001"
-    out.altaCat = nue ? nue.cat : null;                                     // "plastico"
-    out.altaUni = nue ? nue.unidad : null;                                  // "Bolsas"
-    out.altaQty = nue ? nue.qty : null;                                     // 7 (ya cargado)
-    out.altaNombre = nue ? nue.nombre : null;                               // el detalle textual
-    out.altaPosteoDet = (posted[0] || {}).p_detalle;                        // va como detalle al RPC
-    out.altaPosteoCat = (posted[0] || {}).p_categoria;                      // "plastico"
-    out.altaCierraPantalla = _ins.nuevo === null;
-    out.altaVaASuCat = _ins.cat === "plastico";
-
-    // 10b) Sin detalle no deja crear; "Sin categoría clara" cae en el ❓
-    let alerts = 0; const _al = window.alert; window.alert = function () { alerts++; };
-    insNuevoOpen("");
-    insNuevoOk();
-    out.altaExigeDetalle = alerts === 1 && _ins.nuevo !== null;
-    document.getElementById("insNvDet").value = "Cosa rara sin nombre";
-    insNuevoOk();
-    await new Promise(function (r) { setTimeout(r, 30); });
-    const nue2 = _ins.items.filter(function (it) { return it.nombre === "Cosa rara sin nombre"; })[0];
-    out.altaSinCat = nue2 ? nue2.cat : "(no se creó)";                      // "" → chip ❓
-    out.altaSinQtyAbrePopup = !!document.querySelector("#insBody .ins-qov");  // sin cantidad, pide
-    insCloseQty();
-    // ya no hay campo de código: el operario no tiene por qué saberlo
-    out.altaSinCampoCod = !document.getElementById("insNvCod");
-    // categoría sin unidad fija: con cantidad y sin unidad no deja agregar
-    insNuevoOpen("importados");
-    document.getElementById("insNvDet").value = "Cosa importada rara";
-    document.getElementById("insNvQty").value = "5";
-    out.impSinDefault = _ins.nuevo.uni === "";
-    insNuevoOk();
-    out.altaExigeUnidad = _ins.nuevo !== null && alerts === 2;
-    insNuevoPick("uni", "MC");
-    insNuevoOk();
-    await new Promise(function (r) { setTimeout(r, 30); });
-    out.altaConUnidadOk = _ins.nuevo === null;
-    window.alert = _al;
+    out.riSinAltaP1 = !document.querySelector("#insBody .ins-catbtn.add");   // sin "+" en categorías
+    insSetCat("fleje");
+    out.riSinAltaEnCat = !document.querySelector("#insBody .ins-itbtn.add"); // sin "+" dentro de la categoría
     insBack();
-
+    let alertRI = ""; let altas0 = posted.length;
+    const _alRI = window.alert; window.alert = function (m) { alertRI = String(m); };
+    insNuevoOpen("");
+    out.riRechazaAlta = _ins.nuevo === null && /no se puede agregar un insumo/i.test(alertRI);
+    insNuevoOpen("plastico");
+    out.riRechazaAltaBolsa = _ins.nuevo === null;
+    await new Promise(function (r) { setTimeout(r, 30); });
+    out.riNoCreoNada = posted.length === altas0;   // no se posteó ningún insumo nuevo
+    window.alert = _alRI;
+    insBack();
 
     // 11) nada se sale del ancho del celular (390px)
     out.overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
@@ -257,20 +213,14 @@ catch (_e) {
     r.uni2745 === "Kg" && r.uniPP === "Bolsas" && r.uni2955 === "" &&
     r.nFleje === 3 && r.ordenFleje === "5,22,2745" && r.hayAtras === true &&
     /Fleje/.test(r.tituloFleje || "") && r.ubicEnBoton === true && r.sinAgregarEnEI === true && r.sinMasEnEI === true &&
-    r.eiRechazaAlta === true && r.riTieneAlta === true &&
+    r.eiRechazaAlta === true &&
     r.popupAbierto === true && r.popupCod === "22" && r.popupStock === true && r.qtyTrasChg === 3 &&
     r.popupCerrado === true && r.botonMarcado === true && r.finHabilitado === true && r.finCuenta === true &&
     r.volvioAP1 === true && r.flejeMarcada === true && r.catCargados === true && r.qtySobrevive === 3 &&
     r.rowsBusca === 2 && r.buscaTraeDep === true &&
     r.avisoDep === true && r.nDep === 1 && r.noHayDepurar === true &&
-    r.altaAbre === true && /Insumo nuevo/.test(r.altaTitulo || "") &&
-    r.haySinCatClara === true && r.uniOfrecidas === true && r.altaUniAuto === "Bolsas" &&
-    /^TMP-\d+$/.test(r.altaCod || "") && r.altaPosteoDet === "Bolsa gris sin etiqueta" && r.altaCat === "plastico" && r.altaUni === "Bolsas" &&
-    r.altaQty === 7 && r.altaNombre === "Bolsa gris sin etiqueta" && r.altaPosteoCat === "plastico" &&
-    r.altaCierraPantalla === true && r.altaVaASuCat === true &&
-    r.altaExigeDetalle === true && r.altaSinCat === "" && r.altaSinQtyAbrePopup === true &&
-    r.altaSinCampoCod === true && r.impSinDefault === true && r.altaExigeUnidad === true && r.altaConUnidadOk === true &&
-    /^Detalle \| Elegí la categoría \| Cantidad \| Unidad$/.test(r.ordenCampos || "") &&
+    r.riSinAltaP1 === true && r.riSinAltaEnCat === true &&
+    r.riRechazaAlta === true && r.riRechazaAltaBolsa === true && r.riNoCreoNada === true &&
     r.movN === 1 && r.confirmBloqueaSinUni === true && r.confirmAbreElQueFalta === true && r.movUbic === "V2 Ad" && r.movUni === "kg" && r.movDelta === -3 &&
     r.overflow === 0 &&
     errs.length === 0;
