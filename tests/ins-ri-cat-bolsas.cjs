@@ -9,7 +9,17 @@
    (g) v29.29: la bolsa sólo en Bolsas, con su equivalente en kg (también en el movimiento);
    (e) v29.25: en RECIBIR y en «Envío a otros», de plásticos sólo las bolsas reales (sin TMP- ni
        códigos viejos). En plásticos NO hay «+ Agregar insumo» (categoría cerrada); el alta
-       generica si abre al recibir (v30.05). Sale 1 si falla. */
+       generica si abre al recibir (v30.05). Sale 1 si falla.
+
+   ⚠ v30.16 — ESTE TEST VIVÍA EN ROJO SÓLO EN CI (issue #24, desde el 10/10): local pasaba
+   3 de 3 y en el runner fallaba siempre. Lo que lo hacía depender del entorno:
+     · salía a la RED de verdad (`insFetchGp2Ri`, `insFetchFlejeProv`, `insFetchConfig`,
+       `insGp2Rpc` y el `fetch` de `gv_insumo_origenes` de askInsUbicacion no estaban
+       mockeados), así que el resultado dependía de si el runner llega a Supabase y de lo
+       que la base tenga HOY;
+     · leía el DOM justo después de funciones que repintan, sin esperar la condición.
+   Ahora: toda la red abortada salvo `file://` + esos cinco mockeados + se espera la
+   condición. El test mide la REGLA, no el runner. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -18,6 +28,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 390, height: 844 } });
   const errs = []; p.on("pageerror", (e) => errs.push(e.message));
+  // v30.16 — nada de red: el test mide la regla, no si el runner llega a Supabase.
+  await p.route("**://**", (r) => (/^file:/.test(r.request().url()) ? r.continue() : r.abort()));
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(async () => {
     window.alert = function () {};
@@ -36,6 +48,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ]; };
     window.stockFetchSaldos = async function () { return {}; };
     window.insFetchSaldosXUni = async function () { return {}; };
+    // v30.16 — lo que el modal pide a la base: fijo, para que el resultado no dependa del runner
+    window.insFetchGp2Ri = async function () { return null; };
+    window.insFetchFlejeProv = async function () { return null; };
+    window.insFetchConfig = async function () { return null; };
+    window.insGp2Rpc = async function () { return null; };
     const out = {};
     /* 13/10: se espera la CONDICION, no el reloj. insRecibirCat() es async (dibuja
        "Cargando..." y recien despues los botones) y insChooserGo no devuelve su promesa:
@@ -50,6 +67,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const btns = Array.from(document.querySelectorAll("#insChooserModal .ins-ri-cat")).map(function (x) { return x.textContent; });
     out.a = btns.length === 6 && !btns.some(function (t) { return /Importados/.test(t); });
     insRecibirCatGo("fleje");
+    await _hasta(function () { const x = document.getElementById("insUbicModal"); return !!x && x.style.display === "flex"; });
     const ub = document.getElementById("insUbicModal");
     out.b = !!ub && ub.style.display === "flex" && gp2Llamado === 0 && window._insRiCat === "fleje";
     await showInsumoModal("RI", "104");
@@ -85,12 +103,15 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       otrasEI && !/ins-itbtn add/.test(htmlRI) && altaBloqueada && altaAbre;
     out.plaRI = plaRI; out.plaEI = plaEI;
     // (f) v29.28 (D9): eligió «Envío a inyectores» (aunque GP2 no devuelva la lista) → sólo bolsas
-    insEnvioTipoGo("iny"); insUbicCancel(); window._insGp2 = null;
+    insEnvioTipoGo("iny");
+    await _hasta(function () { const x = document.getElementById("insUbicModal"); return !!x && x.style.display === "flex"; });
+    insUbicCancel(); window._insGp2 = null;
     await showInsumoModal("EI", "104");
     out.f = _ins.soloBolsas === true && _ins.items.length > 0 && _ins.items.every(function (x) { return x.cat === "plastico"; });
     // (g) v29.29 (Thomas): la bolsa va sólo en Bolsas, se ve en kg y el movimiento lleva los kg
     const ip = _ins.items.findIndex(function (x) { return x.cod === "PP 2630"; });
     insOpenQty(ip); _ins.items[ip].qty = 4; insRender();
+    await _hasta(function () { return !!document.querySelector("#insBody .ins-qov"); });
     const qh = (document.querySelector("#insBody .ins-qov") || {}).innerHTML || "";
     let movG = null; const _smG = window.stockMove; window.stockMove = function (rows) { movG = rows; };
     window.alert = function () {}; insCloseQty(); await insConfirmar(); window.stockMove = _smG;
@@ -102,6 +123,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const htmlCj = document.getElementById("insBody").innerHTML;
     const ic = _ins.items.findIndex(function (x) { return x.cod === "Caja Nº 29"; });
     insOpenQty(ic); insSetUnidad(ic, "Paquetes"); _ins.items[ic].qty = 2; insRender();
+    await _hasta(function () { return !!document.querySelector("#insBody .ins-qov .ins-qok"); });
     const qc = (document.querySelector("#insBody .ins-qov") || {}).innerHTML || "";
     const qcSinMarca = (document.querySelector("#insBody .ins-qov .ins-qok") || {}).disabled === true;
     let movH = null; const _smH = window.stockMove; window.stockMove = function (rows) { movH = rows; };
