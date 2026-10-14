@@ -98,3 +98,18 @@ select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN
 -- Luis: "C4 cuerpo con marca y cromado · I2 cuerpo con marca y sin cromar · C2 sacacorchos completo sin marca".
 -- IN-C4 C16 3 (sin cambio) · IN-I2 G4 4 · IN-C2 alta 'Sacacorcho 521 Completo S/M' 2 (sin componente GP2); G4 -2.
 select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('IN-C2','IN-C4','IN-I2') order by 1;
+
+-- ===================== v30.82 · 2026-10-14 (columnas K y L con códigos TEMPORALES, Luis) =====================
+-- Luis: "vamos a cargar lo que falta con codigos temporales. despues naza me ayuda a cruzarlo con codigos de cervantes".
+-- Backup: zz_backups."GV_Backup_InsUbic_KL_20261014" (las 9 filas K/L de antes). Altas por nuevo_insumo_tmp (partes_crudo):
+-- | celdas            | código   | pieza (Luis)                  | cajones | candidato a cruzar (sin confirmar)            |
+-- |-------------------|----------|-------------------------------|--------:|-----------------------------------------------|
+-- | IN-L1..L4         | TMP-0042 | mango plano 702 grabado chef  | 5+5+3+2 | Z26 (702 doblado c/marca) o DISC1             |
+-- | IN-K1, K2         | TMP-0038 | manija                        |   5 + 5 | H1 Manija Redonda p/cromar (10, sin posición) |
+-- | IN-K5, L5, L6     | TMP-0041 | espaditas                     | 2+2+4   | —                                             |
+-- | IN-K3             | TMP-0039 | batidor pera                  |       5 | 'Batidor Pera p/Cromar' (IN-J1..J3)           |
+-- | IN-K4             | TMP-0040 | palitos                       |       4 | —                                             |
+-- Desplazados (conteo completo, sin otra posición -> 0, criterio v30.62): G11 −20 (era IN-K4) · Z39 −5 (IN-K5) ·
+--   DISC1 −15 (IN-L1..L4) -> queda 11 (IN-C1 5 + IN-E1 6, coincide con lo contado).
+-- Z37 pierde L5/L6 y queda sólo en IN-K6 (sin contar): saldo 9 sin tocar.
+select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN-[KL][0-9]' order by 1;
