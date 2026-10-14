@@ -13,8 +13,8 @@ asistente de ayuda: no ve stock, pedidos, tandas ni datos de nadie.
 3. Si no estás en la lista, tocá **«＋ Soy otro»**, escribí tu **legajo** y **Entrar**.
 4. Si todavía no tenés legajo, tocá **«No tengo legajo»**, escribí tu **nombre y apellido** y
    **«Entrar con mi nombre»**. Entrás igual y un supervisor te valida después.
-5. Si trabajás en **Cervantes**, tocá **«Trabajo en Cervantes · entrar con legajo»**: te lleva a la
-   app de Cervantes, no a la botonera de Virgilio.
+5. Si trabajás en **Cervantes**, esta app no es la tuya: entrás con la app de Cervantes y el
+   código de la TV de Cervantes.
 
 Los supervisores entran con **«Iniciar sesión con Google»**. La llegada cuenta desde que entrás con
 el código de la TV. Si ya entraste hoy, al volver a abrir la app vas directo a tu botonera.

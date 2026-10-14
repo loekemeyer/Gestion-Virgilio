@@ -46,6 +46,10 @@ con legajo»**: valida el legajo contra `Empleados`, guarda la sesión con `solo
 **`legajo_cervantes`** y va derecho a `./cervantes/`. Con esa sesión **Virgilio no entra** (`chooseVirgilio` pide el código de la
 TV y borra la sesión). El monitor y la alarma de Virgilio no cuentan ese ingreso (sólo `clave_tv` / `nombre`, v27.68). Al poner
 la TV en Cervantes, sacar este botón. `tests/cervantes-legajo.cjs`.
+⚠⚠ **v30.39 (Luis, 14/10): SE SACÓ «Trabajo en Cervantes · entrar con legajo».** Cervantes ya entra con su TV en
+Registro Producción 3.0 (`/cervantes-gp2/`). Fuera el botón, el paso `tvCervStep` y `tvMostrarCervantes` /
+`loginCervantesLegajo`. **No volver a ponerlo.** Se dejó el ruteo `soloCervantes` (64360/64422) para que una sesión ya
+guardada ese día siga yendo a `./cervantes/` hasta vencer. `tests/cervantes-legajo.cjs` ahora controla que NO esté.
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.50): los INSTRUCTIVOS de pared se GENERAN, no se dibujan
 
