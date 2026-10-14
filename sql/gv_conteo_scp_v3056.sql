@@ -19,3 +19,19 @@ select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN
 --
 -- Rollback: borrar los movimientos ref 'CONTEO SCP 14/10', reponer las filas IN- desde el backup,
 -- borrar Insumos B4B / 'B13 Malas' y GP2.insumo_equivalencia B4B.
+
+-- ===================== v30.57 · 2026-10-14 (segunda tanda, Luis) =====================
+-- | celda | pieza (lo que dijo Luis)                         | cajones | qué se hizo                          |
+-- |-------|--------------------------------------------------|--------:|--------------------------------------|
+-- | C5+C6 | A1 (mgo plano pint. s/marca 501 p/serigrafiar)   |   3 + 4 | ajuste +7 (A1 total 14 con B2/B3)    |
+-- | C3    | B4B (cuerpo azul ch)                             |       4 | ajuste +4 (B4B total 8 con B6)       |
+-- | F2    | D3 Aleta Izquierda Inox                          |       1 | ALTA + equivalencia GP2 107 + ajuste |
+-- | C1    | DISC1 (mgo plano s/arito estampado chef)         |       5 | sólo posición; total 26 sin contar   |
+-- | E1    | DISC1 (s/arito estampado ch p/702 cromado)       |       6 | sólo posición (A15 sale de E1)       |
+-- | F1    | DISC5 cuerpo sacacorcho verde                    |       1 | coincide; sale de D1                 |
+-- | F3    | DISC3 mango plano blanco                         |       3 | coincide; sale de D6                 |
+-- | F4    | DISC2 mango plano verde                          |       4 | coincide; sale de D5                 |
+-- | F5    | A10 (abrelata uña pint azul c/marca)             |       1 | coincide; sale de E6                 |
+-- Salieron de las celdas: C15 (C5), B9 (C6, queda 2 cajones sin lugar), GRJ9 (F1, F2; stock 0).
+select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN-(C[1-6]|E1|F[1-5])$' order by sector;
+-- Rollback: igual que arriba + borrar Insumos D3 y GP2.insumo_equivalencia D3.
