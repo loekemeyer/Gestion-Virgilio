@@ -332,3 +332,6 @@ que sea posible (que no espere ser posicionado manualmente por un humano)"*.
 - Corre al aprobar (`cuarLiberarConfirmar`, muestra el resultado) y en el cron **`gv-cuarentena-armado-auto`** cada
   0:10 (✅ del pipeline, herencia de pedido partido, reintento). `gv_cuarentena_liberar` **no se tocó** (centinelas 146/154).
 - Centinelas 457-458. `sql/gv_cuarentena_armado_auto_v3038.sql`, `tests/cuar-sacar-armado.cjs`.
+- ⚠ **Más de 30 días en cuarentena** (v30.41, Luis D2): el armador sólo lee pedidos de `ventana_dias` (30). La Edge
+  `gv-ppp-web-tandas-diarias` v46 pregunta `gv_cuarentena_liberados_viejos` (aprobados, sin tanda, pedido de hace 31 a
+  120 días) y vuelve a leer con ventana ancha **sólo esos**. `sql/gv_cuarentena_liberados_viejos_v3041.sql`.

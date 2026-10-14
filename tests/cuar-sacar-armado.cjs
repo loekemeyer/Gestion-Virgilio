@@ -38,4 +38,9 @@ ok(/cron\.schedule\('gv-cuarentena-armado-auto'/.test(sqlAuto), "auto: cron de r
 ok(!/window\.print|remitoPrintDoc|gvImprimirAuto/.test(fn("cuarDevolverConfirmar") + fn("cuarSacarAvisoHtml") + fn("aprCuarArmAsignar")), "no se imprime ningún papel de cuarentena");
 ok(/EN_PROCESO/.test(sql) && /gv_ppp_espera_fecha\(\)/.test(sql) && /gv_ppp_web_desprogramar/.test(sql), "devolver: proceso frena, armado sin día, pendiente como siempre");
 ok(/gv_cuarentena_liberados_familia/.test(sql), "el día se asigna sólo aprobado");
+// v30.41 (Luis D2): el aprobado que pasó más de ventana_dias en cuarentena vuelve al feed del armador
+const edge = fs.readFileSync(path.join(root, "supabase/functions/gv-ppp-web-tandas-diarias/index.ts"), "utf8");
+ok(/gv_cuarentena_liberados_viejos/.test(edge) && (edge.match(/await traerLkConViejos\(desde, ventana\)/g) || []).length === 3 &&
+   (edge.match(/await traerChefConViejos\(ventana\)/g) || []).length === 3, "el armador suma los aprobados viejos en los 3 caminos (dry, intradía, normal)");
+ok(/finally \{ _tdfParaChef = tdf; \}/.test(edge), "la segunda lectura de LK no pisa los pedidos de TdF de Chef");
 process.exit(fail ? 1 : 0);

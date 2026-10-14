@@ -258,6 +258,51 @@ async function traerChef(dias: number): Promise<Fila[]> {
   return _tdfParaChef.length ? [...propios, ..._tdfParaChef] : propios;
 }
 
+/** v46 (v30.39, Luis 14/10: "si un pedido sale de cuarentena, que se programe automaticamente"):
+ *  un pedido que pasó en cuarentena MÁS días que `ventana_dias` (30) ya no venía en el feed y, aprobado,
+ *  no lo programaba nadie. `gv_cuarentena_liberados_viejos` (Virgilio) dice qué pedidos APROBADOS y sin
+ *  tanda quedaron afuera de la ventana; se vuelve a leer con la ventana ancha y se suman SÓLO esos
+ *  (lo demás viejo no entra). Si algo falla, queda el feed normal: es un agregado, no un bloqueo. */
+async function liberadosViejos(emp: "lk" | "chef", ventana: number): Promise<{ ids: Set<string>; dias: number }> {
+  try {
+    const rows = await vgRpc<{ order_id: number | string; fecha_pedido: string }[]>(
+      "gv_cuarentena_liberados_viejos", { p_empresa: emp, p_ventana: ventana });
+    const ids = new Set<string>();
+    let min = "";
+    for (const x of rows ?? []) {
+      ids.add(String(x.order_id));
+      const f = String(x.fecha_pedido ?? "").slice(0, 10);
+      if (f && (!min || f < min)) min = f;
+    }
+    if (!ids.size || !min) return { ids, dias: 0 };
+    const dias = Math.ceil((Date.now() - Date.parse(min + "T00:00:00-03:00")) / 86400000) + 2;
+    return { ids, dias: Math.max(dias, ventana) };
+  } catch (_e) { return { ids: new Set(), dias: 0 }; }
+}
+function sumarViejos(base: Fila[], anchas: Fila[], ids: Set<string>): Fila[] {
+  const ya = new Set(base.map((n) => String(n.order_id)));
+  const extra = anchas.filter((n) => ids.has(String(n.order_id)) && !ya.has(String(n.order_id)));
+  return extra.length ? [...base, ...extra] : base;
+}
+async function traerLkConViejos(desde: string, ventana: number): Promise<Fila[]> {
+  const base = await traerLk(desde);
+  const tdf = _tdfParaChef;            // traerLk lo pisa: la segunda lectura no puede cambiar lo de Chef
+  try {
+    const v = await liberadosViejos("lk", ventana);
+    if (!v.ids.size) return base;
+    const desdeAncho = new Date(Date.now() - v.dias * 86400000).toISOString().slice(0, 10);
+    return sumarViejos(base, await traerLk(desdeAncho), v.ids);
+  } catch (_e) { return base; } finally { _tdfParaChef = tdf; }
+}
+async function traerChefConViejos(ventana: number): Promise<Fila[]> {
+  const base = await traerChef(ventana);
+  try {
+    const v = await liberadosViejos("chef", ventana);
+    if (!v.ids.size) return base;
+    return sumarViejos(base, await traerChef(v.dias), v.ids);
+  } catch (_e) { return base; }
+}
+
 /** PENDIENTE PARA GESTIÓN = pedido de la página con fecha >= gestion_desde que
  *  Producción/ISIS no conozca. La regla vive en Virgilio (`gv_pedidos_web_excluidos`,
  *  sql/gv_pedidos_web_excluidos.sql); acá sólo se le pasa (empresa, order_id, cod,
@@ -828,7 +873,7 @@ Deno.serve(async (req: Request) => {
         let m3Auto = 0, npAuto = 0;
         for (const emp of ["lk", "chef"] as const) {
           try {
-            const crudas = emp === "lk" ? await traerLk(desde) : await traerChef(ventana);
+            const crudas = emp === "lk" ? await traerLkConViejos(desde, ventana) : await traerChefConViejos(ventana);
             const { filas, excluidos, pedidos_crudos } = await soloPendientes(emp, crudas, false);
             const zonas = await resolverZonas(filas.map((n) => {
               const b = barrioCrudo(n);
@@ -880,14 +925,14 @@ Deno.serve(async (req: Request) => {
         //   Ahora un feed caído se anota como `error` y contesta 500.
         const preErrores: string[] = [];
         try {
-          const s = await soloPendientes("lk", await traerLk(desde)); filasLk = s.filas; exLk = s.excluidos;
+          const s = await soloPendientes("lk", await traerLkConViejos(desde, ventana)); filasLk = s.filas; exLk = s.excluidos;
           const p = await pendienteAutomatico("lk", filasLk); m3Auto += p.m3; npAuto += p.np; det.lk = p;
         } catch (e) {
           const msg = `lk: ${e instanceof Error ? e.message : String(e)}`;
           preErrores.push(msg); det.lk = { error: msg };
         }
         try {
-          const s = await soloPendientes("chef", await traerChef(ventana)); filasChef = s.filas; exChef = s.excluidos;
+          const s = await soloPendientes("chef", await traerChefConViejos(ventana)); filasChef = s.filas; exChef = s.excluidos;
           const p = await pendienteAutomatico("chef", filasChef); m3Auto += p.m3; npAuto += p.np; det.chef = p;
         } catch (e) {
           const msg = `chef: ${e instanceof Error ? e.message : String(e)}`;
@@ -913,7 +958,7 @@ Deno.serve(async (req: Request) => {
       try {
         const { filas, excluidos } = filasLk
           ? { filas: filasLk, excluidos: exLk }
-          : await soloPendientes("lk", await traerLk(desde));
+          : await soloPendientes("lk", await traerLkConViejos(desde, ventana));
         const r = await procesarEmpresa("lk", filas, fecha);
         leidas += r.np_leidas; programadas += r.np_programadas; nTandas += r.tandas.length;
         out.lk = { np_leidas: r.np_leidas, excluidos, tandas_nuevas: r.tandas };
@@ -928,7 +973,7 @@ Deno.serve(async (req: Request) => {
       try {
         const { filas, excluidos } = filasChef
           ? { filas: filasChef, excluidos: exChef }
-          : await soloPendientes("chef", await traerChef(ventana));
+          : await soloPendientes("chef", await traerChefConViejos(ventana));
         const r = await procesarEmpresa("chef", filas, fecha, forzarChef);
         leidas += r.np_leidas; programadas += r.np_programadas; nTandas += r.tandas.length;
         out.chef = { np_leidas: r.np_leidas, excluidos, tandas_nuevas: r.tandas };
