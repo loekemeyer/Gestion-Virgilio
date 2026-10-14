@@ -71,6 +71,21 @@ discriminado de momento"). Meses sin stock: pendiente de Luis. **Excepciones por
 ⚠ `ventas_mensuales_cod` la pisó otra sesión el 25/09 y perdió la familia: ahora tiene centinela.
 **Chequeo:** `select * from public.gv_reglas_perdidas;`. `sql/gv_proyeccion_unica_v2268.sql`.
 
+## ⚠ REGLA (Luis, 2026-10-14, v30.43): 552xx SÓLO A PEDIDO · el faltante completable es demanda
+
+**Luis:** *"solo a pedido esos codigos 552xx, así que que solo pidan lo que hay pedido"*.
+
+- Los **552xx** (55215, 55219, 55289…) se fabrican a pedido: en `vista_generador_oc` el **Máximo es 0**
+  y la OC pide `pedidos − stock`. El piso de súper (v30.27) les sumaba una reserva encima del pedido ya
+  cargado: 55219 Maspoli 2000 + 626 = 2626, 55289 Pettofrezza 2000 + 6000 − 20 = 7980. Ahora 2000 y 1980.
+  El patrón vive en `Stock_Config.oc_solo_a_pedido_regex` (`^552[0-9]{2}$`): cambiarlo es un `update`.
+- **El faltante de una NP pickeada/armada que no se facturó cuenta como demanda** (vista
+  `gv_oc_faltante_pickeado`, mismo universo que «Completar pedido»: `cajas_falto > 0`, sin facturar, no
+  anulada `-X`, no cancelada, salida de los últimos 21 días). `pend_np` saca toda NP con tanda pickeada,
+  así que lo que faltó no lo pedía nadie: 789 Dorinka CH 0061, 16 pedidas, 2 armadas, 14 sin OC.
+  Al 14/10: 8 renglones, 45 cajas. La NP que sigue en `pend_np` no se suma dos veces.
+- Centinelas `oc_solo_a_pedido_regex` y `gv_oc_faltante_pickeado`. `sql/gv_generador_oc_solo_pedido_faltante_v3043.sql`.
+
 ## ⚠ Regla del dueño (2026-09-18): en las OC la PROYECCIÓN es siempre rey
 
 **Thomas, 2026-09-18, sobre el generador de OCs:** *"Proyección es siempre rey"*.
