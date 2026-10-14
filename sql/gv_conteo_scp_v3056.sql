@@ -75,3 +75,9 @@ select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN
 -- IN-C4: C16 C Sacacorcho 521 Crom 3 (alta + equivalencia GP2 105).
 -- IN-C2: 'Cpo Sacacorcho 521 S/marca' 2 (alta, SIN componente en GP2). Sale DISC1 de IN-C2 (le quedan IN-L1..L4 sin contar).
 select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('IN-C2','IN-C4');
+
+-- ===================== v30.64 · 2026-10-14 (D10 / D11, Luis) =====================
+-- D11: IN-C2 «sin marcar y sin cromar» -> el alta 'Cpo Sacacorcho 521 S/marca' se RENOMBRA a G4 «Cpo Sacacorcho 521
+--      p/cromar» (partes_crudo) en Insumos, su movimiento y su posición; equivalencia GP2 G4 -> componente 8.
+-- D10: 'Mgo Plano 512 Crudo' queda sólo en Virgilio (Luis: "si no aparece no, puede que sea muy viejo").
+select sector, cod, categoria, cantidad, stock from public.gv_scp_celda where sector='IN-C2';
