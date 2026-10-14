@@ -119,7 +119,8 @@ const RACKS = [
 
   const ok = [];
   const chk = (c, t) => { ok.push([!!c, t]); };
-  chk(out.modos.length === 3 && /SC y SP/.test(out.modos[2]), "(a) los TRES modos, con SC y SP al final");
+  // v30.86: se sumó un cuarto modo, Tránsito, después de SC y SP
+  chk(out.modos.length === 4 && /SC y SP/.test(out.modos[2]) && /Tránsito/.test(out.modos[3]), "(a) los CUATRO modos, con SC y SP tercero y Tránsito al final");
   chk(out.arranca === "pmapModoG", "(a) sigue arrancando en Góndolas");
   chk(out.modoOn === "pmapModoS", "(b) el modo SC y SP queda prendido");
   chk(/gv_scp_celda/.test(String(urlScp)), "(b) lee la vista gv_scp_celda");

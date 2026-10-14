@@ -1,4 +1,6 @@
-/* v21.74 — Entregar insumos: primero "Envío a inyectores" / "Envío a otros".
+/* v30.86 (Luis, 14/10) — Entregar insumos: «Cervantes» (directo al remito) / «Otros» (a quién, obligatorio,
+   con los inyectores habilitados como botones). Lo de abajo es la historia del test.
+   v21.74 — Entregar insumos: primero "Envío a inyectores" / "Envío a otros".
    Inyectores → sólo la lista de GP2 (sin texto libre); si GP2 no responde, abre el texto libre.
    Otros → sólo texto libre, sin llamar a GP2.
    v29.27 (Thomas, D12): el botón de Pat Bet Plast dice «(Manolo)».
@@ -13,6 +15,7 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
   p.on("pageerror", (e) => errs.push(e.message));
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(async () => {
+    const abierto = (id) => { const e = document.getElementById(id); return !!e && e.style.display !== "none"; };
     const vis = (id) => { const e = document.getElementById(id); return !!e && e.offsetParent !== null; };
     let rpc = 0, origCae = false;
     window.insGp2Rpc = async () => { rpc++; return { inyectores: ["JL Matriceria", "Kollplast", "Pat Bet Plast"], materiales: [] }; };
@@ -25,27 +28,34 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
     };
     insChooserGo("EI");
     const ch = document.getElementById("insChooserModal").innerText;
-    const out = { botones: /Envío a inyectores/.test(ch) && /Envío a otros/.test(ch) };
-    insEnvioTipoGo("otros");
-    out.otros = vis("insUbicInput") && vis("insUbicContinuar") && rpc === 0 && !/inyector/i.test(document.getElementById("insUbicGp2").innerText);
-    insUbicCancel();
-    insEnvioTipoGo("iny"); await new Promise((s) => setTimeout(s, 50));
+    /* v30.86 (Luis, 14/10): los dos botones son «Cervantes» y «Otros». */
+    const out = { botones: /Cervantes/.test(ch) && /Otros/.test(ch) && !/Envío a inyectores/.test(ch) };
+    // Cervantes: sin preguntar a quién, directo al remito que sale
+    insEnvioTipoGo("cerv");
+    out.cerv = window._insUbicacion === "Cervantes" && abierto("insDocModal") && !vis("insUbicInput");
+    try { insDocCancel(); } catch (_e) {}
+    const dm = document.getElementById("insDocModal"); if (dm) dm.style.display = "none";
+    // Otros: a quién (texto obligatorio) + los inyectores habilitados como botones
+    insEnvioTipoGo("otros"); await new Promise((s) => setTimeout(s, 50));
     const g = document.getElementById("insUbicGp2").innerText;
-    out.iny = !/JL Matriceria/.test(g) && /Kollplast/.test(g) && /Pat Bet Plast \(Manolo\)/.test(g) && !/Kollplast \(/.test(g) && !vis("insUbicInput") && !vis("insUbicContinuar") && !/otro destino/.test(g);
+    out.otros = vis("insUbicInput") && vis("insUbicContinuar") && /A quién/.test(document.getElementById("insUbicModal").innerText);
+    out.iny = !/JL Matriceria/.test(g) && /Kollplast/.test(g) && /Pat Bet Plast \(Manolo\)/.test(g) && !/Kollplast \(/.test(g);
+    let alerto = ""; const oa = window.alert; window.alert = (m) => { alerto = String(m); };
+    insUbicOk("EI"); window.alert = oa;
+    out.obligatorio = /a quién/i.test(alerto) && abierto("insUbicModal");
     insUbicCancel();
-    /* v29.82: si la lista de habilitados NO se puede leer, se ofrecen los de GP2 (lo de antes):
-       un destino de menos deja al operario sin poder registrar la salida. */
+    /* v29.82: si la lista de habilitados NO se puede leer, se ofrecen los de GP2 (lo de antes). */
     origCae = true;
-    insEnvioTipoGo("iny"); await new Promise((s) => setTimeout(s, 50));
+    insEnvioTipoGo("otros"); await new Promise((s) => setTimeout(s, 50));
     out.sinFiltro = /JL Matriceria/.test(document.getElementById("insUbicGp2").innerText);
     insUbicCancel(); origCae = false;
     window.insGp2Rpc = async () => { throw new Error("caido"); };
-    insEnvioTipoGo("iny"); await new Promise((s) => setTimeout(s, 50));
+    insEnvioTipoGo("otros"); await new Promise((s) => setTimeout(s, 50));
     out.caido = vis("insUbicInput") && vis("insUbicContinuar");
     return out;
   });
   await b.close();
-  const ok = r.botones && r.otros && r.iny && r.sinFiltro && r.caido && !errs.length;
+  const ok = r.botones && r.cerv && r.otros && r.iny && r.obligatorio && r.sinFiltro && r.caido && !errs.length;
   console.log("ins-envio-tipo:", JSON.stringify(r), errs.length ? "· errores: " + errs.join(" | ") : "", ok ? "✓ OK" : "✗ FALLA");
   process.exit(ok ? 0 : 1);
 })();

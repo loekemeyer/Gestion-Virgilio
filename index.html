@@ -6750,6 +6750,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button id="pmapModoG" class="pmap-modo pmap-modo-on" onclick="pmapModo('gondola')">🧱 Góndolas</button>
         <button id="pmapModoR" class="pmap-modo" onclick="pmapModo('rack')">📦 Racks</button>
         <button id="pmapModoS" class="pmap-modo" onclick="pmapModo('scp')">📐 SC y SP</button>
+        <button id="pmapModoT" class="pmap-modo" onclick="pmapModo('transito')">🚚 Tránsito</button>
       </div>
       <div class="pmap-bar">
         <input id="pmapSearch" class="planim-inp planim-search" type="text"
@@ -27887,18 +27888,27 @@ function insEnvioTipo() {
   const btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
   ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;margin:auto;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📤 Entregar insumos</div>' +
-    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué envío es?</div>' +
-    '<button onclick="insEnvioTipoGo(\'iny\')" style="' + btn + 'background:#0d9488;">🏭 Envío a inyectores</button>' +
-    '<button onclick="insEnvioTipoGo(\'otros\')" style="' + btn + 'background:#0f766e;">📦 Envío a otros</button>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿A quién se lo entregás?</div>' +
+    '<button onclick="insEnvioTipoGo(\'cerv\')" style="' + btn + 'background:#0d9488;">🏭 Cervantes</button>' +
+    '<button onclick="insEnvioTipoGo(\'otros\')" style="' + btn + 'background:#0f766e;">📦 Otros</button>' +
     '<button onclick="closeInsumoChooser()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>' +
     '</div>';
   ov.style.display = "flex";
 }
+/* v30.81 (Luis, 14/10): "cuando lo apretás tienen que salir dos opciones: Cervantes y Otros. Si
+   aprietan Otros que tengan que especificar a quiénes". Cervantes va directo al remito; Otros pide
+   a quién (texto obligatorio) y ahí siguen los inyectores de GP2 como botones: las bolsas plásticas
+   sólo salen a un inyector (v29.28, D9), así que el circuito con GP2 no se pierde. */
 function insEnvioTipoGo(sub) {
-  window._insEnvioSub = (sub === "iny") ? "iny" : "otros";   // v29.28 (D9): las bolsas sólo salen a un inyector
   closeInsumoChooser();
-  window._insEiSub = (sub === "iny" ? "iny" : "otros");   // v30.10: el Atras del papel vuelve a la lista correcta
-  askInsUbicacion("EI", window._insEiSub);
+  if (sub === "cerv") {
+    window._insEnvioSub = "otros"; window._insEiSub = "cerv";
+    insUbicOk("EI", null, "Cervantes");
+    return;
+  }
+  window._insEnvioSub = "otros";
+  window._insEiSub = "otros";   // v30.10: el Atras del papel vuelve a la lista correcta
+  askInsUbicacion("EI", "otros");
 }
 
 /* v9.15: Modal para preguntár DÓNDE se envía/recibe antes de abrir el modal de insumos.
@@ -27906,8 +27916,8 @@ function insEnvioTipoGo(sub) {
 function askInsUbicacion(mode, sub) {
   const isIn = mode === "RI";
   const soloIny = !isIn && sub === "iny";     // v21.74: sólo inyectores
-  const soloOtros = !isIn && sub === "otros"; // v21.74: sólo texto libre
-  const titulo = isIn ? "¿De dónde recibís?" : "¿A dónde lo envías?";
+  const soloOtros = !isIn && sub === "otros"; // v30.81: «Otros» = a quién (texto) + los inyectores de GP2
+  const titulo = isIn ? "¿De dónde recibís?" : (soloOtros ? "¿A quién se lo entregás? (obligatorio)" : "¿A dónde lo envías?");
   const hint = isIn ? "Origen/Proveedor" : "Destino/Ubicación";
 
   let ov = document.getElementById("insUbicModal");
@@ -27935,7 +27945,7 @@ function askInsUbicacion(mode, sub) {
   window._insGp2 = null;
   // v29.22: las OC de bolsas de GP2 sólo si lo que se recibe son plásticos
   const _riCat = isIn ? (window._insRiCat || "") : "";
-  if (!soloOtros && (!isIn || !_riCat || _riCat === "plastico")) _insGp2Opciones(mode, soloIny);
+  if (!isIn || !_riCat || _riCat === "plastico") _insGp2Opciones(mode, soloIny);
   // v29.82: los origenes de ESA categoria, como botones. Sin categoria (EI, o una sesion vieja)
   // no hay lista cerrada que mostrar: queda el texto libre.
   if (isIn && _riCat) _insOrigenBotones(mode, _riCat);
@@ -27962,7 +27972,7 @@ function insUbicOk(mode, _gp2, _fijo) {
     const inp = document.getElementById("insUbicInput");
     ubicacion = (inp && inp.value) ? String(inp.value).trim() : "";
     if (!ubicacion) {
-      alert("Completá la ubicación");
+      alert(mode === "EI" ? "Escribí a quién se lo entregás" : "Completá la ubicación");
       return;
     }
     window._insGp2 = null;
@@ -28081,7 +28091,7 @@ function _insDocStep2(mode) {
     html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de Factura</label><input type="date" id="insDocFechaFactura" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;" value="' + hoyAR + '"></div>';
   }
   html += '<div style="display:flex;gap:10px;margin-top:14px;">' +
-    '<button onclick="' + (mode === "EI" ? "insDocCancel();askInsUbicacion('EI', window._insEiSub)" : (window._insDocSolo ? "insDocCancel();insRecibirCat()" : "_insDocStep1('" + mode + "')")) + '" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
+    '<button onclick="' + (mode === "EI" ? (window._insEiSub === "cerv" ? "insDocCancel();insEnvioTipo()" : "insDocCancel();askInsUbicacion('EI', window._insEiSub)") : (window._insDocSolo ? "insDocCancel();insRecibirCat()" : "_insDocStep1('" + mode + "')")) + '" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
     '<button onclick="insDocOk(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;font-size:16px;">Continuar</button>' +
     '</div>';
   body.innerHTML = html;
@@ -28336,7 +28346,7 @@ async function showInsumoModal(mode, legajo, _resume) {
     // próxima apertura de RI/EI sin tener que recargar la app.
     await insLoadMeta(true);
     const _provFleje = (mode === "RI") ? String(window._insProvFleje || "") : ""; window._insProvFleje = null;
-    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni(), mode === "RI" ? insFetchGp2Ri() : Promise.resolve(null),
+    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni(), insFetchGp2Ri(),
       _provFleje ? insFetchFlejeProv() : Promise.resolve(null)]);
     const saldos = res[1] || {};
     const xUni = res[2] || {};
@@ -28366,7 +28376,9 @@ async function showInsumoModal(mode, legajo, _resume) {
     // Ni los TMP- ni los códigos viejos (1262500, 1266500, 1445): no se reciben ni se entregan.
     // v29.35 (D43): en RECEPCIÓN aparecen además todos los componentes de GP2 del rubro. Un insumo ya vinculado a
     // GP2 se ve aunque no tenga lugar en el Mapa; el que falta en Virgilio se da de alta al elegirlo (gv_insumo_desde_gp2).
-    const gp2Ri = (mode === "RI" && Array.isArray(res[3])) ? res[3] : [];
+    /* v30.81 (Luis, 14/10): "la lista de recibir/entregar cajas les muestre todas" las de GP2 (Sector Caja).
+       Al ENTREGAR se suman sólo las cajas: el resto de los rubros sigue saliendo de lo que hay en Virgilio. */
+    const gp2Ri = Array.isArray(res[3]) ? (mode === "RI" ? res[3] : res[3].filter(function (g) { return g.categoria === "cajas"; })) : [];
     const gp2Vinc = {};
     gp2Ri.forEach(function (g) { if (g.cod_virgilio) gp2Vinc[_insK(g.cod_virgilio)] = true; });
     lista = lista.filter(function (x) { return insCatOf(x) !== "plastico" || _insEsBolsaIny(x) || (mode === "RI" && gp2Vinc[_insK(x.cod)]); });
@@ -29004,7 +29016,7 @@ async function insConfirmar() {
     if (insCatOf(it) === "cajas") { if (_insUEq(uni, "Paquetes")) { nota = " · cargado " + _insNum(qty) + " paquetes × " + INS_CAJA_X_PAQ; qty = qty * INS_CAJA_X_PAQ; } uni = "Uni"; }
     // v29.56 (Luis, 13/10): de qué empresa vino, en toda recepción. No parte el stock (sigue Mixto).
     if (isIn && it.marca) nota += " · marca " + it.marca;
-    const row = { cod_art: it.cod, descripcion: ((it.nombre || "") + nota).trim() || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: it.ubic || it.sector || null };
+    const row = { cod_art: it.cod, descripcion: ((it.nombre || "") + nota).trim() || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: isIn ? "TRANSITO" : (it.ubic || it.sector || null) };   // v30.81: todo insumo que ingresa va a TRANSITO (y el trigger aa_gv_insumo_recepcion_transito lo sostiene)
     // v30.06 (Luis, 13/10): el REMITO / la FACTURA van en el movimiento (columna gv_doc), no se
     // pierden. Lo mismo para todas las filas de la recepcion: es UN papel.
     if (doc) row.gv_doc = doc;
@@ -48969,6 +48981,7 @@ function pmapBuscar(v) {
   if (inp && inp.value !== v && v != null) inp.value = v;
   if (_pmapModo === "rack") { prkSaltar(); pmapRender(); return; }
   if (_pmapModo === "scp") { pscpSaltar(); pmapRender(); return; }
+  if (_pmapModo === "transito") { ptrSaltar(); pmapRender(); return; }
   if (_pmapQ) {
     const hayAca = (_pmap || []).some(function (r) {
       return String(r.gondola || "").toUpperCase() === _pmapG && pmapMatch(r, _pmapQ);
@@ -48997,6 +49010,12 @@ function pmapRender() {
     if (dzb) dzb.hidden = true;
     const dz0 = document.getElementById("prkDesfase"); if (dz0) dz0.hidden = true;
     pscpRender(); return;
+  }
+  if (_pmapModo === "transito") {
+    if (vj) vj.style.display = "none";
+    if (dzb) dzb.hidden = true;
+    const dz1 = document.getElementById("prkDesfase"); if (dz1) dz1.hidden = true;
+    ptrRender(); return;
   }
   pmapDiscRender();
   if (vj) vj.style.display = "";
@@ -49166,9 +49185,10 @@ function pmapCellHtml(g, n, porCelda) {
 function pmapModo(m) {
   /* v29.98 (Luis, 13/10) — TRES clases de lugar: góndola · rack · SC y SP (la grilla IN-A1…IN-L6,
      que son las piezas de Cervantes y NO racks). Cada una tiene su modo y su vista. */
-  _pmapModo = (m === "rack") ? "rack" : (m === "scp" ? "scp" : "gondola");
+  _pmapModo = (m === "rack") ? "rack" : (m === "scp" ? "scp" : (m === "transito" ? "transito" : "gondola"));
   const g = document.getElementById("pmapModoG"), r = document.getElementById("pmapModoR"),
-        sc = document.getElementById("pmapModoS");
+        sc = document.getElementById("pmapModoS"), tr = document.getElementById("pmapModoT");
+  if (tr) tr.classList.toggle("pmap-modo-on", _pmapModo === "transito");
   if (g) g.classList.toggle("pmap-modo-on", _pmapModo === "gondola");
   if (r) r.classList.toggle("pmap-modo-on", _pmapModo === "rack");
   if (sc) sc.classList.toggle("pmap-modo-on", _pmapModo === "scp");
@@ -49187,7 +49207,64 @@ function pmapModo(m) {
     if (!_pscp) { pmapSetStatus("Cargando SC y SP…", true); pscpFetch().then(function () { pscpSaltar(); pmapRender(); }); }
     else pscpSaltar();
   }
+  if (_pmapModo === "transito") {
+    if (!_ptr) { pmapSetStatus("Cargando Tránsito…", true); ptrFetch().then(function () { ptrSaltar(); pmapRender(); }); }
+    else ptrSaltar();
+  }
   pmapRender();
+}
+/* v30.81 (Luis, 14/10) — pestaña TRÁNSITO del Mapa: dos sectores que viven en GV_Lugar (tipo 'transito'):
+   · A GUARDAR (AGUARDAR) — la mercadería del depósito a_guardar, en cajas.
+   · TRÁNSITO (TRANSITO)  — los insumos que entraron sin un lugar definido. Toda recepción de insumo entra a
+     TRANSITO (trigger aa_gv_insumo_recepcion_transito) y el que no tiene posición queda anotado ahí
+     (zz_gv_insumo_transito_ubicar). Al darle su lugar en el Mapa sale solo de esta lista.
+   Lo dibuja la vista gv_transito_celda (sql/gv_transito_v3081.sql). Sólo lectura. */
+let _ptr = null, _ptrS = "";
+const PTR_SECS = [{ k: "AGUARDAR", lbl: "A guardar", vacio: "No hay nada en A guardar." },
+                  { k: "TRANSITO", lbl: "Tránsito", vacio: "No hay insumos en tránsito: todo lo recibido tiene su lugar en el Mapa." }];
+async function ptrFetch() {
+  const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_transito_celda",
+    "select=sector,cod,emp,descripcion,cantidad,unidad&order=sector.asc,cod.asc");
+  if (filas || !_ptr) _ptr = filas || [];
+  return _ptr;
+}
+function ptrMatch(r, q) {
+  if (!q) return false;
+  return String(r.cod || "").toUpperCase().indexOf(q) >= 0 || String(r.descripcion || "").toUpperCase().indexOf(q) >= 0;
+}
+function ptrSaltar() {
+  if (!_pmapQ || !_ptr) return;
+  if (_ptr.some(function (r) { return r.sector === _ptrS && ptrMatch(r, _pmapQ); })) return;
+  const otra = _ptr.filter(function (r) { return ptrMatch(r, _pmapQ); })[0];
+  if (otra) _ptrS = otra.sector;
+}
+function ptrGo(s) { _ptrS = String(s || ""); pmapRender(); }
+function ptrRender() {
+  const tabs = document.getElementById("pmapTabs"), box = document.getElementById("pmapGrid"),
+        leg = document.getElementById("pmapLeg");
+  if (!box) return;
+  if (leg) leg.innerHTML = "";
+  if (!_ptr) { box.innerHTML = '<div class="planim-empty">Cargando…</div>'; if (tabs) tabs.innerHTML = ""; return; }
+  if (!_ptrS) _ptrS = PTR_SECS[0].k;
+  const n = function (k) { return _ptr.filter(function (r) { return r.sector === k; }).length; };
+  if (tabs) tabs.innerHTML = PTR_SECS.map(function (s) {
+    const hit = _pmapQ && _ptr.some(function (r) { return r.sector === s.k && ptrMatch(r, _pmapQ); });
+    return '<button class="lug-tab' + (s.k === _ptrS ? " lug-tab-on" : "") + (hit ? " pmap-tab-hit" : "") + '" onclick="ptrGo(\'' + s.k + '\')">' +
+           escapeHtml(s.lbl) + ' <b>' + n(s.k) + '</b></button>';
+  }).join("");
+  const sec = PTR_SECS.filter(function (s) { return s.k === _ptrS; })[0] || PTR_SECS[0];
+  const rows = _ptr.filter(function (r) { return r.sector === sec.k; });
+  let h = '<div class="pmap-head"><b>' + escapeHtml(sec.lbl) + '</b> · ' + rows.length + (rows.length === 1 ? " código" : " códigos") + '</div>';
+  if (!rows.length) h += '<div class="planim-empty">' + escapeHtml(sec.vacio) + '</div>';
+  else h += '<div class="gv-tblwrap"><table class="gv-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Emp</th><th>Cant.</th></tr></thead><tbody>' +
+    rows.map(function (r) {
+      const hit = _pmapQ && ptrMatch(r, _pmapQ);
+      return '<tr' + (hit ? ' class="pmap-hit"' : '') + '><td><b>' + escapeHtml(String(r.cod || "")) + '</b></td><td>' + escapeHtml(String(r.descripcion || "")) +
+        '</td><td style="text-align:center">' + escapeHtml(String(r.emp || "")) + '</td><td style="text-align:center">' + pmapNum(Number(r.cantidad) || 0) +
+        (r.unidad ? " " + escapeHtml(String(r.unidad)) : "") + '</td></tr>';
+    }).join("") + '</tbody></table></div>';
+  box.innerHTML = h;
+  pmapSetStatus("A guardar " + n("AGUARDAR") + " · Tránsito " + n("TRANSITO"));
 }
 async function prkFetch() {
   // v22.77: Racks_Planimetria es una VISTA — la cantidad sale del libro de stock (ubicacion = sector).

@@ -103,9 +103,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       otrasEI && !/ins-itbtn add/.test(htmlRI) && altaBloqueada && altaAbre;
     out.plaRI = plaRI; out.plaEI = plaEI;
     // (f) v29.28 (D9): eligió «Envío a inyectores» (aunque GP2 no devuelva la lista) → sólo bolsas
-    insEnvioTipoGo("iny");
+    // v30.86: «Entregar → Otros» y ahí un INYECTOR (el botón deja la salida marcada como envío a inyector)
+    insEnvioTipoGo("otros");
     await _hasta(function () { const x = document.getElementById("insUbicModal"); return !!x && x.style.display === "flex"; });
-    insUbicCancel(); window._insGp2 = null;
+    insUbicCancel(); window._insGp2 = null; window._insEnvioSub = "iny";
     await showInsumoModal("EI", "104");
     out.f = _ins.soloBolsas === true && _ins.items.length > 0 && _ins.items.every(function (x) { return x.cat === "plastico"; });
     // (g) v29.29 (Thomas): la bolsa va sólo en Bolsas, se ve en kg y el movimiento lleva los kg

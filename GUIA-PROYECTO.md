@@ -1,3 +1,12 @@
+## Nota v30.86 (2026-10-14) — Insumos: Entregar = Cervantes / Otros · cajas de GP2 · lugar TRÁNSITO
+
+- 📤 Entregar insumos pregunta **Cervantes** (directo al remito) u **Otros** (a quién, obligatorio; los inyectores de GP2 como botones).
+- La lista de cajas (RI y EI) sale de **GP2 Sector Caja** (11 cajas).
+- `GV_Lugar` suma el tipo **`transito`** con `AGUARDAR` y `TRANSITO`. Toda `recepcion_insumo` sin ubicación entra a
+  `TRANSITO` (trigger `aa_gv_insumo_recepcion_transito`); el insumo sin lugar en el Mapa queda anotado ahí
+  (`zz_gv_insumo_transito_ubicar`). Mapa → pestaña **🚚 Tránsito** (vista `gv_transito_celda`).
+- Detalle: `docs/REGLAS-INSUMOS.md`; SQL: `sql/gv_transito_v3081.sql`.
+
 ## Nota v27.00 (2026-10-05) — Mon. Admin: la NP web ya no sale «LK LK»
 
 - Luis: el pop-up de un estado del día («NPs por Día», p. ej. Jue 08/10 · En proceso) mostraba «LK LK 0147». El árbol de

@@ -226,10 +226,10 @@ Tocá **📦** y **Enviar**. Hay **3 opciones**:
   Al **recibir** cualquier insumo hay que elegir la **Marca**: de qué empresa viene. En cajas es
   **Loeke** o **Chef**; en el resto está además **Mixto** (sirve para las dos). Es el mismo insumo
   en el mismo lugar — la marca sólo queda anotada, no parte el stock. Sin marca no se registra.
-- **📤 Entregar insumos**: sale stock de insumos. Primero **«¿Qué envío es?»**: **🏭 Envío a
-  inyectores** (elegís el inyector y aparecen sólo las bolsas plásticas; es la única forma de sacar
-  bolsas) o **📦 Envío a otros** (todo lo demás, sin bolsas plásticas);
-  después el destino y el **N° de remito con el que sale**, que es **obligatorio**: un insumo no
+- **📤 Entregar insumos**: sale stock de insumos. Primero **«¿A quién se lo entregás?»**: **🏭 Cervantes**
+  (va directo al remito) u **📦 Otros**, donde escribís a quién (es obligatorio) o tocás un
+  inyector (con un inyector aparecen sólo las bolsas plásticas; es la única forma de sacar bolsas);
+  después el **N° de remito con el que sale**, que es **obligatorio**: un insumo no
   sale sin remito. Después **la lista se abre sola** (no hay que volver a tocar Enviar): las cantidades y
   **«✓ Registrar salida»**. Las bolsas plásticas van a **Kollplast**, **Pat Bet Plast** o
   **Pettofrezza**, y a nadie más. Un insumo que viene en caja master (MC) **sale siempre en MC

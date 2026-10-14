@@ -3,6 +3,30 @@
 > Movido de `CLAUDE.md` el 2026-10-13 (poda 3ra tanda, pedido de Luis) **sin cambiar una palabra**.
 > **Leerlo ENTERO antes de tocar algo de este tema.** Las reglas siguen valiendo igual que cuando estaban en CLAUDE.md.
 
+## ⚠⚠ REGLA (Luis, 2026-10-14, v30.86; la base dice v30.81, llave): ENTREGAR = Cervantes / Otros · cajas de GP2 · todo insumo que entra va a TRÁNSITO
+
+**Luis:** *"entregar insumos … tienen que salir dos opciones: Cervantes y Otros. Si aprietan Otros que tengan que
+especificar a quiénes"* · *"la lista de recibir/entregar cajas les muestre todas"* las de GP2 · *"Todo insumo que
+ingresa a partir de ahora a Virgilio va a ir a un lugar que se va a llamar transito … No quiero que esto se cree
+solo en el front"*.
+
+| qué | cómo |
+|---|---|
+| 📤 Entregar → **Cervantes** | destino fijo «Cervantes», directo al remito que sale (obligatorio, v30.12) |
+| 📤 Entregar → **Otros** | *¿A quién se lo entregás? (obligatorio)* en texto; arriba, los **inyectores habilitados** como botones. Retira «Envío a inyectores / Envío a otros» (v21.74). **Las bolsas sólo salen a un inyector** (D9 sigue): elegir el botón del inyector es lo que las habilita |
+| cajas | RI y EI muestran las cajas de **GP2 Sector Caja** (`gv_gp2_componentes_ri`, categoría `cajas`). Una que Virgilio no tiene se da de alta al tocarla (`gv_insumo_desde_gp2`) |
+| lugar | `GV_Lugar` tipo **`transito`**: `AGUARDAR` (A guardar) y `TRANSITO` (Tránsito). `gv_insumo_sector` los reconoce como posición válida |
+| recepción | el front graba `ubicacion='TRANSITO'`; el trigger **`aa_gv_insumo_recepcion_transito`** pone TRANSITO a toda `recepcion_insumo` que llegue sin ubicación (los importados de `gv_imp_recibir` van a su rack y no se tocan) |
+| sin lugar | **`zz_gv_insumo_transito_ubicar`**: si el insumo no tiene ninguna posición en el Mapa, se le anota TRANSITO en `Insumos_Ubicaciones`. Al darle su lugar sale solo de la lista |
+| Mapa | pestaña **🚚 Tránsito** (vista `gv_transito_celda`): A guardar = depósito `a_guardar` en cajas; Tránsito = insumos con saldo cuyo único lugar es TRANSITO |
+
+- ⚠ **GP2 Sector Caja tiene 11 cajas** (Nº 1, 2, 6, 7, 10, 12, 13, 15, 16, 22, 29) — las mismas 11 que ya tenía Virgilio.
+  `GP2.uni_x_articulo_x_caja` usa además **Nº 5, 8, 14, 27, 28 y «P»** (la Nº 8 en 30 artículos) **sin componente en
+  GP2**: no aparecen en la lista hasta que se den de alta en GP2. No se inventaron.
+- **Forward-facing**: los 19 insumos con stock y sin lugar (alarma `gv_mapa_stock_sin_lugar`) no se pasaron a TRANSITO.
+- `sql/gv_transito_v3081.sql` (centinelas `gv_insumo_recepcion_transito`, `gv_insumo_sector`) ·
+  `tests/ins-envio-tipo.cjs` · `tests/ins-transito-cajas.cjs`.
+
 ## ⚠⚠ REGLA (Luis, 2026-10-14, v30.37): un insumo en 0 LIBERA su rack — la posición NO queda guardada
 
 **Luis:** *"si un rack se queda en 0 stock que figure libre"* y, sobre dejar la posición guardada para cuando vuelva
