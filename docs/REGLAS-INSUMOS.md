@@ -3,6 +3,18 @@
 > Movido de `CLAUDE.md` el 2026-10-13 (poda 3ra tanda, pedido de Luis) **sin cambiar una palabra**.
 > **Leerlo ENTERO antes de tocar algo de este tema.** Las reglas siguen valiendo igual que cuando estaban en CLAUDE.md.
 
+## ⚠⚠ REGLA (Luis, 2026-10-14, v30.37): un insumo en 0 LIBERA su rack — la posición NO queda guardada
+
+**Luis:** *"si un rack se queda en 0 stock que figure libre"* y, sobre dejar la posición guardada para cuando vuelva
+el stock: *"eso está mal"*. Un rack es **volátil**: se vacía y después entra otro producto (LK, CH) o un insumo.
+
+- Trigger `zz_gv_insumo_liberar_rack` → `gv_insumo_liberar_rack_sin_stock(cod)`: sin saldo > 0 en ninguna unidad,
+  se borran las posiciones de **rack** del insumo (las celdas `IN-` de SC/SP no). Queda en `Insumos_Historial`.
+- El rack partido (`W04-1` / `W04-2`) no cambia: se libera sólo la parte del insumo que quedó en 0.
+- ⚠ Pendiente sin hacer (Luis: *"de momento no"*): la **empresa del rack** (`GV_Lugar.empresa`) se «contagia» a lo
+  que entra después (el Mapa muestra `coalesce(lugar, movimiento)` y `gv_imp_recibir` decide racks_ch / insumo por
+  ella). No limpiarla sin que lo pida. `sql/gv_insumo_liberar_rack_v3037.sql`.
+
 ## ⚠⚠ REGLA (Luis, 2026-10-14, v30.30): HAY TRES ESPIRALES — `1000900`, `H201Part` y `007` NO se mezclan
 
 **Luis, textual:** *"hay varias espirales. las que estan en y04 ahora son las 1000900. en AD4 hay unas que se llaman
