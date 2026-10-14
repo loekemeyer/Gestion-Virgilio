@@ -43,4 +43,7 @@ const edge = fs.readFileSync(path.join(root, "supabase/functions/gv-ppp-web-tand
 ok(/gv_cuarentena_liberados_viejos/.test(edge) && (edge.match(/await traerLkConViejos\(desde, ventana\)/g) || []).length === 3 &&
    (edge.match(/await traerChefConViejos\(ventana\)/g) || []).length === 3, "el armador suma los aprobados viejos en los 3 caminos (dry, intradía, normal)");
 ok(/finally \{ _tdfParaChef = tdf; \}/.test(edge), "la segunda lectura de LK no pisa los pedidos de TdF de Chef");
+const sqlExc = fs.readFileSync(path.join(root, "sql/gv_cuarentena_ventana_exc_v3044.sql"), "utf8");
+ok(/from public\."GV_Cuarentena_Ventana_Exc" x/.test(sqlExc) && /after insert on public\."GV_Cuarentena_Log"/.test(sqlExc),
+   "la excepción de ventana es sólo la foto del 14/10 + lo que entra a cuarentena desde ahí (sin basura vieja)");
 process.exit(fail ? 1 : 0);

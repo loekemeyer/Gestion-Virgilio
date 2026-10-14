@@ -332,6 +332,10 @@ que sea posible (que no espere ser posicionado manualmente por un humano)"*.
 - Corre al aprobar (`cuarLiberarConfirmar`, muestra el resultado) y en el cron **`gv-cuarentena-armado-auto`** cada
   0:10 (✅ del pipeline, herencia de pedido partido, reintento). `gv_cuarentena_liberar` **no se tocó** (centinelas 146/154).
 - Centinelas 457-458. `sql/gv_cuarentena_armado_auto_v3038.sql`, `tests/cuar-sacar-armado.cjs`.
-- ⚠ **Más de 30 días en cuarentena** (v30.41, Luis D2): el armador sólo lee pedidos de `ventana_dias` (30). La Edge
-  `gv-ppp-web-tandas-diarias` v46 pregunta `gv_cuarentena_liberados_viejos` (aprobados, sin tanda, pedido de hace 31 a
-  120 días) y vuelve a leer con ventana ancha **sólo esos**. `sql/gv_cuarentena_liberados_viejos_v3041.sql`.
+- ⚠ **Más de 30 días en cuarentena** (v30.44, Luis D2: *"que sea una excepcion para pedidos que entraron en la cuarentena
+  y clientes nuevos. Los que estan ahora + forward-facing. no arriesgues a traer basura vieja"*): el armador sólo lee
+  `ventana_dias` (30). La excepción vale SÓLO para **`GV_Cuarentena_Ventana_Exc`**: la foto del 14/10 (8 pedidos en
+  cuarentena / clientes nuevos sin aprobar, no anulados) + todo pedido al que desde ahí se le anota `entro` en
+  `GV_Cuarentena_Log` (trigger). La Edge `gv-ppp-web-tandas-diarias` v46 los relee con ventana ancha vía
+  `gv_cuarentena_liberados_viejos`. Lo aprobado antes del 14/10 no entra nunca (la v30.41 tomaba cualquier aprobado
+  de 31 a 120 días: **retirado**). `sql/gv_cuarentena_ventana_exc_v3044.sql`.
