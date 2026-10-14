@@ -1,0 +1,8 @@
+-- v30.70-encima (Elías, 14/10/2026, D6): en public.gv_horas_operario_detalle_v2 (fuente del PDF
+-- «Horas por operario» que llega al celular y del modal Reporte diario Virgilio), una tarea hecha
+-- MIENTRAS otra está abierta se descuenta de la de afuera, igual que el baño: cada minuto es de la
+-- ÚLTIMA tarea abierta que lo cubre (CTEs iv / iv_pts / iv_seg / iv_own / owned). Aplica a los
+-- cierres del mismo día; los que cruzan la medianoche siguen con el cálculo anterior.
+-- Caso: Jhonny Moncayo 09/10, Hs Total 11:11 -> 9:00 (jornada 9:05).
+-- Se aplicó por replace() sobre la definición viva; backup en zz_backups.gv_horas_operario_detalle_v2_def_20261014.
+-- Centinela: GV_Reglas_Centinela v30.70 (patrón 'owned o where o\.rid = n\.rid').

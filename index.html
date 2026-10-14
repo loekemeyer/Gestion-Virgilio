@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.69">
+<link rel="stylesheet" href="gv-ui.css?v=30.70">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.69"></script>
+<script type="module" src="recepcion.js?v=30.70"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10792,7 +10792,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.69";
+const APP_VERSION = "v30.70";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -22623,7 +22623,7 @@ function openReporteVirgilio() {
   const hoy = new Date(), ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
   body.innerHTML =
     '<div class="stkpop-hint" style="max-width:900px;white-space:normal">Elegí un día y generá el reporte. Se arma en el momento como cuadro; <b>no manda WhatsApp</b> (el envío diario a Juan es aparte).<br>'
-    + 'Las horas son opcionales: vacías miden la jornada entera (08:00 a 17:00); cargadas miden <b>sólo ese lapso</b> (ej. 13:00 a 16:30).</div>' +
+    + 'Sin horas: mismo cálculo que el PDF que llega al celular. Con Desde/Hasta mide <b>sólo ese lapso</b> (ej. 13:00 a 16:30), con el cálculo anterior.</div>' +
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
     '<label style="font-weight:700;font-size:14px">Día:</label>' +
     '<input type="date" id="rvFecha" value="' + _iso(hoy) + '" max="' + _iso(hoy) + '" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">' +
@@ -22736,6 +22736,67 @@ function _rvPendHtml(p) {
     items.map(function (t) { return '<li>' + t + '</li>'; }).join("") + '</ul>';
   return h;
 }
+// v30.70 — (Elías, 14/10, D2) sin lapso, el cuadro sale del MISMO cálculo que el PDF que llega al
+// celular («Horas por operario», gv-reporte-horas-xlsx → gv_horas_operario_detalle_v2). Antes usaba el
+// motor viejo (calculo.js, jornada recortada 08–17) y daba otros números: Farias 09/10, 3:27 contra 5:01.
+// Con Desde/Hasta sigue el motor viejo: el cálculo del celular no mide lapsos.
+const RV_DET = [["cr","Ctrol<br>Remit"],["rg","Recep y<br>Guard ART"],["limp","Limp"],["rk","Racks"],["pc","Comida"],
+  ["cc","Carg<br>Cami"],["rr","Recep<br>Remi"],["pb","Baño"],["ei","Entrg<br>Insum"],["at","Timbre"],["ct","Cont"],
+  ["ri","Recep<br>Insum"],["perm","Perm"],["anu","Anulado"]];
+const RV_ALIAS = { "104": "Jhonny", "8": "Farias", "94": "Isidro", "277": "Jhonny C", "237": "Franco" };
+function _rvHorasHtml(filas) {
+  const MIN_H = 1 / 60, num = function (v) { return Number(v) || 0; };
+  const hm = function (h) { if (!(h > MIN_H)) return ""; const t = Math.round(h * 60); return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0"); };
+  const rit = function (m3, hs) { return (hs > 0.05 && m3 > 0) ? (Math.round(m3 / hs * 100) / 100).toFixed(2).replace(".", ",") : "—"; };
+  const rows = filas.map(function (f) {
+    const d = { nombre: RV_ALIAS[String(f.legajo)] || String(f.nombre || "").trim().split(/\s+/)[0] || ("Leg " + f.legajo) };
+    ["jor","pick","arm","m3p","m3a"].concat(RV_DET.map(function (c) { return c[0]; })).forEach(function (k) { d[k] = num(f[k]); });
+    d.prod = d.pick + d.arm;
+    d.noprod = RV_DET.reduce(function (s, c) { return s + d[c[0]]; }, 0);
+    d.sin = Math.max(d.jor - d.prod - d.noprod, 0);
+    d.total = d.prod + d.noprod;
+    return d;
+  }).sort(function (a, b) { return b.noprod - a.noprod; });
+  const det = RV_DET.filter(function (c) { return rows.some(function (r) { return r[c[0]] > MIN_H; }); });
+  const haySin = rows.some(function (r) { return r.sin > MIN_H; });
+  const islas = [
+    [["nombre", "Nombre", true]],
+    [["_pk", "Pking<br>x Hs"], ["_ar", "Arma<br>x Hs"]],
+    [["_prod", "Hs<br>Prod"], ["_np", "Hs No<br>Prod"], ["_tot", "Hs<br>Total"]],
+    (haySin ? [["_sin", "T<br>Muerto"]] : []).concat(det),
+  ].filter(function (i) { return i.length; });
+  const val = function (r, k) {
+    if (k === "nombre") return r.nombre;
+    if (k === "_pk") return rit(r.m3p, r.pick);
+    if (k === "_ar") return rit(r.m3a, r.arm);
+    if (k === "_prod") return hm(r.prod);
+    if (k === "_np") return hm(r.noprod);
+    if (k === "_tot") return hm(r.total);
+    if (k === "_sin") return hm(r.sin);
+    return hm(r[k]);
+  };
+  const G = "2px solid #0f172a", F = "1px solid #475569";
+  const gap = function (tag) { return '<' + tag + ' style="width:6px;min-width:6px;padding:0;border:none;background:transparent"></' + tag + '>'; };
+  const lados = function (j, n) { return 'border-left:' + (j === 0 ? G : F) + ';border-right:' + (j === n - 1 ? G : F) + ';'; };
+  let h = '<div style="overflow-x:auto;margin-bottom:6px;padding:1px"><table style="border-collapse:collapse;table-layout:auto;font-size:14px"><thead><tr>';
+  h += islas.map(function (isla, k) {
+    return (k ? gap("th") : "") + isla.map(function (c, j) {
+      return '<th style="padding:6px 7px;text-align:center;vertical-align:middle;font-size:13px;font-weight:800;color:#0f172a;background:#fff;white-space:nowrap;line-height:1.15;border-top:' + G + ';border-bottom:' + G + ';' + lados(j, isla.length) + '">' + c[1] + '</th>';
+    }).join("");
+  }).join("") + '</tr></thead><tbody>';
+  h += rows.map(function (r, ri) {
+    const abajo = (ri === rows.length - 1) ? G : F;
+    return '<tr>' + islas.map(function (isla, k) {
+      return (k ? gap("td") : "") + isla.map(function (c, j) {
+        const v = val(r, c[0]);
+        const b = lados(j, isla.length) + 'border-bottom:' + abajo + ';';
+        if (c[2]) return '<td style="padding:6px 10px;text-align:left;font-weight:700;color:#0f172a;white-space:nowrap;background:#fff;' + b + '">' + escapeHtml(v) + '</td>';
+        return '<td style="padding:6px 8px;text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;background:#fff;color:#0f172a;' + b + '">' + escapeHtml(v) + '</td>';
+      }).join("");
+    }).join("") + '</tr>';
+  }).join("") + '</tbody></table></div>';
+  return h;
+}
 async function rvGenerar() {
   const f = (document.getElementById("rvFecha") || {}).value;
   // v21.18 — lapso opcional. Vacías = jornada entera; la edge decide (parseVentana) y
@@ -22750,6 +22811,25 @@ async function rvGenerar() {
   const dd = f.split("-").reverse().join("/");
   const lapso = (hDesde || hHasta) ? (" de " + (hDesde || "08:00") + " a " + (hHasta || "17:00")) : "";
   est.innerHTML = "Generando el reporte del " + dd + lapso + "…"; if (vis) vis.innerHTML = ""; desc.style.display = "none";
+  if (!hDesde && !hHasta) {
+    try {
+      const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
+      const URLH = SUPABASE_URL + "/functions/v1/gv-reporte-horas-xlsx";
+      const r = await fetch(URLH, { method: "POST", headers: H, body: JSON.stringify({ fecha: f, solo_filas: true }) });
+      const j = await r.json().catch(function () { return null; });
+      if (!r.ok || !j || j.error) { est.textContent = "No se pudo generar: " + ((j && (j.error || j.message)) || ("HTTP " + r.status)); return; }
+      const filas = j.filas || [];
+      if (!filas.length) { est.textContent = "El " + dd + " no tiene datos de operarios cargados."; return; }
+      est.textContent = "Listo — " + dd + " · " + filas.length + " operario" + (filas.length === 1 ? "" : "s") + " · mismo cálculo que el PDF del celular.";
+      if (vis) vis.innerHTML = '<div style="font-size:16px;font-weight:800;color:#0f172a;margin:2px 0 8px">Horas por operario — ' + dd + '</div>' + _rvHorasHtml(filas);
+      // el PDF imprimible se arma aparte (tarda: Excel + 2 PDF); el cuadro no lo espera
+      fetch(URLH, { method: "POST", headers: H, body: JSON.stringify({ fecha: f, solo_xlsx: true }) })
+        .then(function (x) { return x.json(); })
+        .then(function (k) { if (k && k.pdfUrl && desc) { desc.href = k.pdfUrl; desc.setAttribute("download", "Virgilio-" + f + ".pdf"); desc.style.display = "inline"; } })
+        .catch(function () {});
+    } catch (e) { est.textContent = "Error de red: " + ((e && e.message) || e); }
+    return;
+  }
   try {
     const r = await fetch(SUPABASE_URL + "/functions/v1/gv-reporte-diario-virgilio", {
       method: "POST",
@@ -63738,7 +63818,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.69"></script>
+<script src="importacion.js?v=30.70"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67029,15 +67109,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.69"></script>
-<script src="hotsale.js?v=30.69"></script>
-<script src="estadisticas.js?v=30.69"></script>
-<script src="ads.js?v=30.69"></script>
-<script src="plantel.js?v=30.69"></script>
+<script src="cobranzas.js?v=30.70"></script>
+<script src="hotsale.js?v=30.70"></script>
+<script src="estadisticas.js?v=30.70"></script>
+<script src="ads.js?v=30.70"></script>
+<script src="plantel.js?v=30.70"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.69"></script>
+<script src="analisis.js?v=30.70"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.69"></script>
+<script src="ayuda.js?v=30.70"></script>
 
 </body>
 </html>
