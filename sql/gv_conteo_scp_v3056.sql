@@ -46,3 +46,9 @@ select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('I
 -- IN-A4: C15 -> A15 Cpo Uña Inox LK C/M 6 (sólo posición; A15 sistema 7, IN-E2 sin contar).
 -- IN-A5: C6 sale -> C15 3 cajones. C15 ajuste -3 (6 -> 3). C15 conserva IN-A1 hasta contarla.
 select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('IN-A1','IN-A4','IN-A5','IN-E2') order by 1;
+
+-- ===================== v30.60 · 2026-10-14 (respuestas D5/D6, Luis) =====================
+-- D5: IN-C3 es cuerpo azul CON marca CH -> B7 Cpo Sacacorcho CH Serig (alta + equivalencia GP2 90).
+--     B4B -4 (queda 4, IN-B6) · B7 +4 (IN-C3).
+-- D6: IN-E1 ya cromado -> DISC1 confirmado, sin cambios.
+select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('IN-B6','IN-C3') order by 1;
