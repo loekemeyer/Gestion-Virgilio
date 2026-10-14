@@ -17,14 +17,17 @@ solo en el front"*.
 | cajas | RI y EI muestran las cajas de **GP2 Sector Caja** (`gv_gp2_componentes_ri`, categoría `cajas`). Una que Virgilio no tiene se da de alta al tocarla (`gv_insumo_desde_gp2`) |
 | lugar | `GV_Lugar` tipo **`transito`**: `AGUARDAR` (A guardar) y `TRANSITO` (Tránsito). `gv_insumo_sector` los reconoce como posición válida |
 | recepción | el front graba `ubicacion='TRANSITO'`; el trigger **`aa_gv_insumo_recepcion_transito`** pone TRANSITO a toda `recepcion_insumo` que llegue sin ubicación (los importados de `gv_imp_recibir` van a su rack y no se tocan) |
-| sin lugar | **`zz_gv_insumo_transito_ubicar`**: si el insumo no tiene ninguna posición en el Mapa, se le anota TRANSITO en `Insumos_Ubicaciones`. Al darle su lugar sale solo de la lista |
-| Mapa | pestaña **🚚 Tránsito** (vista `gv_transito_celda`): A guardar = depósito `a_guardar` en cajas; Tránsito = insumos con saldo cuyo único lugar es TRANSITO |
+| saldo de Tránsito | **v30.87 (Luis: *"TODO INSUMO QUE INGRESA, INGRESA A TRANSITO. quería que dejaras de buscar el lugar donde estaba el insumo y cargarle más ahí"*)**: Tránsito es un **saldo** = `sum(delta)` de los movimientos de insumos con `ubicacion='TRANSITO'`. Lo recibido **no** se suma al lugar que ya tenía el insumo. Se retira el `zz_gv_insumo_transito_ubicar` de la v30.81 (anotaba TRANSITO sólo al que no tenía lugar) |
+| salir de Tránsito | **📍 Ubicar** en la pestaña (supervisor): **`gv_transito_ubicar(cod, unidad, cantidad, posición)`** escribe dos movimientos tipo **`transito_ubicar`** (−TRANSITO / +posición; el total no cambia) y suma la cantidad a esa posición en `Insumos_Ubicaciones`. No deja ubicar más de lo que hay en tránsito ni a TRANSITO / AGUARDAR |
+| Mapa | pestaña **🚚 Tránsito** (vista `gv_transito_celda`): A guardar = depósito `a_guardar` en cajas; Tránsito = el saldo de arriba, por código y unidad |
 
-- ⚠ **GP2 Sector Caja tiene 11 cajas** (Nº 1, 2, 6, 7, 10, 12, 13, 15, 16, 22, 29) — las mismas 11 que ya tenía Virgilio.
-  `GP2.uni_x_articulo_x_caja` usa además **Nº 5, 8, 14, 27, 28 y «P»** (la Nº 8 en 30 artículos) **sin componente en
-  GP2**: no aparecen en la lista hasta que se den de alta en GP2. No se inventaron.
-- **Forward-facing**: los 19 insumos con stock y sin lugar (alarma `gv_mapa_stock_sin_lugar`) no se pasaron a TRANSITO.
-- `sql/gv_transito_v3081.sql` (centinelas `gv_insumo_recepcion_transito`, `gv_insumo_sector`) ·
+- **Cajas: 17 en GP2 Sector Caja** (v30.87, Luis: *"dalas de alta en la parte de virgilio de GP2 … que nunca les falte
+  ningún código para recibir/enviar (tengan o no stock)"*). A las 11 de siempre se sumaron **Nº 5, 8, 14, 27, 28 y «P»**,
+  las que `GP2.uni_x_articulo_x_caja` usaba sin componente: componente en sector 11 con código **provisorio `CJ<n>`**
+  (no tienen lugar en Cervantes), inventario en 0 en *Sector Caja* (11) y *Sector Caja en Virgilio* (77), el insumo
+  `Caja Nº n` / `Caja P` en Virgilio y su fila en `insumo_equivalencia`. `sql/gv_cajas_gp2_alta_v3087.sql`.
+- **D2 (Luis): no** — los 19 insumos con stock y sin lugar no se pasan a TRANSITO. Forward-facing.
+- `sql/gv_transito_v3081.sql` + `sql/gv_transito_saldo_v3087.sql` (centinelas `gv_insumo_recepcion_transito`, `gv_insumo_sector`, `gv_transito_ubicar`) ·
   `tests/ins-envio-tipo.cjs` · `tests/ins-transito-cajas.cjs`.
 
 ## ⚠⚠ REGLA (Luis, 2026-10-14, v30.37): un insumo en 0 LIBERA su rack — la posición NO queda guardada

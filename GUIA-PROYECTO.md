@@ -1,3 +1,9 @@
+## Nota v30.88 (2026-10-14; la base dice v30.87) — Tránsito es un SALDO · 17 cajas en GP2
+
+- Toda recepción de insumo queda en **Tránsito** (`ubicacion='TRANSITO'`) hasta que un supervisor la **ubica** desde
+  Mapa → 🚚 Tránsito → 📍 Ubicar (`gv_transito_ubicar`, movimientos tipo `transito_ubicar`, el total no cambia).
+- Cajas de GP2 Sector Caja: 11 → 17 (Nº 5, 8, 14, 27, 28 y P, código provisorio `CJ<n>`), también en Virgilio.
+
 ## Nota v30.86 (2026-10-14) — Insumos: Entregar = Cervantes / Otros · cajas de GP2 · lugar TRÁNSITO
 
 - 📤 Entregar insumos pregunta **Cervantes** (directo al remito) u **Otros** (a quién, obligatorio; los inyectores de GP2 como botones).

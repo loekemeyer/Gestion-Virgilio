@@ -1,4 +1,4 @@
-/* v30.86 (Luis, 14/10) — tres cosas del mismo pedido:
+/* v30.86 (Luis, 14/10) — tres cosas del mismo pedido (v30.87: + el 📍 Ubicar de Tránsito):
    (a) el Mapa tiene la pestaña 🚚 Tránsito con sus DOS sectores (A guardar · Tránsito), leídos de gv_transito_celda;
    (b) la RECEPCIÓN de un insumo se graba con ubicacion = 'TRANSITO' (la base lo sostiene con aa_gv_insumo_recepcion_transito);
    (c) al ENTREGAR, la lista de cajas trae TODAS las cajas de GP2 (Sector Caja), no sólo las que Virgilio ya tiene;
@@ -31,6 +31,16 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
     const tabs = document.getElementById("pmapTabs").innerText, grid1 = document.getElementById("pmapGrid").innerText;
     ptrGo("TRANSITO");
     const grid2 = document.getElementById("pmapGrid").innerText;
+    // v30.87: de Tránsito se sale UBICANDO (gv_transito_ubicar), con posición y cantidad, sin pasarse de lo que hay
+    let rpc = null; window.pmapRpc = async function (fn, body) { rpc = { fn: fn, body: body }; return { ok: true, data: { sector: "X20" } }; };
+    const iN = _ptr.findIndex(function (x) { return x.cod === "N°19"; });
+    ptrUbicarAbrir(iN);
+    document.getElementById("ptrUbSec").value = "X20"; document.getElementById("ptrUbCant").value = "500";
+    await ptrUbicarOk(); const frenoTope = rpc === null;
+    document.getElementById("ptrUbCant").value = "100";
+    await ptrUbicarOk();
+    out.ubicar = /📍 Ubicar/.test(grid2) && !/Ubicar/.test(grid1) && frenoTope && !!rpc && rpc.fn === "gv_transito_ubicar" &&
+      rpc.body.p_cod === "N°19" && rpc.body.p_cantidad === 100 && rpc.body.p_sector === "X20" && rpc.body.p_unidad === "Kg";
     out.a = /Tránsito/.test(modos[3] || "") && /A guardar/.test(tabs) && /Tránsito/.test(tabs) &&
             /328E/.test(grid1) && !/N°19/.test(grid1) && /N°19/.test(grid2) && /Caja Nº 8/.test(grid2);
     pmapModo("gondola");
@@ -65,7 +75,7 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
     return out;
   });
   await b.close();
-  const ok = r.a && r.b && r.c && !errs.length;
+  const ok = r.a && r.ubicar && r.b && r.c && !errs.length;
   console.log("ins-transito-cajas:", JSON.stringify(r), errs.length ? "· errores: " + errs.join(" | ") : "· pageerrors: none", ok ? "· ✓ OK" : "· ✗ FALLA");
   process.exit(ok ? 0 : 1);
 })();

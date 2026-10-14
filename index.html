@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.87">
+<link rel="stylesheet" href="gv-ui.css?v=30.88">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.87"></script>
+<script type="module" src="recepcion.js?v=30.88"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10761,7 +10761,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.87";
+const APP_VERSION = "v30.88";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -26200,6 +26200,7 @@ function _stkInsHistChip(e) {
     if (e.tipo === "recepcion_insumo") return { t: "⬇ Ingreso", bg: "#dcfce7", fg: "#166534" };
     if (e.tipo === "entrega_insumo") return { t: "⬆ Egreso", bg: "#fee2e2", fg: "#991b1b" };
     if (e.tipo === "inicial") return { t: "Inicial", bg: "#e0e7ff", fg: "#3730a3" };
+    if (e.tipo === "transito_ubicar") return { t: "📍 Ubicado", bg: "#e0f2fe", fg: "#075985" };   // v30.87: de Tránsito a una posición
     return { t: "Ajuste", bg: "#fef3c7", fg: "#92400e" };
   }
   const map = { aceptar: "Aceptado", fusionar: "🔗 Fusionado", alta: "Alta", recodificar: "Recodificado",
@@ -49215,13 +49216,14 @@ function pmapModo(m) {
 }
 /* v30.81 (Luis, 14/10) — pestaña TRÁNSITO del Mapa: dos sectores que viven en GV_Lugar (tipo 'transito'):
    · A GUARDAR (AGUARDAR) — la mercadería del depósito a_guardar, en cajas.
-   · TRÁNSITO (TRANSITO)  — los insumos que entraron sin un lugar definido. Toda recepción de insumo entra a
-     TRANSITO (trigger aa_gv_insumo_recepcion_transito) y el que no tiene posición queda anotado ahí
-     (zz_gv_insumo_transito_ubicar). Al darle su lugar en el Mapa sale solo de esta lista.
-   Lo dibuja la vista gv_transito_celda (sql/gv_transito_v3081.sql). Sólo lectura. */
+   · TRÁNSITO (TRANSITO)  — v30.87 (Luis: "TODO INSUMO QUE INGRESA, INGRESA A TRANSITO"): es un SALDO. Toda
+     recepción de insumo entra con ubicacion TRANSITO (trigger aa_gv_insumo_recepcion_transito) y se queda ahí
+     hasta que un supervisor la UBICA (📍 Ubicar → gv_transito_ubicar: −TRANSITO / +posición, el total no cambia).
+     Ya no se busca el lugar que tenía el insumo para cargarle más ahí.
+   Lo dibuja la vista gv_transito_celda (sql/gv_transito_v3081.sql + sql/gv_transito_saldo_v3087.sql). */
 let _ptr = null, _ptrS = "";
 const PTR_SECS = [{ k: "AGUARDAR", lbl: "A guardar", vacio: "No hay nada en A guardar." },
-                  { k: "TRANSITO", lbl: "Tránsito", vacio: "No hay insumos en tránsito: todo lo recibido tiene su lugar en el Mapa." }];
+                  { k: "TRANSITO", lbl: "Tránsito", vacio: "No hay insumos en tránsito: todo lo recibido ya se ubicó." }];
 async function ptrFetch() {
   const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_transito_celda",
     "select=sector,cod,emp,descripcion,cantidad,unidad&order=sector.asc,cod.asc");
@@ -49256,16 +49258,53 @@ function ptrRender() {
   const rows = _ptr.filter(function (r) { return r.sector === sec.k; });
   let h = '<div class="pmap-head"><b>' + escapeHtml(sec.lbl) + '</b> · ' + rows.length + (rows.length === 1 ? " código" : " códigos") + '</div>';
   if (!rows.length) h += '<div class="planim-empty">' + escapeHtml(sec.vacio) + '</div>';
-  else h += '<div class="gv-tblwrap"><table class="gv-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Emp</th><th>Cant.</th></tr></thead><tbody>' +
+  else {
+    const ubicable = sec.k === "TRANSITO";
+    h += '<div class="gv-tblwrap"><table class="gv-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Emp</th><th>Cant.</th>' + (ubicable ? '<th></th>' : '') + '</tr></thead><tbody>' +
     rows.map(function (r) {
       const hit = _pmapQ && ptrMatch(r, _pmapQ);
       return '<tr' + (hit ? ' class="pmap-hit"' : '') + '><td><b>' + escapeHtml(String(r.cod || "")) + '</b></td><td>' + escapeHtml(String(r.descripcion || "")) +
         '</td><td style="text-align:center">' + escapeHtml(String(r.emp || "")) + '</td><td style="text-align:center">' + pmapNum(Number(r.cantidad) || 0) +
-        (r.unidad ? " " + escapeHtml(String(r.unidad)) : "") + '</td></tr>';
+        (r.unidad ? " " + escapeHtml(String(r.unidad)) : "") + '</td>' +
+        (ubicable ? '<td><button class="planim-btn-save ptr-ubicar" onclick="ptrUbicarAbrir(' + _ptr.indexOf(r) + ')">📍 Ubicar</button></td>' : '') + '</tr>';
     }).join("") + '</tbody></table></div>';
+  }
   box.innerHTML = h;
   pmapSetStatus("A guardar " + n("AGUARDAR") + " · Tránsito " + n("TRANSITO"));
 }
+/* v30.87 — sacar de Tránsito: el supervisor dice A DÓNDE va (posición de rack o de SC/SP) y cuánto. */
+let _ptrUb = null;
+function ptrUbicarAbrir(i) {
+  const r = (_ptr || [])[i]; if (!r) return;
+  const m = document.getElementById("pmapCeldaModal"), tit = document.getElementById("pmapCeldaTit"),
+        box = document.getElementById("pmapCeldaBody");
+  if (!m || !tit || !box) return;
+  _ptrUb = r; pmapCeldaStatus("");
+  tit.textContent = "Ubicar " + r.cod;
+  box.innerHTML = '<div class="prk-det"><b>' + escapeHtml(String(r.cod)) + '</b>' + (r.descripcion ? ' — ' + escapeHtml(String(r.descripcion)) : '') +
+    '<br>En tránsito: <b>' + pmapNum(Number(r.cantidad) || 0) + (r.unidad ? ' ' + escapeHtml(String(r.unidad)) : '') + '</b></div>' +
+    '<div class="prk-ins-row"><input class="planim-inp" id="ptrUbSec" type="text" placeholder="Posición (X20, IN-A1…)" style="width:150px" oninput="this.value=this.value.toUpperCase()">' +
+    '<input class="planim-inp" id="ptrUbCant" type="number" inputmode="decimal" min="0" step="any" value="' + (Number(r.cantidad) || 0) + '" style="width:90px">' +
+    '<button class="planim-btn-save" onclick="ptrUbicarOk()">✓ Ubicar</button></div>' +
+    '<div class="prk-nota">Sale de Tránsito y entra a esa posición. El stock total del insumo no cambia.</div>';
+  m.classList.add("show");
+  setTimeout(function () { const s = document.getElementById("ptrUbSec"); if (s) s.focus(); }, 50);
+}
+async function ptrUbicarOk() {
+  const r = _ptrUb; if (!r) return;
+  const sec = String((document.getElementById("ptrUbSec") || {}).value || "").trim();
+  const q = Number(String((document.getElementById("ptrUbCant") || {}).value || "").replace(",", "."));
+  if (!sec) { pmapCeldaStatus("Escribí la posición.", false); return; }
+  if (!(q > 0)) { pmapCeldaStatus("La cantidad tiene que ser mayor que cero.", false); return; }
+  if (q > (Number(r.cantidad) || 0)) { pmapCeldaStatus("En tránsito hay " + pmapNum(Number(r.cantidad) || 0) + ".", false); return; }
+  pmapCeldaStatus("Guardando…", true);
+  const res = await pmapRpc("gv_transito_ubicar", { p_cod: r.cod, p_unidad: r.unidad || null, p_cantidad: q, p_sector: sec,
+    p_legajo: (typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) ? String(legajoInput.value) : null });
+  if (!res.ok) { pmapCeldaStatus("No se guardó: " + res.err, false); return; }
+  _ptr = null; await ptrFetch(); pmapRender();
+  pmapCeldaStatus("✓ " + r.cod + ": " + pmapNum(q) + " a " + ((res.data && res.data.sector) || sec) + ".", true);
+}
+window.ptrUbicarAbrir = ptrUbicarAbrir; window.ptrUbicarOk = ptrUbicarOk; window.ptrGo = ptrGo;
 async function prkFetch() {
   // v22.77: Racks_Planimetria es una VISTA — la cantidad sale del libro de stock (ubicacion = sector).
   const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_rack_celda",
@@ -63771,7 +63810,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.87"></script>
+<script src="importacion.js?v=30.88"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67062,15 +67101,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.87"></script>
-<script src="hotsale.js?v=30.87"></script>
-<script src="estadisticas.js?v=30.87"></script>
-<script src="ads.js?v=30.87"></script>
-<script src="plantel.js?v=30.87"></script>
+<script src="cobranzas.js?v=30.88"></script>
+<script src="hotsale.js?v=30.88"></script>
+<script src="estadisticas.js?v=30.88"></script>
+<script src="ads.js?v=30.88"></script>
+<script src="plantel.js?v=30.88"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.87"></script>
+<script src="analisis.js?v=30.88"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.87"></script>
+<script src="ayuda.js?v=30.88"></script>
 
 </body>
 </html>
