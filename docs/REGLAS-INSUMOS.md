@@ -3,7 +3,7 @@
 > Movido de `CLAUDE.md` el 2026-10-13 (poda 3ra tanda, pedido de Luis) **sin cambiar una palabra**.
 > **Leerlo ENTERO antes de tocar algo de este tema.** Las reglas siguen valiendo igual que cuando estaban en CLAUDE.md.
 
-## ⚠⚠ REGLA (Luis, 2026-10-14, v30.30): HAY VARIAS ESPIRALES — `1000900` y `H201Part` NO se mezclan
+## ⚠⚠ REGLA (Luis, 2026-10-14, v30.30): HAY TRES ESPIRALES — `1000900`, `H201Part` y `007` NO se mezclan
 
 **Luis, textual:** *"hay varias espirales. las que estan en y04 ahora son las 1000900. en AD4 hay unas que se llaman
 H201part ... que no se mezclen"* · *"si ayer se unifico algo que quede marcadamente separado ahora"*.
@@ -12,7 +12,7 @@ H201part ... que no se mezclen"* · *"si ayer se unifico algo que quede marcadam
 |---|---|---|---|---|
 | `1000900` | Espiral Chino | Y04 | D1 | sí, como 1000900 |
 | `H201Part` | Espiral Chino TN | AD04 | **ninguno** | **no** (se sacó el map al 1000900) |
-| `007` | Espiral (Chef) | Z02 | D1 | sí, suma al 1000900 (Luis no lo cambió) |
+| `007` | Espiral Chef | Z02 | **ninguno** | **no** (Luis 14/10: *"son 3 espirales diferentes"*) |
 
 - El 13/10 se cargaron **156 cajas de Y04 como H201Part**: eran del 1000900. El 14/10 quedó H201Part 24.000 u
   (AD04) y 1000900 78.000 u (Y04). **No volver a mapear H201Part a 1000900 ni a D1** porque «parezcan» lo mismo.

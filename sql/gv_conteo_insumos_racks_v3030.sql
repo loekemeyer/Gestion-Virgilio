@@ -62,3 +62,11 @@ select cod, sector, estado from public.gv_insumo_ubicacion
 --   dos movimientos de prueba (neto 0) y queda como estaba.
 -- PEP1: «Mango pelador negro calado sin grabar» (confirmado por Luis).
 -- 587C: no existe en el depósito (Luis). Se descarta del pendiente de la tarea 4448.
+
+-- ===================== v30.34 · 2026-10-14 (cuarta pasada, Luis) =====================
+-- Backup: zz_backups."GV_Backup_590E_007_20261014".
+-- 590E: la entrega del 24/08 (id 19734959, −4 MC a Cervantes) se REEXPRESA a −2.400 Uni (update, no insert:
+--   el trigger BEFORE INSERT gv_insumo_unidad_base convierte a unidades todo MC nuevo, así que un ajuste en MC
+--   nunca cierra una línea MC vieja). Queda Uni 0 y sale de la alarma «con stock y sin lugar».
+-- 007 «Espiral Chef»: se saca del map al importado 1000900 y del vínculo GP2 D1. D1 queda sólo con 1000900.
+-- Importación 1000900: 78.000 (antes 81.500 con el 007).
