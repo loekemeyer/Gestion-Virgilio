@@ -53,3 +53,12 @@ select cod, sector, estado from public.gv_insumo_ubicacion
 --   H201Lever O01 (26.400 u) · CB01 N07 (2.950 u) · 590E Z07 (2.400 u) · 584E AC06 (0 u).
 -- 440E es PRODUCTO, no insumo: insumos −528 Uni; racks +168 inner X21 (14 MC) y +360 inner X23 (30 MC).
 -- Productos que Luis nombró y NO se tocaron: N07 513 360 cajas (coincide) · Z07 363E 15 MC (sistema 11 MC).
+
+-- ===================== v30.33 · 2026-10-14 (tercera pasada, Luis) =====================
+-- 363E Z07: +24 inner (11 MC -> 15 MC). gv_rack_celda Z07: master 15 inner 90.
+-- En 0 "hasta contarlos": H201Lever −26.400 Uni · CB01 −2.950 Uni (ref 'CONTEO 0 (Luis 14/10)').
+-- 590E: su total YA era 0 (Uni 2.400 + MC −4 x 600). El ajuste MC +4 lo convierte a Uni el trigger de
+--   «el insumo con MC queda en unidades», así que no se puede cerrar la línea MC desde acá: se borraron los
+--   dos movimientos de prueba (neto 0) y queda como estaba.
+-- PEP1: «Mango pelador negro calado sin grabar» (confirmado por Luis).
+-- 587C: no existe en el depósito (Luis). Se descarta del pendiente de la tarea 4448.
