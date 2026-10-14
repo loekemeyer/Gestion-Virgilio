@@ -93,3 +93,18 @@ select cod, sector, estado from public.gv_insumo_ubicacion
 --   gv_insumo_ubicaciones_guardar desde Insumos, gv_rack_posicion_guardar / gv_rack_partir / gv_lugar_orden).
 --   Ningún cron escribe Insumos_Ubicaciones ni GV_Lugar (el único cron de insumos, 152, escribe en GP2).
 --   => un conteo cargado no lo pisa ningún proceso automático.
+
+-- ===================== séptima pasada · 2026-10-14 (Luis) =====================
+-- Backup: zz_backups."GV_Backup_Insumos_Conteo3_20261014". Racks nuevos en GV_Lugar: O07 (719) y Q33 (757).
+-- Factores MC que faltaban: 1000900 MC 2.000 · 522ES MC 100 · H201Lever MC 1.200 · 944P MC 144 + Cajas 36 (inner).
+--   El inner de 1000900 (156 = 4 por MC, 500 u) y 522ES (80 = 4 por MC, 25 u) va en la nota de la posición:
+--   no hay unidad «Inner» en Insumos_Factores y no se inventa una.
+-- Stock (ajuste, ref 'CONTEO <cod> <rack> 14/10'):
+--   944P  Y01  3 cajas inner x 36   =    108 u (master de 4, quedan 3)
+--   H201Lever O07 22 MC x 1.200     = 26.400 u (estaba en 0 «hasta contarlo»)
+--   CB01  Q33  15 MC x 200 (2 inner) =  3.000 u («CB01Part» de Luis = CB01, único código)
+--   1000900 Y04 78.000 y 522ES W04 2.000 ya coincidían: sólo factor y nota.
+select cod_art, unidad, saldo from public.vista_saldos_insumos_x_unidad
+ where cod_art in ('1000900','522ES','944P','H201Lever','CB01') and saldo <> 0;
+--  1000900 78.000 · 522ES 2.000 · 944P 108 · CB01 3.000 · H201Lever 26.400; posiciones 'ok'; gv_reglas_perdidas vacía.
+-- Rollback: borrar los 3 ajustes por ref, las 3 posiciones nuevas, los factores agregados y O07/Q33; Insumos desde el backup.
