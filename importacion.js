@@ -4964,6 +4964,11 @@ function _impPiEdCss() {
     ".ipe-tbl td.cod{font-weight:800;font-family:Consolas,Menlo,monospace}" +
     ".ipe-tbl td.cod small{font-family:inherit;font-size:10px;color:#64748b;font-weight:700;margin-left:3px}" +
     ".ipe-tbl tr.cambia td{background:#fefce8}" +
+    ".ipe-tbl tr.nuevo td{background:#f0fdf4}" +
+    ".ipe-nuevo{display:inline-block;background:#dcfce7;color:#166534;border-radius:6px;padding:1px 6px;font-size:11px;font-weight:800}" +
+    ".ipe-q-x{border:0;background:transparent;color:#b91c1c;font-weight:800;cursor:pointer;padding:0 2px;font-size:12px}" +
+    ".ipe-agr{display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:10px;padding-top:8px;border-top:1px dashed #cbd5e1;font-size:13px;color:#0f172a}" +
+    ".ipe-agr input{width:340px;max-width:70vw;padding:6px 8px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13.5px}" +
     ".ipe-tbl tr.tot td{background:#f8fafc;font-weight:800;border-top:2px solid #e2e8f0}" +
     ".ipe-in{width:92px;padding:4px 6px;border:1.5px solid #cbd5e1;border-radius:7px;font-size:13.5px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}" +
     ".ipe-in:focus{border-color:#2563eb;outline:none}" +
@@ -4993,7 +4998,8 @@ async function impPiEditar(refEnc, provEnc) {
   _impPiEdCss();
   const ref = decodeURIComponent(refEnc || ""), prov = decodeURIComponent(provEnc || "");
   _impPiEd = { ref: ref, prov: prov, paso: "quien", editor: "", editores: null, edErr: "", lineas: null, linErr: "",
-    nuevos: {}, refNuevo: ref, preview: null, msg: "", msgTipo: "", hist: null, guardando: false, guardado: null };
+    nuevos: {}, refNuevo: ref, preview: null, msg: "", msgTipo: "", hist: null, guardando: false, guardado: null,
+    agregar: [], agrAbierto: false, maestro: null };
   let ov = document.getElementById("impPiEdOv");
   if (!ov) { ov = document.createElement("div"); ov.id = "impPiEdOv"; document.body.appendChild(ov); }
   ov.classList.add("show");
@@ -5016,6 +5022,19 @@ async function impPiEditar(refEnc, provEnc) {
     if (_impPiEd !== st) return;
     st.lineas = null; st.linErr = String(e.message || e); _impPiEdRender();
   });
+  // v30.44: el maestro para ➕ Agregar artículo (activos; uni × master para la ayuda de la cantidad)
+  Promise.all([
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados", "select=id,cod_art,marca,descripcion,proveedor,activo&order=cod_art"),
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados_Volumen", "select=cod,uni_master").catch(function () { return []; })
+  ]).then(function (rs) {
+    if (_impPiEd !== st) return;
+    const um = {}; (rs[1] || []).forEach(function (v) { if (v && v.cod) um[String(v.cod).trim().toUpperCase()] = Number(v.uni_master) || 0; });
+    st.maestro = (rs[0] || []).filter(function (r) { return r && r.activo !== false && r.cod_art; }).map(function (r) {
+      return { id: r.id, cod_art: r.cod_art, marca: r.marca || "", descripcion: r.descripcion || "", proveedor: r.proveedor || "",
+        uni_master: um[String(r.cod_art).trim().toUpperCase()] || 0 };
+    });
+    if (st.paso === "editar" && st.agrAbierto) _impPiEdRender();
+  }).catch(function () { if (_impPiEd === st) { st.maestro = []; if (st.agrAbierto) _impPiEdRender(); } });
   _pedImpRpc("gv_imp_pi_ediciones", { p_pedido_ref: ref, p_proveedor: prov, p_limite: 200 }).then(function (hs) {
     if (_impPiEd !== st) return;
     st.hist = hs || []; _impPiEdRender();
@@ -5065,6 +5084,7 @@ function _impPiEdPintarTotales() {
     const d = document.getElementById("ipeD" + l.bache_id); if (d) d.innerHTML = _impPiEdDelta(n - a);
     const tr = document.getElementById("ipeR" + l.bache_id); if (tr) tr.className = (n !== a) ? "cambia" : "";
   });
+  (st.agregar || []).forEach(function (x) { tN += Number(x.unidades) || 0; });
   const t = document.getElementById("ipeTotN"); if (t) t.textContent = _impPiEdNum(tN);
   const td = document.getElementById("ipeTotD"); if (td) td.innerHTML = _impPiEdDelta(tN - tA);
 }
@@ -5075,13 +5095,17 @@ function _impPiEdCambios() {
     const n = st.nuevos[l.bache_id], a = Number(l.unidades) || 0;
     if (n !== a) out.push({ bache_id: l.bache_id, unidades: n, antes: a });
   });
+  // v30.44: renglones nuevos (sin bache_id): la RPC los da de alta en la PI
+  (st.agregar || []).forEach(function (x) { out.push({ agregar: true, importado_id: x.id, unidades: Number(x.unidades) || 0 }); });
   return out;
 }
 async function impPiEdRevisar() {
   const st = _impPiEd; if (!st || st.guardando) return;
   const cambios = _impPiEdCambios();
   const refN = (st.refNuevo && st.refNuevo !== st.ref) ? st.refNuevo : null;
-  if (!cambios.length && !refN) { st.msg = "No cambiaste ninguna cantidad ni el número de PI."; st.msgTipo = "info"; _impPiEdRender(); return; }
+  if (!cambios.length && !refN) { st.msg = "No cambiaste ninguna cantidad, no agregaste artículos ni cambiaste el número de PI."; st.msgTipo = "info"; _impPiEdRender(); return; }
+  const sinCant = (st.agregar || []).filter(function (x) { return !(Number(x.unidades) > 0); });
+  if (sinCant.length) { st.msg = "Poné la cantidad del " + sinCant.map(function (x) { return codCanon(x.cod_art); }).join(", ") + " (o sacalo con ✕)."; st.msgTipo = "err"; _impPiEdRender(); return; }
   const neg = cambios.filter(function (c) { return c.unidades < 0; });
   if (neg.length) { st.msg = "Una cantidad no puede ser negativa."; st.msgTipo = "err"; _impPiEdRender(); return; }
   st.guardando = true; st.msg = ""; _impPiEdRender();
@@ -5105,11 +5129,64 @@ async function impPiEdGuardar() {
   } catch (e) { st.msg = "No se guardó nada: " + (e.message || e); st.msgTipo = "err"; }
   st.guardando = false; _impPiEdRender();
 }
+/* v30.44 (Luis, 14/10): «que haya un botón que permita agregar artículos al pedido» (PI OL-10139 sin el 811E).
+   Los renglones nuevos viajan en p_cambios SIN bache_id ({agregar:true, importado_id, unidades}); la RPC los
+   da de alta con la PI, el proveedor y las fechas de la PI, y quedan en el mismo registro (antes 0 → después N). */
+function _impPiEdAgrEtiq(r) { return codCanon(r.cod_art) + " · " + (r.marca || "—") + " · " + (r.descripcion || "") + (r.proveedor ? " (" + r.proveedor + ")" : ""); }
+function _impPiEdAgrOpciones() {
+  const st = _impPiEd; if (!st || !st.maestro) return [];
+  const ya = {};
+  (st.lineas || []).forEach(function (l) { if (l.importado_id != null) ya[l.importado_id] = 1; });
+  (st.agregar || []).forEach(function (x) { ya[x.id] = 1; });
+  const prov = String(st.prov || "").trim().toLowerCase();
+  const libres = st.maestro.filter(function (r) { return !ya[r.id]; });
+  const delProv = libres.filter(function (r) { return String(r.proveedor || "").trim().toLowerCase() === prov; });
+  const otros = libres.filter(function (r) { return String(r.proveedor || "").trim().toLowerCase() !== prov; });
+  return delProv.concat(otros);
+}
+function _impPiEdAgrHtml() {
+  const st = _impPiEd; if (!st) return "";
+  if (!st.agrAbierto) return '<div style="margin-top:8px"><button class="ipe-b" onclick="impPiEdAgrToggle()">➕ Agregar artículo a la PI</button></div>';
+  let h = '<div class="ipe-agr"><b>➕ Agregar artículo</b>';
+  if (!st.maestro) h += ' <span style="color:#64748b">Cargando el maestro…</span>';
+  else if (!st.maestro.length) h += ' <span class="ipe-men">No se pudo leer el maestro de importados.</span>';
+  else {
+    h += '<input id="ipeAgrIn" list="ipeAgrDl" placeholder="Código o descripción" autocomplete="off" onchange="impPiEdAgrElegir(this.value)" onkeydown="if(event.key===\'Enter\')impPiEdAgrElegir(this.value)">' +
+      '<datalist id="ipeAgrDl">' + _impPiEdAgrOpciones().map(function (r) { return '<option value="' + escapeHtml(_impPiEdAgrEtiq(r)) + '"></option>'; }).join("") + '</datalist>';
+  }
+  h += '<button class="ipe-b" onclick="impPiEdAgrToggle()">Cerrar</button></div>';
+  h += '<div style="font-size:11.5px;color:#64748b;margin-top:4px">Primero los de ' + escapeHtml(st.prov || "este proveedor") + '. Entra con el embarque y la llegada de esta PI.</div>';
+  return h;
+}
+function impPiEdAgrToggle() { const st = _impPiEd; if (!st) return; st.agrAbierto = !st.agrAbierto; st.msg = ""; _impPiEdRender();
+  if (st.agrAbierto) { const i = document.getElementById("ipeAgrIn"); if (i) try { i.focus(); } catch (_e) {} } }
+function impPiEdAgrElegir(txt) {
+  const st = _impPiEd; if (!st || !st.maestro) return;
+  const t = String(txt || "").trim(); if (!t) return;
+  const ops = _impPiEdAgrOpciones();
+  let r = ops.find(function (x) { return _impPiEdAgrEtiq(x) === t; });
+  if (!r) { const tc = codCanon(t).toUpperCase(); const ex = ops.filter(function (x) { return codCanon(x.cod_art).toUpperCase() === tc; }); if (ex.length === 1) r = ex[0]; }
+  if (!r) { st.msg = "«" + t + "» no está en el maestro de importados (o ya está en la PI)."; st.msgTipo = "err"; _impPiEdRender(); return; }
+  st.agregar.push({ id: r.id, cod_art: r.cod_art, marca: r.marca, descripcion: r.descripcion, uni_master: r.uni_master, unidades: 0 });
+  st.preview = null; st.msg = r.uni_master ? ("El " + codCanon(r.cod_art) + " viene de a " + _impPiEdNum(r.uni_master) + " u por master.") : ""; st.msgTipo = "info";
+  _impPiEdRender();
+  const ins = document.querySelectorAll("#impPiEdOv tr.nuevo .ipe-in"); const last = ins[ins.length - 1]; if (last) try { last.focus(); } catch (_e) {}
+}
+function impPiEdAgrCant(i, v) {
+  const st = _impPiEd; if (!st || !st.agregar[i]) return;
+  const n = Math.round(Number(String(v == null ? "" : v).replace(",", ".").trim()));
+  st.agregar[i].unidades = isFinite(n) && n > 0 ? n : 0;
+  st.preview = null;
+  const d = document.getElementById("ipeAD" + i);
+  if (d) d.innerHTML = _impPiEdDelta(st.agregar[i].unidades) + ' <button class="ipe-q-x" title="Sacar de lo que se agrega" onclick="impPiEdAgrQuitar(' + i + ')">✕</button>';
+  _impPiEdPintarTotales();
+}
+function impPiEdAgrQuitar(i) { const st = _impPiEd; if (!st) return; st.agregar.splice(i, 1); st.preview = null; st.msg = ""; _impPiEdRender(); }
 function _impPiEdTablaDiff(p) {
   let h = '<table class="ipe-tbl"><thead><tr><th>Código</th><th>Antes<br>u</th><th>Después<br>u</th><th>Dif.<br>u</th></tr></thead><tbody>';
   (p.filas || []).forEach(function (f) {
     h += '<tr class="cambia"><td class="cod">' + escapeHtml(codCanon(f.cod_art)) + (f.marca ? '<small>' + escapeHtml(f.marca) + '</small>' : '') + '</td>' +
-      '<td>' + _impPiEdNum(f.antes) + '</td><td><b>' + (f.sale ? '0 <span class="ipe-men" style="font-size:11px">sale de la PI</span>' : _impPiEdNum(f.despues)) + '</b></td>' +
+      '<td>' + (f.nuevo ? '<span class="ipe-nuevo">nuevo</span>' : _impPiEdNum(f.antes)) + '</td><td><b>' + (f.sale ? '0 <span class="ipe-men" style="font-size:11px">sale de la PI</span>' : _impPiEdNum(f.despues)) + '</b></td>' +
       '<td>' + _impPiEdDelta(f.delta) + '</td></tr>';
   });
   h += '<tr class="tot"><td>Total PI</td><td>' + _impPiEdNum(p.total_antes) + '</td><td>' + _impPiEdNum(p.total_despues) + '</td><td>' + _impPiEdDelta((p.total_despues || 0) - (p.total_antes || 0)) + '</td></tr>';
@@ -5164,8 +5241,16 @@ function _impPiEdRender() {
           '<td><input class="ipe-in" type="number" inputmode="numeric" min="' + lleg + '" step="1" value="' + (tiene ? n : "") + '" placeholder="' + a + '" oninput="impPiEdSetCant(' + l.bache_id + ',this.value)"></td>' +
           '<td id="ipeD' + l.bache_id + '">' + _impPiEdDelta(n - a) + '</td></tr>';
       });
+      (st.agregar || []).forEach(function (x, i) {
+        const u = Number(x.unidades) || 0; tN += u;
+        h += '<tr class="nuevo"><td class="cod" title="' + escapeHtml(x.descripcion || "") + '">' + escapeHtml(codCanon(x.cod_art)) + (x.marca ? '<small>' + escapeHtml(x.marca) + '</small>' : '') + '</td>' +
+          '<td>—</td><td><span class="ipe-nuevo">nuevo</span></td>' +
+          '<td><input class="ipe-in" type="number" inputmode="numeric" min="1" step="1" value="' + (u || "") + '" placeholder="u" oninput="impPiEdAgrCant(' + i + ',this.value)"></td>' +
+          '<td id="ipeAD' + i + '">' + _impPiEdDelta(u) + ' <button class="ipe-q-x" title="Sacar de lo que se agrega" onclick="impPiEdAgrQuitar(' + i + ')">✕</button></td></tr>';
+      });
       h += '<tr class="tot"><td>Total</td><td></td><td>' + _impPiEdNum(tA) + '</td><td id="ipeTotN">' + _impPiEdNum(tN) + '</td><td id="ipeTotD">' + _impPiEdDelta(tN - tA) + '</td></tr></tbody></table>';
       h += '<div style="font-size:11.5px;color:#64748b;margin-top:6px">Vacío = queda igual · 0 = sale de la PI · no puede quedar por debajo de lo que ya llegó.</div>';
+      h += _impPiEdAgrHtml();
     }
     h += msg + '<div class="ipe-foot"><button class="ipe-b" onclick="impPiEdCerrar()">Cancelar</button>' +
       '<button class="ipe-b pri" ' + (st.guardando || !st.lineas ? 'disabled' : '') + ' onclick="impPiEdRevisar()">' + (st.guardando ? 'Revisando…' : 'Ver cambios →') + '</button></div>';

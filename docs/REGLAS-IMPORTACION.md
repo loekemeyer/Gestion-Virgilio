@@ -454,6 +454,12 @@ después **simulado en la base** (`gv_imp_pi_editar(..., p_simular=true)`, no es
 - El front manda el `antes` que VIO: si la línea cambió mientras se editaba, la RPC frena y no pisa.
 - Las tres RPC son sólo supervisor (`authenticated`) y están en `_PED_IMP_RPC_ESCRITURA`.
 - `sql/gv_imp_pi_editar_v2594.sql`, `tests/imp-pi-editar.cjs`. Centinela: 2 filas de `gv_imp_pi_editar`.
+- **v30.44 (Luis, 14/10): ➕ AGREGAR ARTÍCULO a la PI** (*"que haya un botón que permita agregar artículos al pedido"*;
+  caso: PI OL-10139 de Ownland sin el 811E). En el paso de cantidades, buscador del maestro (activos; primero los del
+  proveedor de la PI, sin los que ya están). El renglón viaja en `p_cambios` **sin `bache_id`**
+  (`{agregar:true, importado_id, unidades}`), misma RPC y firma: hereda PI, proveedor, embarque y llegada de la PI; frena
+  si el artículo ya está (se corrige la cantidad, no se duplica); log `antes 0 → después N`. Avisa las u por master.
+  Centinela `v_imp = any (v_agregados) or exists`. `sql/gv_imp_pi_editar_agregar_v3044.sql`, `tests/imp-pi-agregar.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-29, v24.32): la nacionalización por artículo es de 🚢 EN CURSO — y el proveedor la abre
 
