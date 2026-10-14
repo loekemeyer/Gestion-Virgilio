@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.70">
+<link rel="stylesheet" href="gv-ui.css?v=30.71">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.70"></script>
+<script type="module" src="recepcion.js?v=30.71"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10792,7 +10792,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.70";
+const APP_VERSION = "v30.71";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11442,19 +11442,23 @@ const ARM_MESA_OPCIONES = ["Mesa 1", "Mesa 2"];
 /* OC por NP para la hoja de armado impresa (Luis, 14/10 D1). Caché que se llena al cargar y cada 5 min;
    si una NP tiene dos OC distintas (NP web repetida entre LK y Chef) no se imprime ninguna. */
 var _armOcPorNp = {};
-async function _armOcRefrescar() {
+const _ARM_OC_RE = /\bO\.?C\.?\s*(?:N[\u00ba\u00b0o]?\.?\s*)?:?\s*(\d{5,})/i;
+function _armOcGuardar(k, obs) { const m = _ARM_OC_RE.exec(String(obs || "")); _armOcPorNp[k] = m ? m[1] : ""; }
+/* Trae FRESCA la OC de estas NP ("98620" ISIS o "LK 0346" web) antes de armar la hoja. Se espera siempre. */
+async function _armOcAsegurar(nps) {
   const h = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  const re = /\bO\.?C\.?\s*(?:N[\u00ba\u00b0o]?\.?\s*)?:?\s*(\d{5,})/i;
-  const nuevo = {};
-  for (const u of ["PPP_Web_Programacion?select=np,observaciones&observaciones=ilike.*OC*", "PPP_Programacion_Diaria?select=np,observaciones&observaciones=ilike.*OC*"]) {
-    try { const r = await fetch(SUPABASE_URL + "/rest/v1/" + u, { headers: h, cache: "no-store" }); if (!r.ok) continue;
-      (await r.json()).forEach(function (x) { const m = re.exec(String(x.observaciones || "")); if (!m) return; const k = String(x.np); nuevo[k] = (nuevo[k] && nuevo[k] !== m[1]) ? "?" : m[1]; });
-    } catch (_e) {}
-  }
-  if (Object.keys(nuevo).length) _armOcPorNp = nuevo;
+  const isis = [], web = { lk: [], ch: [] };
+  (nps || []).forEach(function (x) { const s = String(x || "").trim(); const m = /^(LK|CH)\s+0*(\d+)$/i.exec(s);
+    if (m) web[m[1].toLowerCase()].push(m[2]); else if (/^\d+$/.test(s)) isis.push(s); });
+  const q = [];
+  if (isis.length) q.push(fetch(SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria?select=np,observaciones&np=in.(" + isis.join(",") + ")", { headers: h, cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : []; }).then(function (rows) { isis.forEach(function (n) { _armOcPorNp[n] = ""; }); rows.forEach(function (x) { if (_ARM_OC_RE.test(String(x.observaciones || ""))) _armOcGuardar(String(x.np), x.observaciones); }); }));
+  ["lk", "ch"].forEach(function (e) { if (!web[e].length) return;
+    q.push(fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?select=np,observaciones&empresa=eq." + e + "&np=in.(" + web[e].join(",") + ")", { headers: h, cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : []; }).then(function (rows) { rows.forEach(function (x) { _armOcGuardar(pwebNpLabel(e, x.np), x.observaciones); }); })); });
+  await Promise.all(q.map(function (p) { return p.catch(function () {}); }));
 }
-function _armOcDeNp(np) { const v = _armOcPorNp[String(np)]; return (v && v !== "?") ? v : ""; }
-try { setTimeout(_armOcRefrescar, 4000); setInterval(_armOcRefrescar, 300000); } catch (_e) {}
+function _armOcDeNp(np) { return _armOcPorNp[String(np || "").trim()] || ""; }
 async function _armOcDeTanda(tanda) {
   const t = String(tanda || "").trim().toUpperCase(); if (!t) return [];
   const h = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
@@ -59210,6 +59214,7 @@ async function pgaVerArmado(tanda){
   gvHojaPreview('<div style="padding:28px;text-align:center;color:#64748b;font:inherit;">Cargando armado de ' + escapeHtml(tanda) + '…</div>', null);
   var rows = [];
   try { rows = await pgaArmadoDatos(tanda); } catch (_e){}
+  try { await _armOcAsegurar(rows.map(function (r){ return r.np; })); } catch (_e){}
   if (!rows.length){ gvHojaPreview('<div style="padding:28px;color:#64748b;">La tanda ' + escapeHtml(tanda) + ' no tiene pedidos para mostrar.</div>', null); return; }
   if (!document.getElementById("rmtSheetCss")){ var st = document.createElement("style"); st.id = "rmtSheetCss"; st.textContent = REMITO_SHEET_CSS; document.head.appendChild(st); }
   var inners = rows.map(function (r){ return armadoRemitoInnerHtml(armadoRemitoData(r)); });
@@ -59253,9 +59258,10 @@ function armadoRemitoInnerHtml(d, tipo){
       '</div>' +
     '</div>';
 }
-function showRemitoArmado(np){
+async function showRemitoArmado(np){
   const row = (_npcRows || []).find(function(r){ return String(r.np) === String(np); });
   if (!row){ alert("No encontré el pedido NP " + np + " en la lista."); return; }
+  try { await _armOcAsegurar([np]); } catch (_e){}
   const d = armadoRemitoData(row);
   _remitoInner = armadoRemitoInnerHtml(d);
   if (!document.getElementById("rmtSheetCss")){ const st = document.createElement("style"); st.id = "rmtSheetCss"; st.textContent = REMITO_SHEET_CSS; document.head.appendChild(st); }
@@ -59832,6 +59838,7 @@ function _psUpdatePollInfo(){ const el = document.getElementById("psPollInfo"); 
    (Entregas), el picker por tanda (TP) y nombres. Devuelve [d] (armadoRemitoData) alineado
    con items. Lo reusa la estación de impresión (psPrintBatch) y la Cola de impresión NP. */
 async function _armadoRemitoDataForItems(items){
+  try { await _armOcAsegurar(items.map(function (x){ return x.np; })); } catch (_e){}
   const npIn = items.map(function (x){ return encodeURIComponent(x.np); }).join(",");
   // v15.46 — el MISMO listado pero ENTRECOMILLADO, para las NP de la página, que llevan un
   // espacio ("CH 0005"): sin comillas PostgREST no resuelve el in() (lección de la v12.67).
@@ -60060,6 +60067,7 @@ async function facFacturadoInner(np, tanda){
       resumen: resumen, armadorLeg: String(tal.legajo || ""), pickerLeg: pickerLeg,
       faltantes: (parts[2] || []).map(function(x){ return { cod: String(x.cod_art || "").trim(), cajas: Number(x.cajas_falto) || 0 }; })
     };
+    try { await _armOcAsegurar([np]); } catch (_e){}
     const d = armadoRemitoData(row);
     return armadoRemitoInnerHtml(d, "FACTURADO");
   } catch(_e){ return null; }
@@ -63818,7 +63826,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.70"></script>
+<script src="importacion.js?v=30.71"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67109,15 +67117,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.70"></script>
-<script src="hotsale.js?v=30.70"></script>
-<script src="estadisticas.js?v=30.70"></script>
-<script src="ads.js?v=30.70"></script>
-<script src="plantel.js?v=30.70"></script>
+<script src="cobranzas.js?v=30.71"></script>
+<script src="hotsale.js?v=30.71"></script>
+<script src="estadisticas.js?v=30.71"></script>
+<script src="ads.js?v=30.71"></script>
+<script src="plantel.js?v=30.71"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.70"></script>
+<script src="analisis.js?v=30.71"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.70"></script>
+<script src="ayuda.js?v=30.71"></script>
 
 </body>
 </html>
