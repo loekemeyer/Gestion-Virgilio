@@ -40,3 +40,9 @@ select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN
 -- B1: D4 Cabezal Crom. (cabezal cromado p/sacacorcho) 2 cajones; sistema 0 -> ajuste +2.
 --     Sale A4 de B1 (A4 queda 8 = B4 4 + B5 4, coincide). D4 conserva IN-D4 hasta contar la columna D.
 select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('IN-B1','IN-D4');
+
+-- ===================== v30.59 · 2026-10-14 (corrección, Luis) =====================
+-- Luis: "IN-A4 cuerpo uña cromado 6 cajones · IN-A5 cuerpo sacacorcho 520 cromado 3 cajones".
+-- IN-A4: C15 -> A15 Cpo Uña Inox LK C/M 6 (sólo posición; A15 sistema 7, IN-E2 sin contar).
+-- IN-A5: C6 sale -> C15 3 cajones. C15 ajuste -3 (6 -> 3). C15 conserva IN-A1 hasta contarla.
+select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('IN-A1','IN-A4','IN-A5','IN-E2') order by 1;
