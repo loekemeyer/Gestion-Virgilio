@@ -113,3 +113,12 @@ select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('I
 --   DISC1 −15 (IN-L1..L4) -> queda 11 (IN-C1 5 + IN-E1 6, coincide con lo contado).
 -- Z37 pierde L5/L6 y queda sólo en IN-K6 (sin contar): saldo 9 sin tocar.
 select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN-[KL][0-9]' order by 1;
+
+-- ===================== v30.83 · 2026-10-14 (respuestas D4/D5, Luis) =====================
+-- D4: la manija de IN-K1/K2 ES H1 «Manija Redonda p/cromar» (cruda). Los 10 sin posición son esos: no se cuentan dos veces.
+-- IN-K4 = Z39 Puntas Sin Despuntar 525 (4) · IN-K5, L5, L6 = Z37 Puntas Sin Despuntar 520 (2+2+4).
+-- Mecanismo de fusión de la casa: el movimiento del TMP se renombra al código real, las posiciones también, y el TMP
+--   sale del catálogo (Insumos_Historial 'fusion'). H1 −10 (doble) -> 10 · Z39 0 -> 4 · Z37 −8 -> 9 (K6 sin contar).
+-- D5: G11 no apareció (Luis: "a menos que sea uno de los mangos mal rotulado"): queda en 0.
+-- Siguen para Naza: TMP-0039 batidor pera (IN-K3, 5) · TMP-0042 mango plano 702 grabado chef (IN-L1..L4, 15).
+select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN-[KL][0-9]' order by 1;
