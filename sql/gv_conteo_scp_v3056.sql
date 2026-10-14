@@ -1,0 +1,21 @@
+-- v30.56 · 2026-10-14 · CONTEO DE SC y SP (celdas IN-), primera tanda (Luis, Virgilio). Aplicado por MCP en la sesión.
+-- Luis: "lo que cuento es canónico". Backup: zz_backups."GV_Backup_InsUbic_SCP_20261014" (las 55 filas IN- de antes).
+--
+-- | celda | pieza                                  | cajones | sistema antes | qué se hizo                         |
+-- |-------|----------------------------------------|--------:|---------------|-------------------------------------|
+-- | B2+B3 | A1 Mgo Plano 501 Pint. (s/marca)       |   3 + 4 | 7, sin lugar  | posición                            |
+-- | B4+B5 | A4 Mgo Plano 501 Serig (c/marca)       |   4 + 4 | 8             | posición (B1 sigue sin contar)      |
+-- | B6    | B4B Cpo Sacacorcho Pint Azul S/marca CH|       4 | no existía    | ALTA + equivalencia GP2 529 + ajuste|
+-- | A2    | C9 Resorte U Crom                      |       2 | 2             | posición (E5 sigue sin contar)      |
+-- | A3    | D14 Resorte 520 Niq.                   |       3 | 3             | posición (F6 sigue sin contar)      |
+-- | A4    | C15 C Sacacorcho 520                   |       6 | 0             | ajuste +6 (A1/C5 siguen sin contar) |
+-- | A6    | B13 Malas (cartel «malas»)             |       5 | B13 5         | ALTA aparte, sin GP2; B13 −5 / +5   |
+--
+-- Salieron de esas 9 celdas: B13 (A2, A3), C6 (A6, B6), A4 (B2), A7 (B3), A9 (B4), C5 (B5).
+-- Movimientos con ref 'CONTEO SCP 14/10'.
+--
+-- Verificación:
+select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN-(A[2-6]|B[2-6])$' order by sector;
+--
+-- Rollback: borrar los movimientos ref 'CONTEO SCP 14/10', reponer las filas IN- desde el backup,
+-- borrar Insumos B4B / 'B13 Malas' y GP2.insumo_equivalencia B4B.
