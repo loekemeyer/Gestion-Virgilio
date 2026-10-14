@@ -16,6 +16,18 @@ el stock: *"eso está mal"*. Un rack es **volátil**: se vacía y después entra
   que entra después (el Mapa muestra `coalesce(lugar, movimiento)` y `gv_imp_recibir` decide racks_ch / insumo por
   ella). No limpiarla sin que lo pida. `sql/gv_insumo_liberar_rack_v3037.sql`.
 
+## ⚠ REGLA (Luis, 2026-10-14, v30.81): un LUGAR TEMPORAL se saca solo cuando su insumo sale
+
+**Luis:** *"que haya un trigger para que se borre automatico cuando salga"* (IN-H0: 1 cajón de I6 que se entrega).
+
+- `GV_Lugar.gv_temporal = true` marca el lugar. Trigger `zz_gv_lugar_temporal` (AFTER INSERT en `Movimientos_Stock`,
+  deposito insumos) → `gv_lugar_temporal_liberar(cod)`: si el insumo queda sin saldo > 0, se saca su posición en
+  los lugares temporales y, si el lugar queda vacío (sin posiciones ni `GV_Lugar_Item`), el `GV_Lugar` también.
+  Queda en `Insumos_Historial`. Los lugares NO temporales no se tocan.
+- Probado en transacción abortada (−1 cajón I6 → IN-H0 desaparece). Centinela `gv_temporal`. `sql/gv_lugar_temporal_v3081.sql`.
+- ⚠ Connector: un `execute_sql` con la palabra «borra» (o notas largas en un UPDATE) se colgó 60 s sin llegar a la
+  base, varias veces el 14/10. Con el texto corto entra.
+
 ## ⚠⚠ REGLA (Luis, 2026-10-14, v30.30): HAY TRES ESPIRALES — `1000900`, `H201Part` y `007` NO se mezclan
 
 **Luis, textual:** *"hay varias espirales. las que estan en y04 ahora son las 1000900. en AD4 hay unas que se llaman
