@@ -10,7 +10,7 @@ export const CAMPOS = {
   consignatario: 'Consignatario (Para:)', en_packing_list: 'Está en el packing list',
   fotos_con_codigos_distintos: 'Fotos con códigos distintos',
   codigo_barras: 'Código de barras (EAN13)', marca: 'Marca (frente vs barcode)', articulo: 'Artículo (nombre)',
-  comercializador: 'Comercializador (nombre)', marca_frente: 'Otra marca en el frente', cuit_importador: 'CUIT importador', cuit_comercializador: 'CUIT comercializador',
+  comercializador: 'Comercializador (nombre)', marca_frente: 'Otra marca en el frente', empresa_articulo: 'Empresa del artículo (Importados)', cuit_importador: 'CUIT importador', cuit_comercializador: 'CUIT comercializador',
   comercializador_cruzado: 'Comercializador (nombre y CUIT)', dos_lados: 'Los dos lados (mismo barcode)',
   parte_cruda: 'Parte cruda', cantidad_ci: 'Cantidad CI vs PL', en_ci: 'Está en la Commercial Invoice',
   en_pl: 'Está en el packing list', importador_ci: 'Comprador de la CI = importador',

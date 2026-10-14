@@ -18,7 +18,7 @@ export function ean13Valido(codigo) {
 const HINTS = new Map([[DecodeHintType.TRY_HARDER, true]]);
 
 // Decodifica una imagen en escala de grises (un byte por pixel). Devuelve el EAN-13 o null.
-export function decodificarLuminancia(lum, ancho, alto) {
+function probarBinarizadores(lum, ancho, alto) {
   for (const Binarizador of [HybridBinarizer, GlobalHistogramBinarizer]) {
     try {
       const r = new EAN13Reader().decode(new BinaryBitmap(new Binarizador(new RGBLuminanceSource(lum, ancho, alto))), HINTS);
@@ -27,6 +27,16 @@ export function decodificarLuminancia(lum, ancho, alto) {
     } catch { /* no encontró código con este binarizador */ }
   }
   return null;
+}
+
+// r82: si no lee, prueba con la imagen en NEGATIVO (barras claras sobre fondo oscuro,
+// p. ej. código impreso en blanco sobre el cartón de color).
+export function decodificarLuminancia(lum, ancho, alto) {
+  const directo = probarBinarizadores(lum, ancho, alto);
+  if (directo) return directo;
+  const inv = new Uint8ClampedArray(lum.length);
+  for (let i = 0; i < lum.length; i++) inv[i] = 255 - lum[i];
+  return probarBinarizadores(inv, ancho, alto);
 }
 
 function luminancia(ctx, w, h) {
