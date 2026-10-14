@@ -1,3 +1,4 @@
+-- REGLA_CONFIRMADA_POR_USUARIO (Luis, 14/10: «1 agrega el boton»)
 -- v30.44 (Luis, 14/10): ✏️ EDITAR PI — «que haya un botón que permita agregar artículos al pedido».
 -- Caso: PI OL-10139 (Ownland) quedó sin el 811E.
 --
