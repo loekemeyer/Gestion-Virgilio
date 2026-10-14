@@ -70,3 +70,12 @@ select cod, sector, estado from public.gv_insumo_ubicacion
 --   nunca cierra una línea MC vieja). Queda Uni 0 y sale de la alarma «con stock y sin lugar».
 -- 007 «Espiral Chef»: se saca del map al importado 1000900 y del vínculo GP2 D1. D1 queda sólo con 1000900.
 -- Importación 1000900: 78.000 (antes 81.500 con el 007).
+
+-- ===================== v30.35 · 2026-10-14 (quinta pasada, Luis) =====================
+-- «AD04 (24000)» en Stock → Insumos: el número entre paréntesis es Insumos_Ubicaciones.cantidad (cantidad
+--   DECLARADA por posición, la usa el Mapa como «🧰 insumo · N»), NO el stock. El stock canónico es
+--   Movimientos_Stock (vista_saldos_insumos_x_unidad) y la ubicación canónica es gv_insumo_ubicacion
+--   (Insumos_Ubicaciones resuelto contra GV_Lugar). Se pone cantidad = 0 en las 3 que tenían una sola
+--   posición: H201Part AD04 (24000), 439E X24 (312), 584E Z10 (12, con stock 0). Backup:
+--   zz_backups."GV_Backup_InsUbic_cant_20261014".
+-- 599ES: −1.200 Uni (Luis: «sacalo»). Con saldo 0 sale de la lista (la tabla filtra los que están en 0).
