@@ -81,3 +81,15 @@ select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('I
 --      p/cromar» (partes_crudo) en Insumos, su movimiento y su posición; equivalencia GP2 G4 -> componente 8.
 -- D10: 'Mgo Plano 512 Crudo' queda sólo en Virgilio (Luis: "si no aparece no, puede que sea muy viejo").
 select sector, cod, categoria, cantidad, stock from public.gv_scp_celda where sector='IN-C2';
+
+-- ===================== v30.65 · 2026-10-14 (vacías + columnas H, I, J; Luis) =====================
+-- VACÍAS: IN-A1, IN-D1..D6, IN-E2..E6, IN-F6 (se borran sus posiciones). C1 Abrelata Pie Uña Serig (IN-D3) -5 -> 0;
+--   A15 (IN-E2) -1 -> 6 (sólo IN-A4).
+-- IN-H1 A7 Mgo Plano 701 Crom. 4 (c/arito estampado chef, cromado) · IN-H2/H3/H4 N7 Pinza Corta 3+5+5 = 13 (coincide)
+-- IN-H5 alta 'Puntas Espiral Disc' 1 · IN-H6/H7 Z26 Mgo Plano 702 crudo 2+5 = 7; I11 (701 doblado) sin posición -> 0
+-- IN-I1 alta 'Espiral Nacional Disc' 1 · IN-I2 G4 (521 sin cromar) 4 -> G4 total 6
+-- IN-I3..I6 alta I14 Cuchilla Abrelata p/Templar (hierro p/cementar) 1+5+5+5 = 16, equivalencia GP2 19
+-- IN-J1..J3 alta 'Batidor Pera p/Cromar' 15 (sin componente GP2) · IN-J4 G13 3 (coincide)
+-- IN-J5 Z2B Pza Grande Sacaf Art LK p/Cromar 5 (cabezal sacafuente; sale de IN-J6)
+-- Pendientes por celdas sin contar: G11 (IN-K4), Z39 (IN-K5), Z37 (IN-K6, L5, L6), DISC1 (IN-L1..L4), DISC4 (IN-G5, G6).
+select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN-(H.|I.|J.)$' order by col, fila;
