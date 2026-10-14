@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.74">
+<link rel="stylesheet" href="gv-ui.css?v=30.75">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.74"></script>
+<script type="module" src="recepcion.js?v=30.75"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10792,7 +10792,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.74";
+const APP_VERSION = "v30.75";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35120,17 +35120,30 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
      hecha MIENTRAS otra está abierta se descuenta de la de afuera, igual que el baño. Cada minuto es de la
      ÚLTIMA tarea abierta que lo cubre. Se arma por legajo con todos los cierres del mismo día (sin los X) y
      computeClosureDur usa ese tiempo propio en vez de «bruto − muerto». Jhonny 09/10: 11:11 → 9:00. */
+  /* encima-cruce (D9): inicio del tramo del día de cierre de una tarea que cruza de día — mismo criterio que
+     computeClosureDur (ingreso real de ese día o la hora de entrada, nunca antes de la apertura). */
+  const _closeStartOf = (leg, tsInicioMs, tsClienteMs) => {
+    const h = horariosMap.get(String(leg)) || {};
+    const _he = parseHHMMtoHours(h.entrada);
+    const horaEntrada = (_he == null) ? 8 : _he;
+    const dayClose = isoToDayKey(tsClienteMs);
+    const ing = ingresoByLegajo.get(String(leg));
+    const cs = (ing && isoToDayKey(ing.getTime()) === dayClose) ? ing.getTime() : tsOfHourOnDay(dayClose, horaEntrada);
+    return Math.max(cs, tsInicioMs);
+  };
   const _ownByKey = new Map();
   (function () {
     const byLeg = new Map();
     for (const ev of events) {
-      if (!ev.ts_inicio || /X$/.test(String(ev.opcion || ""))) continue;
+      if (!ev.ts_inicio || /X$/.test(String(ev.opcion || "")) || ev.opcion === "LT") continue;   // LT no es tarea (= vista: opcion <> 'LT')
       const s = new Date(ev.ts_inicio).getTime(), e = new Date(ev.ts_cliente).getTime();
-      if (!isFinite(s) || !isFinite(e) || e <= s || e - s >= 24 * 3600 * 1000) continue;
-      if (isoToDayKey(s) !== isoToDayKey(e)) continue;
+      if (!isFinite(s) || !isFinite(e) || e <= s) continue;
       const k = String(ev.legajo || "").trim(); if (!k) continue;
+      let s2 = s;
+      if (isoToDayKey(s) !== isoToDayKey(e)) { s2 = _closeStartOf(k, s, e); if (s2 >= e) continue; }   // encima-cruce
+      else if (e - s >= 24 * 3600 * 1000) continue;
       if (!byLeg.has(k)) byLeg.set(k, []);
-      byLeg.get(k).push({ s: s, e: e, key: k + "|" + s + "|" + e });
+      byLeg.get(k).push({ s: s2, e: e, key: k + "|" + s2 + "|" + e });
     }
     for (const [k, arr] of byLeg) {
       const pts = Array.from(new Set(arr.flatMap(function (x) { return [x.s, x.e]; }))).sort(function (x, y) { return x - y; });
@@ -35230,7 +35243,9 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
        sólo aparece si ese día también está en `events` (no lo está cuando se mira un día
        suelto); los días intermedios se cuentan como jornada completa y no tienen detalle. */
     const muertoOpen  = Math.min(openPortion,  deadOverlapMs(leg, tsInicioMs, Math.min(fjOpenMs, tsClienteMs)));
-    const muertoClose = Math.min(closePortion, deadOverlapMs(leg, closeStartMs, tsClienteMs));
+    const _okC = String(leg).trim() + "|" + closeStartMs + "|" + tsClienteMs;   // encima-cruce
+    const muertoClose = _ownByKey.has(_okC) ? Math.max(0, closePortion - _ownByKey.get(_okC))
+                                            : Math.min(closePortion, deadOverlapMs(leg, closeStartMs, tsClienteMs));
     const muerto = muertoOpen + muertoClose;
     if (outBreakdown) {
       outBreakdown.sameDay = false;
@@ -63860,7 +63875,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.74"></script>
+<script src="importacion.js?v=30.75"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67151,15 +67166,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.74"></script>
-<script src="hotsale.js?v=30.74"></script>
-<script src="estadisticas.js?v=30.74"></script>
-<script src="ads.js?v=30.74"></script>
-<script src="plantel.js?v=30.74"></script>
+<script src="cobranzas.js?v=30.75"></script>
+<script src="hotsale.js?v=30.75"></script>
+<script src="estadisticas.js?v=30.75"></script>
+<script src="ads.js?v=30.75"></script>
+<script src="plantel.js?v=30.75"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.74"></script>
+<script src="analisis.js?v=30.75"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.74"></script>
+<script src="ayuda.js?v=30.75"></script>
 
 </body>
 </html>

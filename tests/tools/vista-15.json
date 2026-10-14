@@ -12,7 +12,8 @@
     "v23.72 (28/09): lo abierto que cruza de día suma a SU día hasta el FJ; en el día de cierre sólo el tramo desde la entrada: 8 hs_arm 7,40 -> 6,75, hs_prod 10,73 -> 10,09.",
     "v23.72-sig: la tarea abierta termina donde empieza la siguiente del legajo: 104 hs_mov 1,15 -> 1,83 (EI abierto 13:08 hasta el RT de 13:49).",
     "v26.43-cola (02/10): re-congelada con la COLA sin registro despues del TP/TAP sumada a picking/armado (Luis): 277 hs_pick 6,37 -> 7,77 · 237 hs_arm 5,60 -> 6,63 · 8 hs_arm 6,75 -> 8,76 (hs_prod 10,09 -> 12,10). 104 y 94 identicos.",
-    "v30.70-encima (14/10, Elías D7/D8): tareas encimadas se descuentan de la de afuera (como el baño); dos tareas con el mismo horario se reparten el tiempo: 277 hs_pick 7,77 -> 6,56 (E29A y E03C pickeadas juntas 13:37-14:28) · 8 hs_prod 12,10 -> 11,66. Re-congelada con el MCP."
+    "v30.70-encima (14/10, Elías D7/D8): tareas encimadas se descuentan de la de afuera (como el baño); dos tareas con el mismo horario se reparten el tiempo: 277 hs_pick 7,77 -> 6,56 (E29A y E03C pickeadas juntas 13:37-14:28) · 8 hs_prod 12,10 -> 11,66. Re-congelada con el MCP.",
+    "v30.75-encima-cruce (14/10, Elías D9): el tramo del día de cierre de una tarea que cruza de día también entra en la regla de encimadas: 8 hs_arm 8,76 -> 5,88 · hs_prod 11,66 -> 8,78 (E11A abierto el 14 tapaba los remitos del 15 a la mañana)."
   ],
   "dia": "2026-09-15",
   "operarios": [
@@ -21,12 +22,12 @@
       "tandas_pick": 1,
       "prom_hs_pick": 0.01,
       "tandas_arm": 3,
-      "prom_hs_arm": 2.92,
+      "prom_hs_arm": 1.96,
       "hs_pick": 0.01,
-      "hs_arm": 8.76,
+      "hs_arm": 5.88,
       "hs_mov": 0,
       "hs_noprod": 0.89,
-      "hs_prod": 11.66
+      "hs_prod": 8.78
     },
     {
       "legajo": "94",

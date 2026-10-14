@@ -12,3 +12,7 @@
 -- D8 (Elías, 14/10): el monitor grande de index.html (fetchMonitorDayStats, _ownByKey) aplica la misma regla.
 -- Ajuste encima-reparto en las dos funciones y el monitor: dos tareas con el MISMO horario (2 tandas pickeadas
 -- juntas) se reparten el tiempo en partes iguales. tests/tools/vista-15.json re-congelada.
+-- D9 (Elías, 14/10) encima-cruce: el tramo del día de cierre (desde la entrada) de una tarea que cruza de día también
+-- entra en la regla (iv sale de calc con close_start). Farias 15/09: E11A abierto el 14 16:22 y cerrado el 15 12:05
+-- tapaba los remitos de la mañana; hs_prod 11,66 -> 8,78 (jornada 9,62). Backup: zz_backups.gv_horas_encima_cruce_def_20261014.
+-- Monitor grande: _closeStartOf + _ownByKey; LT fuera de la línea de tiempo (= vista).
