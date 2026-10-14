@@ -10,7 +10,8 @@ el stock: *"eso está mal"*. Un rack es **volátil**: se vacía y después entra
 
 - Trigger `zz_gv_insumo_liberar_rack` → `gv_insumo_liberar_rack_sin_stock(cod)`: sin saldo > 0 en ninguna unidad,
   se borran las posiciones de **rack** del insumo (las celdas `IN-` de SC/SP no). Queda en `Insumos_Historial`.
-- El rack partido (`W04-1` / `W04-2`) no cambia: se libera sólo la parte del insumo que quedó en 0.
+- **Rack partido** (v30.38, Luis: *"W04-1 pasa a ser W04 y todo sigue"*): cuando una parte se vacía y queda una sola
+  ocupada, el rack vuelve a ser uno (`gv_rack_unir_si_queda_una`, trigger `zz_gv_rack_unir`). `sql/gv_rack_unir_v3038.sql`.
 - ⚠ Pendiente sin hacer (Luis: *"de momento no"*): la **empresa del rack** (`GV_Lugar.empresa`) se «contagia» a lo
   que entra después (el Mapa muestra `coalesce(lugar, movimiento)` y `gv_imp_recibir` decide racks_ch / insumo por
   ella). No limpiarla sin que lo pida. `sql/gv_insumo_liberar_rack_v3037.sql`.

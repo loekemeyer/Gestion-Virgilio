@@ -1,0 +1,14 @@
+-- v30.38 · 2026-10-14 · Luis: rack partido (W04-1 / W04-2): cuando queda UNA sola parte ocupada,
+-- "W04-1 pasa a ser W04 y todo sigue".
+--
+-- gv_rack_unir_si_queda_una(sector): si el rack tiene gv_sub > 1 y como mucho una parte con stock, traslada lo que
+--   haya en esa parte al rack entero (2 movimientos 'traslado', ref 'unir rack X', legajo 'auto'), pone gv_sub = null
+--   y lo registra en GV_Rack_Particion (por 'auto').
+-- Trigger zz_gv_rack_unir (AFTER INSERT en Movimientos_Stock, racks / racks_ch con ubicación «X-k»): sólo corre
+--   cuando ESE movimiento dejó su parte en 0. Así no deshace un rack que se acaba de partir y todavía espera lo nuevo.
+-- Centinela: objeto gv_rack_unir_si_queda_una, patrón 'set gv_sub = null'.
+--
+-- Probado 14/10 en transacción abortada: AB10 partido, entra 957E a AB10-2, se vacía AB10-1 -> AB10 vuelve a ser
+-- uno solo con el 957E (24). Aplicado a AB10 real: AB10-2 estaba vacía desde el 13/10 15:53 -> AB10 con 956E 132.
+--
+-- Rollback: drop trigger zz_gv_rack_unir on public."Movimientos_Stock"; volver a partir con gv_rack_partir.
