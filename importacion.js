@@ -3068,14 +3068,22 @@ function _impRecLugares(l) {
     (c.racks || []).filter(function (r) { return r.estado !== "reservado"; }).forEach(function (r) {
       var e = r.estado === "libre" ? "libre" : r.estado === "mismo" ? "ya tiene este código (" + (r.cajas || 0) + " cj)" : "⚠ ocupado: " + r.cod + " (" + (r.cajas || 0) + " cj)";
       var n = Math.max(1, Number(r.partes) || 1);
-      if (n <= 1) { out.push({ v: r.sector, t: r.sector + " · " + r.empresa + " · " + e }); return; }
+      /* v30.42 (Luis 14/10): el rack no tiene empresa; se muestra la de lo que tiene adentro (si tiene) */
+      var re = r.empresa ? " · " + r.empresa : "";
+      if (n <= 1) { out.push({ v: r.sector, t: r.sector + re + " · " + e }); return; }
       for (var k = 1; k <= n; k++) {
-        out.push({ v: r.sector + "-" + k, t: r.sector + "-" + k + " · " + r.empresa + " · parte " + k + " de " + n + " · el rack: " + e });
+        out.push({ v: r.sector + "-" + k, t: r.sector + "-" + k + re + " · parte " + k + " de " + n + " · el rack: " + e });
       }
     });
     return out;
   }
-  if (l.destino === "insumos") return (c.insumos_pos || []).map(function (p) { return { v: p.sector, t: p.sector + (p.insumos ? " · tiene " + p.insumos : " · vacía") }; });
+  /* v30.42: un insumo va a cualquier rack que esté libre o que ya tenga insumos (no a uno ocupado por un producto) */
+  if (l.destino === "insumos") {
+    var libreR = {};
+    (c.racks || []).forEach(function (r) { if (r.estado === "libre") libreR[String(r.sector).toUpperCase()] = 1; });
+    return (c.insumos_pos || []).filter(function (p) { return p.insumos || libreR[String(p.sector).toUpperCase()] || !(c.racks || []).length; })
+      .map(function (p) { return { v: p.sector, t: p.sector + (p.insumos ? " · tiene " + p.insumos : " · vacía") }; });
+  }
   return [];
 }
 function _impRecRender() {

@@ -1,0 +1,37 @@
+-- v30.42 · 2026-10-14 · Luis: UN RACK NO TIENE EMPRESA. La empresa viaja con el CÓDIGO.
+-- "La identidad del código es única para casi todos (identidad = empresa). Las únicas excepciones son el 437E, 438E,
+--  439E y 809E. Para esos 4, cuando son producto y no insumo, se puede preguntar de qué empresa son cuando se los va a
+--  poner en un rack" · "un rack vacío puede ser ocupado por cualquier cosa, que se vea así en el mapa" ·
+--  "un rack es volátil: no debería contagiarle su estado de empresa viejo a lo nuevo que se pone".
+--
+-- LA TABLA "un código = una empresa" = gv_empresa_de_articulo(cod) (GV_Articulo_Empresa_Cache + vivo). Al 14/10 resuelve
+-- TODOS los códigos con stock: 187 LK, 83 CH; los 4 duales dan null (se eligen).
+--
+-- Backup de las definiciones y de la empresa de los 210 racks: zz_backups."GV_Backup_RackEmpresa_defs_20261014".
+--
+-- | objeto                          | antes                                                    | ahora                                   |
+-- |---------------------------------|----------------------------------------------------------|-----------------------------------------|
+-- | gv_imp_recibir                  | insumo sólo a racks 'IN'; aviso rack_otra_empresa;        | cualquier rack; sin aviso; 'racks' +    |
+-- |                                 | racks_ch si el rack era CH                                | empresa del código (CH incluido)        |
+-- | gv_imp_recibir_contexto         | racks LK/CH para producto, racks IN para insumos;         | todos los racks para los dos; empresa = |
+-- |                                 | 'empresa' = la del rack                                   | la del contenido (null si vacío)        |
+-- | gv_rack_posicion_guardar        | dual sin empresa -> la del rack -> LK                     | dual sin empresa -> FRENA               |
+-- | racks_plani_ingreso(_nacional)  | dual sin empresa -> LK                                    | dual sin empresa -> FRENA               |
+-- | gv_emp_default_o_dual (nueva)   |                                                           | LK por defecto, salvo dual: excepción   |
+-- | gv_rack_celda                   | empresa = coalesce(rack, contenido)                       | empresa = contenido ('IN' = insumos)    |
+-- | Racks_Planimetria               | emp = coalesce(contenido, rack)                           | emp = contenido                         |
+-- | gv_lugar_articulo               | producto fijo en un rack: empresa del rack                | la del código (cache); duales afuera    |
+-- | gv_articulo_empresa             | 95 códigos de Chef como LK (salía de gv_uxb_lk)           | la tabla buena + los 4 duales. No la    |
+-- |                                 |                                                           | leía nadie                              |
+-- | GV_Lugar.empresa (210 racks)    | LK / CH / IN                                              | NULL (góndolas y SC/SP no se tocan)     |
+-- | 712E en racks_ch (444 cajas)    | depósito racks_ch                                         | racks + empresa CH (AC10 144, X03 192,  |
+-- |                                 |                                                           | Y28 108). 725E ya estaba así            |
+--
+-- Probado 14/10 (transacción abortada): 437E sin empresa en el Mapa y 438E sin empresa en Ingreso -> frenan;
+-- 437E con CH -> CH; 712E sin empresa -> CH; 723 marcado LK por el operario -> se graba CH (la del código);
+-- recepción simulada a O01 -> sin aviso de otra empresa; contexto: 210 racks y 210 posiciones de insumo.
+-- Front: tests/rack-sin-empresa.cjs. Centinelas v30.42 en GV_Reglas_Centinela.
+--
+-- Queda igual: góndolas (su empresa sigue en GV_Lugar: es la que separa 437E LK en F09-F12 de 437E CH en L07/L08),
+-- celdas IN- de SC/SP, picking y armado. aceptar_conteo de un dual en un rack pide la empresa del sector
+-- (0 conteos de racks en la historia: no se tocó).

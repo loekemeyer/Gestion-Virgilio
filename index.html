@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.48">
+<link rel="stylesheet" href="gv-ui.css?v=30.49">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.48"></script>
+<script type="module" src="recepcion.js?v=30.49"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10792,7 +10792,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.48";
+const APP_VERSION = "v30.49";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30927,7 +30927,7 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
       if (!ocupados[secU]) libres.push(sec);
     });
     libres.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
-    _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, cods: cods, libres: libres, ocupados: ocupados, partesDe: partesDe, rackDe: rackDe, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", codNuevo: false, masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
+    _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, cods: cods, libres: libres, ocupados: ocupados, partesDe: partesDe, rackDe: rackDe, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", codNuevo: false, masters: 0, inner: 0, sector: (libres[0] || ""), emp: "", done: [], confirming: false };
     _ir.tsInicio = _irIni || Date.now(); if (!_irIni) { try { gvRacksTramo("IRI", _ir.legajo, _ir.tsInicio); } catch (_e) {} }   // v23.66: el tramo de racks arranca al abrir · v26.83: o sigue el abierto
     irRender();
   } catch (e) { const b = document.getElementById("irBody"); if (b) b.innerHTML = '<div class="ir-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -30978,9 +30978,11 @@ function irRender() {
   if (sectorOcupadoOtro) h += _irOcupadoHtml(secU, ocupadoPor);
   else if (ocupadoPor) h += '<div class="ir-ok2">➕ ' + escapeHtml(secU) + ' ya tiene ' + escapeHtml(ocupadoPor) + ' — se suma.</div>';
   h += '<div class="ir-libres">' + _ir.libres.slice(0, 14).map(function (s) { return '<button class="ir-chip' + (secU === s.toUpperCase() ? ' on' : '') + '" onclick="irSetSec(\'' + escapeHtml(s) + '\')">' + escapeHtml(s) + '</button>'; }).join("") + (_ir.libres.length > 14 ? '<span class="ir-more">+' + (_ir.libres.length - 14) + ' libres</span>' : (_ir.libres.length ? '' : '<span class="ir-more">sin sectores libres</span>')) + '</div>';
-  h += '<div class="ir-fld"><div class="ir-lbl">Empresa</div><div class="ir-seg"><button class="ir-segb' + (_ir.emp === "LK" ? " on" : "") + '" onclick="irSetEmp(\'LK\')">LK · Loeke</button><button class="ir-segb' + (_ir.emp === "CH" ? " on" : "") + '" onclick="irSetEmp(\'CH\')">CH · Chef</button></div></div>';
+  // v30.42 (Luis 14/10): la empresa sale del código. Sólo los 4 duales (437E, 438E, 439E, 809E) eligen LK o CH, sin valor por defecto.
+  const irDual = prkEsDual(codN);
+  if (irDual) h += '<div class="ir-fld"><div class="ir-lbl">Empresa (código dual)</div><div class="ir-seg"><button class="ir-segb' + (_ir.emp === "LK" ? " on" : "") + '" onclick="irSetEmp(\'LK\')">LK · Loeke</button><button class="ir-segb' + (_ir.emp === "CH" ? " on" : "") + '" onclick="irSetEmp(\'CH\')">CH · Chef</button></div></div>';
   const dispOk = !nac || (disp > 0 && Number(_ir.inner) <= disp);
-  const ok = codN && (Number(_ir.inner) > 0) && secU && !sectorOcupadoOtro && dispOk && !codMal;
+  const ok = codN && (Number(_ir.inner) > 0) && secU && !sectorOcupadoOtro && dispOk && !codMal && (!irDual || !!_ir.emp);
   h += '<button class="ir-fin"' + (ok ? "" : " disabled") + ' onclick="irRevisar()">Revisar carga →' + (secU && Number(_ir.inner) > 0 ? ' (' + (Number(_ir.inner) || 0) + ' cajas a ' + escapeHtml(secU) + ')' : '') + '</button>';
   if (_ir.done.length) {
     h += '<div class="ir-done-h">Cargados en esta sesión (' + _ir.done.length + ')</div>';
@@ -31240,6 +31242,7 @@ async function irRevisar() {
   const ocupadoPor = _ir.ocupados[secU] || "";
   const sectorOcupadoOtro = ocupadoPor && _irNorm(ocupadoPor) !== codN;
   if (!codN || !(Number(_ir.inner) > 0) || !secU || sectorOcupadoOtro) return;
+  if (prkEsDual(codN) && !_ir.emp) return;   // v30.42: dual sin empresa elegida no avanza
   if (_ir.modo === "nacional") { const disp = _irDisp(_ir.cod, _ir.origen); if (!(disp > 0) || Number(_ir.inner) > disp) return; }
   // v29.67: el candado del código (D2) — acá es donde frena, aunque el chequeo de fondo no haya llegado
   if (_ir.modo !== "nacional" && !(await _irCodGuard(codN))) return;
@@ -31252,7 +31255,7 @@ function irRenderConfirm(body) {
   const cod = _irNorm(_ir.cod), sector = String(_ir.sector || "").trim().toUpperCase();
   const inner = Number(_ir.inner) || 0, masters = Number(_ir.masters) || 0;
   const nombre = artNombre(_ir.cod, "") || "";
-  const empTxt = _ir.emp === "CH" ? "CH · Chef" : "LK · Loeke";
+  const empTxt = prkEsDual(cod) ? (_ir.emp === "CH" ? "CH · Chef" : "LK · Loeke") : "";   // v30.42: no dual = la del código
   const ocupadoPor = _ir.ocupados[sector] || "";
   const suma = ocupadoPor && _irNorm(ocupadoPor) === cod;
   const nac = _ir.modo === "nacional";
@@ -31266,7 +31269,7 @@ function irRenderConfirm(body) {
   h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Sector</span><span class="ir-rev-val">' + escapeHtml(sector) + (suma ? ' <small class="ir-rev-sm">➕ suma a ' + escapeHtml(ocupadoPor) + '</small>' : '') + '</span></div>';
   if (!nac) h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Masters</span><span class="ir-rev-val">' + masters + '</span></div>';
   h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Cajas' + (nac ? ' a mover' : ' (inner)') + '</span><span class="ir-rev-val ir-rev-big">' + inner + '</span></div>';
-  h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Empresa</span><span class="ir-rev-val ir-rev-txt">' + escapeHtml(empTxt) + '</span></div>';
+  if (empTxt) h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Empresa</span><span class="ir-rev-val ir-rev-txt">' + escapeHtml(empTxt) + '</span></div>';
   h += '</div>';
   h += '<div class="ir-conf-btns"><button class="ir-back" onclick="irVolver()">← Volver</button><button class="ir-confirm" onclick="irCargar()">✓ Confirmar carga</button></div>';
   body.innerHTML = h;
@@ -31295,7 +31298,7 @@ function closeIR() {
 async function irCargar() {
   if (!_ir) return;
   const nac = _ir.modo === "nacional";
-  const cod = _irNorm(_ir.cod), sector = String(_ir.sector || "").trim().toUpperCase(), inner = Number(_ir.inner) || 0, emp = (_ir.emp === "CH" ? "CH" : "LK"), leg = _ir.legajo || "";
+  const cod = _irNorm(_ir.cod), sector = String(_ir.sector || "").trim().toUpperCase(), inner = Number(_ir.inner) || 0, emp = (prkEsDual(cod) ? (_ir.emp === "CH" ? "CH" : (_ir.emp === "LK" ? "LK" : "")) : ""), leg = _ir.legajo || "";
   // nacional: masters se deriva del CxM (mueven cajas sueltas); importación: lo puso el usuario
   const cxmv = _ir.cxm[cod] || 0;
   const masters = nac ? (cxmv > 0 ? Math.floor(inner / cxmv) : 0) : (Number(_ir.masters) || 0);
@@ -48687,7 +48690,7 @@ function lugRender(filter) {
   return '<div class="lug-row">' +
       '<div class="lug-row-h">' +
         '<span class="lug-sec">' + sE + '</span>' +
-        '<span class="lug-meta">' + escapeHtml(String(l.tipo || "")) + ' · <b>' + escapeHtml(emp) + '</b>' +
+        '<span class="lug-meta">' + escapeHtml(String(l.tipo || "")) + (l.tipo === "rack" ? '' : ' · <b>' + escapeHtml(emp) + '</b>') +   // v30.42: un rack no tiene empresa
           (l.uso ? ' · ' + escapeHtml(String(l.uso)) : '') +
           ' · orden ' + (l.orden != null ? Number(l.orden) : "—") + '</span>' +
       '</div>' +
@@ -49383,8 +49386,11 @@ function prkAbrir(sector) {
   pmapCeldaStatus("");
   tit.textContent = "Rack · " + sector + (r.empresa ? " · " + r.empresa : "");
   const libre = r.estado === "libre", d = pmapDesc(r);
-  const emp = String(r.empresa || "LK").toUpperCase();
+  /* v30.42 (Luis 14/10): el rack NO tiene empresa; la empresa es la del contenido ("IN" = hay insumos). Un rack vacío
+     puede recibir cualquier cosa: muestra el formulario de producto y el de insumos. LK/CH se elige sólo para los 4 duales. */
+  const emp = String(r.empresa || "").toUpperCase();
   const secJ = JSON.stringify(String(sector)).replace(/"/g, "&quot;");
+  const dualIni = !libre && prkEsDual(r.cod);
   if (emp === "IN") {   // rack de insumos: sólo insumos, sin formulario de artículo
     box.innerHTML = '<div class="prk-det">Rack de <b>insumos</b>.' +
       (r.estado === "sin_lugar" ? '<br>⚠ Esta posición no existe como rack en 📍 Lugares del depósito.' : "") + '</div>' +
@@ -49398,10 +49404,10 @@ function prkAbrir(sector) {
     (r.estado === "sin_lugar" ? '<br>⚠ Esta posición no existe como rack en 📍 Lugares del depósito.' : "") +
     '</div>' + prkStockLinea(sector) +
     '<div class="prk-form">' +
-      '<label>Código<input class="planim-inp" id="prkCod" type="text" value="' + escapeHtml(libre ? "" : String(r.cod || "")) + '" placeholder="438E, 505… (Pedidos / Cajas = reservado)" oninput="this.value=this.value.toUpperCase()"></label>' +
+      '<label>Código<input class="planim-inp" id="prkCod" type="text" value="' + escapeHtml(libre ? "" : String(r.cod || "")) + '" placeholder="438E, 505… (Pedidos / Cajas = reservado)" oninput="this.value=this.value.toUpperCase();prkEmpVer()"></label>' +
       '<label>MC<input class="planim-inp planim-inp-num" id="prkMc" type="number" inputmode="numeric" min="0" value="' + (libre ? "" : (Number(r.master_cajas) || 0)) + '"></label>' +
       '<label>Cajas<input class="planim-inp planim-inp-num" id="prkInner" type="number" inputmode="numeric" min="0" value="' + (libre ? "" : (Number(r.innercajas) || 0)) + '"></label>' +
-      '<label>Empresa<select class="planim-inp" id="prkEmp"><option value="LK"' + (emp === "LK" ? " selected" : "") + '>LK</option><option value="CH"' + (emp === "CH" ? " selected" : "") + '>CH</option></select></label>' +
+      '<label id="prkEmpLbl"' + (dualIni ? '' : ' style="display:none"') + '>Empresa (dual)<select class="planim-inp" id="prkEmp"><option value="">elegí</option><option value="LK"' + (dualIni && emp === "LK" ? " selected" : "") + '>LK</option><option value="CH"' + (dualIni && emp === "CH" ? " selected" : "") + '>CH</option></select></label>' +
       '<label class="prk-mot">Motivo (obligatorio)<input class="planim-inp" id="prkMotivo" type="text" placeholder="Conteo del 25/09, palet movido…"></label>' +
     '</div>' +
     '<div class="prk-btns">' +
@@ -49676,19 +49682,34 @@ async function prkPartir(sector) {
   pmapCeldaStatus("✓ " + rack + (n > 1 ? " quedó en " + n + " partes (" + rack + "-1 … " + rack + "-" + n + ")." : " volvió a ser un solo lugar."), true);
 }
 let _prkGuardando = false;
+/* v30.42: los 4 códigos duales (437E, 438E, 439E, 809E) son los únicos que eligen empresa al guardar en un rack. */
+function prkEsDual(cod) {
+  const k = String(cod || "").toUpperCase().trim().replace(/\s+(LK|CH)$/, "").replace(/^0+(?=.)/, "");
+  return !!(typeof EMPRESA_SPLIT_CODS !== "undefined" && EMPRESA_SPLIT_CODS[k]);
+}
+function prkEmpVer() {
+  const c = document.getElementById("prkCod"), l = document.getElementById("prkEmpLbl");
+  if (!c || !l) return;
+  const dual = prkEsDual(c.value);
+  l.style.display = dual ? "" : "none";
+  if (!dual) { const s = document.getElementById("prkEmp"); if (s) s.value = ""; }
+}
+window.prkEmpVer = prkEmpVer;
 async function prkGuardar(sector, vaciar) {
   if (_prkGuardando) return;
   const v = function (id) { const el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
   const cod = vaciar ? "" : v("prkCod").toUpperCase();
   const mc = vaciar ? 0 : Number(v("prkMc") || 0), inner = vaciar ? 0 : Number(v("prkInner") || 0);
-  const emp = v("prkEmp") || "LK", motivo = v("prkMotivo");
+  const emp = v("prkEmp"), motivo = v("prkMotivo");
   if (!motivo) { pmapCeldaStatus("Escribí el motivo: queda en el movimiento de stock.", false); return; }
+  // v30.42: la empresa sale del código; sólo los 4 duales la eligen (sin valor por defecto)
+  if (!vaciar && prkEsDual(cod) && !emp) { pmapCeldaStatus("Es un código dual: elegí si es de LK o de CH.", false); return; }
   if (!vaciar && cod && !/^(PEDIDOS|CAJAS)$/.test(cod) && !(inner > 0)) { pmapCeldaStatus("Poné las cajas que hay (o vaciá la posición).", false); return; }
   if (vaciar && !confirm("¿Vaciar " + sector + "? Sale del stock del depósito racks lo que tenía cargado.")) return;
   _prkGuardando = true;
   pmapCeldaStatus("Guardando…", true);
   const r = await pmapRpc("gv_rack_posicion_guardar", {
-    p_sector: sector, p_cod: cod, p_master: mc, p_inner: inner, p_emp: emp, p_motivo: motivo
+    p_sector: sector, p_cod: cod, p_master: mc, p_inner: inner, p_emp: (prkEsDual(cod) ? emp : null) || null, p_motivo: motivo
   });
   _prkGuardando = false;
   if (!r.ok) { pmapCeldaStatus("No se guardó: " + r.err, false); return; }
@@ -63643,7 +63664,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.48"></script>
+<script src="importacion.js?v=30.49"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -66934,15 +66955,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.48"></script>
-<script src="hotsale.js?v=30.48"></script>
-<script src="estadisticas.js?v=30.48"></script>
-<script src="ads.js?v=30.48"></script>
-<script src="plantel.js?v=30.48"></script>
+<script src="cobranzas.js?v=30.49"></script>
+<script src="hotsale.js?v=30.49"></script>
+<script src="estadisticas.js?v=30.49"></script>
+<script src="ads.js?v=30.49"></script>
+<script src="plantel.js?v=30.49"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.48"></script>
+<script src="analisis.js?v=30.49"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.48"></script>
+<script src="ayuda.js?v=30.49"></script>
 
 </body>
 </html>

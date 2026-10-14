@@ -3,6 +3,26 @@
 > Movido de `CLAUDE.md` el 2026-10-13 (poda 3ra tanda, pedido de Luis) **sin cambiar una palabra**.
 > **Leerlo ENTERO antes de tocar algo de este tema.** Las reglas siguen valiendo igual que cuando estaban en CLAUDE.md.
 
+## ⚠⚠ REGLA (Luis, 2026-10-14, v30.42): UN RACK NO TIENE EMPRESA — la empresa viaja con el CÓDIGO
+
+**Luis, textual:** *"La identidad del código es única para casi todos (identidad = empresa). Las únicas excepciones son el
+437E, 438E, 439E y 809E. Para esos 4, cuando son producto y no insumo, se puede preguntar de qué empresa son cuando se los
+va a poner en un rack"* · *"un rack es volátil: se vacía un rack de Chef y después puede ir un producto de LK o un insumo.
+No debería contagiarle su estado de empresa viejo a lo nuevo"* · *"un rack vacío puede ser ocupado por cualquier cosa"*.
+
+- **La empresa de un código** = `gv_empresa_de_articulo(cod)`. Resuelve todos los códigos con stock (14/10: 187 LK, 83 CH);
+  los 4 duales dan null y **se eligen** al guardar en un rack (Mapa e Ingreso a racks: LK/CH sólo para ellos, sin valor
+  por defecto; la base frena con `gv_emp_default_o_dual` si llega un dual sin empresa).
+- **`GV_Lugar.empresa` de los racks es NULL** (los 210). El Mapa (`gv_rack_celda`) muestra la empresa del CONTENIDO;
+  `IN` = la celda tiene insumos. Un rack vacío abre el formulario de producto y el de insumos.
+- **CH en racks = depósito `racks` + empresa CH.** `racks_ch` no se escribe más desde la recepción de importados
+  (el 712E se pasó el 14/10; quedó vacío). El ajuste manual de Stocks todavía ofrece `racks_ch`.
+- ⚠ **`gv_articulo_empresa` NO decide la empresa de nadie**: estaba mal (95 códigos de Chef como LK) y se redefinió
+  sobre la tabla buena. Para un código, `gv_empresa_de_articulo`.
+- ⚠ **Las góndolas SÍ tienen empresa** y no se tocaron: es la que separa el 437E LK (F09-F12) del 437E CH (L07/L08) en
+  el picking.
+- `sql/gv_rack_sin_empresa_v3042.sql` (antes/ahora de cada objeto, pruebas y backup) · `tests/rack-sin-empresa.cjs`.
+
 ## ⚠ Regla de Thomas (2026-09-18, v20.17 · asentada v20.20): el EXCEDENTE va en el ORDEN DEL RECORRIDO
 
 Probando el módulo de operarios con una tanda: *"primero le dice que pickee del excedente, eso

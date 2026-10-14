@@ -848,6 +848,8 @@ echo "== pmap-gondolas (v17.23: 🗺️ Mapa de góndolas — celdas de a 5, la 
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-gondolas.cjs
 echo "== pmap-racks (v22.67: 📦 pestaña Racks del Mapa — solo lectura, vista gv_rack_celda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-racks.cjs
+echo "== rack-sin-empresa (v30.42: el rack no tiene empresa; LK/CH sólo para los 4 duales; rack vacío = cualquier cosa) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rack-sin-empresa.cjs
 echo "== pmap-scp (v29.98: 📐 SC y SP — la tercera clase de lugar, grilla IN-A1…) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-scp.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-punto-unico.cjs
