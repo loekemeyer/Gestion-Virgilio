@@ -559,6 +559,14 @@ vacías) · `node tests/arm-mesa-inicio.cjs` (corre la pantalla: el AP con mesa 
 encola AUI, el cuadro que explota **no** traba el asistente) · `node tests/mon-tv.cjs`.
 `sql/gv_armado_mesa_aui_v2990.sql` (rollback al pie).
 
+## REGLA (Luis, 2026-10-14, v30.29): LIQUIDAR un código viejo dentro del picking de su reemplazo
+
+`PK_LIQUIDAR_EN` (index.html): `"574E" → 574 LK, F50`. Mientras el 574 tenga saldo terminado > 0
+(`vista_saldos_stock`), el picking que pida 574E levanta primero las cajas del 574 (paso propio, su
+PKC descuenta el 574) y el resto del 574E. Al llegar a 0 se apaga solo; si la consulta falla, picking
+normal. El pedido y la factura siguen en 574E. Para liquidar otro código: sumar una fila al mapa.
+Test: `tests/pk-liquidar-574.cjs`.
+
 ## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
 
 > Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
