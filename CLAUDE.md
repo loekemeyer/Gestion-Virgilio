@@ -101,10 +101,12 @@ Preferencias del dueño (Elías, 28/09/2026). El porqué y la historia de cada p
 - ⚠⚠ **EL PEDIDO ES LA AUTORIZACIÓN** (Luis, 04/10): lo que el dueño pidió —funciones, columnas, centinelas, el
   refresco que lo hace efectivo— se aplica en el mismo pedido, sin un segundo «sí». El «sí» previo queda para lo que
   **NO** pidió: corrección de datos que Claude detecta solo, borrados, reversiones.
-- ⚠⚠ **EL SQL LO CORRE LA SESIÓN, NUNCA EL USUARIO** (Luis, 07/10): no se le dan pasos para el SQL Editor. Si el MCP
-  se cuelga a los 60 s, pedir **una vez** que apruebe el cartel o ponga `execute_sql` / `apply_migration` en *Always
-  allow*, y reintentar. Con «Always allow» igual se traba si el texto trae `delete` / `drop` / `truncate`: armarlo con
-  `execute replace($s$…QQB…$s$, 'QQB', 'DE'||'LETE')` y usar `create or replace trigger` en vez de `drop` + `create`.
+- ⚠⚠ **EL SQL LO CORRE LA SESIÓN, NUNCA EL USUARIO** (Luis, 07/10): no se le dan pasos para el SQL Editor. ⚠ **`execute_sql`
+  y `apply_migration` YA ESTÁN en *Always allow*** (connector y `.claude/settings.json`, medido 14/10): **no se le pide
+  al usuario que los apruebe ni que los ponga en Always allow**. El cartel sólo sale por (a) el guardián de reglas
+  protegidas (`claude-reglas-guard.cjs`, a propósito) o (b) Supabase cuando el texto trae `delete` / `drop` /
+  `truncate`: armarlo con `execute replace($s$…QQB…$s$, 'QQB', 'DE'||'LETE')` y usar `create or replace trigger` en vez
+  de `drop` + `create`. Detalle y cómo medirlo: `docs/REGLAS-SUPABASE.md`.
 - ⚠⚠ **Excepción Chef** (`nkhzocgdpwtgrmwleihr`): no está en el connector y no se conecta. El SQL se le pasa a Luis
   completo en el chat y después se le pide el `select` de verificación.
 

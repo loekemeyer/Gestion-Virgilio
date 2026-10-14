@@ -74,7 +74,8 @@ allow.extend(nuevos)
 # (copia vieja en claude.ai) lo sigue poniendo en "ask", y un ask le gana a todo
 # allow: se saca aca, en cada arranque. El push forzado sigue en deny.
 ask = perms.get("ask", [])
-SACAR_ASK = ["Bash(git push:*)", "Bash(git push *)"]
+SACAR_ASK = ["Bash(git push:*)", "Bash(git push *)",
+             "mcp__Supabase__execute_sql", "mcp__Supabase__apply_migration"]  # Luis 14/10
 sacados = [x for x in ask if x in SACAR_ASK]
 if sacados:
     perms["ask"] = [x for x in ask if x not in SACAR_ASK]

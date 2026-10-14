@@ -22,10 +22,10 @@
 # (Medido: con "Bash" en allow y "Bash(curl:*)" en ask, el curl queda denegado.)
 #
 # QUE SIGUE PREGUNTANDO, a proposito:
-#   - mcp__Supabase__apply_migration / deploy_edge_function: estructura y deploy.
-#     (execute_sql SI esta permitida desde el 18/09: preguntaba en cada select y
-#     era el 90 % de los carteles. La regla del 26/08 —los datos no se tocan sin
-#     permiso explicito— la sostiene el CLAUDE.md, no el dialogo.)
+#   - mcp__Supabase__deploy_edge_function: deploy.
+#     (execute_sql SI esta permitida desde el 18/09 y apply_migration desde el
+#     14/10, Luis: preguntaban en cada llamada. La regla del 26/08 —los datos no
+#     se tocan sin permiso explicito— la sostiene el CLAUDE.md, no el dialogo.)
 #   - git push, curl y wget (lista ASK).
 #   - Todo lo que este en DENY, que ni preguntando pasa.
 #
