@@ -35,3 +35,8 @@ select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN
 -- Salieron de las celdas: C15 (C5), B9 (C6, queda 2 cajones sin lugar), GRJ9 (F1, F2; stock 0).
 select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN-(C[1-6]|E1|F[1-5])$' order by sector;
 -- Rollback: igual que arriba + borrar Insumos D3 y GP2.insumo_equivalencia D3.
+
+-- ===================== v30.58 · 2026-10-14 (tercera tanda, Luis) =====================
+-- B1: D4 Cabezal Crom. (cabezal cromado p/sacacorcho) 2 cajones; sistema 0 -> ajuste +2.
+--     Sale A4 de B1 (A4 queda 8 = B4 4 + B5 4, coincide). D4 conserva IN-D4 hasta contar la columna D.
+select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('IN-B1','IN-D4');
