@@ -478,6 +478,20 @@ con su propia cola (`gv_pkm_q_v1`, tope 800) y todo en try/catch: **si falla, el
 - Forward-facing: `Stock_Config.conteo_picking_desde` (08/10 09:48). Centinela 373. `sql/gv_conteo_picking_v2858.sql`,
   `tests/conteo-picking-admin.cjs`, `tests/pk-conteo-ciclico.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-14, v30.53): «NO HAY EN GÓNDOLA» del armado deja la góndola en 0 — en los dos sentidos
+
+Caso: C14 (960E) y J26/J27 (591) vacías con la góndola en −1 (F47B pickeó 1 caja de celdas en 0).
+
+- **«Hay de menos» + «No hay en góndola»** (y «No hay más» de Líos, que usa la misma rama) es un **conteo**: la góndola
+  se lleva a **0** leyendo el saldo vivo. Antes sólo subía una negativa y topada en `qty`; una positiva quedaba con
+  stock fantasma. Ajuste `terminado`, ref `picking_difiere`, `client_id` **`npdg_<tanda>_<np>_<cod>_<qty>`** (un doble
+  toque no ajusta dos veces). Separar_pedidos sigue igual (`npd_…`, −qty).
+- **No duplica un ajuste a mano**: si alguien ya dejó la góndola en 0, el saldo vivo da 0 y el armado no escribe nada.
+- **Dual** (saldo en las dos empresas): no se toca (`_stkGondolaSaldoVivoEmp` devuelve null).
+- **«Hay de más»** NO mueve stock y está bien: la pantalla le pide al armador que **vuelva a guardar** las que sobran.
+  **«Sí, agarro de góndola»** tampoco (lo descontó el picking).
+- `tests/comp-dif-nofantasma.cjs` (casos 2, 6, 7 y 8; falla contra la v30.52). Problema 782.
+
 ## ⚠ REGLA (Luis, 2026-10-13, v29.49): el ARMADO cruza Entregas con el picking por el CÓDIGO DE PICKING
 
 Auditoría del módulo de operarios (13/10). `reconciliar_pipeline_stock_etapa2` (el `separado` del TAP) cruzaba
