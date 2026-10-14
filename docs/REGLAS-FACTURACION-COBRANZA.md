@@ -206,3 +206,13 @@ va desde **la fecha más temprana entre salida y envío a facturar − 3** hasta
 arrancaba en salida − 3 y toda NP facturada más de 3 días antes de salir quedaba «sin factura» (LK 0421:
 FC 14/10, salida 04/11; 72 de 98 NP afectadas desde mayo). Centinela 463.
 `sql/gv_cruce_fc_asignacion_v3042.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-14): Matiz 552xx y 702EN — NO PREGUNTAR, NO TOCAR
+
+- **Artículos 552xx (Matiz SA)**: hoy **cada caja = 1 unidad** (`uxb = 1`). Las NP viejas que se cargaron en
+  cajas de 24 / 6 (98109 con 55215, 97889 con 55219) dan diferencia en Conciliación: **es historia, no se corrige
+  ni se reporta**. Luis: *"no lo jodas"*.
+- **702EN no tiene que existir**: es un código viejo. Que no tenga uxb en el maestro está bien; no se carga.
+  El que vale es **702E** (12 por caja): medido el 14/10, 46 de 56 NP de Chef cruzan exactas y las otras 10
+  (44467–44508) se facturaron como 702EN con las mismas unidades.
+- **No volver a proponer** cargar uxb para estos códigos ni preguntar por ellos.
