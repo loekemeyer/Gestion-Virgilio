@@ -567,6 +567,12 @@ PKC descuenta el 574) y el resto del 574E. Al llegar a 0 se apaga solo; si la co
 normal. El pedido y la factura siguen en 574E. Para liquidar otro código: sumar una fila al mapa.
 Test: `tests/pk-liquidar-574.cjs`.
 
+**v30.30 (Luis, 14/10): el 574 queda DISCONTINUADO cuando se fue.** `gv_liquidado_discontinuar()` (cron
+160 `gv-liquidado-discontinuar`, 05:13 ART) da de alta el 574 en `Articulos_Discontinuados` cuando hay un
+PKC del 574 con real > 0 desde el 14/10, su tanda tiene remito (CRN) y el saldo del 574 es 0 en todos los
+depósitos. El alta dispara la liberación de la góndola F50. `select * from gv_liquidado_discontinuar(true);`
+simula. `sql/gv_liquidado_discontinuar_v3030.sql`, centinela v30.30 (la app salió en la v30.31).
+
 ## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
 
 > Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
