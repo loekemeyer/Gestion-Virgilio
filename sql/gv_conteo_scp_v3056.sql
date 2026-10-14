@@ -122,3 +122,7 @@ select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN
 -- D5: G11 no apareció (Luis: "a menos que sea uno de los mangos mal rotulado"): queda en 0.
 -- Siguen para Naza: TMP-0039 batidor pera (IN-K3, 5) · TMP-0042 mango plano 702 grabado chef (IN-L1..L4, 15).
 select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN-[KL][0-9]' order by 1;
+
+-- ===================== D6 · 2026-10-14 (Luis): IN-K6 vacía =====================
+-- Sale Z37 de IN-K6; Z37 −1 -> 8 (K5 2 + L5 2 + L6 4).
+select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('IN-K5','IN-K6','IN-L5','IN-L6') order by 1;
