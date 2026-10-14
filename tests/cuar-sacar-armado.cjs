@@ -1,6 +1,6 @@
 // v28.45 (Luis, 07/10) — «🐊 Sacarlo a cuarentena» según la TANDA entera:
 //   pendiente → pierde tanda y día · proceso → NO se puede · armada → sale SOLO con su armado a una
-//   tanda nueva SIN DÍA (figura en A Programar con badge; aprobado NO se programa solo, cartel y día a mano).
+//   tanda nueva SIN DÍA (figura en A Programar con badge; v30.37: aprobado se programa SOLO si se puede, si no cartel y día a mano).
 // Candado estático sobre index.html y el SQL (el backend se probó en transacción abortada).
 const fs = require("fs");
 const path = require("path");
@@ -29,7 +29,12 @@ ok(/gv_cuarentena_sacar_chequeo/.test(fn("cuarComAbrir")), "al sacar a cuarenten
 ok(/s\.chk\.estado === "proceso"\)\) \? "disabled"/.test(html), "con la tanda en proceso el botón queda deshabilitado");
 ok(/separá sus cajas del pallet/.test(fn("cuarSacarAvisoHtml")) && /No se imprime ningún papel/.test(fn("cuarSacarAvisoHtml")), "armada: avisa separar el pallet, sin papel");
 const lib = fn("cuarLiberarConfirmar");
-ok(/p\._cuarArm/.test(lib) && /window\.alert/.test(lib) && /no se programa solo/.test(lib), "al aprobar un armado salta el cartel de asignar a mano");
+// v30.37 (Luis, 14/10): aprobado, el armado se programa SOLO si se puede; el cartel queda sólo para lo que no
+ok(/p\._cuarArm/.test(lib) && /gv_cuarentena_armado_auto/.test(lib), "al aprobar un armado se intenta programar solo (gv_cuarentena_armado_auto)");
+ok(/r_resultado === "programado"/.test(lib) && /window\.alert/.test(lib) && /no se pudo programar solo/.test(lib), "si no se pudo programar solo, salta el cartel de asignar a mano");
+const sqlAuto = fs.readFileSync(path.join(root, "sql/gv_cuarentena_armado_auto_v3037.sql"), "utf8");
+ok(/gv_ppp_web_dia_grupo/.test(sqlAuto) && /gv_cuarentena_liberados_familia/.test(sqlAuto) && /gv_es_super/.test(sqlAuto), "auto: día del armador, sólo aprobado, súper a mano");
+ok(/cron\.schedule\('gv-cuarentena-armado-auto'/.test(sqlAuto), "auto: cron de respaldo cada 10 min");
 ok(!/window\.print|remitoPrintDoc|gvImprimirAuto/.test(fn("cuarDevolverConfirmar") + fn("cuarSacarAvisoHtml") + fn("aprCuarArmAsignar")), "no se imprime ningún papel de cuarentena");
 ok(/EN_PROCESO/.test(sql) && /gv_ppp_espera_fecha\(\)/.test(sql) && /gv_ppp_web_desprogramar/.test(sql), "devolver: proceso frena, armado sin día, pendiente como siempre");
 ok(/gv_cuarentena_liberados_familia/.test(sql), "el día se asigna sólo aprobado");

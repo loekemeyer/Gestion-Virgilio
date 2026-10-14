@@ -53468,14 +53468,28 @@ async function cuarLiberarConfirmar() {
     s.saving = false; cuarComCerrar(); cuarYaProgRecargar();
     _apr.msg = "Pedido enviado a Pedidos a programar (aprobado por " + quien + ")" + (txt ? ", con tu comentario." : "."); _apr.msgErr = false;
     if (p) { p._cuarLiberado = true; }   // pinta al toque; aprCargar lo confirma
-    // v28.45 (Luis, 07/10): "Si estaba armado, que se quede y salte un cartel que diga que se tiene que
-    // revisar y asignar manualmente". No se programa solo: queda en su tanda sin día.
+    // v30.37 (Luis, 14/10): "si un pedido sale de cuarentena, que se programe automaticamente siguiendo
+    // las reglas establecidas en caso de que sea posible". Si estaba ARMADO (v28.45, tanda sin día),
+    // gv_cuarentena_armado_auto le da el día con la regla del armador (grupo de zonas). Sólo si no se
+    // puede (súper, zona no automática, un guard que frena) queda el cartel de asignarlo a mano.
     if (p && p._cuarArm) {
-      const _cm = "⚠ " + aprPedLabel(p) + " ESTABA ARMADO: no se programa solo.\n\nSigue en la tanda " + p._cuarArm.tanda_nueva +
-        " SIN DÍA, con su picking y su armado. Revisalo y asignale el día A MANO: soltalo en un día en A Programar" +
-        " (sale con su mismo armado, no se vuelve a pickear).";
-      _apr.msg = _cm.replace(/\n+/g, " "); _apr.msgErr = true;
-      try { window.alert(_cm); } catch (_e) {}
+      let _au = null;
+      try {
+        const _r = await aprRpc("gv_cuarentena_armado_auto", { p_empresa: empresa, p_order_id: String(orderId) });
+        _au = (_r || []).find(function (x) { return String(x.r_order_id) === String(orderId); }) || null;
+      } catch (_e) { _au = null; }   // sin respuesta: el cron (cada 10 min) lo vuelve a intentar
+      if (_au && _au.r_resultado === "programado") {
+        _apr.msg = aprPedLabel(p) + " estaba armado: se programó solo en la tanda " + _au.r_tanda +
+          (_au.r_fecha ? " para el " + aprDiaCorto(_au.r_fecha) : "") +
+          ", con su mismo picking y armado (no se vuelve a pickear)."; _apr.msgErr = false;
+      } else {
+        const _cm = "⚠ " + aprPedLabel(p) + " ESTABA ARMADO y no se pudo programar solo" +
+          (_au && _au.r_detalle ? ": " + _au.r_detalle : " (se reintenta cada 10 min)") + ".\n\nSigue en la tanda " +
+          p._cuarArm.tanda_nueva + " SIN DÍA, con su picking y su armado. Si querés, asignale el día A MANO: soltalo en un día" +
+          " en A Programar (sale con su mismo armado, no se vuelve a pickear).";
+        _apr.msg = _cm.replace(/\n+/g, " "); _apr.msgErr = true;
+        try { window.alert(_cm); } catch (_e) {}
+      }
     }
     aprRender();
     aprCargar();
