@@ -119,3 +119,11 @@ select cod_art, unidad, saldo from public.vista_saldos_insumos_x_unidad
 -- 944P, H201Lever, CB01: quedan en insumos importados SIN alimentar stock (Luis: «son viejos, que no jodan»).
 --   Se sacó Importados_Stock_Parte 944P -> 944E (sumaba 86 al stock de importación del 944E) y la equivalencia
 --   GP2 944P -> Z48. H201Lever y CB01 no tenían vínculo.
+
+-- ===================== novena pasada · 2026-10-14 (Luis) =====================
+-- El cajón de IN-H0 es GP2 I6 «Mango Plano 502 Doblado» (crudo, 844 u/cajón), NO «Mgo Plano 512 Crudo».
+--   Alta Insumos 'I6' (partes_crudo); posición IN-H0 pasa a I6; ajustes −1 Cajones 512 crudo / +1 Cajones I6.
+--   Quedan: I6 1 cajón (IN-H0) · Mgo Plano 512 Crudo 4 cajones (IN-G3).
+--   NO se tocó GP2.insumo_equivalencia I6 -> 'MGO PLANO 512 CRUDO' (stockgeneral, 14/10 14:21): el espejo copia
+--   a GP2 I6 el saldo del 512 crudo, no el del I6 de Virgilio. Pendiente de decidir.
+-- Connector: un UPDATE con la palabra «borra» en el texto se colgó 3 veces (60 s); sin esa palabra entró al toque.
