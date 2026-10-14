@@ -1,0 +1,15 @@
+-- v30.37 · 2026-10-14 · Luis: "si un rack se queda en 0 stock que figure libre". Y la posición NO queda guardada
+-- (Luis: que el insumo reaparezca solo en el lugar viejo "está mal": un rack es volátil, se vacía y se usa para otra cosa).
+--
+-- Trigger AFTER INSERT en Movimientos_Stock (deposito = 'insumos'): si el insumo ya no tiene saldo > 0 en NINGUNA
+-- unidad, se borran sus posiciones de RACK en Insumos_Ubicaciones (las celdas IN- de SC/SP no se tocan).
+-- Queda en Insumos_Historial ('Rack liberado: stock en 0 (...)', legajo 'auto'). Costo medido: 0,4 ms por movimiento.
+-- Centinela: GV_Reglas_Centinela objeto gv_insumo_liberar_rack_sin_stock, patrón 'saldo > 0'.
+--
+-- Probado 14/10 como anon, en transacción abortada: 337P en Z02 con −1.000 -> sigue en Z02; con −4.464 (llega a 0)
+-- -> Z02 libre en el Mapa. Limpieza del día: 6 flejes en 0 (25 R01AD, 62 R01AT, 5 R04AT, 4 V09AT, N°69 V11AD,
+-- N°7 V12AD). V09AT sigue ocupada por el N°18.
+--
+-- Rollback: drop trigger zz_gv_insumo_liberar_rack on public."Movimientos_Stock"; las posiciones borradas están en
+-- Insumos_Historial (cod + sectores).
+-- (la definición viva está en la base: pg_get_functiondef('public.gv_insumo_liberar_rack_sin_stock(text)'::regprocedure))
