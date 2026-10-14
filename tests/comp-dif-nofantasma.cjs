@@ -50,7 +50,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     }
 
     // ---- CASO 1: góndola en 0 (faltante real). Descuenta separar_pedidos, NO toca terminado. ----
-    window._stkGondolaSaldoVivo = async function () { return 0; };
+    window._stkGondolaSaldoVivoEmp = async function () { return 0; };
     setup(); calls = []; npd = null;
     _compDifResolve("menos", "no");
     await wait(40);
@@ -59,25 +59,25 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.caso0_sinFantasmaGondola = term(calls).length === 0;
     out.caso0_npd = !!npd && npd.texto === "98140|535|menos|no|2|2|D05B";
 
-    // ---- CASO 2: góndola en -5 (picking marcó de más). Devuelve min(qty=2, 5) = 2 a terminado. ----
-    window._stkGondolaSaldoVivo = async function () { return -5; };
+    // ---- CASO 2: góndola en -5. v30.54: «no hay en góndola» la deja en 0 → +5 (antes topaba en qty). ----
+    window._stkGondolaSaldoVivoEmp = async function () { return -5; };
     setup(); calls = []; npd = null;
     _compDifResolve("menos", "no");
     await wait(40);
     out.caso_neg_sep = sep(calls).length === 1 && sep(calls)[0].delta === -2;
     const t2 = term(calls);
-    out.caso_neg_stock = t2.length === 1 && t2[0].delta === 2 && t2[0].ref === "picking_difiere";
+    out.caso_neg_stock = t2.length === 1 && t2[0].delta === 5 && t2[0].ref === "picking_difiere";
     out.caso_neg_npd = !!npd;
 
     // ---- CASO 3: góndola en -1, qty=2 → clamp a 1 en terminado (sólo hasta 0, no por debajo) ----
-    window._stkGondolaSaldoVivo = async function () { return -1; };
+    window._stkGondolaSaldoVivoEmp = async function () { return -1; };
     setup(); calls = [];
     _compDifResolve("menos", "no");
     await wait(40);
     out.caso_clamp = term(calls).length === 1 && term(calls)[0].delta === 1;
 
     // ---- CASO 4: sin dato de saldo (fetch falló → null) → descuenta separar_pedidos, NO terminado ----
-    window._stkGondolaSaldoVivo = async function () { return null; };
+    window._stkGondolaSaldoVivoEmp = async function () { return null; };
     setup(); calls = [];
     _compDifResolve("menos", "no");
     await wait(40);
@@ -85,7 +85,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.caso_null_sinStockGondola = term(calls).length === 0;
 
     // ---- CASO 5: doble toque del mismo caso → mismo client_id (dedup del lado servidor) ----
-    window._stkGondolaSaldoVivo = async function () { return 0; };
+    window._stkGondolaSaldoVivoEmp = async function () { return 0; };
     setup(); calls = [];
     _compDifResolve("menos", "no");
     await wait(20);
@@ -95,12 +95,39 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await wait(20);
     const cid2 = sep(calls).length > 1 && sep(calls)[1].client_id;
     out.caso_dedup_mismoClientId = !!cid1 && cid1 === cid2;
+
+    // ---- CASO 6 (v30.54): góndola en +7 y el armador dice «no hay» → −7 (fantasma fuera, queda en 0) ----
+    window._stkGondolaSaldoVivoEmp = async function () { return 7; };
+    setup(); calls = [];
+    _compDifResolve("menos", "no");
+    await wait(40);
+    const t6 = term(calls);
+    out.caso_pos_aCero = t6.length === 1 && t6[0].delta === -7 && /^npdg_D05B_98140_535_2$/.test(t6[0].client_id);
+
+    // ---- CASO 7 (v30.54): dual (saldo en dos empresas → null) → no toca terminado ----
+    window._stkGondolaSaldoVivoEmp = async function () { return null; };
+    setup(); calls = [];
+    _compDifResolve("menos", "no");
+    await wait(40);
+    out.caso_dual_noToca = term(calls).length === 0;
+
+    // ---- CASO 8 (v30.54): «Sí, agarro de góndola» y «de más» no tocan terminado ----
+    window._stkGondolaSaldoVivoEmp = async function () { return 7; };
+    setup(); calls = [];
+    _compDifResolve("menos", "si");
+    await wait(40);
+    out.caso_si_noToca = term(calls).length === 0;
+    setup(); calls = []; document.getElementById("csep-difreal").value = "5";
+    _compDifResolve("mas", null);
+    await wait(40);
+    out.caso_mas_noToca = term(calls).length === 0;
     return out;
   });
   const pass = r.caso0_sepDescuenta && r.caso0_sinFantasmaGondola && r.caso0_npd &&
     r.caso_neg_sep && r.caso_neg_stock && r.caso_neg_npd &&
     r.caso_clamp && r.caso_null_sep && r.caso_null_sinStockGondola &&
-    r.caso_dedup_mismoClientId && errs.length === 0;
+    r.caso_dedup_mismoClientId && r.caso_pos_aCero && r.caso_dual_noToca &&
+    r.caso_si_noToca && r.caso_mas_noToca && errs.length === 0;
   console.log("comp-dif-nofantasma:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();

@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.53">
+<link rel="stylesheet" href="gv-ui.css?v=30.54">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.53"></script>
+<script type="module" src="recepcion.js?v=30.54"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10792,7 +10792,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.53";
+const APP_VERSION = "v30.54";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15788,7 +15788,7 @@ function _compSepMatrix() {
    con lo que marcó el picking (EP/TP). No es su responsabilidad, sólo avisa y
    sigue (no lo frena). De a 1 artículo. Persiste evento NPD + alerta server-side
    (reporte_agentes_picking_difiere) + regla de stock (sólo "de menos + sin
-   góndola" devuelve a góndola para no quedar negativo). */
+   góndola" toca la góndola: la deja en 0, v30.54). */
 function _compDifStart() { if (_comp) { _comp.sepDif = { mode: "pick", npIdx: (_comp.sepNpIdx == null ? 0 : _comp.sepNpIdx) }; _compRenderSep(); } }
 function _compDifPick(ci) { if (_comp && _comp.sepDif) { _comp.sepDif.ci = ci; _comp.sepDif.mode = "dialog"; _comp.sepDif.tipo = null; _compRenderSep(); } }
 function _compDifTipo(t) { if (_comp && _comp.sepDif) { _comp.sepDif.tipo = t; _compRenderSep(); } }
@@ -15839,14 +15839,19 @@ function _compDifResolve(tipo, gond, realOpt) {
                  client_id: "npd_" + ((_comp && _comp.tanda) || "") + "_" + n.np + "_" + c.cod + "_" + tipo + "_" + gond + "_" + qty };
     try { stockMove([rSep]); } catch (_e) {}
     if (_comp && _comp._difMovs) { _comp._difMovs.push(rSep); }
+    /* v30.54 (Luis, 14/10) — «No hay en góndola» es un CONTEO: el armador miró la celda y está vacía,
+       así que la góndola queda en 0 en los DOS sentidos. Antes sólo subía una negativa (y hasta `qty`);
+       una positiva quedaba con stock fantasma (caso 960E/C14 y 591/J26-J27). Se lee el saldo VIVO, así que
+       un ajuste a mano anterior (que ya la dejó en 0) da delta 0 y no se duplica. Un DUAL (saldo en las
+       dos empresas) no se toca: el conteo no dice de qué pila falta. `client_id` determinístico: un doble
+       toque del mismo caso no ajusta dos veces. */
     (async function () {
       let ret = 0;
-      try { const sal = await _stkGondolaSaldoVivo(c.cod); if (sal != null && sal < 0) ret = Math.min(qty, -sal); } catch (_e) { ret = 0; }
-      if (ret > 0) {
-        // v12.12: el −separar_pedidos ya salió arriba por `qty` completo (que incluye a `ret`),
-        // así que acá solo se devuelve a góndola lo justo para llevarla a 0 (el viejo r2 de
-        // v11.09 se reemplazó por el descuento upfront; mantenerlo duplicaría el descuento).
-        var r1 = { cod_art: c.cod, descripcion: "", deposito: "terminado", delta: ret, tipo: "ajuste", ref: "picking_difiere", legajo: (_comp && _comp.legajo) || "", client_id: _stockClientId() };
+      try { const sal = await _stkGondolaSaldoVivoEmp(c.cod); if (sal != null) ret = -sal; } catch (_e) { ret = 0; }
+      if (ret !== 0) {
+        // v12.12: el −separar_pedidos ya salió arriba por `qty` completo; acá sólo se lleva la góndola a 0.
+        var r1 = { cod_art: c.cod, descripcion: "No hay en góndola (armado " + ((_comp && _comp.tanda) || "") + "): góndola a 0", deposito: "terminado", delta: ret, tipo: "ajuste", ref: "picking_difiere", legajo: (_comp && _comp.legajo) || "",
+                   client_id: "npdg_" + ((_comp && _comp.tanda) || "") + "_" + n.np + "_" + c.cod + "_" + qty };
         try { stockMove([r1]); } catch (_e) {}   // fire-and-forget: realtime
         if (_comp && _comp._difMovs) { _comp._difMovs.push(r1); }   // safety net: flush síncrono en compTerminar
       }
@@ -16504,6 +16509,18 @@ function stockMove(rows) {
    viva `vista_saldos_stock`. Lo usa la regla de "picking difiere" para devolver a góndola
    sólo lo justo si el picking la dejó NEGATIVA (no inflar stock fantasma). Devuelve null si
    no se pudo leer (→ el llamador NO toca el stock). */
+/* v30.54 — igual que `_stkGondolaSaldoVivo` pero devuelve null si el código tiene saldo en DOS empresas
+   (dual): ahí un «no hay en góndola» no dice de qué pila falta y el llamador no toca el stock. */
+async function _stkGondolaSaldoVivoEmp(cod) {
+  try {
+    const a = await gvSaldosDeClaves([String(cod).trim()], { select: "terminado,empresa" });
+    if (!a || !a.length) return 0;
+    const emps = {}; let s = 0;
+    a.forEach(function (r) { const t = Number(r.terminado) || 0; s += t; if (t !== 0) emps[String(r.empresa || "")] = true; });
+    if (Object.keys(emps).length > 1) return null;
+    return s;
+  } catch (_e) { return null; }
+}
 async function _stkGondolaSaldoVivo(cod) {
   try {
     const a = await gvSaldosDeClaves([String(cod).trim()], { select: "terminado" });
@@ -63673,7 +63690,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.53"></script>
+<script src="importacion.js?v=30.54"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -66964,15 +66981,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.53"></script>
-<script src="hotsale.js?v=30.53"></script>
-<script src="estadisticas.js?v=30.53"></script>
-<script src="ads.js?v=30.53"></script>
-<script src="plantel.js?v=30.53"></script>
+<script src="cobranzas.js?v=30.54"></script>
+<script src="hotsale.js?v=30.54"></script>
+<script src="estadisticas.js?v=30.54"></script>
+<script src="ads.js?v=30.54"></script>
+<script src="plantel.js?v=30.54"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.53"></script>
+<script src="analisis.js?v=30.54"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.53"></script>
+<script src="ayuda.js?v=30.54"></script>
 
 </body>
 </html>
