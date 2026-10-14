@@ -111,7 +111,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await wait(40);
     out.caso_dual_noToca = term(calls).length === 0;
 
-    // ---- CASO 8 (v30.54): «Sí, agarro de góndola» y «de más» no tocan terminado ----
+    // ---- CASO 8: «Sí, agarro de góndola» no toca terminado; «de más» registra salida + guardado (v30.55) ----
     window._stkGondolaSaldoVivoEmp = async function () { return 7; };
     setup(); calls = [];
     _compDifResolve("menos", "si");
@@ -120,14 +120,20 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     setup(); calls = []; document.getElementById("csep-difreal").value = "5";
     _compDifResolve("mas", null);
     await wait(40);
-    out.caso_mas_noToca = term(calls).length === 0;
+    const tm = term(calls);
+    // v30.55: «de más» (picking 2, mesa 5) → −3 «salieron sin descontarse» y +3 «el armador las guardó», neto 0
+    out.caso_mas_registra = tm.length === 2 && tm[0].delta === -3 && tm[1].delta === 3 &&
+      tm[0].ref === "picking_difiere_mas" && /marcó 2 y en la mesa había 5/.test(tm[0].descripcion) &&
+      /sin descontarse/.test(tm[0].descripcion) && /legajo 8\) guardó las 3/.test(tm[1].descripcion) &&
+      tm[0].client_id === "npdm_D05B_98140_535_3_sale" && tm[1].client_id === "npdm_D05B_98140_535_3_guarda" &&
+      sep(calls).length === 0;
     return out;
   });
   const pass = r.caso0_sepDescuenta && r.caso0_sinFantasmaGondola && r.caso0_npd &&
     r.caso_neg_sep && r.caso_neg_stock && r.caso_neg_npd &&
     r.caso_clamp && r.caso_null_sep && r.caso_null_sinStockGondola &&
     r.caso_dedup_mismoClientId && r.caso_pos_aCero && r.caso_dual_noToca &&
-    r.caso_si_noToca && r.caso_mas_noToca && errs.length === 0;
+    r.caso_si_noToca && r.caso_mas_registra && errs.length === 0;
   console.log("comp-dif-nofantasma:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();

@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.54">
+<link rel="stylesheet" href="gv-ui.css?v=30.55">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.54"></script>
+<script type="module" src="recepcion.js?v=30.55"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10792,7 +10792,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.54";
+const APP_VERSION = "v30.55";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15825,6 +15825,22 @@ function _compDifResolve(tipo, gond, realOpt) {
   // Si el fire-and-forget falla (offline), el flush síncrono lo aterriza. Si el armado
   // se cancela antes de compTerminar, el ajuste inmediato ya corrigió la góndola negativa
   // (comportamiento correcto: el picking la dejó negativa, la corrección es válida).
+  /* v30.55 (Luis, 14/10) — «HAY DE MÁS» queda REGISTRADO en stock. El picking bajó `real` de la góndola pero
+     marcó `c.sale`: las `qty` de más salieron sin descontarse, y el armador CONFIRMA (botón «Las guardé en
+     góndola») que las devolvió. Son DOS movimientos con el detalle de lo que pasó: −qty (salida sin registrar
+     del picking) y +qty (el armador las guardó). Neto 0, que es lo que hay en la celda: sumar sólo el +qty
+     dejaría `qty` cajas fantasma, porque la salida nunca se había descontado. `client_id` determinístico:
+     un doble toque del mismo caso no escribe dos veces. */
+  if (tipo === "mas" && typeof stockMove === "function") {
+    var _tdM = (_comp && _comp.tanda) || "", _lgM = (_comp && _comp.legajo) || "";
+    var _hhM = ""; try { _hhM = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) {}
+    var _baseM = "Armado " + _tdM + " NP " + n.np + " " + c.cod + ": el picking marcó " + c.sale + " y en la mesa había " + real;
+    var _cidM = "npdm_" + _tdM + "_" + n.np + "_" + c.cod + "_" + qty;
+    var rOut = { cod_art: c.cod, descripcion: (_baseM + " → " + qty + " salieron de góndola sin descontarse").slice(0, 300), deposito: "terminado", delta: -qty, tipo: "ajuste", ref: "picking_difiere_mas", legajo: _lgM, client_id: _cidM + "_sale" };
+    var rIn = { cod_art: c.cod, descripcion: (_baseM + " → el armador (legajo " + _lgM + ") guardó las " + qty + " de más en góndola" + (_hhM ? " a las " + _hhM : "")).slice(0, 300), deposito: "terminado", delta: qty, tipo: "ajuste", ref: "picking_difiere_mas", legajo: _lgM, client_id: _cidM + "_guarda" };
+    try { stockMove([rOut, rIn]); } catch (_e) {}
+    if (_comp && _comp._difMovs) { _comp._difMovs.push(rOut, rIn); }
+  }
   if (tipo === "menos" && gond === "no" && typeof stockMove === "function") {
     // v12.12 (idea 1569): las `qty` cajas del "de menos" nunca salieron realmente de góndola
     // (por eso acá no hay en góndola para completar) pero el picking las registró en
@@ -15880,7 +15896,7 @@ function _compDifResolve(tipo, gond, realOpt) {
   _comp.sepDif = null; _compRenderSep();
   try { _compRecalc(); } catch (_e) {}
   try { alert("✓ Avisado al picking · " + c.cod + " (" + (tipo === "mas" ? "de más" : "de menos") + " " + qty + "). " +
-        (tipo === "menos" ? (gond === "si" ? "El pedido queda COMPLETO: traeé las " + qty + " de góndola. " : "Descontado del pedido. ") : "") +
+        (tipo === "mas" ? "Quedan registradas las " + qty + " que guardaste en góndola. " : "") + (tipo === "menos" ? (gond === "si" ? "El pedido queda COMPLETO: traeé las " + qty + " de góndola. " : "Descontado del pedido. ") : "") +
         "Seguí armando."); } catch (_e) {}
 }
 /* v10.10 — faltante MANUAL reportado en Separar ("de menos" / no estaba en el pedido). Lo mete
@@ -15947,8 +15963,8 @@ function _compDifHtml() {
       '</div>';
   }
   if (d.tipo === "mas") {
-    h += '<div class="csep-difnote2">Las que sobran: volvé a guardarlas (en stock no cambia nada).</div>';
-    h += '<button class="csep-difres" onclick="_compDifResolve(\'mas\',null)">✅ Avisar al picking</button>';
+    h += '<div class="csep-difnote2">Las que sobran: volvé a guardarlas en la góndola y confirmá abajo. Queda registrado en stock.</div>';
+    h += '<button class="csep-difres" onclick="_compDifResolve(\'mas\',null)">✅ Las guardé en góndola · avisar al picking</button>';
   } else if (d.tipo === "menos") {
     h += '<div class="csep-difq">¿Hay en góndola para completar?</div>';
     h += '<div class="csep-difrow"><button class="csep-difgond yes" onclick="_compDifResolve(\'menos\',\'si\')">✅ Sí, agarro<br>de góndola</button><button class="csep-difgond no" onclick="_compDifResolve(\'menos\',\'no\')">🚫 No hay<br>en góndola</button></div>';
@@ -63690,7 +63706,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.54"></script>
+<script src="importacion.js?v=30.55"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -66981,15 +66997,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.54"></script>
-<script src="hotsale.js?v=30.54"></script>
-<script src="estadisticas.js?v=30.54"></script>
-<script src="ads.js?v=30.54"></script>
-<script src="plantel.js?v=30.54"></script>
+<script src="cobranzas.js?v=30.55"></script>
+<script src="hotsale.js?v=30.55"></script>
+<script src="estadisticas.js?v=30.55"></script>
+<script src="ads.js?v=30.55"></script>
+<script src="plantel.js?v=30.55"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.54"></script>
+<script src="analisis.js?v=30.55"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.54"></script>
+<script src="ayuda.js?v=30.55"></script>
 
 </body>
 </html>

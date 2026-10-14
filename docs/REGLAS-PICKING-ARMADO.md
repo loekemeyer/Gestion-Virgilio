@@ -488,9 +488,13 @@ Caso: C14 (960E) y J26/J27 (591) vacías con la góndola en −1 (F47B pickeó 1
   toque no ajusta dos veces). Separar_pedidos sigue igual (`npd_…`, −qty).
 - **No duplica un ajuste a mano**: si alguien ya dejó la góndola en 0, el saldo vivo da 0 y el armado no escribe nada.
 - **Dual** (saldo en las dos empresas): no se toca (`_stkGondolaSaldoVivoEmp` devuelve null).
-- **«Hay de más»** NO mueve stock y está bien: la pantalla le pide al armador que **vuelva a guardar** las que sobran.
-  **«Sí, agarro de góndola»** tampoco (lo descontó el picking).
-- `tests/comp-dif-nofantasma.cjs` (casos 2, 6, 7 y 8; falla contra la v30.53). Problema 782.
+- **«Hay de más»** (v30.55, Luis 14/10): el armador **confirma** con «✅ Las guardé en góndola · avisar al picking», y
+  quedan **dos ajustes** en `terminado`, ref `picking_difiere_mas`, con el detalle en la descripción: **−qty** *"Armado
+  F47B NP … 960E: el picking marcó 2 y en la mesa había 5 → 3 salieron de góndola sin descontarse"* y **+qty** *"… el
+  armador (legajo 104) guardó las 3 de más en góndola a las 11:05"*. **Neto 0**: sumar sólo el +qty dejaría `qty`
+  cajas fantasma, porque esa salida nunca se había descontado. `client_id` `npdm_<tanda>_<np>_<cod>_<qty>_sale|_guarda`.
+- **«Sí, agarro de góndola»** no mueve stock (lo descontó el picking).
+- `tests/comp-dif-nofantasma.cjs` (casos 2, 6, 7 y 8; falla contra la v30.53 y la v30.54). Problema 782.
 
 ## ⚠ REGLA (Luis, 2026-10-13, v29.49): el ARMADO cruza Entregas con el picking por el CÓDIGO DE PICKING
 
