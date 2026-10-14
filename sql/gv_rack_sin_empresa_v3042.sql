@@ -35,3 +35,16 @@
 -- Queda igual: góndolas (su empresa sigue en GV_Lugar: es la que separa 437E LK en F09-F12 de 437E CH en L07/L08),
 -- celdas IN- de SC/SP, picking y armado. aceptar_conteo de un dual en un rack pide la empresa del sector
 -- (0 conteos de racks en la historia: no se tocó).
+
+-- v30.50 · 14/10 (Luis, D21 / D22)
+-- D21: centinelas v30.42 de Racks_Planimetria y gv_imp_recibir pasaron a patrones del CÓDIGO
+--      ('AS id,\s+c\.emp,' y 'when ''rack'' then ''racks''\s+else'): gv_regla_presente ignora comentarios. 0 perdidas.
+-- D22: Stocks → Ajustar / Fijar / Stock inicial ya no ofrece «Racks CH». Probado como anon: un movimiento a racks sin
+--      empresa toma la del código (712E -> CH) y un dual con sufijo guarda la elegida (437E CH -> CH).
+-- Revisión de quién dependía de la empresa del rack (14/10): ningún cron, trigger ni Edge Function la lee.
+--      Funciones que leen GV_Lugar.empresa y siguen bien: gv_conteo_picking_pendientes, gv_picking_* (sólo góndola),
+--      gv_importado_guardar (valida góndola), gv_lugar_item_guardar (sólo la devuelve), gv_gp2_espejo_sync (copia; GP2 no
+--      la lee), gv_empresa_de_articulo_vivo / gv_refrescar_articulo_empresa (resuelven igual: 187 LK, 83 CH, 4 duales).
+--      Vistas: Capacidad_Sector (el único producto fijo en rack con capacidad es 606E en X22, no dual: no cambia nada),
+--      gv_gondola_discontinuada y gv_planimetria_celda (sólo góndola), gv_ocupacion_lugar (nadie la lee),
+--      gv_rack_stock_desfase (vacía), vista_stock_vs_pedidos (712E: racks 444, racks_ch 0, total igual).

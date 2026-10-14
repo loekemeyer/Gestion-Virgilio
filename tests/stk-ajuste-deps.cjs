@@ -1,5 +1,6 @@
 /* Regresión v7.38 — el selector de Depósito de la solapa "⚙ Ajustes" ofrece TODOS los
-   depósitos reales, incluyendo "Para envasar" (para_envasar) y "Racks CH" (racks_ch).
+   depósitos reales, incluyendo "Para envasar" (para_envasar). v30.50 (Luis 14/10, D22): "Racks CH" (racks_ch) YA NO se ofrece:
+   lo de Chef en racks va a racks + empresa CH. El saldo viejo de racks_ch se sigue mostrando.
    Antes faltaban y esos depósitos sólo se podían ajustar por SQL (caso 035E p/envasar,
    809E racks CH). También verifica que stockFijar/stockAjustar leen el depósito elegido y
    que stockComputeSaldos separa el saldo por depósito. Sale 1 si falla. */
@@ -16,7 +17,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // 1) El HTML del selector ofrece para_envasar y racks_ch (+ los clásicos)
     const html = stkBodyAjustes();
     out.tieneEnvasar = html.indexOf('value="para_envasar"') >= 0;
-    out.tieneRacksCh = html.indexOf('value="racks_ch"') >= 0;
+    out.sinRacksCh = html.indexOf('value="racks_ch"') < 0;   // v30.50: no se ofrece
     out.tieneTerminado = html.indexOf('value="terminado"') >= 0;
     out.tieneGuardar = html.indexOf('value="a_guardar"') >= 0;
     out.labelEnvasar = html.indexOf('>Para envasar<') >= 0;
@@ -50,7 +51,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.postDelta = posted && posted[0] && posted[0].delta === 5;
     return out;
   });
-  const pass = r.tieneEnvasar && r.tieneRacksCh && r.tieneTerminado && r.tieneGuardar && r.labelEnvasar &&
+  const pass = r.tieneEnvasar && r.sinRacksCh && r.tieneTerminado && r.tieneGuardar && r.labelEnvasar &&
     r.envasar035 && r.term035 && r.racksch809 && r.postDep && r.postDelta && errs.length === 0;
   console.log("stk-ajuste-deps:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
