@@ -6,3 +6,6 @@
 -- Caso: Jhonny Moncayo 09/10, Hs Total 11:11 -> 9:00 (jornada 9:05).
 -- Se aplicó por replace() sobre la definición viva; backup en zz_backups.gv_horas_operario_detalle_v2_def_20261014.
 -- Centinela: GV_Reglas_Centinela v30.70 (patrón 'owned o where o\.rid = n\.rid').
+-- D7 (Elías, 14/10): la misma regla en public.gv_monitor_horas_operario_dia (TV / Mon. Admin).
+-- Backup: zz_backups.gv_monitor_horas_operario_dia_def_20261014. Centinela v30.70. 09/10: Farias 9,36 h -> 9,08 h (jornada 9,15).
+-- Pendiente: el monitor grande de index.html (fetchMonitorDayStats) calcula en el navegador y NO tiene esta regla.
