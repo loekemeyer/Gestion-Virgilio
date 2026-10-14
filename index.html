@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.73">
+<link rel="stylesheet" href="gv-ui.css?v=30.74">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.73"></script>
+<script type="module" src="recepcion.js?v=30.74"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10792,7 +10792,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.73";
+const APP_VERSION = "v30.74";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35116,6 +35116,36 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     }
     deadByLeg.set(k, out);
   }
+  /* v30.70-encima (Elías 14/10, D8) ≡ gv_monitor_horas_operario_dia / gv_horas_operario_detalle_v2: una tarea
+     hecha MIENTRAS otra está abierta se descuenta de la de afuera, igual que el baño. Cada minuto es de la
+     ÚLTIMA tarea abierta que lo cubre. Se arma por legajo con todos los cierres del mismo día (sin los X) y
+     computeClosureDur usa ese tiempo propio en vez de «bruto − muerto». Jhonny 09/10: 11:11 → 9:00. */
+  const _ownByKey = new Map();
+  (function () {
+    const byLeg = new Map();
+    for (const ev of events) {
+      if (!ev.ts_inicio || /X$/.test(String(ev.opcion || ""))) continue;
+      const s = new Date(ev.ts_inicio).getTime(), e = new Date(ev.ts_cliente).getTime();
+      if (!isFinite(s) || !isFinite(e) || e <= s || e - s >= 24 * 3600 * 1000) continue;
+      if (isoToDayKey(s) !== isoToDayKey(e)) continue;
+      const k = String(ev.legajo || "").trim(); if (!k) continue;
+      if (!byLeg.has(k)) byLeg.set(k, []);
+      byLeg.get(k).push({ s: s, e: e, key: k + "|" + s + "|" + e });
+    }
+    for (const [k, arr] of byLeg) {
+      const pts = Array.from(new Set(arr.flatMap(function (x) { return [x.s, x.e]; }))).sort(function (x, y) { return x - y; });
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const a = pts[i], z = pts[i + 1];
+        let own = null;
+        for (const x of arr) if (x.s <= a && x.e >= z && (!own || x.s > own.s || (x.s === own.s && x.e < own.e))) own = x;
+        if (own) _ownByKey.set(own.key, (_ownByKey.get(own.key) || 0) + (z - a));
+      }
+      for (const x of arr) if (!_ownByKey.has(x.key)) _ownByKey.set(x.key, 0);
+      // encima-reparto: dos tareas con el MISMO horario (2 tandas pickeadas juntas) se reparten el tiempo en partes iguales
+      const _n = new Map(); for (const x of arr) _n.set(x.key, (_n.get(x.key) || 0) + 1);
+      for (const [kk, c] of _n) if (c > 1) _ownByKey.set(kk, _ownByKey.get(kk) / c);
+    }
+  })();
   /* Cuánto tiempo muerto del legajo cae dentro del tramo [s, e]. */
   const deadOverlapMs = (leg, s, e) => {
     const arr = deadByLeg.get(String(leg)) || [];
@@ -35132,7 +35162,9 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     const dayClose = isoToDayKey(tsClienteMs);
     if (dayOpen === dayClose) {
       const bruto = Math.max(0, tsClienteMs - tsInicioMs);
-      const muerto = Math.min(bruto, deadOverlapMs(leg, tsInicioMs, tsClienteMs));
+      const _ok = String(leg).trim() + "|" + tsInicioMs + "|" + tsClienteMs;
+      const muerto = _ownByKey.has(_ok) ? Math.max(0, bruto - _ownByKey.get(_ok))   // v30.70-encima
+                                        : Math.min(bruto, deadOverlapMs(leg, tsInicioMs, tsClienteMs));
       const dur = bruto - muerto;
       if (outBreakdown) {
         outBreakdown.sameDay = true;
@@ -35351,7 +35383,9 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
            movimiento de mercadería. Medido sobre 30 días: 4 cierres de 352, 1,36 h
            de 65,75 (2,1 %) — chico, pero es la misma regla.
            ⚠ A las NO PRODUCTIVAS no se les resta: se restarían a sí mismas. */
-        const muerto = esMov ? Math.min(bruto, deadOverlapMs(leg, iniMs, finMs)) : 0;
+        const _okT = String(leg).trim() + "|" + iniMs + "|" + finMs;   // v30.70-encima: también movimiento y no productivas
+        const muerto = _ownByKey.has(_okT) ? Math.max(0, bruto - _ownByKey.get(_okT))
+                     : (esMov ? Math.min(bruto, deadOverlapMs(leg, iniMs, finMs)) : 0);
         const dur = bruto - muerto;
         if (dur <= 0) continue;
         const fila = {
@@ -63826,7 +63860,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.73"></script>
+<script src="importacion.js?v=30.74"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67117,15 +67151,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.73"></script>
-<script src="hotsale.js?v=30.73"></script>
-<script src="estadisticas.js?v=30.73"></script>
-<script src="ads.js?v=30.73"></script>
-<script src="plantel.js?v=30.73"></script>
+<script src="cobranzas.js?v=30.74"></script>
+<script src="hotsale.js?v=30.74"></script>
+<script src="estadisticas.js?v=30.74"></script>
+<script src="ads.js?v=30.74"></script>
+<script src="plantel.js?v=30.74"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.73"></script>
+<script src="analisis.js?v=30.74"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.73"></script>
+<script src="ayuda.js?v=30.74"></script>
 
 </body>
 </html>
