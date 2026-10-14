@@ -79,3 +79,17 @@ select cod, sector, estado from public.gv_insumo_ubicacion
 --   posición: H201Part AD04 (24000), 439E X24 (312), 584E Z10 (12, con stock 0). Backup:
 --   zz_backups."GV_Backup_InsUbic_cant_20261014".
 -- 599ES: −1.200 Uni (Luis: «sacalo»). Con saldo 0 sale de la lista (la tabla filtra los que están en 0).
+
+-- ===================== v30.36 · 2026-10-14 (sexta pasada, Luis) =====================
+-- O06 alta en GV_Lugar (rack IN). Mgo Pelador 505 -> O06, 15 bolsas x 1.800 = 27.000 u (coincide con el stock).
+-- 522ES: Insumos.ubicacion 'AD2' (texto viejo) -> 'W04', igual que su posición.
+--
+-- QUÉ LEE EL MAPA (verificado 14/10, como anon):
+--   Racks del Mapa = gv_rack_celda = GV_Lugar (racks activos) + Racks_Planimetria (vista: PRODUCTO, sale del libro
+--   de stock con ubicacion = sector) + gv_insumo_ubicacion (INSUMO: Insumos_Ubicaciones resuelto contra GV_Lugar).
+--   Stock de insumos = Movimientos_Stock (vista_saldos_insumos_x_unidad). Insumos.ubicacion es texto viejo: la lista
+--   lo usa SÓLO si el insumo no tiene fila en Insumos_Ubicaciones; el Mapa no lo lee.
+-- QUIÉN ESCRIBE POSICIONES: sólo las RPC que dispara una persona (gv_insumo_posicion_guardar desde el Mapa,
+--   gv_insumo_ubicaciones_guardar desde Insumos, gv_rack_posicion_guardar / gv_rack_partir / gv_lugar_orden).
+--   Ningún cron escribe Insumos_Ubicaciones ni GV_Lugar (el único cron de insumos, 152, escribe en GP2).
+--   => un conteo cargado no lo pisa ningún proceso automático.
