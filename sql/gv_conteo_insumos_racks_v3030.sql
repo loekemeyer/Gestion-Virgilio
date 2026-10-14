@@ -127,3 +127,9 @@ select cod_art, unidad, saldo from public.vista_saldos_insumos_x_unidad
 --   NO se tocó GP2.insumo_equivalencia I6 -> 'MGO PLANO 512 CRUDO' (stockgeneral, 14/10 14:21): el espejo copia
 --   a GP2 I6 el saldo del 512 crudo, no el del I6 de Virgilio. Pendiente de decidir.
 -- Connector: un UPDATE con la palabra «borra» en el texto se colgó 3 veces (60 s); sin esa palabra entró al toque.
+
+-- ===================== décima pasada · 2026-10-14 (Luis, D2) =====================
+-- Luis: Z26 de IN-H6 / IN-H7 está GRABADO; el I6 de Cervantes NO está grabado, igual que el cajón de IN-H0.
+-- GP2.insumo_equivalencia componente 22 (I6): cod_virgilio 'MGO PLANO 512 CRUDO' -> 'I6'.
+--   Backup: zz_backups."GV_Backup_Equiv_I6_20261014". Espejo corrido a mano (el trigger sólo mira componente_id):
+--   GP2 I6 «en Virgilio» 3.376 -> 844 u (1 cajón x 844). «Mgo Plano 512 Crudo» (4 cajones, IN-G3) queda sin componente GP2.
