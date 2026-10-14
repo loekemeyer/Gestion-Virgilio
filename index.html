@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.67">
+<link rel="stylesheet" href="gv-ui.css?v=30.68">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.67"></script>
+<script type="module" src="recepcion.js?v=30.68"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10792,7 +10792,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.67";
+const APP_VERSION = "v30.68";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11439,6 +11439,22 @@ function emitPickUbic(tanda, ubic, legajo) {
    Y es forward-facing: lo ya armado no se toca ni se backfillea. */
 const ARM_MESA_OPCIONES = ["Mesa 1", "Mesa 2"];
 /* OC del cliente (super) de las NP de una tanda: sale de observaciones de la programación web e ISIS. */
+/* OC por NP para la hoja de armado impresa (Luis, 14/10 D1). Caché que se llena al cargar y cada 5 min;
+   si una NP tiene dos OC distintas (NP web repetida entre LK y Chef) no se imprime ninguna. */
+var _armOcPorNp = {};
+async function _armOcRefrescar() {
+  const h = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  const re = /\bO\.?C\.?\s*(?:N[\u00ba\u00b0o]?\.?\s*)?:?\s*(\d{5,})/i;
+  const nuevo = {};
+  for (const u of ["PPP_Web_Programacion?select=np,observaciones&observaciones=ilike.*OC*", "PPP_Programacion_Diaria?select=np,observaciones&observaciones=ilike.*OC*"]) {
+    try { const r = await fetch(SUPABASE_URL + "/rest/v1/" + u, { headers: h, cache: "no-store" }); if (!r.ok) continue;
+      (await r.json()).forEach(function (x) { const m = re.exec(String(x.observaciones || "")); if (!m) return; const k = String(x.np); nuevo[k] = (nuevo[k] && nuevo[k] !== m[1]) ? "?" : m[1]; });
+    } catch (_e) {}
+  }
+  if (Object.keys(nuevo).length) _armOcPorNp = nuevo;
+}
+function _armOcDeNp(np) { const v = _armOcPorNp[String(np)]; return (v && v !== "?") ? v : ""; }
+try { setTimeout(_armOcRefrescar, 4000); setInterval(_armOcRefrescar, 300000); } catch (_e) {}
 async function _armOcDeTanda(tanda) {
   const t = String(tanda || "").trim().toUpperCase(); if (!t) return [];
   const h = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
@@ -59137,6 +59153,7 @@ function armadoRemitoInnerHtml(d, tipo){
   return '' +
     '<div class="rmt-top">' +
       '<div class="rmt-r1"><span class="rmt-np">NP ' + escapeHtml(String(d.np)) + '</span><span class="rmt-fe"><b>Fecha Entrega</b> ' + escapeHtml(npcDmy(d.fecha) || '—') + '</span></div>' +
+      (_armOcDeNp(d.np) ? '<div class="rmt-kv" style="font-size:1.15em"><b>OC</b> ' + escapeHtml(_armOcDeNp(d.np)) + '</div>' : '') +
       '<div class="rmt-kv"><b>Cliente</b> ' + escapeHtml((d.cod ? d.cod + ' - ' : '') + (d.rs || '—')) + '</div>' +
       '<div class="rmt-kv"><b>Tanda</b> ' + escapeHtml((d.tanda || '—') + ' - ' + d.total + ' cajas - ' + d.nLios + ' líos') + '</div>' +
       '<div class="rmt-r4"><span class="rmt-tipo">' + tipo + '</span><span class="rmt-who"><div><b>Picking</b> ' + escapeHtml(d.pickName || '—') + '</div><div><b>Armado</b> ' + escapeHtml(d.armName || '—') + '</div></span></div>' +
@@ -63721,7 +63738,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.67"></script>
+<script src="importacion.js?v=30.68"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67012,15 +67029,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.67"></script>
-<script src="hotsale.js?v=30.67"></script>
-<script src="estadisticas.js?v=30.67"></script>
-<script src="ads.js?v=30.67"></script>
-<script src="plantel.js?v=30.67"></script>
+<script src="cobranzas.js?v=30.68"></script>
+<script src="hotsale.js?v=30.68"></script>
+<script src="estadisticas.js?v=30.68"></script>
+<script src="ads.js?v=30.68"></script>
+<script src="plantel.js?v=30.68"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.67"></script>
+<script src="analisis.js?v=30.68"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.67"></script>
+<script src="ayuda.js?v=30.68"></script>
 
 </body>
 </html>
