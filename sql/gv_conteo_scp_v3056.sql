@@ -93,3 +93,8 @@ select sector, cod, categoria, cantidad, stock from public.gv_scp_celda where se
 -- IN-J5 Z2B Pza Grande Sacaf Art LK p/Cromar 5 (cabezal sacafuente; sale de IN-J6)
 -- Pendientes por celdas sin contar: G11 (IN-K4), Z39 (IN-K5), Z37 (IN-K6, L5, L6), DISC1 (IN-L1..L4), DISC4 (IN-G5, G6).
 select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN-(H.|I.|J.)$' order by col, fila;
+
+-- ===================== v30.66 · 2026-10-14 (C2 / C4 / I2 definitivo, Luis) =====================
+-- Luis: "C4 cuerpo con marca y cromado · I2 cuerpo con marca y sin cromar · C2 sacacorchos completo sin marca".
+-- IN-C4 C16 3 (sin cambio) · IN-I2 G4 4 · IN-C2 alta 'Sacacorcho 521 Completo S/M' 2 (sin componente GP2); G4 -2.
+select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('IN-C2','IN-C4','IN-I2') order by 1;
