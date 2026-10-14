@@ -318,3 +318,17 @@ cartel que diga que se tiene que revisar y asignar manualmente"*.
 - Sacar un armado y darle día lo puede hacer **cualquier supervisor** que ya usa el botón (`es_supervisor_virgilio`; Luis D1, v28.50): señal local `gv.cuar_mover` → `gv_ppp_pedido_mover`. `sql/gv_cuarentena_sacar_cualquiera_v2850.sql`.
 - Centinelas 367-369. `sql/gv_cuarentena_sacar_armado_v2845.sql`, `tests/cuar-sacar-armado.cjs`.
 
+
+## ⚠ REGLA (Luis, 2026-10-14, v30.38): el pedido que SALE de cuarentena se programa SOLO, también si estaba ARMADO
+**Luis:** *"si un pedido sale de cuarentena, que se programe automaticamente siguiendo la reglas establecidas en caso de
+que sea posible (que no espere ser posicionado manualmente por un humano)"*.
+- **Medido antes del cambio:** de los 44 aprobados del 24/09 al 14/10 **sin** armado, los 44 se programaron solos en
+  ≤ 0:05 (el armador, cron 73). Lo único que esperaba a una persona era el **armado sacado a cuarentena** (v28.49).
+- Ahora, aprobado ese pedido, **`gv_cuarentena_armado_auto`** le da el día con la **misma regla del armador**
+  (`gv_ppp_web_dia_grupo`: grupo de zonas por día, plazo, día menos cargado) y lo mueve con
+  `gv_cuarentena_armado_asignar_dia` (conserva tanda, picking y armado).
+- **"Si es posible"**: súper, zona no automática o un guard que frena → queda como antes, con el cartel de asignarlo
+  **a mano** y el motivo.
+- Corre al aprobar (`cuarLiberarConfirmar`, muestra el resultado) y en el cron **`gv-cuarentena-armado-auto`** cada
+  0:10 (✅ del pipeline, herencia de pedido partido, reintento). `gv_cuarentena_liberar` **no se tocó** (centinelas 146/154).
+- Centinelas 457-458. `sql/gv_cuarentena_armado_auto_v3038.sql`, `tests/cuar-sacar-armado.cjs`.

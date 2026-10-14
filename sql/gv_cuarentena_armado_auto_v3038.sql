@@ -1,4 +1,4 @@
--- v30.37 (Luis, 14/10/2026): "si un pedido sale de cuarentena, que se programe automaticamente
+-- v30.38 (Luis, 14/10/2026): "si un pedido sale de cuarentena, que se programe automaticamente
 -- siguiendo las reglas establecidas en caso de que sea posible (que no espere ser posicionado
 -- manualmente por un humano)".
 --
@@ -26,7 +26,7 @@ declare
   a record; v_zona text; v_exp boolean; v_m3 numeric; v_cod text; v_ent date; v_f date;
   v_t text; v_ff date; v_av text; v_vistos bigint[] := array[]::bigint[];
 begin
-  -- v30.37-cuar-auto
+  -- v30.38-cuar-auto
   if not (es_supervisor_virgilio() or gv_es_supervisor_o_servicio()) then
     raise exception 'Sólo un supervisor puede programar un pedido.' using errcode = '42501';
   end if;
@@ -100,6 +100,6 @@ select cron.schedule('gv-cuarentena-armado-auto', '*/10 * * * *',
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version, activo)
 values
  ('gv_cuarentena_armado_auto', 'funcion', 'gv_ppp_web_dia_grupo',
-  'El día del armado que sale de cuarentena lo da la misma regla del armador (grupo de zonas por día)', 'Luis', 'v30.37', true),
+  'El día del armado que sale de cuarentena lo da la misma regla del armador (grupo de zonas por día)', 'Luis', 'v30.38', true),
  ('gv_cuarentena_armado_auto', 'funcion', 'gv_cuarentena_liberados_familia',
-  'Sólo se programa solo lo APROBADO por un humano (fila en Liberados, con herencia de pedido partido)', 'Luis', 'v30.37', true);
+  'Sólo se programa solo lo APROBADO por un humano (fila en Liberados, con herencia de pedido partido)', 'Luis', 'v30.38', true);
