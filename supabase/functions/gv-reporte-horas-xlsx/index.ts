@@ -332,6 +332,8 @@ Deno.serve(async (req: Request) => {
     const { data: filas, error: errRpc } = await sb.rpc("gv_horas_operario_detalle_v2", { p_dia: fecha });
     if (errRpc) throw new Error("gv_horas_operario_detalle_v2: " + errRpc.message);
     if (!filas || !filas.length) return responder({ sin_datos: true, fecha, enviados: 0 });
+    // v30.64: el modal «Reporte diario Virgilio» pide sólo las filas para armar el cuadro (mismo dato que el PDF)
+    if (body?.solo_filas === true) return responder({ solo_filas: true, fecha, filas });
 
     const stamp = Date.now();
     const subir = async (nombre: string, bytes: Uint8Array, tipo: string) => {
