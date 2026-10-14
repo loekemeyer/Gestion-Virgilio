@@ -32,6 +32,13 @@ tenga que vincular bien … y una vez tengamos la base bien armada, limpiamos to
 > SC y SP son **de qué es la PIEZA** (su categoría de Insumos), no de qué es la CELDA: el Mapa
 > **no rotula la celda por sector** y el encabezado no los cuenta aparte.
 
+### ⚠⚠ CONTEO DE UNA CELDA `IN-` = COMPLETO Y REEMPLAZA (Luis, 14/10, v30.62)
+
+**Luis:** *"son conteos completos, no para que sumes. si el sistema tenia otra cosa, remplazalo por lo que te digo
+(tanto codigo como cantidades)"*. La celda contada queda EXACTAMENTE con el código y los cajones dichos; lo que había
+sale. El saldo del código = la suma de sus celdas contadas; el código desplazado sin otra posición va a 0.
+Registro: `sql/gv_conteo_scp_v3056.sql`.
+
 ### ⚠⚠ EL PADRÓN DE LA GRILLA ES EXACTO: **77 celdas, `IN-A1` … `IN-L7`** (Luis, 13/10, v30.10)
 
 **Luis, textual:** *"esos sectores deberían ser «IN-» letras de la A a la L con la siguiente logica /

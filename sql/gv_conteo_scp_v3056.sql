@@ -60,3 +60,13 @@ select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('I
 --   'Mgo Plano 512 Crudo' (partes_crudo, SIN componente en GP2: no existe un 512 crudo) +4.
 -- IN-G4: «HF6» 2 cajones, código inexistente en Virgilio y en GP2; queda H15 (2 cajones) hasta aclararlo.
 select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN-G[1-4]$' order by 1;
+
+-- ===================== v30.62 · 2026-10-14 (revisión completa, Luis) =====================
+-- Luis: "son conteos completos, no para que sumes. si el sistema tenia otra cosa, remplazalo por lo que te digo
+-- (tanto codigo como cantidades)". Se cruzaron las 25 celdas contadas contra Insumos_Ubicaciones y el saldo.
+-- Diferencias corregidas:
+--   IN-G2: era G10 Remaches de afila 1 (no cremallera) -> Z33 queda 3 (-1).
+--   IN-G4: H15 Varilla c/curva, cantidad 0 -> 2 (el saldo ya era 2).
+--   A7 (estaba en IN-B3) -4 y B9 (estaba en IN-C6) -2: desplazados por el conteo y sin otra posición -> 0.
+-- Quedan con saldo distinto del contado porque tienen posiciones en celdas AÚN NO CONTADAS:
+--   DISC1 contado 11 (IN-C1, IN-E1) vs saldo 26 (IN-C2, IN-L1..L4) · A15 contado 6 vs saldo 7 (IN-E2).
