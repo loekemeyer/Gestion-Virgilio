@@ -52,3 +52,11 @@ select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('I
 --     B4B -4 (queda 4, IN-B6) · B7 +4 (IN-C3).
 -- D6: IN-E1 ya cromado -> DISC1 confirmado, sin cambios.
 select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('IN-B6','IN-C3') order by 1;
+
+-- ===================== v30.61 · 2026-10-14 (columna G, Luis) =====================
+-- D7/D8 confirmados (IN-F2 = D3 aleta izq. inox · IN-A4 = A15 cuerpo uña inox LK c/M). D4 (B13): no volver a preguntar.
+-- IN-G1 3 + IN-G2 1: Z33 Cremallera p/Cromar = 4 (sistema 3) -> +1. G10 Remaches de afila sale de IN-G2 (1 cajón, sin lugar).
+-- IN-G3: 4 cajones «mgo plano 512 crudo». Figuraban como Z26 (Mgo Plano 702 Doblado c/Marca, 4): Z26 -4, alta
+--   'Mgo Plano 512 Crudo' (partes_crudo, SIN componente en GP2: no existe un 512 crudo) +4.
+-- IN-G4: «HF6» 2 cajones, código inexistente en Virgilio y en GP2; queda H15 (2 cajones) hasta aclararlo.
+select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN-G[1-4]$' order by 1;
