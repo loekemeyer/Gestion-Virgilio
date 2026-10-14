@@ -42,3 +42,14 @@ select cod, sector, estado from public.gv_insumo_ubicacion
 --
 -- Rollback: reponer desde los dos backups; borrar los ajustes con ref 'CONTEO H201Part AD04 14/10' y
 -- 'CONTEO 1000900 Y04 14/10', el Insumos 1000900 y sus ubicaciones, y los GV_Lugar N01 / Z01.
+
+-- ===================== v30.31 · 2026-10-14 (segunda pasada, Luis) =====================
+-- Backup: zz_backups."GV_Backup_Insumos_Conteo2_20261014".
+-- Descripciones: 1000900 «Espiral Chino» · H201Part «Espiral Chino TN» · 1546903 «Bastidor corta queso».
+-- «Mgo Pelador Ergonomico» pasa a llamarse PEP1 «Mango pelador negro calado sin grabar» (Insumos, movimientos
+--   de insumos, factores, ubicación N01; la equivalencia de GP2 la renombra el trigger -> PEP1 = componente 227).
+-- Coinciden con el sistema (sólo nota): Z02 337P 31 x 144 = 4.464 · Z02 007 7 x 500 = 3.500 · X24 439E 13 MC x 24 = 312.
+-- No estaban donde decía el sistema (se saca la posición; el stock queda y sale en gv_mapa_stock_sin_lugar):
+--   H201Lever O01 (26.400 u) · CB01 N07 (2.950 u) · 590E Z07 (2.400 u) · 584E AC06 (0 u).
+-- 440E es PRODUCTO, no insumo: insumos −528 Uni; racks +168 inner X21 (14 MC) y +360 inner X23 (30 MC).
+-- Productos que Luis nombró y NO se tocaron: N07 513 360 cajas (coincide) · Z07 363E 15 MC (sistema 11 MC).

@@ -10,13 +10,15 @@ H201part ... que no se mezclen"* · *"si ayer se unifico algo que quede marcadam
 
 | insumo | qué es | rack | vínculo GP2 | cuenta para importación |
 |---|---|---|---|---|
-| `1000900` | Espiral Chino (sacacorcho) | Y04 | D1 | sí, como 1000900 |
-| `H201Part` | Espiral TN | AD04 | **ninguno** | **no** (se sacó el map al 1000900) |
+| `1000900` | Espiral Chino | Y04 | D1 | sí, como 1000900 |
+| `H201Part` | Espiral Chino TN | AD04 | **ninguno** | **no** (se sacó el map al 1000900) |
 | `007` | Espiral (Chef) | Z02 | D1 | sí, suma al 1000900 (Luis no lo cambió) |
 
 - El 13/10 se cargaron **156 cajas de Y04 como H201Part**: eran del 1000900. El 14/10 quedó H201Part 24.000 u
   (AD04) y 1000900 78.000 u (Y04). **No volver a mapear H201Part a 1000900 ni a D1** porque «parezcan» lo mismo.
 - El **`546P` pasó a llamarse `1546903`** (bastidor corta queso, X13). La equivalencia con GP2 quedó en UNA fila.
+- **v30.31**: `Mgo Pelador Ergonomico` pasó a llamarse **`PEP1`** (mango pelador negro calado sin grabar, N01 → GP2 PEP1).
+  El **440E de X21/X23 es PRODUCTO**, no insumo: salió de insumos y entró a racks con su posición.
 - Conteo completo, verificación y rollback: `sql/gv_conteo_insumos_racks_v3030.sql`.
 
 ## ⚠ REGLA (Thomas, 2026-09-30, v24.69): un insumo con MC SALE siempre en MC — el stock queda en unidades
