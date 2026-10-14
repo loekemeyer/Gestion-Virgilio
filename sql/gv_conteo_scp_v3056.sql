@@ -70,3 +70,8 @@ select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN
 --   A7 (estaba en IN-B3) -4 y B9 (estaba en IN-C6) -2: desplazados por el conteo y sin otra posición -> 0.
 -- Quedan con saldo distinto del contado porque tienen posiciones en celdas AÚN NO CONTADAS:
 --   DISC1 contado 11 (IN-C1, IN-E1) vs saldo 26 (IN-C2, IN-L1..L4) · A15 contado 6 vs saldo 7 (IN-E2).
+
+-- ===================== v30.63 · 2026-10-14 (IN-C2 / IN-C4, Luis) =====================
+-- IN-C4: C16 C Sacacorcho 521 Crom 3 (alta + equivalencia GP2 105).
+-- IN-C2: 'Cpo Sacacorcho 521 S/marca' 2 (alta, SIN componente en GP2). Sale DISC1 de IN-C2 (le quedan IN-L1..L4 sin contar).
+select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('IN-C2','IN-C4');
