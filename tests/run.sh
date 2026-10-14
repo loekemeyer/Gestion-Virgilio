@@ -605,6 +605,7 @@ echo "== fac-tdf (v13.77: NP LK de Tierra del Fuego → Excel ISIS CHEF con cód
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-tdf.cjs
 node tests/fac-np-cero-aviso.cjs
 node tests/fac-np-cero-candado.cjs
+node tests/fac-xls-sucursal-padron.cjs   # v30.76: col H del Excel ISIS desde el padrón vivo
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-por-dia.cjs
 
 echo "== fac-ajustes-isis (v13.78: checklist manual de ISIS — ajuste − LK / + CH por NP con artículos L; drenaje con L a la góndola Loeke) =="

@@ -3,6 +3,22 @@
 > Movido de `CLAUDE.md` el 2026-10-13 (poda 3ra tanda, pedido de Luis) **sin cambiar una palabra**.
 > **Leerlo ENTERO antes de tocar algo de este tema.** Las reglas siguen valiendo igual que cuando estaban en CLAUDE.md.
 
+## ⚠ REGLA (Luis, 2026-10-14, v30.76): COL H DEL EXCEL ISIS = DIRECCIÓN DEL PADRÓN VIVO
+
+Luis: *"que no se condicione eso desde que manda el pedido el cliente sino que esté armado con la información
+más en vivo posible"*. Caso cliente LK 4142 (Poy Ignacio, LK 0367 / LK 0368): la col H salió «Poy Ignacio —
+ROJAS» en vez de «General Paz 215 - Rojas». El importador de Excel de Krikos de la página LK
+(`admin-excel-krikos.js`, `vendor-import-excel.js`) arma `sucursal_entrega` = razón social + « — » +
+encabezado de columna; 14 pedidos de 9 clientes desde junio.
+
+- Al bajar el Excel, `_facXlsSucViva` **dispara `gv-sync-padron-direcciones`** (LK + Chef, ~0:04, tope 20 s,
+  fail-soft) y después pide **`gv_fac_xls_sucursal(nps)`**: por NP web, la etiqueta del padrón que mejor
+  matchea (`gv_destino_score`, el mismo puntaje del destino de la Programación) o la única dirección del cliente.
+- **Manda el padrón.** Si no resuelve (ambiguo / sin padrón) queda la etiqueta del pedido como antes; una
+  etiqueta «Razón — X» sin padrón va **vacía** y sale un aviso con la NP. Nunca se adivina (v24.76).
+- La Edge Function ahora contesta CORS (la llama el navegador con la sesión del supervisor).
+- Centinela `gv_fac_xls_sucursal`. `sql/gv_fac_xls_sucursal_v3076.sql` · `node tests/fac-xls-sucursal-padron.cjs`.
+
 ## ⚠ REGLA (Thomas, 2026-09-23, v21.99): AGREGAR EXPRESO ISIS — la cola NO frena ningún pedido
 
 El cliente ahora ve con qué expreso le entregamos y lo puede cambiar desde el checkout de la

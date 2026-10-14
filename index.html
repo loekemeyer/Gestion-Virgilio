@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.75">
+<link rel="stylesheet" href="gv-ui.css?v=30.76">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.75"></script>
+<script type="module" src="recepcion.js?v=30.76"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10792,7 +10792,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.75";
+const APP_VERSION = "v30.76";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -60766,6 +60766,42 @@ function _facXlsFilasPlanas(filas) {
   return items;
 }
 
+/* v30.76 (Luis, 14/10) — COL H (SUCURSAL) DESDE EL PADRÓN VIVO. Caso cliente LK 4142 (Poy Ignacio,
+   NP LK 0367 / LK 0368): la col H salió «Poy Ignacio — ROJAS» en vez de la dirección, porque copiaba la
+   etiqueta con la que ENTRÓ el pedido y el importador de Excel de Krikos de la página LK la arma con
+   razón social + « — » + encabezado de la columna. Luis: *"que no se condicione eso desde que manda el
+   pedido el cliente sino que esté armado con la información más en vivo posible"*.
+   1) Dispara `gv-sync-padron-direcciones` (LK + Chef → GV_Clientes_Direcciones) para traer el padrón
+      de ESTE momento, no el de las 05:40. Tope 20 s; si falla, sigue con el padrón que hay.
+   2) `gv_fac_xls_sucursal(nps)` devuelve por NP web la etiqueta del padrón que matchea (como 'padron' /
+      'unica'); si es ambiguo devuelve null y NO se adivina (v24.76). */
+async function _facXlsSucViva(nps) {
+  const out = {};
+  const web = (nps || []).filter(facNpEsWeb).map(_facNpKey);
+  if (!web.length) return out;
+  const h = await facAuthWriteHeaders();
+  if (h) {
+    const ctl = typeof AbortController === "function" ? new AbortController() : null;
+    const to = setTimeout(function () { try { ctl && ctl.abort(); } catch (_e) {} }, 20000);
+    try {
+      await fetch(SUPABASE_URL + "/functions/v1/gv-sync-padron-direcciones",
+        { method: "POST", headers: h, body: "{}", signal: ctl ? ctl.signal : undefined });
+    } catch (_e) { /* sin red o tardó: se usa el padrón que ya está */ }
+    clearTimeout(to);
+  }
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_fac_xls_sucursal", {
+      method: "POST", cache: "no-store",
+      headers: h || { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_nps: web })
+    });
+    if (r.ok) ((await r.json()) || []).forEach(function (x) {
+      out[_facNpKey(x.np)] = { suc: String(x.sucursal || "").trim(), como: String(x.como || "") };
+    });
+  } catch (_e) { /* sin red: queda la etiqueta del pedido, como antes */ }
+  return out;
+}
+
 /* Trae los datos de las NP marcadas y arma las líneas (dedup, tope contra lo pedido,
    orden por código). Los datos de cabecera salen de la lista ya cargada en pantalla. */
 /* v22.53 (Luis) — `opts` (opcional), para «Recuperar pedido»: opts.lineas[np] = [{cod, cajas}] reemplaza
@@ -60778,7 +60814,7 @@ async function _facXlsArmar(nps, opts) {
   // no resuelve el in.() y el Excel salía sin esas filas, en silencio.
   const inList = "(" + nps.map(function (n) { return '"' + String(n).replace(/"/g, "") + '"'; }).join(",") + ")";
 
-  const [ent, base, uxb, vend, match, web] = await Promise.all([
+  const [ent, base, uxb, vend, match, web, sucViva] = await Promise.all([
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Entregas_Virgilio", "select=id,np,cod_art,cajas_pedidas,cajas_entregadas&np=in." + inList + "&order=id.asc"),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos", "select=pedido,fecha&pedido=in." + inList + "&order=id.asc"),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_uxb_articulo", "select=cod,uxb").catch(function () { return []; }),
@@ -60787,8 +60823,10 @@ async function _facXlsArmar(nps, opts) {
     // La fecha de una NP de ISIS sale de PPP_Base_Pedidos; una NP web NO está ahí,
     // así que su fecha de recepción se guarda al programar y se lee de acá. Sin
     // esto el Excel salía con la fecha vacía para todo lo que viene de la página.
-    gvRestTodo("PPP_Web_Programacion?select=np,np_idx,empresa,order_id,fecha_recep,cod_cliente,tanda,direccion", H).catch(function () { return []; })
+    gvRestTodo("PPP_Web_Programacion?select=np,np_idx,empresa,order_id,fecha_recep,cod_cliente,tanda,direccion", H).catch(function () { return []; }),
+    _facXlsSucViva(nps).catch(function () { return {}; })   // v30.76: col H desde el padrón vivo
   ]);
+  const sucSinDir = [];   // v30.76: NP que quedan con la col H vacía (etiqueta «Razón — X» sin match)
   // v21.63 — un pedido de CLIENTE DE PRUEBA no va a ISIS nunca: se saca del Excel acá, antes de armar filas.
   const _prSet = await gvPruebaClientes();
   const _prNps = new Set();
@@ -60982,6 +61020,12 @@ async function _facXlsArmar(nps, opts) {
       }
     }
 
+    // v30.76 — manda el PADRÓN VIVO. Si no resuelve, queda la etiqueta del pedido; pero una etiqueta
+    // «Razón social — X» (importador de Krikos) no es una dirección: va vacía y se avisa.
+    const _viva = (sucViva || {})[_facNpKey(np)];
+    if (_viva && _viva.suc) suc = _viva.suc;
+    else if (/\s—\s/.test(suc)) { sucSinDir.push(np); suc = ""; }
+
     const tdf = (orderByNp[np] && orderByNp[np].empresa === "lk") ? (isisChefBy[String(orderByNp[np].order_id)] || "") : "";   // v13.77
     out.push({
       np: np, cod: tdf || c.cod, rs: c.rs, fechaTxt: _facXlsDDMMYYYY(fecha),
@@ -60993,6 +61037,9 @@ async function _facXlsArmar(nps, opts) {
       excede: lineas.some(function (l) { return l.excede; })
     });
   });
+  if (sucSinDir.length) {
+    try { facShowToast("⚠ Col H vacía en " + sucSinDir.join(", ") + ": el pedido trae «Razón — sucursal» y el padrón no la resuelve. Completala a mano en ISIS."); } catch (_e) {}
+  }
   return out;
 }
 
@@ -63875,7 +63922,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.75"></script>
+<script src="importacion.js?v=30.76"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67166,15 +67213,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.75"></script>
-<script src="hotsale.js?v=30.75"></script>
-<script src="estadisticas.js?v=30.75"></script>
-<script src="ads.js?v=30.75"></script>
-<script src="plantel.js?v=30.75"></script>
+<script src="cobranzas.js?v=30.76"></script>
+<script src="hotsale.js?v=30.76"></script>
+<script src="estadisticas.js?v=30.76"></script>
+<script src="ads.js?v=30.76"></script>
+<script src="plantel.js?v=30.76"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.75"></script>
+<script src="analisis.js?v=30.76"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.75"></script>
+<script src="ayuda.js?v=30.76"></script>
 
 </body>
 </html>

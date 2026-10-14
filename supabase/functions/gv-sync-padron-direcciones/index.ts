@@ -1,5 +1,5 @@
 // gv-sync-padron-direcciones — trae el padron de direcciones de entrega
-// Proyecto VIRGILIO (hrxfctzncixxqmpfhskv) · verify_jwt = false
+// Proyecto VIRGILIO (hrxfctzncixxqmpfhskv) · verify_jwt = true (deployado así; el cron va con service_role)
 //
 // Llena `GV_Clientes_Direcciones` con el padron entero:
 //   · LK    -> LK/customers + LK/customer_delivery_addresses          (WEB_SERVICE_KEY)
@@ -53,8 +53,17 @@ const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const PAGE = 1000;
 
+// v30.76 (Luis, 14/10) — el Facturador la DISPARA antes de armar el Excel ISIS, para que la col H
+// (sucursal) salga con la dirección vigente del padrón y no con la de las 05:40. Se llama desde el
+// navegador con la sesión del supervisor: hacen falta los encabezados CORS y contestar el preflight.
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 function json(b: unknown, s = 200): Response {
-  return new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(b), { status: s, headers: { ...CORS, "Content-Type": "application/json" } });
 }
 
 async function rest(base: string, key: string, path: string): Promise<Record<string, unknown>[]> {
@@ -100,7 +109,8 @@ function dirKey(dir: unknown, barrio: unknown) {
   return n(dir) + "|" + n(barrio);
 }
 
-Deno.serve(async (_req: Request): Promise<Response> => {
+Deno.serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const t0 = Date.now();
   try {
     if (!LK_KEY) return json({ ok: false, error: "falta WEB_SERVICE_KEY" }, 501);
