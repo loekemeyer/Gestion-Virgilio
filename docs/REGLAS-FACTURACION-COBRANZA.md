@@ -198,3 +198,11 @@ y tocar «✓ Ya lo cambié».
   ☐/☑. Al agregar un botón a esa barra, va con ese molde.
 - `tests/stk-excel-stock-insumos.cjs`, `tests/ppp-ent-fecha-pedido.cjs`.
 
+
+## ⚠ REGLA (Luis, 2026-10-14, v30.42): la factura ANTICIPADA también cruza con su NP
+
+La ventana del cruce FC ↔ NP (`gv_cruce_fc_asignacion`, cron **90** `gv-cruce-fc-asig`, a los :07 y :37)
+va desde **la fecha más temprana entre salida y envío a facturar − 3** hasta **la más tardía + 3**. Antes
+arrancaba en salida − 3 y toda NP facturada más de 3 días antes de salir quedaba «sin factura» (LK 0421:
+FC 14/10, salida 04/11; 72 de 98 NP afectadas desde mayo). Centinela 463.
+`sql/gv_cruce_fc_asignacion_v3042.sql`.
