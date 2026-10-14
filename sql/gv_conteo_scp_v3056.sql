@@ -126,3 +126,10 @@ select sector, cod, cantidad, stock from public.gv_scp_celda where sector ~ '^IN
 -- ===================== D6 · 2026-10-14 (Luis): IN-K6 vacía =====================
 -- Sale Z37 de IN-K6; Z37 −1 -> 8 (K5 2 + L5 2 + L6 4).
 select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('IN-K5','IN-K6','IN-L5','IN-L6') order by 1;
+
+-- ===================== D7 · 2026-10-14 (Luis): IN-G5 / IN-G6 =====================
+-- IN-G5 pinza articulada A 1 cajón -> TMP-0043 · IN-G6 pinza articulada B 2 cajones -> TMP-0044 (códigos temporales
+--   para cruzar con Cervantes). DISC4 «Pinza Gastronomica» (3, sus únicas posiciones eran G5/G6) -> 0.
+--   Candidato a cruzar: DISC4 (el total 1 + 2 = 3 coincide).
+-- Con esto las 76 celdas IN- tienen su conteo cargado.
+select sector, cod, cantidad, stock from public.gv_scp_celda where sector in ('IN-G5','IN-G6');
