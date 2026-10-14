@@ -1,6 +1,18 @@
 -- =====================================================================
 --  reporte_diario.sql — Reporte diario por Telegram (v4.78)
 --
+--  ⚠ FIX v30.89 (14/10/2026): "PPP pendiente" reportaba ~16 m³ cuando lo real
+--  eran ~71 m³. Causa: reporte_diario_telegram leía SOLO GV_PPP_Programacion_Diaria
+--  (ISIS, hoy casi vacía: 14 NP) e ignoraba por completo PPP_Web_Programacion,
+--  donde vive toda la PPP viva (117 NP pendientes). Además el chequeo de facturado
+--  era débil (exists en Facturacion_NP, sin mirar cierre_id). Arreglo: la CTE pend
+--  y el loop de "fecha lejana" ahora leen la vista canónica
+--  vista_ppp_programacion_pendiente, que une ISIS + WEB, filtra facturado por
+--  cierre_id y descarta las web canceladas (GV_PPP_Web_NP_Cancelada). Mismo criterio
+--  de union que vista_tanda_m3. Medido 14/10: 71,14 m³ / 119 NP (antes 16,2 / 14).
+--  La función vive en la base (se aplicó con CREATE OR REPLACE sobre la def viva);
+--  acá queda sólo el enganche del cron y la nota del fix.
+--
 --  Cada día a las 18:00 AR (cron 'reporte-diario-telegram', 0 21 * * * UTC) manda
 --  al grupo de Telegram un resumen del día con:
 --    • Producción del día: m³ totales (picking + armado).
