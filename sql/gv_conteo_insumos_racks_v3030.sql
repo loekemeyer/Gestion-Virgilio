@@ -108,3 +108,14 @@ select cod_art, unidad, saldo from public.vista_saldos_insumos_x_unidad
  where cod_art in ('1000900','522ES','944P','H201Lever','CB01') and saldo <> 0;
 --  1000900 78.000 · 522ES 2.000 · 944P 108 · CB01 3.000 · H201Lever 26.400; posiciones 'ok'; gv_reglas_perdidas vacía.
 -- Rollback: borrar los 3 ajustes por ref, las 3 posiciones nuevas, los factores agregados y O07/Q33; Insumos desde el backup.
+
+-- ===================== octava pasada · 2026-10-14 (Luis) =====================
+-- Backups: zz_backups."GV_Backup_SCP_Z33_Z26_20261014" y zz_backups."GV_Backup_944P_desvinculo_20261014".
+-- Z33 (IN-G1) se renombra «Vástago Cremallera» (antes «Cremallera p/Cromar»).
+-- Z26: IN-H6 tiene 1 cajón (no 2) + IN-H7 5 = 6: ajuste −1 Cajones, posición IN-H6 cantidad 1.
+-- IN-H0 (GV_Lugar scp, TEMPORAL): 1 cajón de lo que en Cervantes es I6. GP2 I6 = «Mango Plano 502 Doblado»
+--   está vinculado a «Mgo Plano 512 Crudo» de Virgilio (vínculo del 14/10 14:21): se cargó sobre ese código (+1 cajón).
+--   Al entregarlo se borran la posición y el GV_Lugar IN-H0.
+-- 944P, H201Lever, CB01: quedan en insumos importados SIN alimentar stock (Luis: «son viejos, que no jodan»).
+--   Se sacó Importados_Stock_Parte 944P -> 944E (sumaba 86 al stock de importación del 944E) y la equivalencia
+--   GP2 944P -> Z48. H201Lever y CB01 no tenían vínculo.
