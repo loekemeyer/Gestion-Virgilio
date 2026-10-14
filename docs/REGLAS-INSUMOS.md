@@ -3,6 +3,22 @@
 > Movido de `CLAUDE.md` el 2026-10-13 (poda 3ra tanda, pedido de Luis) **sin cambiar una palabra**.
 > **Leerlo ENTERO antes de tocar algo de este tema.** Las reglas siguen valiendo igual que cuando estaban en CLAUDE.md.
 
+## ⚠⚠ REGLA (Luis, 2026-10-14, v30.30): HAY VARIAS ESPIRALES — `1000900` y `H201Part` NO se mezclan
+
+**Luis, textual:** *"hay varias espirales. las que estan en y04 ahora son las 1000900. en AD4 hay unas que se llaman
+H201part ... que no se mezclen"* · *"si ayer se unifico algo que quede marcadamente separado ahora"*.
+
+| insumo | qué es | rack | vínculo GP2 | cuenta para importación |
+|---|---|---|---|---|
+| `1000900` | Espiral Chino (sacacorcho) | Y04 | D1 | sí, como 1000900 |
+| `H201Part` | Espiral TN | AD04 | **ninguno** | **no** (se sacó el map al 1000900) |
+| `007` | Espiral (Chef) | Z02 | D1 | sí, suma al 1000900 (Luis no lo cambió) |
+
+- El 13/10 se cargaron **156 cajas de Y04 como H201Part**: eran del 1000900. El 14/10 quedó H201Part 24.000 u
+  (AD04) y 1000900 78.000 u (Y04). **No volver a mapear H201Part a 1000900 ni a D1** porque «parezcan» lo mismo.
+- El **`546P` pasó a llamarse `1546903`** (bastidor corta queso, X13). La equivalencia con GP2 quedó en UNA fila.
+- Conteo completo, verificación y rollback: `sql/gv_conteo_insumos_racks_v3030.sql`.
+
 ## ⚠ REGLA (Thomas, 2026-09-30, v24.69): un insumo con MC SALE siempre en MC — el stock queda en unidades
 
 *"Lo mínimo que se le manda es 1 MC… no bajan uni sueltas. Siempre por MC."* En Entrega de insumos (a Cervantes o bajado de racks), un insumo con MC en `Insumos_Factores` abre fijo en MC (`_insSaleMC`). El movimiento se guarda en la unidad BASE y la descripción dice lo cargado (`· cargado 3 MC × 4000`). Lo sostiene también el trigger **`gv_insumo_unidad_base`** (BEFORE INSERT, deposito `insumos`), que convierte cualquier carga en MC que llegue sin convertir. Los movimientos viejos en MC no se tocaron: la pantalla de insumos ya los suma con el factor. `sql/gv_insumo_unidad_base_v2469.sql`, `tests/ins-sale-mc.cjs`.
