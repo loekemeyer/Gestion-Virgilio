@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.83">
+<link rel="stylesheet" href="gv-ui.css?v=30.84">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.83"></script>
+<script type="module" src="recepcion.js?v=30.84"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6734,41 +6734,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
        vistas la leen (gv_codigos_multigrafia, vista_nc_loeke_chef) y guarda los códigos que
        nunca llegaron al mapa, que el propio mapa ahora ofrece traer. -->
 
-  <!-- Overlay: editor de LUGARES (v15.76, solo supervisores). Edita GV_Lugar /
-       GV_Lugar_Item, que reemplazan a Planimetria + Capacidad_Sector.
-       ⚠ El editor viejo (#planimEditorOverlay) queda andando a propósito: no se
-       borra nada hasta que éste esté rodando (regla de Luis, 11/09). -->
-  <div id="lugarEditorOverlay" class="recp-admin-overlay">
-    <div class="recp-admin-bar">
-      <span class="recp-admin-title">📍 Lugares del depósito</span>
-      <button class="recp-admin-close" onclick="closeLugarEditor()">Cerrar</button>
-    </div>
-    <div class="planim-body">
-      <div class="lug-tabs">
-        <button id="lugTabLugar" class="lug-tab lug-tab-on" onclick="lugSetTab('lugar')">Por lugar</button>
-        <button id="lugTabCod" class="lug-tab" onclick="lugSetTab('cod')">Por código</button>
-      </div>
+  <!-- v30.84 (Luis, 14/10): el editor «Lugares del depósito» se borró. Todo se edita desde el Mapa de góndolas. -->
 
-      <div id="lugPaneLugar">
-        <input id="lugSearch" class="planim-inp planim-search" type="text"
-               placeholder="🔍 Buscar lugar (J01, F13…) o el código que guarda…"
-               oninput="lugRender(this.value)">
-        <div id="lugList" class="planim-list"></div>
-      </div>
-
-      <div id="lugPaneCod" hidden>
-        <input id="lugCodSearch" class="planim-inp planim-search" type="text"
-               placeholder="🔍 Código (438E, 505…) — te muestro TODOS sus lugares"
-               oninput="lugRenderCod(this.value)">
-        <div id="lugCodList" class="planim-list"></div>
-      </div>
-
-      <div id="lugStatus" class="planim-status"></div>
-    </div>
-  </div>
-
-  <!-- Overlay: MAPA de góndolas (v17.23, pedido de Thomas). SÓLO LECTURA —
-       para editar está 📍 Lugares del depósito. Lo dibuja todo la vista
+  <!-- Overlay: MAPA de góndolas (v17.23, pedido de Thomas). v17.31: se edita tocando la celda. Lo dibuja todo la vista
        gv_planimetria_celda (sql/gv_planimetria_celda.sql). -->
   <div id="planimMapaOverlay" class="recp-admin-overlay">
     <div class="recp-admin-bar">
@@ -10792,7 +10760,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.83";
+const APP_VERSION = "v30.84";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -48776,203 +48744,7 @@ async function dpSaveCap(cn) {
   } catch (_e) { _dpMsg("dpCapMsg_" + cn, "Sin conexión.", false); }
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   EDITOR DE LUGARES — v15.76 (pedido de Luis, 2026-09-11: "rehacemos el editor")
-
-   Reemplaza a DOS editores que escribían a DOS tablas que ahora son una:
-     · Editor de Planimetría (sus funciones de escritura, borradas en la v17.26) → "Planimetria"
-     · Capacidad por sector  (dpSaveCap / stkCapImport)       → "Capacidad_Sector"
-   Los dos siguen andando a propósito (regla de Luis: nada se borra hasta que el
-   reemplazo esté rodando). Éste escribe a GV_Lugar / GV_Lugar_Item.
-
-   ⚠ NO es el editor viejo apuntando a otra tabla: cambió el MODELO.
-     Planimetria      clave `cod`                 → un código, UN lugar
-     GV_Lugar_Item    clave (sector, cod, clase)  → un código en VARIOS lugares
-   El 437E está en F09, F10, F11 y F12 — eso la tabla vieja no lo podía decir.
-   Por eso la pantalla se para en el LUGAR ("qué hay acá") y no en el código, con
-   una segunda pestaña para el camino inverso ("dónde está este código").
-
-   Además: la EMPRESA no se tipea, la da el lugar; `clase` separa artículo de
-   insumo (hay códigos que son las dos cosas); y `cajas_max` vive acá, que es lo
-   que hacía falta para que Capacidad_Sector desaparezca.
-
-   Permisos: sql/gv_lugar_editor.sql (policy ALL para `authenticated`, mismo
-   patrón que planim_write / cap_write). Sin eso guarda 401 y avisa. */
-const SUPABASE_GVLUGAR_ENDPOINT     = SUPABASE_URL + "/rest/v1/GV_Lugar";
-const SUPABASE_GVLUGARITEM_ENDPOINT = SUPABASE_URL + "/rest/v1/GV_Lugar_Item";
-let _lug = null;   // { lugares:[{sector,tipo,empresa,orden,uso,activo}], items:[{sector,cod,clase,cajas_max,unidad,activo}] }
-let _lugTab = "lugar";
-
-function lugSetStatus(msg, ok) {
-  const el = document.getElementById("lugStatus");
-  if (el) { el.textContent = msg || ""; el.style.color = (ok === false) ? "#b42318" : "#166534"; }
-}
-function lugSetTab(t) {
-  _lugTab = t;
-  const a = document.getElementById("lugPaneLugar"), b = document.getElementById("lugPaneCod");
-  const ta = document.getElementById("lugTabLugar"), tb = document.getElementById("lugTabCod");
-  if (a) a.hidden = (t !== "lugar");
-  if (b) b.hidden = (t !== "cod");
-  if (ta) ta.classList.toggle("lug-tab-on", t === "lugar");
-  if (tb) tb.classList.toggle("lug-tab-on", t === "cod");
-}
-/* Baja las dos tablas. Best-effort: si no están (o no hay red) el editor avisa y
-   no rompe nada — igual que el editor viejo sin Supabase. */
-async function lugFetch(force) {
-  if (_lug && !force) return _lug;
-  const [lugares, items] = await Promise.all([
-    supaFetchAllSafe(SUPABASE_GVLUGAR_ENDPOINT, "select=sector,tipo,empresa,orden,uso,activo&order=orden.asc"),
-    supaFetchAllSafe(SUPABASE_GVLUGARITEM_ENDPOINT, "select=sector,cod,clase,cajas_max,unidad,activo&order=sector.asc")
-  ]);
-  _lug = { lugares: lugares || [], items: items || [] };
-  return _lug;
-}
-function lugItemsDe(sector) {
-  const s = String(sector || "").toUpperCase();
-  return (_lug ? _lug.items : []).filter(function (i) { return String(i.sector).toUpperCase() === s; });
-}
-async function openLugarEditor() {
-  if (!requireSupervisor()) return;
-  const ov = document.getElementById("lugarEditorOverlay");
-  if (ov) ov.classList.add("show");
-  lugSetStatus("Cargando…", true);
-  try {
-    await lugFetch(true);
-    lugSetStatus(_lug.lugares.length + " lugares · " + _lug.items.length + " asignaciones", true);
-  } catch (_e) { lugSetStatus("No pude leer los lugares (sin conexión).", false); }
-  lugSetTab("lugar");
-  const s = document.getElementById("lugSearch");
-  lugRender(s ? s.value : "");
-}
-function closeLugarEditor() {
-  const ov = document.getElementById("lugarEditorOverlay");
-  if (ov) ov.classList.remove("show");
-}
-/* Lista de LUGARES. El filtro busca por sector Y por el código que guarda, así que
-   tipear "438E" trae los cuatro lugares donde está — que es la pregunta que la
-   tabla vieja no podía contestar. Orden = el del recorrido, no alfabético. */
-function lugRender(filter) {
-  const list = document.getElementById("lugList");
-  if (!list) return;
-  if (!_lug) { list.innerHTML = '<div class="planim-empty">Cargando…</div>'; return; }
-  const f = String(filter || "").trim().toUpperCase();
-  const porSector = {};
-  _lug.items.forEach(function (i) {
-    const k = String(i.sector).toUpperCase();
-    (porSector[k] || (porSector[k] = [])).push(i);
-  });
-  const rows = _lug.lugares.filter(function (l) {
-    if (!f) return true;
-    if (String(l.sector).toUpperCase().indexOf(f) >= 0) return true;
-    return (porSector[String(l.sector).toUpperCase()] || []).some(function (i) {
-      return String(i.cod).toUpperCase().indexOf(f) >= 0;
-    });
-  });
-  if (!rows.length) {
-    list.innerHTML = '<div class="planim-empty">' + (f ? 'Ningún lugar coincide con "' + escapeHtml(filter) + '".' : 'No hay lugares cargados.') + '</div>';
-    return;
-  }
-  const CAP = 300;
-  list.innerHTML = rows.slice(0, CAP).map(function (l) {
-    const s = String(l.sector).toUpperCase(), sE = escapeHtml(s);
-    const its = porSector[s] || [];
-    const emp = l.empresa || "—";
-    const chips = its.length
-      ? its.map(function (i) {
-          return '<span class="lug-chip' + (i.clase === "insumo" ? " lug-chip-ins" : "") + '">' +
-                 escapeHtml(_padCod(i.cod)) +
-                 (i.cajas_max != null ? ' <b>' + Number(i.cajas_max) + '</b>' : '') +
-                 ' <button class="lug-x" title="Sacar de ' + sE + '" onclick="lugDelItem(\'' + sE + '\',\'' + escapeHtml(String(i.cod)) + '\',\'' + escapeHtml(String(i.clase)) + '\')">✕</button></span>';
-        }).join("")
-      : '<span class="lug-libre">libre</span>';
-  return '<div class="lug-row">' +
-      '<div class="lug-row-h">' +
-        '<span class="lug-sec">' + sE + '</span>' +
-        '<span class="lug-meta">' + escapeHtml(String(l.tipo || "")) + (l.tipo === "rack" ? '' : ' · <b>' + escapeHtml(emp) + '</b>') +   // v30.42: un rack no tiene empresa
-          (l.uso ? ' · ' + escapeHtml(String(l.uso)) : '') +
-          ' · orden ' + (l.orden != null ? Number(l.orden) : "—") + '</span>' +
-      '</div>' +
-      '<div class="lug-chips">' + chips + '</div>' +
-      '<div class="lug-add">' +
-        '<input class="planim-inp lug-inp-cod" id="lugCod_' + sE + '" type="text" placeholder="Código" oninput="this.value=this.value.toUpperCase()">' +
-        '<select class="planim-inp lug-inp-cls" id="lugCls_' + sE + '"><option value="articulo">artículo</option><option value="insumo">insumo</option></select>' +
-        '<input class="planim-inp planim-inp-num lug-inp-cap" id="lugCap_' + sE + '" type="number" inputmode="numeric" placeholder="cajas máx">' +
-        '<button class="planim-btn-save" onclick="lugAddItem(\'' + sE + '\')">Agregar acá</button>' +
-      '</div>' +
-    '</div>';
-  }).join("") + (rows.length > CAP ? '<div class="planim-empty">Mostrando ' + CAP + ' de ' + rows.length + ' — afiná la búsqueda.</div>' : "");
-}
-/* Camino inverso: un código → TODOS sus lugares. Es lo que la tabla vieja no podía
-   contestar (clave `cod`, un solo lugar por código). */
-function lugRenderCod(filter) {
-  const list = document.getElementById("lugCodList");
-  if (!list) return;
-  if (!_lug) { list.innerHTML = '<div class="planim-empty">Cargando…</div>'; return; }
-  const f = String(filter || "").trim().toUpperCase();
-  if (!f) { list.innerHTML = '<div class="planim-empty">Escribí un código.</div>'; return; }
-  const empDe = {};
-  _lug.lugares.forEach(function (l) { empDe[String(l.sector).toUpperCase()] = l; });
-  const hits = _lug.items.filter(function (i) { return codEmpiezaCon(i.cod, f); });   // v21.43 — por prefijo
-  if (!hits.length) { list.innerHTML = '<div class="planim-empty">Ningún lugar tiene "' + escapeHtml(filter) + '".</div>'; return; }
-  const porCod = {};
-  hits.forEach(function (i) { (porCod[String(i.cod).toUpperCase()] || (porCod[String(i.cod).toUpperCase()] = [])).push(i); });
-  list.innerHTML = Object.keys(porCod).sort().map(function (c) {
-    const its = porCod[c].slice().sort(function (a, b) {
-      const oa = (empDe[String(a.sector).toUpperCase()] || {}).orden, ob = (empDe[String(b.sector).toUpperCase()] || {}).orden;
-      return (oa == null ? 1e9 : oa) - (ob == null ? 1e9 : ob);
-    });
-    return '<div class="lug-row"><div class="lug-row-h"><span class="lug-sec">' + escapeHtml(_padCod(c)) + '</span>' +
-      '<span class="lug-meta">' + its.length + ' lugar' + (its.length > 1 ? 'es' : '') + '</span></div>' +
-      '<div class="lug-chips">' + its.map(function (i) {
-        const l = empDe[String(i.sector).toUpperCase()] || {};
-        return '<span class="lug-chip' + (i.clase === "insumo" ? " lug-chip-ins" : "") + '">' +
-               escapeHtml(String(i.sector)) + ' · ' + escapeHtml(String(l.empresa || "—")) +
-               (i.cajas_max != null ? ' · <b>' + Number(i.cajas_max) + '</b>' : '') + '</span>';
-      }).join("") + '</div></div>';
-  }).join("");
-}
-/* Agrega un código A ESTE LUGAR. La empresa NO se pide: la da el lugar — que es
-   todo el punto del modelo nuevo. */
-async function lugAddItem(sector) {
-  const s = String(sector).toUpperCase();
-  const codEl = document.getElementById("lugCod_" + s);
-  const clsEl = document.getElementById("lugCls_" + s);
-  const capEl = document.getElementById("lugCap_" + s);
-  const cod = codEl ? codCanon(codEl.value.trim().toUpperCase()) : "";   // v16.23 — con el cero adelante
-  if (!cod) { lugSetStatus("Falta el código.", false); return; }
-  const capRaw = capEl ? capEl.value.trim() : "";
-  // v17.31 — por la MISMA RPC que el mapa, que además espeja la capacidad en
-  // Capacidad_Sector. El POST directo que había acá escribía sólo GV_Lugar_Item y
-  // dejaba la capacidad vieja colgada: esa era la mitad "solo_mapa" del problema 84.
-  const r = await pmapRpc("gv_lugar_item_guardar", {
-    p_sector: s, p_cod: cod, p_clase: clsEl ? clsEl.value : "articulo",
-    p_cajas_max: capRaw === "" ? null : (Number(capRaw) || 0)
-  });
-  if (!r.ok) { lugSetStatus("No se guardó: " + r.err, false); return; }
-  await lugFetch(true);
-  lugSetStatus("✓ " + cod + " agregado a " + s + ".", true);
-  if (codEl) codEl.value = ""; if (capEl) capEl.value = "";
-  lugRender((document.getElementById("lugSearch") || {}).value || "");
-}
-/* Saca un código DE ESTE LUGAR — no borra el código del depósito. Es la diferencia
-   con el editor viejo, donde borrar el código lo sacaba de todos lados porque sólo
-   podía estar en uno. */
-async function lugDelItem(sector, cod, clase) {
-  const s = String(sector).toUpperCase(), c = String(cod).toUpperCase(), cl = String(clase || "articulo");
-  const otros = (_lug ? _lug.items : []).filter(function (i) {
-    return String(i.cod).toUpperCase() === c && String(i.sector).toUpperCase() !== s;
-  }).length;
-  if (!confirm("¿Sacar " + c + " de " + s + "?\n\n" +
-      (otros ? "Le quedan otros " + otros + " lugar(es)." : "⚠ Es su ÚNICO lugar: queda sin planimetría.") +
-      "\n\nSe borra del mapa Y de la capacidad.")) return;
-  // v17.31 — misma RPC que el mapa: el DELETE directo que había acá borraba del mapa y
-  // dejaba la fila de Capacidad_Sector, que es la mitad "solo_capacidad" del problema 84.
-  const r = await pmapRpc("gv_lugar_item_sacar", { p_sector: s, p_cod: c, p_clase: cl });
-  if (!r.ok) { lugSetStatus("No se borró: " + r.err, false); return; }
-  await lugFetch(true);
-  lugSetStatus("✓ " + c + " sacado de " + s + ".", true);
-  lugRender((document.getElementById("lugSearch") || {}).value || "");
-}
+/* v30.84 (Luis, 14/10): EDITOR DE LUGARES (v15.76, lug*) borrado. Se edita desde el Mapa de góndolas (gv_lugar_item_guardar / _sacar / gv_lugar_orden). */
 /* ═══════════════════════════════════════════════════════════════════
    🗺️ MAPA DE GÓNDOLAS — v17.23 (pedido de Thomas, 2026-09-14: "quiero un módulo
    en la APP que muestre la planimetría · Góndola A / a5 502 Cap / a4 502 Cap …")
@@ -48981,7 +48753,7 @@ async function lugDelItem(sector, cod, clase) {
    de a 5 —la 5 arriba y la 1 abajo, como el estante— y adentro de cada una el
    código que va ahí y cuántas cajas entran.
 
-   SÓLO LECTURA. Para editar está 📍 Lugares del depósito (lugAddItem/lugDelItem);
+   (v17.31: ya NO es sólo lectura, se edita tocando la celda; ver más abajo.)
    acá no se escribe nada, así que el mapa se puede mirar sin sesión de Google.
 
    Todo lo que muestra sale de UNA vista, `gv_planimetria_celda`
@@ -63922,7 +63694,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.83"></script>
+<script src="importacion.js?v=30.84"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67213,15 +66985,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.83"></script>
-<script src="hotsale.js?v=30.83"></script>
-<script src="estadisticas.js?v=30.83"></script>
-<script src="ads.js?v=30.83"></script>
-<script src="plantel.js?v=30.83"></script>
+<script src="cobranzas.js?v=30.84"></script>
+<script src="hotsale.js?v=30.84"></script>
+<script src="estadisticas.js?v=30.84"></script>
+<script src="ads.js?v=30.84"></script>
+<script src="plantel.js?v=30.84"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.83"></script>
+<script src="analisis.js?v=30.84"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.83"></script>
+<script src="ayuda.js?v=30.84"></script>
 
 </body>
 </html>

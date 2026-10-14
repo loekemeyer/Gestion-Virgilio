@@ -82,7 +82,7 @@ const LIBRE = [
       // operario
       "mgRender", "excRender", "rkbRender", "scRender", "insRender", "mvRender",
       // planimetría / mapa de góndolas
-      "lugRenderCod", "pmapMatch",
+      "pmapMatch",   // v30.84: lugRenderCod se borró con el editor de lugares
       // otros popups de código
       "_provImpRender", "_pedHechoRenderCuerpo",
     ].forEach((fn) => {

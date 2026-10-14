@@ -52,7 +52,9 @@ const BUSQUEDA = [["26", "026"], ["27", "0027"], ["35E", "035E"], ["67", "067"]]
 
     // las tres altas por teclado guardan con el cero adelante (no lo que se tipeó crudo)
     // v17.26 - planimAdd se borro: el editor viejo de planimetria quedo solo lectura
-    ["tallArtAdd", "lugAddItem"].forEach((fn) => {
+    // v30.84 - lugAddItem se borró con el editor de lugares; el alta del mapa (pmapAltaItem)
+    // canoniza en el servidor (gv_lugar_item_guardar → canon_cod_art_val + trigger fn_canon_cols)
+    ["tallArtAdd"].forEach((fn) => {
       if (typeof window[fn] !== "function") { fallas.push("no existe " + fn); return; }
       if (!/codCanon\(/.test(String(window[fn]))) fallas.push(fn + " guarda el código sin pasar por codCanon");
     });
@@ -77,7 +79,8 @@ const BUSQUEDA = [["26", "026"], ["27", "0027"], ["35E", "035E"], ["67", "067"]]
     const c = cuerpo(fn); if (!c) r.push("no existe " + fn); else if (!/_padCod\(/.test(c)) r.push(fn + " muestra el código sin _padCod");
   });
   // v28.84 (D15, tanda 3): Mapa, racks, conteo, capacidad, OC chica, OC Config, Datos pendientes
-  ["lugRender", "lugRenderCod", "pmapAlertaRender", "pmapCellHtml", "prkCellHtml", "prkStockLinea", "prkAbrir",
+  // v30.84: lugRender / lugRenderCod se borraron con el editor de lugares
+  ["pmapAlertaRender", "pmapCellHtml", "prkCellHtml", "prkStockLinea", "prkAbrir",
    "prkDesfaseRender", "prkUbicarAbrir", "pmapCeldaRender", "pmapViejaRender", "stkGondRender", "stkBodyCapacidad",
    "cgRender", "ocgChicaNota", "ocBodyCfg", "_dpRenderCard", "pkConteoCardHtml"].forEach((fn) => {
     const c = cuerpo(fn); if (!c) r.push("no existe " + fn); else if (!/_padCod\(/.test(c)) r.push(fn + " muestra el código sin _padCod");
