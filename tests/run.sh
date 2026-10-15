@@ -23,7 +23,7 @@ node() {
   return 0
 }
 
-echo "== ins-alta-gp2 (v31.10: Insumos edita solo descripcion y cantidad; alta desde GP2 o a mano) =="
+echo "== ins-alta-gp2 (v31.14: Insumos edita solo descripcion y cantidad; alta desde GP2 o a mano) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-alta-gp2.cjs
 echo "== popup-avisos-luis (v31.05: avisos C2/C4/C5 en pop-up para Luis + aviso de Windows minimizada) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/popup-avisos-luis.cjs

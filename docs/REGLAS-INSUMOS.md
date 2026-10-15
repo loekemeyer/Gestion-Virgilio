@@ -3,7 +3,7 @@
 > Movido de `CLAUDE.md` el 2026-10-13 (poda 3ra tanda, pedido de Luis) **sin cambiar una palabra**.
 > **Leerlo ENTERO antes de tocar algo de este tema.** Las reglas siguen valiendo igual que cuando estaban en CLAUDE.md.
 
-## ⚠⚠ REGLA (Luis, 2026-10-15, v31.10): el admin de Insumos de GV edita SÓLO descripción y cantidad · alta desde GP2 o a mano
+## ⚠⚠ REGLA (Luis, 2026-10-15, v31.14): el admin de Insumos de GV edita SÓLO descripción y cantidad · alta desde GP2 o a mano
 
 **Luis:** *"El front de GV solo debería poder modificar cantidades y detalles (no factores, no código de articulo, no
 codigo ISIS, no nada mas). Si se modifica la cantidad, se tiene que ver reflejada en GP2 (debería ocurrir como un
@@ -27,7 +27,7 @@ codigo de GP2 ya existente o introducir uno manualmente (la primera que figure c
   Quedó sin hacer (BAJA): el botón «+ Agregar insumo a esta categoría» conserva su rótulo y el `top:30px` del
   encabezado de dos filas.
 - El ISIS y el vínculo se corrigen en **GP2 → Stock General → Virgilio** (GP2 es el canónico del ISIS, v29.75).
-- `sql/gv_insumo_gp2_info_v3110.sql` · `tests/ins-alta-gp2.cjs` · `tests/ins-admin.cjs` (al día).
+- `sql/gv_insumo_gp2_info_v3114.sql` · `tests/ins-alta-gp2.cjs` · `tests/ins-admin.cjs` (al día).
 
 ## ⚠ REGLA (Luis, 2026-10-15, v31.00): Sector Crudo y Procesado muestran el CAJÓN DE GP2 — sólo se ve, el stock sigue en cajones
 
@@ -38,7 +38,7 @@ funcionando en base a unidad de medida cajones, esto es simplemente para que se 
 - Stock y Compras → 🧰 Insumos → tarjeta **Sector Crudo** / **Sector Procesado**: bloque **«Cajón según GP2»** con
   **Cód C · Kg/caj · Kg/uni · Uni/caj · Uni** (Uni = cajones × uni/caj, con «≈»: es referencia). Las otras
   categorías no lo muestran (`INS_CAT_CAJON_GP2`).
-- Sale de **`gv_insumo_gp2_info()`** (v31.10; antes `gv_insumo_gp2_cajon`) (anon, SECURITY DEFINER, solo lectura): `Insumos` → `GP2.insumo_equivalencia`
+- Sale de **`gv_insumo_gp2_info()`** (v31.14; antes `gv_insumo_gp2_cajon`) (anon, SECURITY DEFINER, solo lectura): `Insumos` → `GP2.insumo_equivalencia`
   (sin mayúsculas ni espacios, como el espejo) → `GP2.componente.kg_x_uni` / `uni_x_cajon`; kg/caj = el producto.
   Es la **misma** relación que usa el espejo para pasar cajones a unidades de GP2 (`Cajones × uni_x_cajon`).
 - **No toca stock, unidades ni factores de Virgilio.** Un insumo sin vínculo dice «sin vincular en GP2»; si la RPC

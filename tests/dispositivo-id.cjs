@@ -3,7 +3,7 @@ const fs = require("fs"), vm = require("vm");
 const src = fs.readFileSync(__dirname + "/../index.html", "utf8");
 let fail = 0; const ok = (c, m) => { console.log((c ? "  ok  " : "  FALLA ") + m); if (!c) fail++; };
 const ini = src.indexOf("var _gvDispMem = null;");
-// v31.10: desde la v31.01 el pop-up de avisos de Luis vive entre este bloque y la Baliza (usa window, setInterval,
+// v31.14: desde la v31.01 el pop-up de avisos de Luis vive entre este bloque y la Baliza (usa window, setInterval,
 // document…); el test corta antes de él, que no es lo que mide.
 const _popup = src.indexOf("/* v31.01 (Luis, 15/10): avisos de sistema en POP-UP", ini), _baliza = src.indexOf("/* v4.50 — Baliza", ini);
 const fin = (_popup > ini && _popup < _baliza) ? _popup : _baliza;
