@@ -58,6 +58,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // un segundo tick no vuelve a encolar los ya vistos en esta página
     await gvPopupTick();
     out.visTick2 = vis();
+    // E) aceptado en otra página: el pop-up abierto acá se cierra en el próximo tick
+    avisos.length = 0; avisos.push({ id: 20, codigo: "C2", texto: "otra pagina", creado_at: "2026-10-15T14:10:00Z" });
+    await gvPopupTick(); await new Promise((res) => setTimeout(res, 30));
+    out.eAbierto = vis();
+    avisos.length = 0;
+    await gvPopupTick(); await new Promise((res) => setTimeout(res, 30));
+    out.eCerrado = !vis();
     // D) minimizada: aviso de Windows + badge
     const notifs = [], badges = [];
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
@@ -86,12 +93,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     "A no inyecta HTML del texto": !r.inyecta,
     "A al aceptar pasa al segundo (C2)": /Racks_Bajadas/.test(r.txt2),
     "A se cierra al aceptar el último": !r.visFin && !r.visTick2,
-    "log mostrado x3": ev("mostrado").length === 3,
+    "log mostrado x4": ev("mostrado").length === 4,
     "log aceptado x3 con quien=luis y dispositivo": ev("aceptado").length === 3 && ev("aceptado").every((c) => c.body.p_quien === "luis" && c.body.p_dispositivo && c.body.p_app_version)
   };
   const fs = require("fs");
   const sw = fs.readFileSync(path.join(__dirname, "..", "sw.js"), "utf8");
   const html = fs.readFileSync(path.join(__dirname, "..", "index.html")).toString("utf8");
+  ok["E aceptado en otra página se cierra acá"] = r.eAbierto && r.eCerrado;
   ok["D minimizada igual consulta"] = r.minPide;
   ok["D aviso de Windows fijo (requireInteraction, tag gv-popup) con C5"] = r.notifs.length === 1 && r.notifs[0].o.requireInteraction === true && r.notifs[0].o.tag === "gv-popup" && /C5/.test(r.notifs[0].t);
   ok["D número en el ícono y vuelve a 0 al aceptar"] = r.badges[0] === 1 && r.badgeFin === 0;
