@@ -1,3 +1,21 @@
+## Nota v30.96 (2026-10-15) — Vista `gv_remitos_controlados`: entregados y retirados en un solo lugar
+
+Luis: *"dejale bien claro y fácil de encontrar los remitos controlados en una vista"*.
+
+```sql
+select * from public.gv_remitos_controlados order by controlado_at desc;
+```
+
+Un renglón por NP con remito controlado (`CRN`). Columnas: `np`, `empresa`, **`tipo`** (`entregado` = fletero y
+Recepción Remitos · `retirado` = el cliente lo retiró en Virgilio), `tipo_segun` (`carga_retira` / `zona_retira` /
+`recepcion_remitos`), **`controlado_at`** (primer CRN = cuándo se entregó), `fecha`, `legajo`, `operario`,
+`cod_cliente`, `razon_social`, `tanda`, `remito`, `fletero`, `cargado_at`, `m3`, `es_web`. Se apoya en
+`gv_ppp_entregados` (mismo universo) y saca los clientes de prueba. El nombre del operario sale de
+`gv_legajo_nombre(legajo)` (security definer: devuelve sólo el nombre del plantel, sin abrir sus horas a anon).
+Medido al crear: 850 NP (806 entregados, 44 retirados), 850 con operario, 0:00 (340 ms) como anon.
+Además: la OC del súper en la hoja de armado (v30.71) leía `PPP_Programacion_Diaria` cruda y tenía en rojo
+`tests/gv-espejo-corte.cjs`; pasa a `gv_ppp_programacion_diaria` (hoy dan lo mismo: 114 NP, 11 con OC).
+
 ## Nota v30.95 (2026-10-15) — Retira: el remito controlado al retirar queda como ENTREGADO en el mismo toque
 
 Luis: *"con los pedidos que los clientes retiran, el remito se recibe/controla al momento de la entrega. Tiene que
