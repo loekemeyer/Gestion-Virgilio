@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.14">
+<link rel="stylesheet" href="gv-ui.css?v=31.16">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6473,7 +6473,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.14"></script>
+<script type="module" src="recepcion.js?v=31.16"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -9482,8 +9482,7 @@ function goToOptions() {
   // Racks → góndola: si hay una orden de bajada pendiente, mostrar la alarma
   // (y reintentar bajadas que quedaron sin enviar). Refresco cada 5'.
   try {
-    racksCheckAlarma(); racksFlushPend();
-    if (!window._racksAlTimer) window._racksAlTimer = setInterval(function () { try { racksCheckAlarma(); } catch (_e) {} }, 5 * 60 * 1000);
+    racksFlushPend();   // v31.15 (D4): la alarma de «orden de bajar racks» se sacó con su pantalla; queda el reintento de lo pendiente
   } catch (_e) {}
   // v5.71: pop-up en vivo de "faltante que llegó → completar" para los que están en Virgilio.
   try { faltPollStart(); } catch (_e) {}
@@ -10819,7 +10818,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.14";
+const APP_VERSION = "v31.16";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27908,11 +27907,7 @@ function stkBodyRacks() {
   h += stkAutoBajadaSection();
   h += '<button class="stk-btn" style="width:100%;margin-bottom:8px;background:#ecfeff;border-color:#a5f3fc;color:#0e7490;" onclick="showMoverModal(\'0\')">🔀 Mover mercadería de una ubicación a otra</button>';
   h += '<button class="stk-btn" style="width:100%;margin-bottom:14px;background:#ecfeff;border-color:#a5f3fc;color:#0e7490;" onclick="showIngresoRacksModal(\'0\', null, \'nacional\')">🏠 Ingresar nacional a racks (mover de a guardar / excedente)</button>';
-  const pend = (_stk.ordenes || []).filter(function (o) { return o.estado === "pendiente"; });
-  h += pend.length
-    ? '<div class="stk-rk-orden pend">📦 Hay una orden de bajar racks→góndola <b>PENDIENTE</b> (' + escapeHtml(String(pend[0].fecha || "")) + '). A los operarios les aparece la alarma; ellos registran lo que bajan y vos lo aprobás acá abajo.</div>'
-    : '<div class="stk-rk-orden">No hay orden de bajada pendiente.</div>';
-  h += '<button class="stk-btn ok" onclick="racksCrearOrden()">📋 OCs generadas — emitir orden de bajar racks</button>';
+  // v31.15 (Luis, 15/10, D4): se sacó «emitir orden de bajar racks» y su pantalla (bajaba SIN posición; Racks_Ordenes vacía)
   const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
   const props = (_stk.bajadas || []).filter(function (b) { return b.estado === "propuesta"; });
   h += '<div id="stkRkConteos"></div>';   // v24.68: conteos a ciegas que no coincidieron → aprueba el supervisor
@@ -27935,15 +27930,6 @@ function stkBodyRacks() {
     h += '<tr><td class="stk-cod">' + escapeHtml(codCanonSuf(a.cod)) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num">' + (M ? (Math.round((a.racks / M) * 100) / 100) : "—") + '</td><td class="num"><b>' + a.racks + '</b></td><td class="num">' + (U ? (a.racks * U) : "—") + "</td></tr>";
   });
   return h + "</tbody></table>";
-}
-async function racksCrearOrden() {
-  const pend = (_stk.ordenes || []).filter(function (o) { return o.estado === "pendiente"; });
-  if (pend.length && !confirm("Ya hay una orden de bajada PENDIENTE. ¿Emitir otra igual?")) return;
-  try {
-    const r = await fetch(SUPABASE_RACKS_ORD_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ estado: "pendiente", creada_por: "admin" }) });
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    alert("✓ Orden de bajar racks→góndola emitida. A los operarios les va a aparecer la alarma."); openStockAdmin();
-  } catch (e) { alert("Error: " + (e.message || e)); }
 }
 /* v5.92 — Guardarraíles al aprobar una bajada de racks, para que NO se repita el
    descuadre 931E/984E (racks negativo por bajada duplicada / "1 MC" contado como
@@ -28020,85 +28006,15 @@ async function racksRechazar(bajadaId) {
   } catch (e) { alert("Error: " + (e.message || e)); }
 }
 
-/* ===== STOCK — RACKS, lado operario (v4.08): alarma de orden pendiente en la botonera +
-   módulo para registrar la bajada (tipo MG). La bajada queda 'propuesta'; Marianela la aprueba
-   en el admin Stocks → recién ahí mueve el stock (racks − / terminado +). ===== */
-async function racksCheckAlarma() {
-  const box = document.getElementById("racksAlarma"); if (!box) return;
-  if (!document.getElementById("rkAlCss")) { const s = document.createElement("style"); s.id = "rkAlCss"; s.textContent = ".rk-alarma{background:#fffbeb;border:2px solid #f59e0b;color:#92400e;border-radius:11px;padding:10px 12px;margin:8px 0;font-size:14px;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.rk-alarma-btn{margin-left:auto;background:#b45309;color:#fff;border:none;border-radius:9px;padding:8px 14px;font-weight:800;cursor:pointer;width:auto;}"; document.head.appendChild(s); }
-  try {
-    const r = await fetch(SUPABASE_RACKS_ORD_ENDPOINT + "?estado=eq.pendiente&select=id,fecha&order=fecha.desc&limit=1", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-    const rows = r.ok ? await r.json() : [];
-    box.innerHTML = rows.length
-      ? '<div class="rk-alarma">📦 <b>Bajar racks → góndola</b> — orden del ' + escapeHtml(String(rows[0].fecha || "")) + '. <button class="rk-alarma-btn" onclick="showBajarRacks(' + rows[0].id + ')">Registrar bajada</button></div>'
-      : "";
-  } catch (_e) { /* sin red: no muestro nada */ }
-}
+/* v31.15 (Luis, 15/10, D4) — se sacaron la alarma de «orden de bajar racks» y su pantalla (showBajarRacks / brConfirmar):
+   era el único camino que mandaba una bajada SIN posición (stock negativo «sin posición» en el Mapa, como el 438E).
+   La base ahora la rechaza (RACKS_SIN_POSICION_BAJA). Bajar de racks se hace por «BR» (rkbConfirmar). */
 function racksFlushPend() {
   let p = []; try { p = JSON.parse(localStorage.getItem("vir_racks_pend") || "[]"); } catch (_e) {}
   if (!p.length) return;
   fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(p) })
     .then(function (r) { if (r.ok) { try { localStorage.removeItem("vir_racks_pend"); } catch (_e) {} } }).catch(function () {});
 }
-let _br = null;
-async function showBajarRacks(ordenId) {
-  if (!document.getElementById("brCss")) {
-    const s = document.createElement("style"); s.id = "brCss";
-    s.textContent = "#brModal{display:none;position:fixed;inset:0;z-index:1295;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#brModal.show{display:block;}.br-card{background:#f8fafc;max-width:470px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.br-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#b45309,#92400e);color:#fff;}.br-title{font-size:18px;font-weight:800;}.br-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.br-body{padding:13px 14px;}.br-loading,.br-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.br-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.br-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;}.br-r1{display:flex;align-items:center;gap:10px;}.br-info{flex:1;min-width:0;}.br-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.br-desc{font-size:12px;color:#475569;}.br-disp{font-size:11.5px;color:#b45309;font-weight:700;margin-top:2px;}.br-stp{display:flex;align-items:center;gap:5px;}.br-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.br-inp{width:58px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.br-conv{font-size:11px;color:#94a3b8;margin-top:4px;}.br-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#b45309;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.br-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}";
-    document.head.appendChild(s);
-  }
-  let ov = document.getElementById("brModal");
-  if (!ov) { ov = document.createElement("div"); ov.id = "brModal"; document.body.appendChild(ov); }
-  ov.classList.add("show");
-  ov.innerHTML = '<div class="br-card"><div class="br-head"><span class="br-title">📦 Bajar racks → góndola</span><button class="br-close" onclick="closeBajarRacks()">Cerrar</button></div><div class="br-body" id="brBody"><div class="br-loading">Cargando stock de racks…</div></div></div>';
-  try {
-    const res = await Promise.all([stockFetchSaldos(), stockFetchArtFactors(), loadArtNombres(),
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Racks_Planimetria", "select=cod_art,sector&estado=eq.ocupado")]);
-    const saldos = res[0] || {};
-    // v10.15: mapa cod→sectores para grabar de qué rack se baja
-    var _brSecs = {};
-    (res[3] || []).forEach(function (r) { var c = _ocgNorm(r.cod_art || ""); if (c) { if (!_brSecs[c]) _brSecs[c] = []; _brSecs[c].push(r.sector); } });
-    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { var c = _ocgNorm(a.cod); return { cod: a.cod, desc: artNombre(a.cod, a.desc), disponible: a.racks, bajar: 0, secs: (_brSecs[c] || []).sort() }; });
-    _br = { ordenId: ordenId, legajo: String((typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim(), factors: res[1] || {}, items: items };
-    brRender();
-  } catch (e) { const b = document.getElementById("brBody"); if (b) b.innerHTML = '<div class="br-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
-}
-function brRender() {
-  if (!_br) return; const body = document.getElementById("brBody"); if (!body) return;
-  if (!_br.items.length) { body.innerHTML = '<div class="br-empty">No hay stock en racks para bajar.</div>'; return; }
-  let h = '<div class="br-hint">Marcá cuántas <b>cajas</b> bajás de cada artículo. El stock se descuenta <b>al registrar</b>.</div>';
-  h += _br.items.map(function (it, i) {
-    const u = stkUnits(it.bajar, it.cod, _br.factors), ud = stkUnits(it.disponible, it.cod, _br.factors);
-    return '<div class="br-row"><div class="br-r1"><div class="br-info"><span class="br-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="br-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span><div class="br-disp">en racks: ' + it.disponible + " cajas" + (ud ? " · " + ud : "") + '</div></div><div class="br-stp"><button class="br-sb" onclick="brChg(' + i + ',-1)">–</button><input class="br-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.bajar + '" oninput="brSet(' + i + ',this.value)"><button class="br-sb" onclick="brChg(' + i + ',1)">+</button></div></div>' + (it.bajar > 0 && u ? '<div class="br-conv">bajás: ' + it.bajar + " cajas · " + u + "</div>" : "") + "</div>";
-  }).join("");
-  const tot = _br.items.reduce(function (s, it) { return s + it.bajar; }, 0);
-  h += '<button class="br-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="brConfirmar()">✓ Registrar bajada de ' + tot + " caja(s)</button>";
-  _renderKeepFocus(body, h);
-}
-function brChg(i, d) { if (!_br) return; const it = _br.items[i]; if (!it) return; it.bajar = Math.max(0, Math.min(it.disponible, it.bajar + d)); brRender(); }
-function brSet(i, v) { if (!_br) return; const it = _br.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.bajar = n; brRender(); }
-function brConfirmar() {
-  if (!_br) return;
-  const sel = _br.items.filter(function (it) { return it.bajar > 0; });
-  if (!sel.length) return;
-  // v9.82 — la bajada del operario NO necesita aprobación de la operadora (pedido del dueño):
-  // el stock ya se mueve acá (racks − / góndola +) y la fila queda 'aprobada' directo, para que
-  // NO aparezca en la cola "Bajadas Racks → góndola". La operadora ya no aprueba nada.
-  // v12.35 — baja ATÓMICA: la fila de Racks_Bajadas + los 2 movimientos de stock
-  // (racks − / góndola +) se escriben en UN solo RPC (una transacción, idempotente
-  // por client_id). Antes eran 2 POST sueltos y podían quedar a medias → bajada
-  // 'aprobada' sin descuento de racks. El stock igual se mueve YA (racks → góndola).
-  const items = sel.map(function (it) {
-    var _sec = (it.secs || []).join(" · ") || null;
-    var _ref = (it.secs && it.secs.length) ? "rack " + it.secs.join(" · ") : "orden " + (_br.ordenId || "");
-    return { cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, sector: _sec, orden_id: _br.ordenId || null, legajo: _br.legajo || "0", ref: _ref };
-  });
-  const n = sel.reduce(function (s, it) { return s + it.bajar; }, 0);
-  closeBajarRacks();
-  postBajaRacks(items);
-  try { alert("✓ Registraste " + n + " caja(s) bajadas de racks. El stock ya se actualizó."); } catch (_e) {}
-}
-function closeBajarRacks() { const ov = document.getElementById("brModal"); if (ov) ov.classList.remove("show"); _br = null; }
 
 /* ===== STOCK — INSUMOS (v4.09): RI (entrada) / EI (salida) registran stock de insumos
    (Movimientos_Stock deposito='insumos', tipo recepcion_insumo / entrega_insumo). Buscador
@@ -64441,7 +64357,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.14"></script>
+<script src="importacion.js?v=31.16"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67762,15 +67678,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.14"></script>
-<script src="hotsale.js?v=31.14"></script>
-<script src="estadisticas.js?v=31.14"></script>
-<script src="ads.js?v=31.14"></script>
-<script src="plantel.js?v=31.14"></script>
+<script src="cobranzas.js?v=31.16"></script>
+<script src="hotsale.js?v=31.16"></script>
+<script src="estadisticas.js?v=31.16"></script>
+<script src="ads.js?v=31.16"></script>
+<script src="plantel.js?v=31.16"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.14"></script>
+<script src="analisis.js?v=31.16"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.14"></script>
+<script src="ayuda.js?v=31.16"></script>
 
 </body>
 </html>

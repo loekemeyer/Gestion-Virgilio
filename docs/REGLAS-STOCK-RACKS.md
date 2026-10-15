@@ -198,7 +198,13 @@ lo busquen de ahí."* El dato estaba en 6 lugares que no coincidían. Quedó as�
 | `impo_comex.productos_referencia` (planilla COMEX) | sólo referencia, en `gv_cxm_conflictos` (el «1» = master igual al inner es basura y no se cuenta) |
 | `Insumos_Factores` (MC de insumos, en unidades) | otro dato (insumos), no se toca |
 
-`sin_master = true` (cxm vacío) = va suelto, se baja 1:1 (505I, 504, 505, 501). Para ver qué falta decidir:
+`sin_master = true` (cxm vacío) = va suelto, se baja 1:1 (505I, 504, 505, 501).
+
+**v31.14 (Luis, 15/10): las TRES relaciones en la misma fila** — `cxm` (inner × master), `uni_x_inner`, `uni_x_master`.
+Si están las tres, `uni_x_master = cxm × uni_x_inner` (constraint `gv_rack_cxm_cierra`). **MC sin inner** = `sin_inner`,
+`cxm` vacío y `uni_x_master` cargado (en racks cada caja es una master, 1:1): 590E, 890E, 323ES. Si un ingreso a racks
+cambia el `cxm` y las unidades dejan de cerrar, el trigger `trg_gv_rack_cxm_coherente` las limpia (manda el conteo
+físico) y el código aparece en `gv_cxm_conflictos`. `sql/gv_cxm_tres_relaciones_v3114.sql`. Para ver qué falta decidir:
 `select * from public.gv_cxm_conflictos order by cod;`. `sql/gv_cxm_canonica_v3113.sql`, `tests/cxm-canonica.cjs`.
 
 ### ⚠ RACKS: una fuente por dato (Luis, 25/09, v22.77)
@@ -922,8 +928,11 @@ Caso 438E (14/10): el legajo 94 bajó 54 cajas con posición **«F15»**, que es
 grabó **sin posición**: el Mapa mostró «438E LK · −54 caj» y AD11 siguió en 78 cuando tenía 24 (corregido el 15/10).
 Problema de auditoría «Bajar de racks acepta una góndola (o posición inexistente)…».
 
-- **Base**: si viene posición y `gv_rack_pos()` no la reconoce → `RACKS_NO_ES_RACK`, no se graba nada. Sin posición
-  (null) sigue pasando: lo usa la bajada por orden (`brConfirmar`), y el front de Bajar de racks ya la exige.
+- **Base**: si viene posición y `gv_rack_pos()` no la reconoce → `RACKS_NO_ES_RACK`, no se graba nada. **Sin posición
+  tampoco** (v31.15, D4: `RACKS_SIN_POSICION_BAJA`, marcador `v31.15-sin-posicion`, centinela 494).
+- **v31.15 (D4): se sacó la bajada por ORDEN** (botón «emitir orden de bajar racks» de Stock → Racks, la alarma de la
+  botonera y `showBajarRacks` / `brConfirmar`): era el único camino que mandaba la bajada sin posición, y `Racks_Ordenes`
+  estaba vacía. Bajar de racks es sólo «BR» (`rkbConfirmar`). `sql/gv_baja_racks_sin_posicion_v3115.sql`.
 - **Front**: `_rkbPosNoRack` pregunta `gv_rack_sector` antes de abrir el código de verificación y avisa. Sin red no frena.
 - **Un rechazo ya no es silencioso**: `postBajaRacks` avisaba «✓ Bajaste» y descartaba el 400 con `console.error`. Ahora
   dice qué no se grabó y por qué. Y la cola offline (`vir_baja_racks_pend`), que va en UNA transacción, con un 400 se
