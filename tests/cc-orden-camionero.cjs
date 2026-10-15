@@ -53,6 +53,11 @@ catch (_e) {
       // la cola guarda { id, payload, … }: el evento está en x.payload
       return (Array.isArray(q) ? q : []).map(x => (x && x.payload) || x).filter(x => x && x.opcion === "CCN").map(x => x.texto);
     };
+    // v30.95 — Retira manda también el CRN (remito controlado = entregado); el camión NO.
+    const leerCrn = function () {
+      let q = []; try { q = JSON.parse(localStorage.getItem(QK) || "[]"); } catch (_e) {}
+      return (Array.isArray(q) ? q : []).map(x => (x && x.payload) || x).filter(x => x && x.opcion === "CRN").map(x => x.texto + "~" + x.descripcion);
+    };
     const limpiarCola = function () { try { localStorage.setItem(QK, "[]"); } catch (_e) {} };
     limpiarCola();
     window.trySendOneReport = function () { return Promise.resolve({ ok: false }); };
@@ -98,6 +103,7 @@ catch (_e) {
       out.enviados[0] === "98603|D70B|Guillermo|1" &&
       out.enviados[1] === "98602|D70A|Guillermo|2" &&
       out.enviados[2] === "98601|D70A|Guillermo|3";
+    out.camionSinCrn = leerCrn().length === 0;
 
     // --- (6) retira: tilde ✓ y sin fletero ---
     limpiarCola();
@@ -108,6 +114,7 @@ catch (_e) {
     out.retiraSinInput = !document.getElementById("ccCamioneroInput");
     ccFinish();
     out.retiraEnvio = leerCola()[0] || "";
+    out.retiraCrn = leerCrn().join(",");
     return out;
   });
 
@@ -116,6 +123,7 @@ catch (_e) {
     r.orden2 === "98601:3° 98602:2° 98603:1°" &&
     r.persiste && r.bloqueaSinFletero && r.siguiAbierto && r.ccnOk &&
     r.retiraChk === "✓" && r.retiraSinInput && /^98700\|D70C\|\|$/.test(r.retiraEnvio) &&
+    r.camionSinCrn && /^98700\|D70C~.*Retira/.test(r.retiraCrn) &&
     errs.length === 0;
   const { alerts, ...vis } = r;
   console.log("cc-orden-camionero:", JSON.stringify(vis), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");

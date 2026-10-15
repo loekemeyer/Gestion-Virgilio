@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.94">
+<link rel="stylesheet" href="gv-ui.css?v=30.95">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.94"></script>
+<script type="module" src="recepcion.js?v=30.95"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10761,7 +10761,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.94";
+const APP_VERSION = "v30.95";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10919,7 +10919,7 @@ async function initStkBadge() {
  * Si hay negativos: badge rojo con cantidad de códigos
  * Si todo OK: tilde verde
  */
-/* v30.92 (Luis, 15/10, D8: "que aparezca mientras haya") — cajas con código TEMPORAL sin cruzar (gv_cajas_codigo_temporal):
+/* v30.95 (Luis, 15/10, D8: "que aparezca mientras haya") — cajas con código TEMPORAL sin cruzar (gv_cajas_codigo_temporal):
    las que el operario escribió a mano (TMP- en Virgilio) y las de GP2 con código de Cervantes provisorio (CJ<n>).
    Contador naranja en «Stock y Compras» y cartel fijo arriba de la solapa Insumos, mientras haya. Las cruza Naza.
    Si la lectura falla, NO se muestra «0»: queda lo último leído. */
@@ -33304,7 +33304,7 @@ function ccRender() {
   // Encabezado por RUTA; posición 1,2,3… = orden de carga (último destino del camión primero).
   // Las NP sin ubicación en ruta caen en una sección aparte, ordenadas por tanda.
   const hasOrden = _cc.items.some(function (it) { return isFinite(it.loadIdx); });
-  let html = `<div class="cc-sub">${esRetira ? "Pedidos <b>retira</b> — tocá los que <b>entregaste</b> (se cuentan en <b>cajas</b>)." : "NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>."}` +
+  let html = `<div class="cc-sub">${esRetira ? "Pedidos <b>retira</b> — tocá los que <b>entregaste</b> con el remito firmado (se cuentan en <b>cajas</b>). Al terminar quedan <b>entregados</b>: no hace falta pasarlos por Recepción Remitos." : "NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>."}` +
              (!esRetira && hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (el círculo verde 1 = primero en subir).` : ``) +
              (!esRetira ? ` Al tocarlos queda el <b>orden en que los cargaste</b> (1°, 2°, 3°…).` : ``) + `</div>`;
   // v11.47 — camión: nombre del fletero con autocompletado (maestro Camioneros).
@@ -33403,11 +33403,24 @@ function ccFinish() {
   // (auditoría revisor-logica 2026-09-11).
   if (!sel.length) { try { alert("Tildá al menos un NP " + (esRetira ? "entregado" : "cargado") + ", o tocá «Cerrar» para salir."); } catch (_e) {} return; }
   sel.forEach(function (it, i) { ccSendDetail(legajo, it.np, it.tanda, camionero, esRetira ? null : i + 1); });   // CCN por NP, con camionero y orden de carga
+  /* v30.95 (Luis, 15/10: "con los pedidos que los clientes retiran, el remito se recibe/controla al
+     momento de la entrega. Tiene que quedar constancia… estamos trabajando con un bot que envía
+     mensajes automáticos cuando el pedido es entregado/retirado"). En Retira el remito firmado vuelve
+     en la mano en el mismo momento: además del CCN se manda el CRN (= entregado) en el mismo toque.
+     Antes el Retira quedaba "cargado" y había que entrar a Recepción Remitos a tildarlo otra vez
+     (medido 15/09–14/10: 42 retira, 38 controlados en ≤0:14 y 4 recién a la mañana siguiente → el
+     aviso de entregado salía con 17 h de atraso). Mismo id determinístico que RR (crn_legajo_np_día):
+     si igual lo tildan en RR, el upsert no duplica. La descripción dice "Retira" para que quien lea
+     la constancia distinga retirado de entregado por fletero; nadie filtra CRN por descripción. */
+  if (esRetira) {
+    sel.forEach(function (it) { crSendDetail(legajo, it.np, it.tanda, "Control Remito NP — Retira (entregado en depósito)"); });
+    try { const ent = pppLoadEntregados(); for (const it of sel) ent.add(String(it.np)); pppSaveEntregados(); if (typeof pppRenderProg === "function") pppRenderProg(); } catch (_e) {}
+  }
   if (camionero) ccUpsertCamionero(camionero);                  // guarda el nombre en el maestro Camioneros
   ccSendClose(legajo);                                          // cierre CC
   ccClearChecked(legajo);
   _cc = null; ccReleaseWakeLock(); closeTandaModal();
-  try { alert((esRetira ? "🚶 Retira terminado. " : "🚛 Carga Camión terminada. ") + sel.length + (esRetira ? " retira(s) entregados." : " NP cargadas.") + (camionero ? "\nFletero: " + camionero : "")); } catch (_e) {}
+  try { alert((esRetira ? "🚶 Retira terminado. " : "🚛 Carga Camión terminada. ") + sel.length + (esRetira ? " retira(s) entregados — remito controlado, pasan a Pedidos Entregados." : " NP cargadas.") + (camionero ? "\nFletero: " + camionero : "")); } catch (_e) {}
 }
 function ccSendClose(legajo) {
   const st = getLegajoState(legajo);
@@ -33763,12 +33776,12 @@ function crFinish() {
   _cr = null; crReleaseWakeLock(); closeTandaModal();
   try { alert("✓ Control de remitos terminado. " + sel.length + " pedido(s) controlados → Pedidos Entregados."); } catch (_e) {}
 }
-function crSendDetail(legajo, np, tanda) {
+function crSendDetail(legajo, np, tanda, descripcion) {
   const nowMs = Date.now();
   // v15.33 — ídem ccSendDetail: no persistir el placeholder "—" de pantalla.
   const tandaPersist = (String(tanda || "").trim() === "—") ? "" : tanda;
   const payload = {
-    legajo: legajo, opcion: "CRN", descripcion: "Control Remito NP",
+    legajo: legajo, opcion: "CRN", descripcion: descripcion || "Control Remito NP",
     texto: (String(np) + "|" + String(tandaPersist)).toUpperCase(),
     ts: nowMs,
     id: ("crn_" + legajo + "_" + np + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
@@ -63848,7 +63861,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.94"></script>
+<script src="importacion.js?v=30.95"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67139,15 +67152,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.94"></script>
-<script src="hotsale.js?v=30.94"></script>
-<script src="estadisticas.js?v=30.94"></script>
-<script src="ads.js?v=30.94"></script>
-<script src="plantel.js?v=30.94"></script>
+<script src="cobranzas.js?v=30.95"></script>
+<script src="hotsale.js?v=30.95"></script>
+<script src="estadisticas.js?v=30.95"></script>
+<script src="ads.js?v=30.95"></script>
+<script src="plantel.js?v=30.95"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.94"></script>
+<script src="analisis.js?v=30.95"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.94"></script>
+<script src="ayuda.js?v=30.95"></script>
 
 </body>
 </html>

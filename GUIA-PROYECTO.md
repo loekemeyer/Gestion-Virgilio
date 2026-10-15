@@ -1,3 +1,18 @@
+## Nota v30.95 (2026-10-15) — Retira: el remito controlado al retirar queda como ENTREGADO en el mismo toque
+
+Luis: *"con los pedidos que los clientes retiran, el remito se recibe/controla al momento de la entrega. Tiene que
+quedar constancia de eso, ya que estamos trabajando con un bot que envía mensajes automáticos cuando el pedido es
+entregado/retirado"*. **Carga Camión → 🚶 Retira → «Terminé Retira»** manda ahora, por cada NP tildada, el `CCN`
+(como antes) **y el `CRN`** (= entregado) con `descripcion = 'Control Remito NP — Retira (entregado en depósito)'`
+y el mismo id determinístico que Recepción Remitos (`crn_<legajo>_<np>_<día>`): si igual lo tildan en RR, el upsert
+no duplica. El Retira ya no pasa por Recepción Remitos. **Camión no cambia** (el CRN lo sigue dando RR al volver el
+remito del fletero).
+Medido antes del cambio (15/09–14/10): 42 retira web cargados, todos con CRN; 38 controlados en ≤0:14 después de
+la carga y 4 recién a la mañana siguiente (hasta 17:04 de atraso para el aviso de entregado).
+**Retirado vs entregado**: los dos son `CRN`; el retirado se distingue por la descripción (nadie filtra CRN por
+descripción, medido en funciones, vistas y repo). El bot de avisos (`wa_*`, Edge Function `lk_factura-check` en el
+proyecto de LK) hoy **no lee CRN**: avisa facturas. Test: `tests/cc-orden-camionero.cjs` (retira manda CRN, camión no).
+
 ## Nota v30.92 (2026-10-15) — Aviso de cajas con código temporal sin cruzar
 
 - `gv_cajas_codigo_temporal()` (TMP de Virgilio + CJ… de GP2): contador naranja en «Stock y Compras» y cartel arriba
