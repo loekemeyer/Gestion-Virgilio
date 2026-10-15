@@ -17,7 +17,7 @@
      · esperado  = el tamaño D17 de la tanda (fijo + arranque + paradas + cajas + alturas),
                    o sea cuánto tendría que haber tardado POR SU DIFICULTAD.
      · real      = EP→TP menos pausas declaradas y huecos de más de 5 min, más la cola.
-     · rendimiento = esperado ÷ real. 100 % = llegó al ritmo esperado.
+     · rendimiento = (esperado ÷ real) − 1. 0 % = fue al ritmo esperado; + más rápido, − más lento.
      · s/caja del PKC = cuándo se TOCÓ OK, no cuándo se levantó la caja: medido el 13/10,
        marcar por ahí da 48 % de las tandas. Por eso va como dato, no como acusación.
      · s en la góndola = de que la pantalla mostró el código a que se confirmó (registro
@@ -43,7 +43,14 @@ function _anN(v, dec) {
   var n = Number(v);
   return isFinite(n) ? n.toLocaleString("es-AR", { minimumFractionDigits: dec || 0, maximumFractionDigits: dec || 0 }) : "—";
 }
-function _anPct(x) { var n = Number(x); return isFinite(n) && n > 0 ? Math.round(n * 100) + " %" : "—"; }
+/* Rendimiento = índice − 1, en puntos: 0 % = fue al ritmo esperado; + más rápido, − más lento.
+   (antes mostraba el índice crudo, y un 50 % más rápido se leía «150 %» — Thomas, 15/10/2026). */
+function _anPct(x) {
+  var n = Number(x);
+  if (!(isFinite(n) && n > 0)) return "—";
+  var d = Math.round((n - 1) * 100);
+  return (d > 0 ? "+" + d : d < 0 ? "−" + Math.abs(d) : "0") + " %";
+}
 /* Las horas van en H:MM (regla de unidades v20.x); menos de una hora, en minutos. */
 function _anMin(m) {
   var n = Number(m);
@@ -366,7 +373,7 @@ function _anFaseHtml(f, esPick) {
 
 function _anGlosarioHtml(d) {
   return '<details><summary>Cómo se leen estos números</summary><div class="an-in an-gl">' +
-    '<b>Rendimiento</b>: lo que tendría que haber tardado por su dificultad ÷ lo que tardó. 100 % = llegó al ritmo.<br>' +
+    '<b>Rendimiento</b>: cuánto más rápido o más lento fue que su dificultad. 0 % = al ritmo esperado; +20 % = tardó un 20 % menos; −20 % = tardó un 20 % más.<br>' +
     '<b>Esperado</b>: el tamaño de la tanda según el esquema de dificultad (códigos, cajas, paradas, alturas).<br>' +
     '<b>Real</b>: de que tomó la tanda a que la cerró, menos pausas declaradas y huecos de más de 5 minutos, más la cola.<br>' +
     '<b>Desde el anterior</b>: lo que pasó entre que confirmó el código de arriba y éste.<br>' +
