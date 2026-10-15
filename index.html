@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.08">
+<link rel="stylesheet" href="gv-ui.css?v=31.09">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -3197,6 +3197,24 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
 .pmap-modal-x{ width:auto; margin:0; padding:6px 12px; font-size:16px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; }
 .pmap-modal-body{ padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
 .pmap-modal-body .planim-inp{ margin:0; }
+/* v31.08 — pase disenador-gvui sobre el Mapa (Luis 15/10: "mejorar la visual de todo este módulo"). Todo con
+   #planimMapaOverlay adelante: .planim-* y .prk-* también los usan otras pantallas y acá no se tocan. */
+#planimMapaOverlay .pmap-sec, #planimMapaOverlay .pmap-colft{ color:var(--gv-ink-2); }
+#planimMapaOverlay .pmap-libre .pmap-cod{ color:var(--gv-ink-2); font-size:var(--gv-fs-md); }
+#planimMapaOverlay .prk-mc{ font-size:var(--gv-fs-md); color:var(--gv-ink-2); }
+#planimMapaOverlay .prk-nota, #planimMapaOverlay .planim-status{ font-size:var(--gv-fs-sm); color:var(--gv-ink-2); }
+#planimMapaOverlay .prk-ins-row{ font-size:var(--gv-fs-md); }
+#planimMapaOverlay .pmap-modal-head{ font-size:var(--gv-fs-lg); }
+#planimMapaOverlay .pmap-modal-x{ min-height:var(--gv-tap); padding:0 var(--gv-sp-4); font-size:var(--gv-fs-md); font-weight:700; border-radius:var(--gv-r-sm); }
+#planimMapaOverlay .pmap-modal-body .planim-btn-save, #planimMapaOverlay .pmap-modal-body .prk-vaciar{ font-size:var(--gv-fs-lg); height:auto; min-height:var(--gv-tap); padding:0 var(--gv-sp-5); }
+#planimMapaOverlay .pmap-modo{ white-space:nowrap; }
+#pmapTabs.pmap-subtabs{ display:grid; grid-template-columns:repeat(auto-fit, minmax(52px, 1fr)); }
+#pmapTabs.pmap-subtabs .lug-tab{ width:auto; }
+.pmap-cols.ptr-cols{ grid-template-columns:repeat(auto-fill, minmax(156px, 1fr)); }
+.pmap-cell.ptr-cell{ height:auto; min-height:82px; }
+.pmap-cell.ptr-cell .pmap-cod{ font-size:var(--gv-fs-lg); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:normal; }
+.ptr-ub-row .planim-inp{ flex:1 1 140px; }
+@media (max-width:460px){ #planimMapaOverlay .pmap-modo, #pmapTabs.pmap-subtabs .lug-tab{ padding:var(--gv-sp-3) var(--gv-sp-1); font-size:var(--gv-fs-md); } }
 .pmap-it{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; border:1px solid #e2e8f0; border-radius:10px; padding:8px 10px; background:#f8fafc; }
 .pmap-it-cod{ font-size:17px; font-weight:800; color:#0f172a; min-width:64px; }
 .pmap-it-desc{ flex:1 1 140px; font-size:12.5px; color:#64748b; min-width:0; }
@@ -6455,7 +6473,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.08"></script>
+<script type="module" src="recepcion.js?v=31.09"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10801,7 +10819,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.08";
+const APP_VERSION = "v31.09";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -49302,7 +49320,7 @@ function pmapRender() {
   const vj = document.getElementById("pmapVieja");
   pmapAlertaRender();
   // v31.05: en Tránsito y en SC y SP las solapas son SUB-PESTAÑAS del mismo tamaño que los modos
-  tabs.className = "pmap-tabs" + ((_pmapModo === "transito" || _pmapModo === "scp") ? " pmap-subtabs" : "");
+  tabs.className = "pmap-tabs pmap-subtabs";   // v31.08: un solo formato de solapa en los cuatro modos
   const dzb = document.getElementById("pmapDisc");   // v30.13: el aviso de discontinuados es de GÓNDOLAS
   if (_pmapModo === "rack") {
     if (vj) vj.style.display = "none";
@@ -49590,11 +49608,11 @@ function ptrRender() {
   });
   const nSin = rows.filter(function (r) { return r.origen === "sin_lugar"; }).length;
   let h = '<div class="pmap-head"><b>' + escapeHtml(sec.lbl) + '</b> · ' + rows.length + (rows.length === 1 ? " código" : " códigos") +
-    (sec.k === "TRANSITO" && rows.length ? ' · ' + (rows.length - nSin) + ' recibidos · <b>' + nSin + '</b> sin lugar · tocá uno para ubicarlo' : '') + '</div>';
+    (sec.k === "TRANSITO" && rows.length ? ' · <b>' + nSin + '</b> sin lugar' + (rows.length - nSin ? ' · ' + (rows.length - nSin) + ' recibidos' : '') + ' · tocá para ubicar' : '') + '</div>';
   if (!rows.length) h += '<div class="planim-empty">' + escapeHtml(sec.vacio) + '</div>';
   else h += '<div class="pmap-wrap"><div class="pmap-cols ptr-cols">' + rows.map(ptrCellHtml).join("") + '</div></div>';
   box.innerHTML = h;
-  pmapSetStatus("A guardar " + n("AGUARDAR") + " · Tránsito " + n("TRANSITO"));
+  pmapSetStatus("");   // los números ya están en las sub-pestañas
 }
 /* v30.87 / v31.05 — sacar de Tránsito: el supervisor elige la CLASE de lugar (góndola · rack · SC y SP), la
    posición y cuánto. Lo recibido sale por gv_transito_ubicar (−TRANSITO / +posición); lo que tenía stock sin
@@ -49629,7 +49647,7 @@ function ptrClase(cl) {
   _ptrCl = cl;
   document.querySelectorAll("#pmapCeldaBody .ptr-clases button").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-cl") === cl); });
   const s = document.getElementById("ptrUbSec");
-  if (s) s.placeholder = cl === "gondola" ? "Celda de góndola (F13…)" : cl === "scp" ? "Celda de SC y SP (IN-A1…)" : "Posición de rack (X20, R01AD…)";
+  if (s) s.placeholder = cl === "gondola" ? "F13…" : cl === "scp" ? "IN-A1…" : "X20, R01AD…";
   _ptrCargarClase(cl).catch(function () {});
   pmapCeldaStatus("");
 }
@@ -49646,9 +49664,10 @@ function ptrUbicarAbrir(i) {
     '<div class="ptr-clases">' + PTR_CLASES.map(function (c) {
       return '<button type="button" data-cl="' + c[0] + '" onclick="ptrClase(\'' + c[0] + '\')">' + c[1] + '</button>';
     }).join("") + '</div>' +
-    '<div class="prk-ins-row"><input class="planim-inp" id="ptrUbSec" type="text" list="ptrUbList" autocomplete="off" style="width:180px" oninput="this.value=this.value.toUpperCase()">' +
+    '<div class="prk-ins-row ptr-ub-row"><input class="planim-inp" id="ptrUbSec" type="text" list="ptrUbList" autocomplete="off" aria-label="Posición" oninput="this.value=this.value.toUpperCase()">' +
     '<datalist id="ptrUbList"></datalist>' +
-    '<input class="planim-inp" id="ptrUbCant" type="number" inputmode="decimal" min="0" step="any" value="' + (Number(r.cantidad) || 0) + '" style="width:110px">' +
+    '<input class="planim-inp" id="ptrUbCant" type="number" inputmode="decimal" min="0" step="any" aria-label="Cantidad" value="' + (Number(r.cantidad) || 0) + '" style="flex:0 1 110px">' +
+    (r.unidad ? '<span class="prk-mc">' + escapeHtml(String(r.unidad)) + '</span>' : '') +
     '<button class="planim-btn-save" onclick="ptrUbicarOk()">Ubicar</button></div>' +
     '<div class="prk-nota">' + (sin ? 'Queda anotado en esa posición: es lo que ve el módulo de Insumos.' : 'Sale de Tránsito y entra a esa posición. El stock total del insumo no cambia.') + '</div>';
   m.classList.add("show");
@@ -50054,7 +50073,7 @@ function pscpRender() {
     const it = function (cls, txt, c) { return '<span><i class="pmap-sw ' + cls + '"></i>' + txt + ' <b>' + c + '</b></span>'; };
     leg.innerHTML = it("", "piezas anotadas", _pscp.filter(function (r) { return r.cod; }).length) +
                     it("pmap-libre", "celda libre", _pscp.filter(function (r) { return r.estado === "libre"; }).length) +
-                    '<span>el stock de cada pieza lo lleva <b>GP2</b> (Cervantes): acá se dice DÓNDE está</span>';
+                    '<span title="El stock de cada pieza lo lleva GP2 (Cervantes): acá se dice dónde está.">stock en GP2</span>';
   }
   pmapSetStatus(cs.length + " columnas · " + _pscp.length + " piezas anotadas en " +
     Object.keys(_pscp.reduce(function (a, r) { a[r.sector] = 1; return a; }, {})).length + " celdas" +
@@ -50073,8 +50092,8 @@ function pscpAbrir(sector) {
   _pmapCelda = sector; pmapCeldaStatus("");
   tit.textContent = "Celda " + sector;
   const S = JSON.stringify(String(sector)).replace(/"/g, "&quot;");
-  let h = '<div class="prk-det"><b>' + escapeHtml(String(sector)) + '</b> — acá NO van cajas de artículo: ' +
-    'son piezas de Cervantes. El saldo de cada una lo lleva GP2; esto dice dónde está.</div>' +
+  let h = '<div class="prk-det" title="Acá no van cajas de artículo. El saldo de cada pieza lo lleva GP2; esto dice dónde está."><b>' +
+    escapeHtml(String(sector)) + '</b> · piezas de Cervantes</div>' +
     '<div class="prk-ins"><b>Piezas en esta celda</b>';
   if (!fs.length) h += '<div class="prk-nota" style="margin-top:4px">Ninguna.</div>';
   fs.forEach(function (x, k) {
@@ -50085,7 +50104,7 @@ function pscpAbrir(sector) {
   });
   h += '<div class="prk-ins-row"><input class="planim-inp" id="pscpNuevo" type="text" placeholder="Código de pieza (A4, DISC1…)" style="width:170px" oninput="this.value=this.value.toUpperCase()">' +
     '<button class="planim-btn-save" onclick="pscpAgregar(' + S + ')">Agregar</button></div>' +
-    '<div class="prk-nota">Se guarda en Insumos_Ubicaciones por gv_insumo_posicion_guardar: es lo que ve el módulo de Insumos.</div></div>';
+    '<div class="prk-nota">Lo ve el módulo de Insumos.</div></div>';
   box.innerHTML = h;
   m.classList.add("show");
 }
@@ -64183,7 +64202,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.08"></script>
+<script src="importacion.js?v=31.09"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67504,15 +67523,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.08"></script>
-<script src="hotsale.js?v=31.08"></script>
-<script src="estadisticas.js?v=31.08"></script>
-<script src="ads.js?v=31.08"></script>
-<script src="plantel.js?v=31.08"></script>
+<script src="cobranzas.js?v=31.09"></script>
+<script src="hotsale.js?v=31.09"></script>
+<script src="estadisticas.js?v=31.09"></script>
+<script src="ads.js?v=31.09"></script>
+<script src="plantel.js?v=31.09"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.08"></script>
+<script src="analisis.js?v=31.09"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.08"></script>
+<script src="ayuda.js?v=31.09"></script>
 
 </body>
 </html>

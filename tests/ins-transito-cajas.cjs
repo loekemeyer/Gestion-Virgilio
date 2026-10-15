@@ -22,7 +22,8 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
         { sector: "AGUARDAR", cod: "328E", emp: "LK", descripcion: "art", cantidad: 12, unidad: "caj", origen: "a_guardar" },
         { sector: "TRANSITO", cod: "N°19", emp: "IN", descripcion: "Fleje 13,6", cantidad: 144, unidad: "Kg", origen: "transito" },
         { sector: "TRANSITO", cod: "Caja Nº 8", emp: "IN", descripcion: "caja", cantidad: 50, unidad: "Cajas", origen: "transito" },
-        { sector: "TRANSITO", cod: "N°94", emp: "IN", descripcion: "Fleje", cantidad: 835, unidad: "Kg", origen: "sin_lugar", ref_id: 77 }];
+        { sector: "TRANSITO", cod: "N°94", emp: "IN", descripcion: "Fleje", cantidad: 835, unidad: "Kg", origen: "sin_lugar", ref_id: 77 },
+        { sector: "TRANSITO", cod: "FLEJE PROLIPROPILENO·SUNCHOS 12 MM", emp: "IN", descripcion: "", cantidad: 72, unidad: "Kg", origen: "sin_lugar" }];
       if (/gv_rack_celda/.test(u)) return [{ sector: "X20", rack: "X", estado: "libre" }, { sector: "IN-F3", rack: "IN", estado: "libre" }];
       if (/gv_scp_celda/.test(u)) return [{ sector: "IN-F3", col: "F", fila: 3, estado: "libre" }];
       if (/gv_planimetria_celda/.test(u)) return [{ sector: "F03", gondola: "F", celda: 3, estado: "libre" }];
@@ -41,6 +42,10 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
     // v31.05: cada código es un BOTÓN (como las celdas de los otros modos); A guardar se ve pero no se ubica desde acá
     out.btnsTr = document.querySelectorAll("#pmapGrid button.ptr-cell").length;
     out.subtabs = document.getElementById("pmapTabs").classList.contains("pmap-subtabs");
+    // v31.08 (pase GV-UI): un nombre largo no se corta ni pisa la cantidad; la celda crece
+    out.celdaLarga = (function () { const c = [...document.querySelectorAll("#pmapGrid button.ptr-cell")].filter(function (b) { return /SUNCHOS/.test(b.textContent); })[0];
+      return c ? { alto: c.offsetHeight, sobra: c.scrollHeight - c.clientHeight, q: getComputedStyle(c.querySelector(".ptr-q")).fontSize } : null; })();
+    out.celdaOk = !!out.celdaLarga && out.celdaLarga.sobra <= 0;
     ptrGo("AGUARDAR"); out.btnsAg = document.querySelectorAll("#pmapGrid button.ptr-cell").length; ptrGo("TRANSITO");
     let rpc = null; window.pmapRpc = async function (fn, body) { rpc = { fn: fn, body: body }; return { ok: true, data: { sector: body.p_sector } }; };
     const iN = _ptr.findIndex(function (x) { return x.cod === "N°19"; });
@@ -49,7 +54,7 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
     await ptrUbicarOk(); const frenoTope = rpc === null;
     document.getElementById("ptrUbCant").value = "100";
     await ptrUbicarOk();
-    out.ubicar = out.btnsTr === 3 && out.btnsAg === 0 && frenoTope && !!rpc && rpc.fn === "gv_transito_ubicar" &&
+    out.ubicar = out.btnsTr === 4 && out.btnsAg === 0 && frenoTope && !!rpc && rpc.fn === "gv_transito_ubicar" &&
       rpc.body.p_cod === "N°19" && rpc.body.p_cantidad === 100 && rpc.body.p_sector === "X20" && rpc.body.p_unidad === "Kg";
     // v31.05: el insumo con stock SIN LUGAR se ubica por gv_insumo_posicion_guardar y reemplaza el lugar inexistente;
     // la clase elegida manda: «F3» con Góndola va a la celda F03, no a la IN-F3 de SC y SP
@@ -105,7 +110,7 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
     return out;
   });
   await b.close();
-  const ok = r.a && r.ubicar && r.subtabs && r.sinLugar && r.sinEmoji && r.b && r.c && r.eiAlta && !errs.length;
+  const ok = r.a && r.ubicar && r.celdaOk && r.subtabs && r.sinLugar && r.sinEmoji && r.b && r.c && r.eiAlta && !errs.length;
   console.log("ins-transito-cajas:", JSON.stringify(r), errs.length ? "· errores: " + errs.join(" | ") : "· pageerrors: none", ok ? "· ✓ OK" : "· ✗ FALLA");
   process.exit(ok ? 0 : 1);
 })();
