@@ -4423,8 +4423,32 @@
     startKrikosInboxAutoRefresh();
   }
 
+  // 15/10/2026 (copiado de LK v2.3.565): init llamaba a get_super_prices / get_super_cadenas / krikos_inbox_list a
+  // los 200 ms, antes de que se recuperara la sesión de LK: salían como visitante y la base las rechaza (401 en el
+  // log). Ahora arranca cuando hay sesión, al cargar o cuando el admin se loguea. En modo Est. Madre embebida
+  // (GV_EM_EMBED) no hay sesión de LK —todo pasa por el proxy de Gestión—, así que arranca como antes.
+  var _scotIniciado = false;
+  function arrancarUnaVez() {
+    if (_scotIniciado) return;
+    _scotIniciado = true;
+    init();
+  }
   function bootstrap() {
-    setTimeout(init, 200);
+    setTimeout(async function () {
+      try {
+        if (!window.GV_EM_EMBED && window.sb && window.sb.auth) {
+          var r = await window.sb.auth.getSession();
+          if (r && r.data && r.data.session) { arrancarUnaVez(); return; }
+          window.sb.auth.onAuthStateChange(function (_ev, ses) {
+            if (ses) arrancarUnaVez();
+          });
+          return;
+        }
+      } catch (e) {
+        console.warn("[supercot] no se pudo leer la sesión, arranco igual:", e);
+      }
+      arrancarUnaVez();
+    }, 200);
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootstrap);
