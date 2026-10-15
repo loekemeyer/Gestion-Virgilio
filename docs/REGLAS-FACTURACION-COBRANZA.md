@@ -3,6 +3,24 @@
 > Movido de `CLAUDE.md` el 2026-10-13 (poda 3ra tanda, pedido de Luis) **sin cambiar una palabra**.
 > **Leerlo ENTERO antes de tocar algo de este tema.** Las reglas siguen valiendo igual que cuando estaban en CLAUDE.md.
 
+## ⚠ REGLA (Luis, 2026-10-15, v30.96–98): FC ANULADA POR NC NO SE CRUZA CON LA NP
+
+ISIS no dice qué FC anula cada NC (`isis_*.comprobantes_aplicados` vacío para NC, el PDF no trae el
+comprobante asociado). La NC de anulación lista **los mismos artículos con las mismas cantidades y el
+mismo total**: se aparea por esa firma, como **pila** — la NC anula la **última** FC viva igual a ella
+emitida antes (hora de ingesta con 3 min de margen; si no, la última sin mirar la hora). NC parcial o
+de descuento (`P25%`) no iguala ninguna firma y no anula nada.
+
+- `GV_FC_Anulada` (incremental), `gv_fc_nc_aparear(p_dias=45)` — lo llama `gv_cruce_fc_asig_refrescar`
+  antes de asignar (cron `gv-cruce-fc-asig`, `7-59/30`). `gv_cruce_fc_asignacion` y
+  `gv_fac_complemento_cruce` excluyen las anuladas. Conciliación: chip «⊘ refacturada ×N» / «FC anulada»
+  (`gv_fc_anuladas_np`).
+- Caso origen: 14/10 Muare (21 FC, 13 NC), Poy y Rosemblit; las 10 NP estaban en la FC anulada.
+- **Demora medida** (141 anulaciones desde 07/2026): 70 el mismo día — 49 dentro de 0:30, todas
+  dentro de 2:14 desde la FC —; 17 al día siguiente; 54 a 2 días o más (devoluciones). El cruce
+  recién lo ve en la corrida siguiente del cron (hasta 0:30 más).
+- Centinelas v30.97 (base), código en v30.98. `sql/gv_fc_anulada_nc_v3096.sql`. Problema 803.
+
 ## ⚠ REGLA (Luis, 2026-10-14, v30.76): COL H DEL EXCEL ISIS = DIRECCIÓN DEL PADRÓN VIVO
 
 Luis: *"que no se condicione eso desde que manda el pedido el cliente sino que esté armado con la información

@@ -167,7 +167,14 @@ $f$;
 revoke all on function public.gv_fc_anuladas_np(text[]) from public, anon;
 grant execute on function public.gv_fc_anuladas_np(text[]) to authenticated;
 
--- PENDIENTE (esperando el «sí» de Luis: son objetos con regla protegida en GV_Reglas_Centinela):
--- gv_cruce_fc_asignacion / gv_fac_complemento_cruce + not exists GV_FC_Anulada en docs, y
--- gv_cruce_fc_asig_refrescar llamando a gv_fc_nc_aparear() antes de asignar. Hasta entonces el
--- cruce sigue pudiendo asignar una FC anulada; la Conciliación ya muestra el chip.
+-- v30.97 (Luis, 15/10, D3 sí — REGLA_CONFIRMADA_POR_USUARIO). Migración gv_fc_anulada_nc_v3097_cruce,
+-- aplicada con replace() sobre la definición VIVA (las reglas 158/181/182/463 quedan intactas):
+--   gv_cruce_fc_asignacion  docs lk/chef: + and not exists (select 1 from public."GV_FC_Anulada" _gv_an
+--                           where _gv_an.empresa = '<lk|chef>' and _gv_an.fc_id = d.id)
+--   gv_fac_complemento_cruce idem en sus docs.
+--   gv_cruce_fc_asig_refrescar antes del create temp table _gv_asig_new:
+--     begin perform public.gv_fc_nc_aparear(); exception when others then null; end;
+-- Centinelas nuevas: gv_cruce_fc_asignacion «GV_FC_Anulada», gv_cruce_fc_asig_refrescar
+-- «gv_fc_nc_aparear», gv_fc_nc_aparear «f.created_at <= r.created_at».
+-- Medido al aplicar: 1.054 FC anuladas apareadas (LK 682, Chef 372); el recálculo cambió 111 filas del
+-- cruce; 0 NP quedan asignadas a una FC anulada; las 10 NP del 14/10 pasaron a la FC vigente.
