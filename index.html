@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.04">
+<link rel="stylesheet" href="gv-ui.css?v=31.05">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.04"></script>
+<script type="module" src="recepcion.js?v=31.05"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10783,7 +10783,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.04";
+const APP_VERSION = "v31.05";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10884,6 +10884,7 @@ function _gvPopupMostrar() {
 window.gvPopupAceptar = async function () {
   const a = _gvPopupActual;
   if (!a) return;
+  _gvPopupPedirPermiso();
   const btn = document.getElementById("gvPopupAceptar");
   if (btn) { btn.disabled = true; btn.textContent = "Guardando…"; }
   try {
@@ -10896,18 +10897,65 @@ window.gvPopupAceptar = async function () {
   _gvPopupActual = null;
   const ov = document.getElementById("gvPopupOverlay");
   if (ov) ov.style.display = "none";
+  _gvPopupBadge(_gvPopupCola.length);
+  if (!_gvPopupCola.length) { try { navigator.serviceWorker.getRegistration().then(function (r) { return r && r.getNotifications({ tag: "gv-popup" }); }).then(function (ns) { (ns || []).forEach(function (n) { n.close(); }); }).catch(function () {}); } catch (_e) {} }
   _gvPopupMostrar();
 };
+/* v31.05 (Luis, 15/10): con la app instalada y MINIMIZADA, el navegador NO deja que la página se
+   restaure sola (window.focus() sin un click está bloqueado en Chrome). Lo más cerca que se puede:
+   (1) aviso de Windows con su sonido, que queda fijo hasta tocarlo y al tocarlo trae la app al frente
+   (sw.js, notificationclick); (2) un pitido de la página; (3) el número en el ícono de la barra de tareas.
+   El permiso de notificaciones se pide al apretar «Aceptar» (necesita un click). */
+function _gvPopupBadge(n) {
+  try { if (navigator.setAppBadge) { if (n > 0) navigator.setAppBadge(n); else navigator.clearAppBadge(); } } catch (_e) {}
+}
+function _gvPopupSonido() {
+  try {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _audioCtx;
+    if (ctx.state === "suspended") ctx.resume().catch(function () {});
+    [0, 0.25, 0.5].forEach(function (t, i) {
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(i === 2 ? 1175 : 880, ctx.currentTime + t);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.2);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(ctx.currentTime + t); osc.stop(ctx.currentTime + t + 0.22);
+    });
+  } catch (_e) {}
+}
+async function _gvPopupNotificar(nuevos) {
+  try {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    if (document.visibilityState === "visible" && document.hasFocus()) return;   // a la vista: alcanza el pop-up
+    const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+    const a = nuevos[0];
+    const titulo = "Aviso de sistema · " + a.codigo + " " + (GV_POPUP_NOMBRE[a.codigo] || "") + (nuevos.length > 1 ? " (+" + (nuevos.length - 1) + ")" : "");
+    const opt = { body: String(a.texto || "").slice(0, 240), tag: "gv-popup", renotify: true, requireInteraction: true, icon: "icons/icon-192.png", data: { url: location.href } };
+    if (reg && reg.showNotification) await reg.showNotification(titulo, opt);
+    else { const n = new Notification(titulo, opt); n.onclick = function () { try { window.focus(); } catch (_e) {} n.close(); }; }
+  } catch (_e) {}
+}
+function _gvPopupPedirPermiso() {
+  try { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission().catch(function () {}); } catch (_e) {}
+}
 async function gvPopupTick() {
   try {
     if (!gvPopupPersona()) return;
-    if (document.visibilityState === "hidden") return;
+    // v31.05: corre también con la ventana MINIMIZADA (antes cortaba con "hidden" y el aviso esperaba a que volvieras).
     const rows = await _gvPopupRpc("gv_popup_pendientes", { p_persona: gvPopupPersona() });
-    (rows || []).forEach(function (a) {
+    if (!rows) return;
+    const nuevos = [];
+    rows.forEach(function (a) {
       if (_gvPopupVisto[a.id]) return;
       _gvPopupVisto[a.id] = 1;
       _gvPopupCola.push(a);
+      nuevos.push(a);
     });
+    _gvPopupBadge(rows.length);
+    if (nuevos.length) { _gvPopupSonido(); _gvPopupNotificar(nuevos); }
     _gvPopupMostrar();
   } catch (_e) {}
 }
@@ -64018,7 +64066,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.04"></script>
+<script src="importacion.js?v=31.05"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64498,7 +64546,9 @@ function rolPickerAbrir(ev) {
     });
   }
 }
-function rolElegir(k) { _rolSet(k); var ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none"; rolPanelRender(k); }
+function rolElegir(k) { _rolSet(k); var ov = document.getElementById("rolPickerOv"); if (ov) ov.style.display = "none"; rolPanelRender(k);
+  if (k === "luis" && typeof window._gvPopupPedirPermiso === "function") window._gvPopupPedirPermiso();   // v31.05: el click de elegir rol habilita pedir el permiso de avisos de Windows
+}
 /* v29.95 (Luis, 13/10: *"aprieto luis y no entra"*): ⚠ TODO ESTO VIVE ADENTRO DE LA IIFE
    `initAuth`, así que un `onclick="rolElegir('luis')"` del HTML NO lo encuentra — un handler
    inline se resuelve contra WINDOW, no contra el scope del script. Es el mismo pozo de
@@ -67337,15 +67387,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.04"></script>
-<script src="hotsale.js?v=31.04"></script>
-<script src="estadisticas.js?v=31.04"></script>
-<script src="ads.js?v=31.04"></script>
-<script src="plantel.js?v=31.04"></script>
+<script src="cobranzas.js?v=31.05"></script>
+<script src="hotsale.js?v=31.05"></script>
+<script src="estadisticas.js?v=31.05"></script>
+<script src="ads.js?v=31.05"></script>
+<script src="plantel.js?v=31.05"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.04"></script>
+<script src="analisis.js?v=31.05"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.04"></script>
+<script src="ayuda.js?v=31.05"></script>
 
 </body>
 </html>

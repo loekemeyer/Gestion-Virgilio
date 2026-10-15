@@ -12,6 +12,11 @@ intentó escribir en una tabla cerrada, `anon-bloqueo:…`), **C4** (celular nue
   El mail de Google es compartido, así que no hay otra forma de saberlo.
 - **Sólo notifica**: botón «Aceptar». Aceptar en una página lo cierra en todas.
 - ⚠ **Telegram y pop-up CONVIVEN** hasta que Luis diga lo contrario (Luis, 15/10: *"no lo preguntes más"*). No proponer apagar el Telegram de un aviso que pasó a pop-up.
+- **v31.05 — app instalada y minimizada**: la ventana **no se puede restaurar sola** (Chrome bloquea `window.focus()` sin
+  click). En su lugar: aviso de Windows con su sonido, fijo hasta tocarlo (`requireInteraction`), que al tocarlo trae
+  la app al frente (`notificationclick` en `sw.js`); pitido de la página; número en el ícono de la barra de tareas
+  (`setAppBadge`). El permiso se pide al elegir «Luis» en el selector o al apretar Aceptar. Con la app CERRADA no
+  llega nada (haría falta Web Push, no está).
 - **C3** (monitor GT abierto fuera de horario) queda **sólo en Telegram** (Luis, D4). Lo mismo B (informes) y C1 (salud del outbox).
 - **Log** (`GV_Popup_Log`): un `mostrado` cada vez que salta en una página, un `aceptado` con rol, mail, dispositivo
   y versión. Review: `select * from public.gv_popup_review order by creado_at desc;`

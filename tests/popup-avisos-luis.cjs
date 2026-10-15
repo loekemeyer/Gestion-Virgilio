@@ -4,6 +4,9 @@
       con p_quien = 'luis'; con dos avisos, muestra el segundo al aceptar el primero.
    B) Con otro rol (o sin rol) NO pide nada ni salta nada.
    C) Sin sesión de Google no llama a la base (las RPC exigen supervisor).
+   D) v31.05: con la ventana sin foco (minimizada) igual consulta, manda el aviso de Windows
+      (requireInteraction, tag gv-popup), pone el número en el ícono y suena; sw.js trae la app al
+      frente al tocar el aviso; elegir el rol «luis» pide el permiso.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -55,6 +58,22 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // un segundo tick no vuelve a encolar los ya vistos en esta página
     await gvPopupTick();
     out.visTick2 = vis();
+    // D) minimizada: aviso de Windows + badge
+    const notifs = [], badges = [];
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    document.hasFocus = () => false;
+    window.Notification = function () {}; window.Notification.permission = "granted";
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { getRegistration: async () => ({ showNotification: async (t, o) => notifs.push({ t, o }), getNotifications: async () => [] }) } });
+    navigator.setAppBadge = (n) => badges.push(n); navigator.clearAppBadge = () => badges.push(0);
+    avisos.length = 0; avisos.push({ id: 13, codigo: "C5", texto: "Login de operario rechazado por red", creado_at: "2026-10-15T14:00:00Z" });
+    const antes = calls.length;
+    await gvPopupTick();
+    await new Promise((res) => setTimeout(res, 50));
+    out.minPide = calls.length > antes;
+    out.notifs = notifs; out.badges = badges.slice();
+    document.getElementById("gvPopupAceptar").click();
+    await new Promise((res) => setTimeout(res, 50));
+    out.badgeFin = badges[badges.length - 1];
     out.calls = calls;
     return out;
   });
@@ -67,9 +86,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     "A no inyecta HTML del texto": !r.inyecta,
     "A al aceptar pasa al segundo (C2)": /Racks_Bajadas/.test(r.txt2),
     "A se cierra al aceptar el último": !r.visFin && !r.visTick2,
-    "log mostrado x2": ev("mostrado").length === 2,
-    "log aceptado x2 con quien=luis y dispositivo": ev("aceptado").length === 2 && ev("aceptado").every((c) => c.body.p_quien === "luis" && c.body.p_dispositivo && c.body.p_app_version)
+    "log mostrado x3": ev("mostrado").length === 3,
+    "log aceptado x3 con quien=luis y dispositivo": ev("aceptado").length === 3 && ev("aceptado").every((c) => c.body.p_quien === "luis" && c.body.p_dispositivo && c.body.p_app_version)
   };
+  const fs = require("fs");
+  const sw = fs.readFileSync(path.join(__dirname, "..", "sw.js"), "utf8");
+  const html = fs.readFileSync(path.join(__dirname, "..", "index.html")).toString("utf8");
+  ok["D minimizada igual consulta"] = r.minPide;
+  ok["D aviso de Windows fijo (requireInteraction, tag gv-popup) con C5"] = r.notifs.length === 1 && r.notifs[0].o.requireInteraction === true && r.notifs[0].o.tag === "gv-popup" && /C5/.test(r.notifs[0].t);
+  ok["D número en el ícono y vuelve a 0 al aceptar"] = r.badges[0] === 1 && r.badgeFin === 0;
+  ok["D sw.js trae la app al frente al tocar el aviso"] = /addEventListener\("notificationclick"[\s\S]{0,400}\.focus\(\)[\s\S]{0,200}openWindow/.test(sw);
+  ok["D elegir «luis» pide el permiso"] = /k === "luis" && typeof window\._gvPopupPedirPermiso/.test(html);
   const fallas = Object.keys(ok).filter((k) => !ok[k]);
   if (errs.length) fallas.push("pageerror: " + errs.join(" | "));
   await b.close();
