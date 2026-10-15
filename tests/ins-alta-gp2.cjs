@@ -1,4 +1,4 @@
-/* v31.02 (Luis, 15/10) — Stock y Compras → Insumos:
+/* v31.10 (Luis, 15/10) — Stock y Compras → Insumos:
    (a) editar un insumo deja cambiar SÓLO la descripción GV y la cantidad (sin código, ISIS, categoría, unidad, factores);
        guardar manda insumo_editar con p_nombre solamente y la cantidad como ajuste en la unidad primaria;
    (b) las tablas muestran «Descripción GV» y «Descripción GP2»;
@@ -133,7 +133,7 @@ catch (_e) {
     stkInsAltaCerrar();
     return out;
   });
-  // (g) pase GV-UI (v31.02): a 390 px todo lo tocable del alta mide ≥ 44 y el botón principal es el verde de la casa (5:1)
+  // (g) pase GV-UI (v31.10): a 390 px todo lo tocable del alta mide ≥ 44 y el botón principal es el verde de la casa (5:1)
   await p.setViewportSize({ width: 390, height: 800 });
   const ui = await p.evaluate(async () => {
     stkInsAltaAbrir("partes_crudo"); await stkInsAltaModo("gp2"); stkInsAltaElegir(1);

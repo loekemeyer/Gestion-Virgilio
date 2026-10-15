@@ -68,7 +68,7 @@ catch (_e) {
     out.headCajon = /Cajón según GP2/.test(head) && /Cód C/.test(head) && /Kg\/caj/.test(head) && /Kg\/uni/.test(head) && /Uni\/caj/.test(head);
     out.batidor = (fila("Batidor Pera p/Cromar") || []).join(" | ");
     out.sinVinc = (fila("Z26") || []).join(" | ");
-    // v31.02 (pase GV-UI): el que falta es «—» y el motivo va en el title
+    // v31.10 (pase GV-UI): el que falta es «—» y el motivo va en el title
     out.sinVincTitle = Array.from(document.querySelectorAll("#stkInsCatPopBody [title]")).some(e => e.title === "sin vincular en GP2");
     stkInsCatPopup("parte_procesado");
     out.a1 = (fila("A1") || []).join(" | ");

@@ -263,7 +263,7 @@ catch (_e) {
     // v7.37: un código en 0 (fleje "5", 38 X 0,55) NO se lista en su categoría — no
     // ensucia la vista con lo que quedó neteado / sin stock.
     out.ceroOcultoEnCat = tblF.length ? !/38 X 0,55/.test(tblF[0].innerHTML) : false;
-    // v31.02: el alta es un pop-up (GP2 recomendado / a mano); acá se crea a mano
+    // v31.10: el alta es un pop-up (GP2 recomendado / a mano); acá se crea a mano
     stkInsAltaAbrir("fleje");
     out.altaPopupRecomiendaGp2 = /Tomar un código de GP2[\s\S]*Recomendado/.test((document.getElementById("stkInsAltaModal") || {}).innerHTML || "");
     await stkInsAltaModo("manual");
@@ -321,7 +321,7 @@ catch (_e) {
     // v7.37: el 0-code oculto de la categoría SIGUE en «Todos los insumos», con su unidad
     // de categoría (Kg) en vez de "—" (fallback de v7.34). Nada se pierde.
     const tr5Todos = Array.prototype.filter.call(tot.querySelectorAll("tbody tr"), function (tr) { return /38 X 0,55/.test(tr.textContent); })[0];
-    out.ceroEnTodosConUni = !!tr5Todos && /Kg/.test(tr5Todos.querySelectorAll("td")[6].textContent);   // v31.02: +Descripción GP2
+    out.ceroEnTodosConUni = !!tr5Todos && /Kg/.test(tr5Todos.querySelectorAll("td")[6].textContent);   // v31.10: +Descripción GP2
     // v7.82: la tabla de «Todos los insumos» tiene botón Editar en cada fila (editor
     // de cantidad inline). Sin editar no hay inputs en tbody (sólo botones).
     out.totalTieneEditar = !!tot.querySelector("tbody button") && /Editar/.test(tot.querySelector("tbody button").textContent);

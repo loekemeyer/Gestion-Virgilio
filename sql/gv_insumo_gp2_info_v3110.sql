@@ -1,4 +1,4 @@
--- v31.02 (Luis, 15/10): "los insumos en las tablas deberían tener «Descripcion GV» y «Descripción GP2»" y el alta
+-- v31.10 (Luis, 15/10): "los insumos en las tablas deberían tener «Descripcion GV» y «Descripción GP2»" y el alta
 -- de un insumo puede "tomar un codigo de GP2 ya existente … ya viene con el codigo de GP2 y toda la info que tenga
 -- cargada alli". Las dos son SOLO LECTURA de GP2 (anon no lee GP2: SECURITY DEFINER). GV no escribe en GP2 desde acá:
 -- el vinculo lo hace gv_insumo_desde_gp2 (v29.35), igual que en Recibir insumos.
@@ -8,7 +8,7 @@
 create or replace function public.gv_insumo_gp2_info()
 returns table(cod text, cod_c text, desc_c text, isis text, kg_x_uni numeric, uni_x_cajon numeric, kg_x_cajon numeric)
 language sql stable security definer set search_path to 'public' as $f$
-  -- marcador v31.02-gp2-info
+  -- marcador v31.10-gp2-info
   select i.cod, c.codigo, c.descripcion, e.isis, c.kg_x_uni, c.uni_x_cajon,
          case when c.kg_x_uni > 0 and c.uni_x_cajon > 0 then round(c.kg_x_uni * c.uni_x_cajon, 2) end
     from public."Insumos" i
@@ -25,7 +25,7 @@ create or replace function public.gv_gp2_componentes_alta(p_categoria text)
 returns table(comp_id bigint, codigo text, descripcion text, nombre_gv text, unidad text,
               kg_x_uni numeric, uni_x_cajon numeric, kg_x_cajon numeric, vinculado_a text)
 language sql stable security definer set search_path to 'public' as $f$
-  -- marcador v31.02-gp2-alta
+  -- marcador v31.10-gp2-alta
   select c.id, c.codigo, c.descripcion, public.gv_gp2_nombre_insumo(c.id), lower(coalesce(c.unidad_medida, 'unidad')),
          c.kg_x_uni, c.uni_x_cajon,
          case when c.kg_x_uni > 0 and c.uni_x_cajon > 0 then round(c.kg_x_uni * c.uni_x_cajon, 2) end,

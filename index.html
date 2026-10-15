@@ -25632,7 +25632,7 @@ function stkBodySalidas() {
 let _stkIns = null;
 async function stkInsLoad() {
   insEnsureCss();   // los chips de categoría usan .ins-cchip
-  _stkInsCssV3102();   // v31.02: .stk-meta / .stk-err-l de las columnas de GP2
+  _stkInsCssV3102();   // v31.10: .stk-meta / .stk-err-l de las columnas de GP2
   _stk.insLoaded = true;
   _stkIns = { cat: "", abierta: "", filtro: "", edit: null, nuevoEn: "", msg: "", tf: {}, hf: { cod: "", grupo: "" }, abre: {} };   // v8.35 — todo cerrado al entrar
   const body = document.getElementById("stkBody");
@@ -25646,7 +25646,7 @@ async function stkInsLoad() {
    Una lectura rota devuelve null (no {}): la tabla lo dice en vez de mostrar «sin vincular» en todo. */
 async function _stkInsFetchCajonGp2() {
   try {
-    // v31.02: gv_insumo_gp2_info = lo mismo que gv_insumo_gp2_cajon + la DESCRIPCIÓN de GP2 y su ISIS
+    // v31.10: gv_insumo_gp2_info = lo mismo que gv_insumo_gp2_cajon + la DESCRIPCIÓN de GP2 y su ISIS
     var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_gp2_info", { method: "POST",
       headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" });
     if (!r.ok) return null;
@@ -25655,7 +25655,7 @@ async function _stkInsFetchCajonGp2() {
     return m;
   } catch (_e) { return null; }
 }
-/* v31.02 — pase GV-UI (disenador-gvui, 15/10): el dato de GP2 y el error de lectura NO van en .stk-sub (10,5 px,
+/* v31.10 — pase GV-UI (disenador-gvui, 15/10): el dato de GP2 y el error de lectura NO van en .stk-sub (10,5 px,
    #94a3b8, 2,45:1): .stk-meta (12 px, ink-2, 7:1) y .stk-err-l (rojo). En la tabla de la categoría: divisor de fila y
    números centrados; en el celular, blanco de toque de 44 px en la fila en edición y en el alta. */
 function _stkInsCssV3102() {
@@ -25668,7 +25668,7 @@ function _stkInsCssV3102() {
     "@media (max-width:560px){#stkInsCatPopBody .stk-inp,#stkInsCatPopBody .stk-btn,#stkBody .stk-tbl .stk-inp,#stkBody .stk-tbl .stk-btn{min-height:var(--gv-tap,44px)}}";
   document.head.appendChild(st);
 }
-/* v31.02 (Luis, 15/10): "los insumos en las tablas deberían tener «Descripcion GV» y «Descripción GP2»". */
+/* v31.10 (Luis, 15/10): "los insumos en las tablas deberían tener «Descripcion GV» y «Descripción GP2»". */
 function _stkInsDescGp2(it) {
   var g = _stkIns && _stkIns.gp2caj;
   if (g == null) return '<span class="stk-err-l">no se pudo leer GP2</span>';
@@ -26062,7 +26062,7 @@ function stkInsCatPopup(k) {
   _stkIns.filtro = "";
   _stkIns.nuevoEn = "";
   _stkInsCssV3102();
-  _stkPopShell("📦 " + titulo, "stkInsCatPopBody", INS_CAT_CAJON_GP2.indexOf(k) >= 0 ? true : undefined);   // v31.02: el cajón de GP2 no entra en el ancho normal
+  _stkPopShell("📦 " + titulo, "stkInsCatPopBody", INS_CAT_CAJON_GP2.indexOf(k) >= 0 ? true : undefined);   // v31.10: el cajón de GP2 no entra en el ancho normal
   const body = document.getElementById("stkInsCatPopBody");
   if (!body) return;
   body.innerHTML = _stkInsListado(k, _stkIns.items);
@@ -26109,7 +26109,7 @@ function _stkInsListado(k, items) {
   // v9.19 — alta con stock inicial opcional. Si se completa "cant" (y unidad si hace
   // falta), después de crear el insumo se registra un movimiento de ajuste para dejar
   // el saldo en esa cantidad y así aparecer en la tabla (que filtra los que están en 0).
-  // v31.02 (Luis, 15/10): el alta abre un pop-up — tomar un código de GP2 (recomendado) o crear uno a mano.
+  // v31.10 (Luis, 15/10): el alta abre un pop-up — tomar un código de GP2 (recomendado) o crear uno a mano.
   h += '<div style="margin-bottom:7px;">' + (k === "?" ? "" : '<button class="stk-btn" onclick="stkInsAltaAbrir(\'' + k + '\')">+ Agregar insumo a esta categoría</button>') + '</div>';
   const conCaj = INS_CAT_CAJON_GP2.indexOf(k) >= 0;   // v31.00: cajón de GP2 sólo en Sector Crudo / Procesado
   if (!lista.length) h += '<div class="stk-empty">Sin insumos' + (f ? " con ese filtro" : "") + '.</div>';
@@ -26144,7 +26144,7 @@ function _stkInsListado(k, items) {
           (conCaj ? _stkInsCajonCeldas(it, du) : '') +
           '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button></td></tr>';
       }
-      /* v31.02 (Luis, 15/10): "El front de GV solo debería poder modificar cantidades y detalles (no factores, no
+      /* v31.10 (Luis, 15/10): "El front de GV solo debería poder modificar cantidades y detalles (no factores, no
          código de articulo, no codigo ISIS, no nada mas)". Código, ISIS, categoría, unidad y factores quedan de
          lectura; la cantidad va en la unidad PRIMARIA (la misma que se muestra) y se guarda como ajuste, que el
          espejo copia a GP2 como movimiento. */
@@ -26244,7 +26244,7 @@ function _stkInsTodos(items) {
   else h += lista.map(function (it) {
     const ed = _stkIns.edit === "art:" + it.cod;
     if (ed) {
-      // ---------- fila en edición (v31.02): sólo descripción GV y cantidad (mismos IDs que _stkInsListado) ----------
+      // ---------- fila en edición (v31.10): sólo descripción GV y cantidad (mismos IDs que _stkInsListado) ----------
       var du = _insDosUnidades(it);
       return '<tr><td><b>' + escapeHtml(it.cod) + '</b>' + (it.isis ? '<div class="stk-meta">isis: ' + escapeHtml(it.isis) + '</div>' : '') + '</td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:160px;" title="Descripción en Gestión Virgilio"></td>' +
@@ -26640,7 +26640,7 @@ async function _stkInsAjustar(it, cod, qtyStr, uniNueva) {
   });
   if (!r.ok) throw new Error("no se pudo ajustar la cantidad (HTTP " + r.status + ")");
 }
-/* v31.02 (Luis, 15/10): "El front de GV solo debería poder modificar cantidades y detalles (no factores, no código
+/* v31.10 (Luis, 15/10): "El front de GV solo debería poder modificar cantidades y detalles (no factores, no código
    de articulo, no codigo ISIS, no nada mas). Si se modifica la cantidad, se tiene que ver reflejada en GP2 (debería
    ocurrir como un movimiento)". Se manda la DESCRIPCIÓN (insumo_editar, sólo p_nombre) y la CANTIDAD en la unidad
    primaria (asiento de ajuste en Movimientos_Stock; el trigger zz_gv_gp2_espejo_insumos lo copia a GP2 como un
@@ -26661,7 +26661,7 @@ async function stkInsGuardar(cod) {
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
 }
 
-/* ===== v31.02 (Luis, 15/10) — ALTA DE INSUMO desde la categoría =====
+/* ===== v31.10 (Luis, 15/10) — ALTA DE INSUMO desde la categoría =====
    "Si se elige «Agregar insumo a esta categoría» debería salir un pop-up que diga si se quiere tomar un codigo de GP2
    ya existente o introducir uno manualmente (la primera que figure como recomendada). Si se toma codigo de GP2 ya
    viene con el codigo de GP2 y toda la info que tenga cargada alli. Se puede editar la descripcion y la cantidad
@@ -26858,7 +26858,7 @@ async function stkInsAlta(k) {
     const nom = _stkInsVal("nvNom") || null, isis = _stkInsVal("nvIsis");
     // v10.10 — ubicación ya no se carga en el alta de insumos (viene de Racks_Planimetria)
     await _stkInsRpc("insumo_alta", { p_cod: cod, p_nombre: nom, p_categoria: k === "?" ? null : k, p_ubicacion: null, p_legajo: "admin" });
-    if (isis) await _stkInsRpc("insumo_editar", { p_cod: cod, p_isis: isis });   // v31.02: el alta a mano lleva su ISIS
+    if (isis) await _stkInsRpc("insumo_editar", { p_cod: cod, p_isis: isis });   // v31.10: el alta a mano lleva su ISIS
     await _stkInsAltaFactor(cod, q.uni);
     await _stkInsAltaStock(cod, nom, q.qty, q.uni);
     stkInsAltaCerrar();
