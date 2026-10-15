@@ -1030,6 +1030,37 @@ nada—: el reintento tapa el blip, el fail-closed de arriba sobrevive a una ca�
 crons de LK que ahogaban la base— se bajó el mismo día: watchdog **job 63** de 1 a 2 min, y los `*/10` **62/66/68**
 sacados del stack de minuto :00 (pico por minuto 9 → 6, con 6 worker slots). `tests/pweb-lk-token.cjs` bloque 7.
 
+## ⚠ REGLA (Luis, 2026-10-15, v30.93): un cambio de RLS en LK se mide con `v_pedidos_web_np` COMO ADMIN antes de darlo por terminado
+
+**Qué pasó:** el 14/10 a las 15:19 una sesión que endurecía la RLS de LK cambió la policy
+`chef_padron_lectura` de abierta a `_es_admin_o_servidor()`. Los datos no cambiaron para nadie de
+Gestión (admin, `service_role` y las funciones `SECURITY DEFINER` de `postgres` siguen viendo
+todo), pero el **plan** de `v_pedidos_web_np` sí: con la policy nueva el planner unió las 20.942
+líneas contra el mapa de m³ (1.503 códigos) con nested loop y la vista pasó de 1,2 s a 24 s.
+PostgREST corta a los 8 s → **A Programar quedó en 500** desde las 18:08 del 14/10 hasta la v30.93
+(problema 802). Probado revirtiendo policy y vista dentro de una transacción.
+
+**Regla:**
+1. Toda policy, `GRANT` o `REVOKE` que toque una tabla que lean `v_pedidos_web` /
+   `v_pedidos_web_np` (`orders`, `customers`, `customer_delivery_addresses`, `chef_padron`,
+   `gv_isis_override`, `expo_clientes_pendientes`, `pedido_diferido`) se cierra midiendo la vista
+   **como admin** y con el corte real:
+   ```sql
+   select set_config('request.jwt.claims', json_build_object('sub',
+            (select auth_user_id from admins where auth_user_id is not null limit 1),
+            'role','authenticated')::text, true),
+          set_config('statement_timeout','8s', true);
+   set local role authenticated;
+   select count(*), clock_timestamp()-now() dur
+     from public.v_pedidos_web_np where fecha_recep >= current_date - 30;
+   ```
+   Tiene que volver muy por debajo de 8 s (hoy ~2,7 s). Si corta, el cambio de RLS no está terminado.
+2. **Como `postgres` no sirve para medir**: el MCP entra como dueño, salta la RLS y la vista tarda
+   1,4 s aunque para el admin tarde 24 s.
+3. En la vista, el m³ por línea se busca en un jsonb (`vol.m ->> art`), no con `LEFT JOIN vol`:
+   el join es el que el planner da vuelta cuando la RLS le achica la estimación de filas.
+   `sql/lk_v_pedidos_web_np_m3_lookup_v3093.sql`.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.78): antes de optimizar, medir — y leer lo que se usa, no el universo
 
 **Luis, con la captura del `canceling statement due to statement timeout` en A Programar:**
