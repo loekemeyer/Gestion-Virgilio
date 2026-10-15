@@ -263,7 +263,10 @@ catch (_e) {
     // v7.37: un código en 0 (fleje "5", 38 X 0,55) NO se lista en su categoría — no
     // ensucia la vista con lo que quedó neteado / sin stock.
     out.ceroOcultoEnCat = tblF.length ? !/38 X 0,55/.test(tblF[0].innerHTML) : false;
-    _stkIns.nuevoEn = "fleje"; _stkInsCatPopupRefresh();
+    // v31.02: el alta es un pop-up (GP2 recomendado / a mano); acá se crea a mano
+    stkInsAltaAbrir("fleje");
+    out.altaPopupRecomiendaGp2 = /Tomar un código de GP2[\s\S]*Recomendado/.test((document.getElementById("stkInsAltaModal") || {}).innerHTML || "");
+    await stkInsAltaModo("manual");
     document.getElementById("nvCod").value = "7654321";
     await stkInsAlta("fleje");
     const alta = rpc.filter(function (x) { return x.fn === "insumo_alta"; })[0];
@@ -291,7 +294,7 @@ catch (_e) {
     out.uniLibreNoAvisa = !/EST[ÁA] EN USO/.test(confirmado0);
 
     // 8b) No se puede dar de alta un código que ya está en uso
-    _stkIns.nuevoEn = "fleje"; stkRender();
+    stkInsAltaAbrir("fleje"); await stkInsAltaModo("manual");
     document.getElementById("nvCod").value = "22";
     const antesAlta = rpc.length;
     await stkInsAlta("fleje");
@@ -318,7 +321,7 @@ catch (_e) {
     // v7.37: el 0-code oculto de la categoría SIGUE en «Todos los insumos», con su unidad
     // de categoría (Kg) en vez de "—" (fallback de v7.34). Nada se pierde.
     const tr5Todos = Array.prototype.filter.call(tot.querySelectorAll("tbody tr"), function (tr) { return /38 X 0,55/.test(tr.textContent); })[0];
-    out.ceroEnTodosConUni = !!tr5Todos && /Kg/.test(tr5Todos.querySelectorAll("td")[5].textContent);
+    out.ceroEnTodosConUni = !!tr5Todos && /Kg/.test(tr5Todos.querySelectorAll("td")[6].textContent);   // v31.02: +Descripción GP2
     // v7.82: la tabla de «Todos los insumos» tiene botón Editar en cada fila (editor
     // de cantidad inline). Sin editar no hay inputs en tbody (sólo botones).
     out.totalTieneEditar = !!tot.querySelector("tbody button") && /Editar/.test(tot.querySelector("tbody button").textContent);
@@ -423,7 +426,7 @@ catch (_e) {
     r.nCajasCat === 6 && r.sinDepurar === true && r.catDetalle === true && r.catMuestraUnis === true &&
     r.listadoOculto === true && r.listadoAbre === true && r.listadoFleje === 1 && r.listadoNoTraePP === true &&
     r.ceroOcultoEnCat === true && r.ceroEnTodosConUni === true &&
-    r.altaEnSuCat === true &&
+    r.altaEnSuCat === true && r.altaPopupRecomiendaGp2 === true &&
     r.catEditAbre === true && r.catGuardaNombre === "Cajas y embalaje" && r.catGuardaUnis === "Paquetes,Uni,MC" &&
     r.haySecUnidades === true && r.uniSacar === true && r.uniUsadaAvisa === true && r.uniLibreNoAvisa === true &&
     /Pendientes.*\|.*Categor.*\|.*Todos.*\|.*Unidades/.test(r.ordenSecciones || "") && r.altaRechazaDuplicado === true &&
@@ -431,7 +434,7 @@ catch (_e) {
     r.histColapsadoInicio === true && r.hayHist === true && r.histTieneIngreso === true && r.histTieneEgreso === true &&
     r.histTieneFusion === true && r.histTieneCatGuardar === true && r.histMuestraQuien === true &&
     r.histOrdenado === true && r.histFiltraCat === true &&
-    r.hayTablaTotal === true && /Código\|Detalle\|Categoría\|Rack \/ sector\|Cantidad\|Unidad/.test(r.totalCols || "") &&
+    r.hayTablaTotal === true && /Código\|Descripción GV\|Descripción GP2\|Categoría\|Rack \/ sector\|Cantidad\|Unidad/.test(r.totalCols || "") &&
     r.totalTieneEditar === true && r.totalSinEditarInline === true &&
     r.totalEditAbreInputs === true && r.totalEditAbreGuardar === true && r.totalEditBtnsNowrap === true && r.totalEditCancela === true &&
     r.totalGuardaPostea === true && r.totalGuardaDelta === 666 && r.totalGuardaUni === "Kg" && r.totalGuardaCod === "5" &&

@@ -23,6 +23,8 @@ node() {
   return 0
 }
 
+echo "== ins-alta-gp2 (v31.02: Insumos edita solo descripcion y cantidad; alta desde GP2 o a mano) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-alta-gp2.cjs
 echo "== ins-cajon-gp2 (v31.00: Sector Crudo / Procesado muestran el cajon de GP2: Cod C, kg/caj, kg/uni, uni/caj) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-cajon-gp2.cjs
 echo "== ppp-res-demora-camion (v21.72: Resumen = MAYOR demora por camion, y camiones sin tope de m3) =="

@@ -3,6 +3,26 @@
 > Movido de `CLAUDE.md` el 2026-10-13 (poda 3ra tanda, pedido de Luis) **sin cambiar una palabra**.
 > **Leerlo ENTERO antes de tocar algo de este tema.** Las reglas siguen valiendo igual que cuando estaban en CLAUDE.md.
 
+## ⚠⚠ REGLA (Luis, 2026-10-15, v31.02): el admin de Insumos de GV edita SÓLO descripción y cantidad · alta desde GP2 o a mano
+
+**Luis:** *"El front de GV solo debería poder modificar cantidades y detalles (no factores, no código de articulo, no
+codigo ISIS, no nada mas). Si se modifica la cantidad, se tiene que ver reflejada en GP2 (debería ocurrir como un
+movimiento)"* · *"Si se elige «Agregar insumo a esta categoría» debería salir un pop-up que diga si se quiere tomar un
+codigo de GP2 ya existente o introducir uno manualmente (la primera que figure como recomendada)"*.
+
+| qué | cómo |
+|---|---|
+| Editar (tabla de la categoría y «Todos los insumos») | sólo **Descripción GV** (`insumo_editar` con `p_nombre` y nada más) y **cantidad** en la unidad primaria (asiento `ajuste`). Código, ISIS, categoría, unidad y factores quedan de lectura; se sacaron «⚖», «＋ unidad» y «⚖ Unidades». La ubicación sigue en el Mapa (📍) |
+| Cantidad → GP2 | el ajuste dispara `zz_gv_gp2_espejo_insumos`: GP2 recibe un movimiento `ajuste` «Espejo Virgilio (…)» en el depósito «… en Virgilio». Medido 15/10 en transacción deshecha: +1 cajón de A1 → +756 u en Sector Procesado en Virgilio. Sin vínculo en GP2 no viaja |
+| Columnas | **Descripción GV** (`Insumos.nombre`) y **Descripción GP2** (`componente.descripcion` + su código) en las dos tablas, de `gv_insumo_gp2_info()` (reemplaza a `gv_insumo_gp2_cajon` de la v31.00, borrada) |
+| + Agregar insumo | pop-up: **Tomar un código de GP2 (Recomendado)** o **Crear uno a mano**. Una categoría sin sector en GP2 (importados) no ofrece la primera |
+| desde GP2 | `gv_gp2_componentes_alta(categoría)` (el ya vinculado sale gris: «ya es …»). Trae código y descripción de GP2; se edita la Descripción GV y la cantidad inicial (muestra «≈ N uni según GP2» con el cajón). Crea y vincula `gv_insumo_desde_gp2` (el de Recibir insumos). El cajón de GP2 **no** se copia a los factores de GV (el stock sigue en su unidad); si GP2 no tiene cajón se puede cargar un factor a mano |
+| a mano | código, Descripción GV, ISIS, cantidad inicial con unidad, unidad secundaria + factor. Queda sin vincular |
+
+- La pantalla de **Pendientes de identificar** (TMP del operario) no se tocó: es alta/identificación, no edición.
+- El ISIS y el vínculo se corrigen en **GP2 → Stock General → Virgilio** (GP2 es el canónico del ISIS, v29.75).
+- `sql/gv_insumo_gp2_info_v3102.sql` · `tests/ins-alta-gp2.cjs` · `tests/ins-admin.cjs` (al día).
+
 ## ⚠ REGLA (Luis, 2026-10-15, v31.00): Sector Crudo y Procesado muestran el CAJÓN DE GP2 — sólo se ve, el stock sigue en cajones
 
 **Luis:** *"en GP2 tenemos lo que significa un cajon (ejemplo, un cajon de batidores son 29.99kg y cada unidad son
@@ -12,7 +32,7 @@ funcionando en base a unidad de medida cajones, esto es simplemente para que se 
 - Stock y Compras → 🧰 Insumos → tarjeta **Sector Crudo** / **Sector Procesado**: bloque **«Cajón según GP2»** con
   **Cód C · Kg/caj · Kg/uni · Uni/caj · Uni** (Uni = cajones × uni/caj, con «≈»: es referencia). Las otras
   categorías no lo muestran (`INS_CAT_CAJON_GP2`).
-- Sale de **`gv_insumo_gp2_cajon()`** (anon, SECURITY DEFINER, solo lectura): `Insumos` → `GP2.insumo_equivalencia`
+- Sale de **`gv_insumo_gp2_info()`** (v31.02; antes `gv_insumo_gp2_cajon`) (anon, SECURITY DEFINER, solo lectura): `Insumos` → `GP2.insumo_equivalencia`
   (sin mayúsculas ni espacios, como el espejo) → `GP2.componente.kg_x_uni` / `uni_x_cajon`; kg/caj = el producto.
   Es la **misma** relación que usa el espejo para pasar cajones a unidades de GP2 (`Cajones × uni_x_cajon`).
 - **No toca stock, unidades ni factores de Virgilio.** Un insumo sin vínculo dice «sin vincular en GP2»; si la RPC

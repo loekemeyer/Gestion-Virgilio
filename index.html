@@ -25623,13 +25623,22 @@ async function stkInsLoad() {
    Una lectura rota devuelve null (no {}): la tabla lo dice en vez de mostrar «sin vincular» en todo. */
 async function _stkInsFetchCajonGp2() {
   try {
-    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_gp2_cajon", { method: "POST",
+    // v31.02: gv_insumo_gp2_info = lo mismo que gv_insumo_gp2_cajon + la DESCRIPCIÓN de GP2 y su ISIS
+    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_gp2_info", { method: "POST",
       headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" });
     if (!r.ok) return null;
     var m = {};
     (await r.json()).forEach(function (x) { m[String(x.cod)] = x; });
     return m;
   } catch (_e) { return null; }
+}
+/* v31.02 (Luis, 15/10): "los insumos en las tablas deberían tener «Descripcion GV» y «Descripción GP2»". */
+function _stkInsDescGp2(it) {
+  var g = _stkIns && _stkIns.gp2caj;
+  if (g == null) return '<span class="stk-sub">⚠ no se pudo leer GP2</span>';
+  var x = g[String(it.cod)];
+  if (!x) return '<span class="stk-sub">sin vincular en GP2</span>';
+  return escapeHtml(x.desc_c || "—") + (x.cod_c ? '<div class="stk-sub">' + escapeHtml(x.cod_c) + '</div>' : '');
 }
 /* Sector Crudo y Sector Procesado muestran el cajón de GP2 al lado del stock. */
 var INS_CAT_CAJON_GP2 = ["partes_crudo", "parte_procesado"];
@@ -26061,22 +26070,13 @@ function _stkInsListado(k, items) {
   // v9.19 — alta con stock inicial opcional. Si se completa "cant" (y unidad si hace
   // falta), después de crear el insumo se registra un movimiento de ajuste para dejar
   // el saldo en esa cantidad y así aparecer en la tabla (que filtra los que están en 0).
-  h += '<div style="margin-bottom:7px;">' + (_stkIns.nuevoEn === k
-    ? '<span class="stk-nuevo">' +
-        '<input class="stk-inp" id="nvCod" placeholder="código" style="width:96px;"> ' +
-        '<input class="stk-inp" id="nvNom" placeholder="detalle" style="width:170px;"> ' +
-        '<input class="stk-inp" id="nvUbi" placeholder="ubicación" style="width:90px;"> ' +
-        '<input class="stk-inp" id="nvQty" type="number" step="any" placeholder="cant" title="Stock inicial (opcional)" style="width:70px;"> ' +
-        _stkInsUniSel("nvUni", "") + ' ' +
-        '<button class="stk-btn" onclick="stkInsAlta(\'' + k + '\')">✓ Crear</button> ' +
-        '<button class="stk-btn stk-btn-x" onclick="if(_stkIns){_stkIns.nuevoEn=\'\';stkRender();}">Cancelar</button>' +
-      '</span>'
-    : (k === "?" ? "" : '<button class="stk-btn" onclick="if(_stkIns){_stkIns.nuevoEn=\'' + k + '\';stkRender();}">+ Agregar insumo a esta categoría</button>')) + '</div>';
+  // v31.02 (Luis, 15/10): el alta abre un pop-up — tomar un código de GP2 (recomendado) o crear uno a mano.
+  h += '<div style="margin-bottom:7px;">' + (k === "?" ? "" : '<button class="stk-btn" onclick="stkInsAltaAbrir(\'' + k + '\')">+ Agregar insumo a esta categoría</button>') + '</div>';
   const conCaj = INS_CAT_CAJON_GP2.indexOf(k) >= 0;   // v31.00: cajón de GP2 sólo en Sector Crudo / Procesado
   if (!lista.length) h += '<div class="stk-empty">Sin insumos' + (f ? " con ese filtro" : "") + '.</div>';
   else {
     h += '<div class="stk-tblwrap"><table class="stk-tbl"><thead>' +
-      '<tr><th rowspan="2">Cód</th><th rowspan="2">ISIS</th><th rowspan="2">Detalle</th><th rowspan="2">Ubic.</th>' +
+      '<tr><th rowspan="2">Cód</th><th rowspan="2">ISIS</th><th rowspan="2">Descripción GV</th><th rowspan="2">Descripción GP2</th><th rowspan="2">Ubic.</th>' +
       '<th colspan="2" style="text-align:center;border-left:1px solid #cbd5e1;">Primaria</th>' +
       '<th colspan="2" style="text-align:center;border-left:1px solid #cbd5e1;">Secundaria</th>' +
       '<th rowspan="2" class="num" style="border-left:1px solid #cbd5e1;">Factor</th>' +
@@ -26090,12 +26090,12 @@ function _stkInsListado(k, items) {
     h += lista.map(function (it) {
       const ed = _stkIns.edit === "art:" + it.cod;
       const u = _stkInsUni1(it);
-      if (_stkIns.edit === "fact:" + it.cod) return _stkInsFactRow(it);   // editor de factores
       if (!ed) {
         const du = _insDosUnidades(it);
         return '<tr><td><b>' + escapeHtml(it.cod) + '</b></td>' +
           '<td class="stk-sub">' + escapeHtml(it.isis || "—") + '</td>' +
           '<td>' + escapeHtml(it.nombre || "—") + '</td>' +
+          '<td>' + _stkInsDescGp2(it) + '</td>' +
           '<td>' + escapeHtml(_stkInsUbicStr(it) || "—") + '</td>' +
           '<td class="num"' + (du.neg ? ' style="color:#b91c1c;font-weight:800;"' : "") + ' style="border-left:1px solid #eef2f7;">' + du.cantP + '</td>' +
           '<td>' + escapeHtml(du.uniP || "—") + '</td>' +
@@ -26105,22 +26105,26 @@ function _stkInsListado(k, items) {
           (conCaj ? _stkInsCajonCeldas(it, du) : '') +
           '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button></td></tr>';
       }
-      const du = _insDosUnidades(it);   // v8.35 — prellenar secundaria/factor en la edición
+      /* v31.02 (Luis, 15/10): "El front de GV solo debería poder modificar cantidades y detalles (no factores, no
+         código de articulo, no codigo ISIS, no nada mas)". Código, ISIS, categoría, unidad y factores quedan de
+         lectura; la cantidad va en la unidad PRIMARIA (la misma que se muestra) y se guarda como ajuste, que el
+         espejo copia a GP2 como movimiento. */
+      const du = _insDosUnidades(it);
       return '<tr>' +
-        '<td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:88px;" title="Código conocido (clave del stock)"></td>' +
-        '<td><input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis" style="width:78px;color:#64748b;" title="Código del sistema (isis)"></td>' +
-        '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:150px;"><br><span class="stk-sub">cat:</span> ' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
+        '<td><b>' + escapeHtml(it.cod) + '</b></td>' +
+        '<td class="stk-sub">' + escapeHtml(it.isis || "—") + '</td>' +
+        '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:170px;" title="Descripción en Gestión Virgilio"></td>' +
+        '<td>' + _stkInsDescGp2(it) + '</td>' +
         '<td>' + _stkInsUbicMapa(it) + '</td>' +
-        '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:70px;" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'qty\')" title="Cantidad primaria (en la unidad base)"></td>' +
-        '<td>' + _stkInsUniSel("edUni_" + it.cod, du.uniP || _stkInsUniMostrar(it)) + '</td>' +
-        '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edSecQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.cantS) + '" style="width:66px;" placeholder="cant" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'sec\')" title="Cargá Cant secundaria O el Factor: el otro se completa solo"></td>' +
-        '<td>' + _stkInsUniSel("edSecUni_" + it.cod, du.uniS) + '</td>' +
-        '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edFactor_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.factor) + '" style="width:58px;" placeholder="factor" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'factor\')" title="Cuántas ' + escapeHtml(du.uniP || "base") + ' hay en 1 de la secundaria"></td>' +
+        '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.cantP) + '" style="width:80px;" title="Cantidad en ' + escapeHtml(du.uniP || "su unidad") + ' (se guarda como ajuste)"></td>' +
+        '<td>' + escapeHtml(du.uniP || "—") + '</td>' +
+        '<td class="num" style="border-left:1px solid #eef2f7;">' + (du.cantS !== "" ? du.cantS : '<span class="stk-sub">—</span>') + '</td>' +
+        '<td>' + (du.uniS ? escapeHtml(du.uniS) : '<span class="stk-sub">—</span>') + '</td>' +
+        '<td class="num" style="border-left:1px solid #eef2f7;">' + (du.factor !== "" ? du.factor : '<span class="stk-sub">—</span>') + '</td>' +
         (conCaj ? _stkInsCajonCeldas(it, du) : '') +
         '<td><div style="display:flex;gap:6px;flex-wrap:nowrap;white-space:nowrap;">' +
         '<button class="stk-btn" style="white-space:nowrap;" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button>' +
-        '<button class="stk-btn stk-btn-x" style="white-space:nowrap;" onclick="stkInsEdit(null)">Cancelar</button>' +
-        '<button class="stk-btn" style="white-space:nowrap;" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\',true)" title="Agregar una 3ª unidad (o más) y su factor — abre el editor de unidades con lo que ya cargaste">＋ unidad</button></div></td></tr>';
+        '<button class="stk-btn stk-btn-x" style="white-space:nowrap;" onclick="stkInsEdit(null)">Cancelar</button></div></td></tr>';
     }).join("");
     h += '</tbody></table></div>';
   }
@@ -26182,10 +26186,11 @@ function _stkInsTodos(items) {
   if (!_stkAbierta("todos")) return h;
   h += '<div class="stk-cut">La foto completa del catálogo. Podés <b>editar cantidad y unidad</b> de cualquier insumo (incluidos los que están en 0). Se actualiza sola cuando editás algo arriba.</div>';
   h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr>' +
-    '<th>Código</th><th>Detalle</th><th>Categoría</th><th>Rack / sector</th><th class="num">Cantidad</th><th>Unidad</th><th></th></tr>' +
+    '<th>Código</th><th>Descripción GV</th><th>Descripción GP2</th><th>Categoría</th><th>Rack / sector</th><th class="num">Cantidad</th><th>Unidad</th><th></th></tr>' +
     '<tr class="stk-filtros">' +
     '<th><input class="stk-inp" style="width:100px;" placeholder="filtrar" value="' + escapeHtml(f.cod || "") + '" oninput="stkInsFiltro(\'cod\',this.value)"></th>' +
     '<th><input class="stk-inp" style="width:140px;" placeholder="filtrar" value="' + escapeHtml(f.nom || "") + '" oninput="stkInsFiltro(\'nom\',this.value)"></th>' +
+    '<th></th>' +
     '<th><select class="stk-inp" onchange="stkInsFiltro(\'cat\',this.value)"><option value="">(todas)</option>' +
       INS_CATS.map(function (c) { return '<option value="' + c.k + '"' + (f.cat === c.k ? " selected" : "") + '>' + escapeHtml(c.lbl) + '</option>'; }).join("") +
       '<option value="?"' + (f.cat === "?" ? " selected" : "") + '>❓ Sin categoría</option></select></th>' +
@@ -26196,26 +26201,23 @@ function _stkInsTodos(items) {
       '</select></th>' +
     '<th></th>' +
     '</tr></thead><tbody>';
-  if (!lista.length) h += '<tr><td colspan="7" class="stk-empty">Nada con esos filtros.</td></tr>';
+  if (!lista.length) h += '<tr><td colspan="8" class="stk-empty">Nada con esos filtros.</td></tr>';
   else h += lista.map(function (it) {
     const ed = _stkIns.edit === "art:" + it.cod;
     if (ed) {
-      // ---------- fila en modo edición (mismos IDs que _stkInsListado → stkInsGuardar) ----------
-      var u = _stkInsUni1(it);
-      return '<tr><td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:100px;" title="Código conocido (clave del stock)"><br>' +
-        '<input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis (sistema)" style="width:100px;margin-top:3px;color:#64748b;" title="Código del sistema (isis) — informativo, no toca el stock"></td>' +
-        '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:140px;"></td>' +
-        '<td>' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
+      // ---------- fila en edición (v31.02): sólo descripción GV y cantidad (mismos IDs que _stkInsListado) ----------
+      var du = _insDosUnidades(it);
+      return '<tr><td><b>' + escapeHtml(it.cod) + '</b>' + (it.isis ? '<div class="stk-sub">isis: ' + escapeHtml(it.isis) + '</div>' : '') + '</td>' +
+        '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:160px;" title="Descripción en Gestión Virgilio"></td>' +
+        '<td>' + _stkInsDescGp2(it) + '</td>' +
+        '<td>' + escapeHtml(insCatLbl(insCatOf(it))) + '</td>' +
         '<td>' + _stkInsUbicMapa(it) + '</td>' +
-        '<td><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:82px;"></td>' +
-        '<td>' + _stkInsUniSel("edUni_" + it.cod, _stkInsUniMostrar(it)) + '</td>' +
+        '<td><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.cantP) + '" style="width:82px;" title="Cantidad en ' + escapeHtml(du.uniP || "su unidad") + ' (se guarda como ajuste)"></td>' +
+        '<td>' + escapeHtml(du.uniP || "—") + '</td>' +
         '<td><div style="display:flex;gap:6px;flex-wrap:nowrap;white-space:nowrap;">' +
         '<button class="stk-btn" style="white-space:nowrap;" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button>' +
-        '<button class="stk-btn stk-btn-x" style="white-space:nowrap;" onclick="stkInsEdit(null)">Cancelar</button>' +
-        '<button class="stk-btn" style="white-space:nowrap;" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Agregar/definir unidades de medida (master cajas, inner, uni…) y sus factores">⚖ Unidades</button></div></td></tr>';
+        '<button class="stk-btn stk-btn-x" style="white-space:nowrap;" onclick="stkInsEdit(null)">Cancelar</button></div></td></tr>';
     }
-    // v8.26/28 — editor de UNIDADES/FACTORES del insumo (misma función en las dos listas)
-    if (_stkIns.edit === "fact:" + it.cod) return _stkInsFactRow(it);
     var xs = (it.xuni || []).filter(function (u) { return Math.abs(u.saldo) > 0.0005; });
     var neg = function (x) { return x < 0 ? ' style="color:#b91c1c;font-weight:800;"' : ""; };
     // v8.26 — si tiene factores: mostrar el saldo en TODAS sus unidades (mismo stock)
@@ -26230,12 +26232,12 @@ function _stkInsTodos(items) {
       uniCell = xs.length ? xs.map(function (x) { return '<div>' + escapeHtml(x.uni) + '</div>'; }).join("") : '<span class="stk-sub">' + escapeHtml(_stkInsUniMostrar(it) || "—") + '</span>';
     }
     return '<tr><td><b>' + escapeHtml(it.cod) + '</b>' + (it.isis ? '<div class="stk-sub">isis: ' + escapeHtml(it.isis) + '</div>' : '') + '</td><td>' + escapeHtml(it.nombre || "—") + '</td>' +
+      '<td>' + _stkInsDescGp2(it) + '</td>' +
       '<td>' + escapeHtml(insCatLbl(insCatOf(it))) + '</td>' +
       '<td>' + escapeHtml(_stkInsUbicStr(it) || "—") + '</td>' +
       '<td class="num">' + cantCell + '</td>' +
       '<td>' + uniCell + '</td>' +
-      '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button> ' +
-      '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Definir unidades y factores de conversión">⚖</button></td></tr>';
+      '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button></td></tr>';
   }).join("");
   return h + '</tbody></table></div>';
 }
@@ -26599,84 +26601,224 @@ async function _stkInsAjustar(it, cod, qtyStr, uniNueva) {
   });
   if (!r.ok) throw new Error("no se pudo ajustar la cantidad (HTTP " + r.status + ")");
 }
+/* v31.02 (Luis, 15/10): "El front de GV solo debería poder modificar cantidades y detalles (no factores, no código
+   de articulo, no codigo ISIS, no nada mas). Si se modifica la cantidad, se tiene que ver reflejada en GP2 (debería
+   ocurrir como un movimiento)". Se manda la DESCRIPCIÓN (insumo_editar, sólo p_nombre) y la CANTIDAD en la unidad
+   primaria (asiento de ajuste en Movimientos_Stock; el trigger zz_gv_gp2_espejo_insumos lo copia a GP2 como un
+   movimiento «ajuste · Espejo Virgilio» si el insumo está vinculado). El código, el ISIS, la categoría, la unidad y
+   los factores NO se tocan desde acá: el ISIS y el vínculo se editan en GP2 → Stock General → Virgilio. */
 async function stkInsGuardar(cod) {
   const it = (_stkIns.items || []).filter(function (x) { return x.cod === cod; })[0];
   if (!it) return;
-  const nuevoCod = _stkInsVal("edCod_" + cod), nom = _stkInsVal("edNom_" + cod);
-  const cat = _stkInsVal("edCat_" + cod);
-  const uni = _stkInsVal("edUni_" + cod), qty = _stkInsVal("edQty_" + cod);
-  const isis = _stkInsVal("edIsis_" + cod);   // v8.28 — código del sistema (informativo)
-  if (!nuevoCod) { alert("El código no puede quedar vacío."); return; }
-  if (nuevoCod !== cod && (_stkIns.items || []).some(function (x) { return x.cod === nuevoCod; })) {
-    alert("El código " + nuevoCod + " ya está en uso.\n\nPoné otro."); return;
-  }
-  if (uni && !insUniPermitida(cat, uni)) {
-    const c0 = insCatDef(cat);
-    alert("⛔ «" + uni + "» no está permitida en " + (c0 ? c0.lbl : "esa categoría") + ".\n\nSe carga en: " + (c0 ? c0.unis.join(" / ") : "?") + ".");
-    return;
-  }
+  const nom = _stkInsVal("edNom_" + cod), qty = _stkInsVal("edQty_" + cod);
+  if (!nom) { alert("La descripción no puede quedar vacía."); return; }
+  const du = _insDosUnidades(it);
+  const uni = (du.uniP && du.uniP !== "—") ? du.uniP : (_stkInsUniMostrar(it) || null);
   try {
-    // v22.82: la ubicación ya no se guarda desde acá — se edita en el Mapa (📍 Editar en el Mapa).
-    // Sólo se manda lo que CAMBIÓ. Si tocaron nada más la categoría, el insumo se
-    // mueve a esa categoría y listo: no se reescribe el resto.
-    const cambios = {};
-    if (nom !== it.nombre) cambios.p_nombre = nom || null;
-    if ((cat || "") !== (it.cat || "")) cambios.p_categoria = cat || null;
-    if ((isis || "") !== (it.isis || "")) cambios.p_isis = isis ? isis : "__sin__";   // v8.28
-    if (Object.keys(cambios).length) {
-      cambios.p_cod = cod;
-      // p_categoria = null en la función significa "no tocar"; para VACIARLA hay que
-      // pedirlo explícito, así que se manda el marcador que la función entiende.
-      if ("p_categoria" in cambios && cambios.p_categoria === null) cambios.p_categoria = "__sin__";
-      await _stkInsRpc("insumo_editar", cambios);
-    }
-    await _stkInsAjustar(it, cod, qty, uni);            // cantidad / unidad, con asiento
-    let msg = "✓ " + cod + " actualizado.";
-    if (nuevoCod !== cod) {                              // el rename va último
-      const n = await _stkInsRpc("insumo_recodificar", { p_cod: cod, p_nuevo: nuevoCod });
-      msg = "✓ " + cod + " → " + nuevoCod + " (" + (n || 0) + " movimiento(s) de stock).";
-    }
-    // v8.35 — factores desde la propia edición: primaria = unidad del qty (base) + secundaria/factor
-    const finalCod = (nuevoCod !== cod) ? nuevoCod : cod;
-    const secUni = _stkInsVal("edSecUni_" + cod);
-    const factor = parseFloat(String(_stkInsVal("edFactor_" + cod)).replace(",", ".")) || 0;
-    const baseUni = uni || _stkInsUniMostrar(it) || "Uni";
-    if (secUni && factor > 0 && !_insUEq(secUni, baseUni)) {
-      await _stkInsRpc("insumo_factores_guardar", { p_cod: finalCod, p_factores: [
-        { unidad: baseUni, factor: 1, es_base: true },
-        { unidad: secUni, factor: factor, es_base: false }
-      ]});
-      await insFetchFactores();
-    }
-    _stkIns.edit = null; _stkIns.edUbics = {}; _stkIns.msg = msg;
+    if (nom !== (it.nombre || "")) await _stkInsRpc("insumo_editar", { p_cod: cod, p_nombre: nom });
+    await _stkInsAjustar(it, cod, qty, uni);            // cantidad, con asiento (unidad: la primaria)
+    _stkIns.edit = null; _stkIns.edUbics = {}; _stkIns.msg = "✓ " + cod + " actualizado.";
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
+}
+
+/* ===== v31.02 (Luis, 15/10) — ALTA DE INSUMO desde la categoría =====
+   "Si se elige «Agregar insumo a esta categoría» debería salir un pop-up que diga si se quiere tomar un codigo de GP2
+   ya existente o introducir uno manualmente (la primera que figure como recomendada). Si se toma codigo de GP2 ya
+   viene con el codigo de GP2 y toda la info que tenga cargada alli. Se puede editar la descripcion y la cantidad
+   inicial (con los factores tomados de GP2, si no hay que se puedan establecer manualmente). Si se elige crear uno de
+   0, que se pueda introducir todo manualmente."
+   · GP2: lista de gv_gp2_componentes_alta(categoría); el alta + el vínculo los hace gv_insumo_desde_gp2 (el mismo de
+     Recibir insumos). El cajón de GP2 se MUESTRA (≈ uni), no se copia a los factores de GV: el stock de Virgilio
+     sigue en su unidad (cajones en SC/SP). Si GP2 no tiene cajón, se puede cargar un factor a mano (de GV).
+   · A mano: código, descripción, ISIS, cantidad inicial con su unidad, y una unidad secundaria con su factor. */
+const INS_CAT_GP2 = ["partes_crudo", "parte_procesado", "fleje", "partes_plasticas", "cajas", "plastico"];
+function stkInsAltaAbrir(k) {
+  if (!_stkIns) return;
+  _stkIns.alta = { k: k, modo: null, comps: null, q: "", sel: null };
+  _stkInsAltaRender();
+}
+function stkInsAltaCerrar() {
+  const ov = document.getElementById("stkInsAltaModal"); if (ov) ov.remove();
+  if (_stkIns) _stkIns.alta = null;
+}
+async function stkInsAltaModo(m) {
+  const a = _stkIns && _stkIns.alta; if (!a) return;
+  a.modo = m; a.sel = null;
+  _stkInsAltaRender();
+  if (m === "gp2" && !Array.isArray(a.comps)) {
+    try {
+      const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_gp2_componentes_alta", { method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_categoria: a.k }), cache: "no-store" });
+      a.comps = r.ok ? await r.json() : "err";       // una lectura rota no es «GP2 no tiene nada»
+    } catch (_e) { a.comps = "err"; }
+    if (_stkIns.alta === a) _stkInsAltaRender();
+  }
+}
+function stkInsAltaBuscar(v) { const a = _stkIns && _stkIns.alta; if (!a) return; a.q = v; _stkInsAltaLista(); }
+function stkInsAltaElegir(i) {
+  const a = _stkIns && _stkIns.alta; if (!a || !Array.isArray(a.comps)) return;
+  a.sel = a.comps[i] || null; _stkInsAltaRender();
+}
+function stkInsAltaAtras() {
+  const a = _stkIns && _stkIns.alta; if (!a) return;
+  if (a.sel) a.sel = null; else a.modo = null;
+  _stkInsAltaRender();
+}
+function _stkInsAltaLista() {
+  const a = _stkIns.alta, el = document.getElementById("stkInsAltaLista"); if (!el || !Array.isArray(a.comps)) return;
+  const q = String(a.q || "").trim().toLowerCase();
+  const filas = a.comps.map(function (c, i) { return { c: c, i: i }; }).filter(function (x) {
+    return !q || (String(x.c.codigo || "") + " " + String(x.c.descripcion || "") + " " + String(x.c.nombre_gv || "")).toLowerCase().indexOf(q) >= 0;
+  });
+  el.innerHTML = filas.length ? filas.map(function (x) {
+    const c = x.c, ya = c.vinculado_a;
+    const caj = Number(c.uni_x_cajon) > 0 ? _insNumAR(c.uni_x_cajon, 0) + " uni/caj" : "";
+    return '<button class="stk-altaitem"' + (ya ? ' disabled title="Ya está en Virgilio como ' + escapeHtml(ya) + '"' : ' onclick="stkInsAltaElegir(' + x.i + ')"') + '>' +
+      '<b>' + escapeHtml(c.codigo) + '</b> <span>' + escapeHtml(c.descripcion || "") + '</span>' +
+      '<span class="stk-sub">' + (ya ? "ya es " + escapeHtml(ya) : escapeHtml(caj)) + '</span></button>';
+  }).join("") : '<div class="stk-empty">' + (q ? "Nada con «" + escapeHtml(a.q) + "»." : "GP2 no tiene componentes en esta categoría.") + '</div>';
+}
+function stkInsAltaEquiv() {
+  const a = _stkIns && _stkIns.alta, el = document.getElementById("nvEquiv"); if (!a || !a.sel || !el) return;
+  const q = parseFloat(String(_stkInsVal("nvQty")).replace(",", ".")) || 0, u = _stkInsVal("nvUni"), uxc = Number(a.sel.uni_x_cajon) || 0;
+  el.textContent = (q > 0 && uxc > 0 && /^caj/i.test(u)) ? "≈ " + _insNumAR(Math.round(q * uxc), 0) + " uni según GP2" : "";
+}
+function _stkInsAltaRender() {
+  const a = _stkIns && _stkIns.alta; if (!a) return;
+  if (!document.getElementById("stkInsAltaCss")) {
+    const st = document.createElement("style"); st.id = "stkInsAltaCss";
+    st.textContent = ".stk-altacard{background:#f8fafc;max-width:460px;width:100%;margin:auto;border-radius:14px;padding:16px;box-shadow:0 24px 70px rgba(0,0,0,.45);box-sizing:border-box;font-size:14px}" +
+      ".stk-altattl{font-size:17px;font-weight:800;margin-bottom:2px}.stk-altasub{font-size:13px;color:#64748b;margin-bottom:12px}" +
+      ".stk-altaop{display:block;width:100%;text-align:left;margin-bottom:8px;padding:12px 14px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;cursor:pointer;font-size:15px;font-weight:700}" +
+      ".stk-altaop.rec{border:2px solid #4f46e5}.stk-altaop[disabled]{opacity:.5;cursor:not-allowed}.stk-altaop small{display:block;font-weight:500;color:#64748b;font-size:12px;margin-top:2px}" +
+      ".stk-altarec{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#4f46e5;color:#fff;font-size:11px;vertical-align:middle}" +
+      ".stk-altalista{max-height:46vh;overflow:auto;margin:8px 0;border:1px solid #e2e8f0;border-radius:8px;background:#fff}" +
+      ".stk-altaitem{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;width:100%;text-align:left;padding:8px 10px;border:0;border-bottom:1px solid #eef2f7;background:none;cursor:pointer;font-size:14px}" +
+      ".stk-altaitem[disabled]{opacity:.45;cursor:not-allowed}.stk-altaitem:not([disabled]):hover{background:#eef2ff}" +
+      ".stk-altaf{display:grid;grid-template-columns:max-content 1fr;gap:7px 10px;align-items:center;margin:6px 0 12px}.stk-altaf label{font-size:12px;font-weight:700;color:#475569}" +
+      ".stk-altabtns{display:flex;gap:8px;justify-content:flex-end}" +
+      // el modal vive fuera de .stkpop-body: sin esto el botón toma el estilo global (100% de ancho, letra grande)
+      ".stk-altacard .stk-btn{width:auto;margin:0;min-height:40px;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 14px;font-size:14px;font-weight:800;cursor:pointer;color:#0f172a}" +
+      ".stk-altacard .stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a}.stk-altacard .stk-btn.stk-btn-x{color:#b91c1c;border-color:#fecaca}" +
+      ".stk-altacard .stk-btn[disabled]{opacity:.5}.stk-altacard .stk-inp{font-size:14px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:7px;box-sizing:border-box;max-width:100%}" +
+      ".stk-altacard input.stk-inp:not([type=number]){width:100%}";
+    document.head.appendChild(st);
+  }
+  let ov = document.getElementById("stkInsAltaModal");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "stkInsAltaModal";
+    ov.setAttribute("style", "position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:100000;display:flex;align-items:flex-start;justify-content:center;padding:18px;overflow:auto");
+    document.body.appendChild(ov);
+  }
+  const cDef = insCatDef(a.k), cat = cDef ? cDef.lbl : a.k;
+  const hayGp2 = INS_CAT_GP2.indexOf(a.k) >= 0;
+  const cerrar = '<button class="stk-btn stk-btn-x" onclick="stkInsAltaCerrar()">Cancelar</button>';
+  let h = '<div class="stk-altacard"><div class="stk-altattl">+ Agregar insumo</div><div class="stk-altasub">' + escapeHtml(cat) + '</div>';
+  if (!a.modo) {
+    h += '<button class="stk-altaop rec" id="stkAltaGp2"' + (hayGp2 ? ' onclick="stkInsAltaModo(\'gp2\')"' : ' disabled') + '>Tomar un código de GP2<span class="stk-altarec">Recomendado</span>' +
+      '<small>' + (hayGp2 ? "Viene con el código y lo que GP2 tenga cargado; queda vinculado." : "Esta categoría no tiene sector en GP2.") + '</small></button>' +
+      '<button class="stk-altaop" id="stkAltaManual" onclick="stkInsAltaModo(\'manual\')">Crear uno a mano<small>Código, descripción, ISIS, cantidad y unidades, todo a mano. Queda sin vincular a GP2.</small></button>' +
+      '<div class="stk-altabtns">' + cerrar + '</div>';
+  } else if (a.modo === "gp2" && !a.sel) {
+    if (a.comps === null) h += '<div class="stk-sub">Cargando componentes de GP2…</div>';
+    else if (a.comps === "err") h += '<div class="stk-sub">⚠ No se pudo leer GP2. <button class="stk-btn" onclick="_stkIns.alta.comps=null;stkInsAltaModo(\'gp2\')">Reintentar</button></div>';
+    else h += '<input class="stk-inp" id="stkAltaQ" style="width:100%;box-sizing:border-box;" placeholder="🔎 Buscar código o descripción de GP2" value="' + escapeHtml(a.q) + '" oninput="stkInsAltaBuscar(this.value)">' +
+      '<div class="stk-altalista" id="stkInsAltaLista"></div>';
+    h += '<div class="stk-altabtns"><button class="stk-btn" onclick="stkInsAltaAtras()">‹ Atrás</button>' + cerrar + '</div>';
+  } else if (a.modo === "gp2") {
+    const c = a.sel, uxc = Number(c.uni_x_cajon) > 0;
+    const uniDef = (insCatUni(a.k) || (insCatUnis(a.k) || [])[0] || "");
+    h += '<div class="stk-altaf">' +
+      '<label>Código</label><b>' + escapeHtml(c.codigo) + '</b>' +
+      '<label>Descripción GP2</label><span>' + escapeHtml(c.descripcion || "—") + '</span>' +
+      '<label>Descripción GV</label><input class="stk-inp" id="nvNom" value="' + escapeHtml(c.nombre_gv || c.descripcion || "") + '">' +
+      '<label>Cantidad inicial</label><span><input class="stk-inp" id="nvQty" type="number" step="any" placeholder="0" style="width:90px;" oninput="stkInsAltaEquiv()"> ' + _stkInsUniSel("nvUni", uniDef).replace("<select ", '<select onchange="stkInsAltaEquiv()" ') + ' <span class="stk-sub" id="nvEquiv"></span></span>' +
+      (uxc
+        ? '<label>Cajón según GP2</label><span>1 cajón = <b>' + _insNumAR(c.uni_x_cajon, 0) + '</b> uni' + (Number(c.kg_x_uni) > 0 ? ' · ' + _insNumAR(c.kg_x_uni, 4) + ' kg/uni' : '') + (Number(c.kg_x_cajon) > 0 ? ' · ' + _insNumAR(c.kg_x_cajon, 2) + ' kg/caj' : '') + '</span>'
+        : '<label>Factor</label><span><span class="stk-sub">GP2 no tiene cajón cargado:</span> 1 ' + _stkInsUniSel("nvSecUni", "") + ' = <input class="stk-inp" id="nvFactor" type="number" step="any" style="width:80px;" placeholder="cuántas"> de la unidad de arriba</span>') +
+      '</div>' +
+      '<div class="stk-altabtns"><button class="stk-btn" onclick="stkInsAltaAtras()">‹ Atrás</button>' + cerrar +
+      '<button class="stk-btn ok" id="stkAltaCrear" onclick="stkInsAltaGp2Crear()">✓ Crear y vincular</button></div>';
+  } else {
+    h += '<div class="stk-altaf">' +
+      '<label>Código</label><input class="stk-inp" id="nvCod" placeholder="código">' +
+      '<label>Descripción GV</label><input class="stk-inp" id="nvNom" placeholder="descripción">' +
+      '<label>ISIS</label><input class="stk-inp" id="nvIsis" inputmode="numeric" placeholder="opcional" style="width:110px;">' +
+      '<label>Cantidad inicial</label><span><input class="stk-inp" id="nvQty" type="number" step="any" placeholder="0" style="width:90px;"> ' + _stkInsUniSel("nvUni", "") + '</span>' +
+      '<label>Unidad secundaria</label><span>1 ' + _stkInsUniSel("nvSecUni", "") + ' = <input class="stk-inp" id="nvFactor" type="number" step="any" style="width:80px;" placeholder="cuántas"> de la unidad de arriba <span class="stk-sub">(opcional)</span></span>' +
+      '</div>' +
+      '<div class="stk-altabtns"><button class="stk-btn" onclick="stkInsAltaAtras()">‹ Atrás</button>' + cerrar +
+      '<button class="stk-btn ok" id="stkAltaCrear" onclick="stkInsAlta(\'' + a.k + '\')">✓ Crear</button></div>';
+  }
+  ov.innerHTML = h + '</div>';
+  if (a.modo === "gp2" && !a.sel && Array.isArray(a.comps)) _stkInsAltaLista();
+}
+/* factor manual (opcional): base = la unidad de la cantidad; secundaria = cuántas base hay en 1 */
+async function _stkInsAltaFactor(cod, base) {
+  const sec = _stkInsVal("nvSecUni"), f = parseFloat(String(_stkInsVal("nvFactor")).replace(",", ".")) || 0;
+  if (!sec || !(f > 0)) return;
+  if (!base) throw new Error("para el factor hace falta la unidad de la cantidad");
+  if (_insUEq(sec, base)) return;
+  await _stkInsRpc("insumo_factores_guardar", { p_cod: cod, p_factores: [
+    { unidad: base, factor: 1, es_base: true }, { unidad: sec, factor: f, es_base: false }] });
+  await insFetchFactores();
+}
+async function _stkInsAltaStock(cod, nom, qty, uni) {
+  if (!(qty > 0)) return;
+  const r = await fetch(SUPABASE_URL + "/rest/v1/Movimientos_Stock", {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify([{ cod_art: cod, descripcion: nom, deposito: "insumos", delta: qty, tipo: "ajuste", unidad: uni, legajo: "admin" }])
+  });
+  if (!r.ok) throw new Error("insumo creado pero falló el stock inicial (HTTP " + r.status + ")");
+}
+function _stkInsAltaLeerQty(k) {
+  const qtyStr = _stkInsVal("nvQty");
+  const qty = qtyStr ? parseFloat(String(qtyStr).replace(",", ".")) : 0;
+  const uni = _stkInsVal("nvUni") || null;
+  if (qty && !uni) { alert("Elegí la unidad para la cantidad inicial."); return null; }
+  if (uni && !insUniPermitida(k, uni)) {
+    const c0 = insCatDef(k);
+    alert("⛔ «" + uni + "» no está permitida en " + (c0 ? c0.lbl : "esa categoría") + ".\n\nSe carga en: " + (c0 ? c0.unis.join(" / ") : "?") + ".");
+    return null;
+  }
+  return { qty: qty, uni: uni };
+}
+async function stkInsAltaGp2Crear() {
+  const a = _stkIns && _stkIns.alta; if (!a || !a.sel) return;
+  const nom = _stkInsVal("nvNom");
+  if (!nom) { alert("Poné la descripción."); return; }
+  const q = _stkInsAltaLeerQty(a.k); if (!q) return;
+  const b = document.getElementById("stkAltaCrear"); if (b) { b.disabled = true; b.textContent = "…"; }
+  try {
+    const cod = await _stkInsRpc("gv_insumo_desde_gp2", { p_comp_id: a.sel.comp_id, p_legajo: "admin" });
+    if (!cod) throw new Error("GP2 no devolvió el código");
+    if (nom !== (a.sel.nombre_gv || "")) await _stkInsRpc("insumo_editar", { p_cod: cod, p_nombre: nom });
+    await _stkInsAltaFactor(cod, q.uni);
+    await _stkInsAltaStock(cod, nom, q.qty, q.uni);
+    stkInsAltaCerrar();
+    _stkIns.msg = "✓ " + cod + " creado desde GP2 (" + a.sel.codigo + ")" + (q.qty > 0 ? " con " + q.qty + " " + q.uni : "") + ".";
+    await stkInsRefresh(); stkRender();
+  } catch (e) { if (b) { b.disabled = false; b.textContent = "✓ Crear y vincular"; } alert("No se pudo: " + (e.message || e)); }
 }
 async function stkInsAlta(k) {
   const cod = _stkInsVal("nvCod");
   if (!cod) { alert("Poné el código."); return; }
   const ya = (_stkIns.items || []).filter(function (x) { return x.cod === cod; })[0];
   if (ya) { alert("El código " + cod + " ya está en uso" + (ya.nombre ? " (" + ya.nombre + ")" : "") + ".\n\nPoné otro."); return; }
-  // v9.19 — stock inicial opcional. Si viene con cant > 0, después del alta
-  // insertamos un movimiento de ajuste para que arranque con saldo (si no,
-  // no aparecería en la tabla de la categoría, que oculta los que están en 0).
-  const qtyStr = _stkInsVal("nvQty");
-  const qty = qtyStr ? parseFloat(String(qtyStr).replace(",", ".")) : 0;
-  const uni = _stkInsVal("nvUni") || null;
-  if (qty && !uni) { alert("Elegí la unidad para la cantidad inicial."); return; }
+  // v9.19 — stock inicial opcional: un insumo en 0 no aparece en la tabla de la categoría.
+  const q = _stkInsAltaLeerQty(k); if (!q) return;
   try {
-    const nom = _stkInsVal("nvNom") || null;
+    const nom = _stkInsVal("nvNom") || null, isis = _stkInsVal("nvIsis");
     // v10.10 — ubicación ya no se carga en el alta de insumos (viene de Racks_Planimetria)
     await _stkInsRpc("insumo_alta", { p_cod: cod, p_nombre: nom, p_categoria: k === "?" ? null : k, p_ubicacion: null, p_legajo: "admin" });
-    if (qty > 0) {
-      const r = await fetch(SUPABASE_URL + "/rest/v1/Movimientos_Stock", {
-        method: "POST",
-        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
-        body: JSON.stringify([{ cod_art: cod, descripcion: nom, deposito: "insumos", delta: qty, tipo: "ajuste", unidad: uni, legajo: "admin" }])
-      });
-      if (!r.ok) throw new Error("insumo creado pero falló el stock inicial (HTTP " + r.status + ")");
-    }
-    _stkIns.nuevoEn = ""; _stkIns.msg = "✓ " + cod + " creado" + (qty > 0 ? " con " + qty + " " + uni : "") + ".";
+    if (isis) await _stkInsRpc("insumo_editar", { p_cod: cod, p_isis: isis });   // v31.02: el alta a mano lleva su ISIS
+    await _stkInsAltaFactor(cod, q.uni);
+    await _stkInsAltaStock(cod, nom, q.qty, q.uni);
+    stkInsAltaCerrar();
+    _stkIns.nuevoEn = ""; _stkIns.msg = "✓ " + cod + " creado" + (q.qty > 0 ? " con " + q.qty + " " + q.uni : "") + ".";
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
 }

@@ -38,14 +38,14 @@ catch (_e) {
       { cod_art: "22", unidad: "Kg", saldo: 100 }
     ];
     const CAJ = [
-      { cod: "Batidor Pera p/Cromar", cod_c: "GRJ10", kg_x_uni: 0.098, uni_x_cajon: 306, kg_x_cajon: 29.99 },
-      { cod: "A1", cod_c: "A1", kg_x_uni: 0.0397, uni_x_cajon: 756, kg_x_cajon: 30.01 },
+      { cod: "Batidor Pera p/Cromar", cod_c: "GRJ10", desc_c: "Batidor Pera", kg_x_uni: 0.098, uni_x_cajon: 306, kg_x_cajon: 29.99 },
+      { cod: "A1", cod_c: "A1", desc_c: "Mgo Plano 501 Pint.", kg_x_uni: 0.0397, uni_x_cajon: 756, kg_x_cajon: 30.01 },
       { cod: "22", cod_c: "IA1", kg_x_uni: null, uni_x_cajon: null, kg_x_cajon: null }
     ];
     window.fetch = function (url, opt) {
       url = String(url);
       const m = String((opt && opt.method) || "GET").toUpperCase();
-      if (url.indexOf("/rpc/gv_insumo_gp2_cajon") >= 0) return rotaGp2 ? J({ message: "x" }, false) : J(CAJ);
+      if (url.indexOf("/rpc/gv_insumo_gp2_info") >= 0) return rotaGp2 ? J({ message: "x" }, false) : J(CAJ);
       if (url.indexOf("/rpc/") >= 0) return J([]);
       if (m === "POST") { posts++; return J({}); }
       if (url.indexOf("Insumos_Categorias") >= 0) return J(CATS);
