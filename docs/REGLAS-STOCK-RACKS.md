@@ -899,6 +899,20 @@ select m.id, m.creado, m.cod_art, m.delta, m.ref, m.legajo
 cambia de modo con el código puesto, y los dos rótulos nuevos; verificado que falla contra la v30.00).
 
 
+## ⚠ REGLA (Luis, 2026-10-15, v31.12, D2): BAJAR DE RACKS sólo desde una posición que ES RACK
+
+Caso 438E (14/10): el legajo 94 bajó 54 cajas con posición **«F15»**, que es la **góndola**. `registrar_baja_racks` lo
+grabó **sin posición**: el Mapa mostró «438E LK · −54 caj» y AD11 siguió en 78 cuando tenía 24 (corregido el 15/10).
+Problema de auditoría «Bajar de racks acepta una góndola (o posición inexistente)…».
+
+- **Base**: si viene posición y `gv_rack_pos()` no la reconoce → `RACKS_NO_ES_RACK`, no se graba nada. Sin posición
+  (null) sigue pasando: lo usa la bajada por orden (`brConfirmar`), y el front de Bajar de racks ya la exige.
+- **Front**: `_rkbPosNoRack` pregunta `gv_rack_sector` antes de abrir el código de verificación y avisa. Sin red no frena.
+- **Un rechazo ya no es silencioso**: `postBajaRacks` avisaba «✓ Bajaste» y descartaba el 400 con `console.error`. Ahora
+  dice qué no se grabó y por qué. Y la cola offline (`vir_baja_racks_pend`), que va en UNA transacción, con un 400 se
+  reenvía **de a uno**: antes un ítem malo trababa la cola entera para siempre.
+- Marcador `v31.12-no-es-rack`, centinela 493, `tests/rkb-pos-no-rack.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-10-15, v31.11; la base dice v31.10-gondola): tercer modo de INGRESO A RACKS — «🗄 Desde góndola»
 
 **Luis:** *"Agrega al «Ingreso a Racks» una tercera pestaña que sea «Desde góndola» que permita enviar cajas desde

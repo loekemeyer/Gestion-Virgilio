@@ -23,6 +23,8 @@ node() {
   return 0
 }
 
+echo "== rkb-pos-no-rack (v31.12: Bajar de racks no registra una posicion que no es rack; el rechazo se avisa) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rkb-pos-no-rack.cjs
 echo "== ir-desde-gondola (v31.11: Ingreso a racks, pestaña Desde góndola con conversor de masters; duales al RPC pelados) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ir-desde-gondola.cjs
 echo "== popup-avisos-luis (v31.10: avisos C2/C4/C5 en pop-up y Web Push al ultimo dispositivo activo de Luis) =="
