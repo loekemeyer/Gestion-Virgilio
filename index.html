@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.00">
+<link rel="stylesheet" href="gv-ui.css?v=31.01">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.00"></script>
+<script type="module" src="recepcion.js?v=31.01"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -8134,9 +8134,44 @@ function getPendingsForLegajo(legajo) {
       else                                              seCierranAuto.push(item);
     }
   }
+  // v31.01 (Luis, 15/10: «cuando terminan el día con tareas abiertas, tiene que avisar que se van a cerrar y cómo»):
+  // las tareas de MÓDULO (racks, ingreso, guardado, Mover racks, CP, urgente, Insumos) no son toggles y el FJ no las
+  // cerraba: en la base quedaba la apertura sin cierre. Ahora se listan y se cierran al terminar el día.
+  const modulos = tdModulosAbiertos(st);
   // Mantengo seCierran como unión para compatibilidad con código viejo.
-  return { sobreviven, seCierranAuto, seCierranConInput,
+  return { sobreviven, seCierranAuto, seCierranConInput, modulos,
            seCierran: [...seCierranAuto, ...seCierranConInput] };
+}
+
+/* v31.01 — tareas de módulo abiertas (vivas: < 12 h; una vencida se limpia sin evento, como ya hacían sus cierres). */
+const TD_MODULOS = [
+  { k: "racks", desc: "Bajar de racks" }, { k: "ir", desc: "Ingreso a racks" }, { k: "mg", desc: "Guardado a Góndola" },
+  { k: "tmov", code: "MOV", desc: "Mover racks" }, { k: "tcp", code: "CP", desc: "Completar Pedido" },
+  { k: "trc", code: "RC", desc: "Pasar a urgente" }, { k: "tins", code: "INS", desc: "Insumos y Productos" }
+];
+function tdModulosAbiertos(st) {
+  return TD_MODULOS.filter(function (m) { return st && st[m.k] && st[m.k].active && _gvModVivo(st, m.k); })
+    .map(function (m) { return { tipo: m.code || m.k, k: m.k, desc: m.desc }; });
+}
+/* Cierra cada tarea de módulo con el MISMO cierre que su botón (el tiempo hasta ahora queda registrado). */
+function tdCerrarModulos(legajoStr) {
+  const st = getLegajoState(legajoStr) || {};
+  TD_MODULOS.forEach(function (m) {
+    if (!(st[m.k] && st[m.k].active)) return;
+    try {
+      if (m.code) { modTareaFin(legajoStr, m.code, false); return; }
+      if (m.k === "mg") { gvModTareaFin(legajoStr, "mg", "MG", "Guardado a Góndola"); return; }
+      const vivo = _gvModVivo(st, m.k), ini = st[m.k].ts || Date.now();
+      if (m.k === "racks") {
+        if (vivo) gvRacksTramo("RKB", legajoStr, ini, "sin bajar");
+        if (typeof _rkb !== "undefined" && _rkb) _rkb._cerrado = true;
+      } else {
+        if (vivo) gvRacksTramo("IRT", legajoStr, ini, String(((typeof _ir !== "undefined" && _ir && _ir.done) || []).length) + " palet(s)");
+        if (typeof _ir !== "undefined" && _ir) _ir._cerrado = true;
+      }
+      if (!vivo) { const s2 = getLegajoState(legajoStr) || {}; s2[m.k] = { active: false }; setLegajoState(legajoStr, s2); }
+    } catch (_e) {}
+  });
 }
 
 function terminarDia() {
@@ -8154,44 +8189,26 @@ function terminarDia() {
        </ul>`
     : `<div class="history-empty">Sin reportes hoy.</div>`;
 
-  // Por cada tarea que puede arrastrarse (Picking/Armado/CR/MG) preguntamos si
-  // continúa mañana. "Finalizar ahora" pide el dato de cierre (solo Picking y
-  // Armado lo necesitan: la tanda/pedido) y la cierra al confirmar.
-  const sobrevivenHtml = pendings.sobreviven.length
-    ? pendings.sobreviven.map(p => {
-        const tipo = p.tipo;
-        const needsInput = (tipo === "Picking" || tipo === "Armado");
-        const valEsc = escapeHtml(p.valor || "");
+  // v31.01 (Luis, 15/10): Picking y Armado en curso NO se preguntan: queda registrado lo hecho y la tanda se frena
+  // (cron 129, freno al fichar salida) para que la retome él u otra persona. CR / RR se cierran como el resto.
+  const tdTanda = pendings.sobreviven.filter(p => p.tipo === "Picking" || p.tipo === "Armado");
+  const tdCierraTambien = pendings.sobreviven.filter(p => !(p.tipo === "Picking" || p.tipo === "Armado"))
+    .concat(pendings.modulos);
+  const sobrevivenHtml = tdTanda.map(p => {
+        const isPick = p.tipo === "Picking";
         return `
         <div style="margin:8px 0; padding:8px; border:1px solid #bae6fd; border-radius:6px; background:#fff;">
-          <div><b>${escapeHtml(tipo)}</b>${p.valor ? ` <i>${valEsc}</i>` : ""}${p.desc ? ` — ${escapeHtml(p.desc)}` : ""}</div>
-          <div style="margin-top:6px; font-size:14px; display:flex; flex-wrap:wrap; gap:6px;">
-            <label style="display:inline-flex; align-items:center; gap:8px; min-height:42px; padding:4px 14px 4px 8px; border-radius:8px; cursor:pointer;">
-              <input type="radio" name="td_cont_${escapeHtml(tipo)}" value="si" checked style="width:20px; height:20px; margin:0; flex:0 0 auto;"
-                     onchange="var w=document.getElementById('td_closewrap_${escapeHtml(tipo)}'); if(w) w.style.display='none';">
-              Continúa mañana
-            </label>
-            <label style="display:inline-flex; align-items:center; gap:8px; min-height:42px; padding:4px 14px 4px 8px; border-radius:8px; cursor:pointer;">
-              <input type="radio" name="td_cont_${escapeHtml(tipo)}" value="no" style="width:20px; height:20px; margin:0; flex:0 0 auto;"
-                     onchange="var w=document.getElementById('td_closewrap_${escapeHtml(tipo)}'); if(w) w.style.display='block';">
-              Finalizar ahora
-            </label>
-          </div>
-          ${needsInput ? `
-            <div style="margin-top:6px; font-size:12.5px; color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:6px 8px;">⚠ Si ya lo terminaste, marcá <b>"Finalizar ahora"</b> y cargá la tanda. Dejarlo abierto para mañana hace que no se pueda medir bien tu ritmo.</div>
-            <div id="td_closewrap_${escapeHtml(tipo)}" style="display:none; margin-top:6px;">
-              <input type="text" id="td_close_${escapeHtml(tipo)}" value="${valEsc}"
-                     placeholder="Dato para cerrar (tanda/pedido)"
-                     style="width:100%; padding:8px; border:2px solid #38bdf8; border-radius:6px; font-size:16px; box-sizing:border-box;">
-            </div>` : ""}
+          <div><b>${escapeHtml(p.tipo)}</b>${p.valor ? ` de la tanda <i>${escapeHtml(p.valor)}</i>` : ""}</div>
+          <div style="margin-top:4px; font-size:14px;">Queda registrado lo que ${isPick ? "pickeaste" : "armaste"} hasta acá.
+            Mañana lo podés retomar vos u otra persona.</div>
         </div>`;
-      }).join("")
-    : "<div style='color:#666; font-size:14px;'>Ninguno.</div>";
+      }).join("");
 
-  // Toggles auto-cerrables sin input (AT/PB/Limp/PC/CT/Perm)
-  const seCierranAutoHtml = pendings.seCierranAuto.length
+  // Toggles auto-cerrables sin input (AT/PB/Limp/PC/CT/Perm) + CR/RR + tareas de módulo (v31.01)
+  const tdAuto = pendings.seCierranAuto.concat(tdCierraTambien);
+  const seCierranAutoHtml = tdAuto.length
     ? `<ul style="margin:6px 0 0 0; padding-left:20px;">
-         ${pendings.seCierranAuto.map(p =>
+         ${tdAuto.map(p =>
            `<li><b>${escapeHtml(p.tipo)}</b> — ${escapeHtml(p.desc)}</li>`).join("")}
        </ul>`
     : "";
@@ -8252,14 +8269,16 @@ function terminarDia() {
       ${summaryHtml}
     </div>
 
-    <div style="margin-bottom:14px; padding:10px; background:#f0f9ff; border-radius:8px;">
-      <b style="color:#075985;">⏸ Tareas abiertas — ¿continúan mañana?</b>
+    ${tdTanda.length ? `
+    <div id="tdTandas" style="margin-bottom:14px; padding:10px; background:#f0f9ff; border-radius:8px;">
+      <b style="color:#075985;">⏸ Tanda en curso — queda frenada</b>
       ${sobrevivenHtml}
-    </div>
+    </div>` : ""}
 
-    ${pendings.seCierranAuto.length ? `
-      <div style="padding:10px; background:#fef2f2; border-radius:8px; margin-bottom:14px;">
-        <b style="color:#991b1b;">⛔ Se cierran ahora:</b>
+    ${tdAuto.length ? `
+      <div id="tdSeCierran" style="padding:10px; background:#fef2f2; border-radius:8px; margin-bottom:14px;">
+        <b style="color:#991b1b;">⛔ Se cierran ahora, con la hora de este momento:</b>
+        <div style="font-size:12.5px; color:#991b1b; margin-top:2px;">El tiempo que trabajaste hasta acá queda registrado.</div>
         ${seCierranAutoHtml}
       </div>
     ` : ""}
@@ -8274,7 +8293,7 @@ function terminarDia() {
       </div>
     ` : ""}
 
-    ${(!pendings.seCierranAuto.length && !pendings.seCierranConInput.length) ? `
+    ${(!tdAuto.length && !pendings.seCierranConInput.length && !tdTanda.length) ? `
       <div style="padding:10px; background:#f0fdf4; border-radius:8px;">
         <span style="color:#166534;">Sin toggles abiertos para cerrar.</span>
       </div>
@@ -8433,8 +8452,8 @@ async function confirmarTerminarDia() {
   // dato de cierre (tanda/pedido), que validamos ANTES de tocar el estado.
   const contDecisions = [];   // { tipo, continua, closeText }
   for (const p of pendNow.sobreviven) {
-    const sel = document.querySelector('input[name="td_cont_' + p.tipo + '"]:checked');
-    const continua = !sel || sel.value === "si";   // default: continúa mañana
+    // v31.01: sin pregunta — Picking/Armado siguen (se frenan), CR/RR se cierran.
+    const continua = (p.tipo === "Picking" || p.tipo === "Armado");
     let closeText = "";
     if (!continua && (p.tipo === "Picking" || p.tipo === "Armado")) {
       const el = document.getElementById("td_close_" + p.tipo);
@@ -8565,6 +8584,9 @@ async function confirmarTerminarDia() {
     if (st.continuar) delete st.continuar[d.tipo];   // finalizada: sin marca
   }
   setLegajoState(legajoStr, st);
+
+  // 1c) v31.01: tareas de módulo abiertas → su cierre de siempre, ANTES del FJ.
+  tdCerrarModulos(legajoStr);
 
   // 2) Reporte FJ "Fin de Jornada" con resumen del día como JSON en texto.
   //    client_id DETERMINÍSTICO por (legajo, día) -> si tocan Terminar Día
@@ -10761,7 +10783,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.00";
+const APP_VERSION = "v31.01";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -64053,7 +64075,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.00"></script>
+<script src="importacion.js?v=31.01"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67372,15 +67394,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.00"></script>
-<script src="hotsale.js?v=31.00"></script>
-<script src="estadisticas.js?v=31.00"></script>
-<script src="ads.js?v=31.00"></script>
-<script src="plantel.js?v=31.00"></script>
+<script src="cobranzas.js?v=31.01"></script>
+<script src="hotsale.js?v=31.01"></script>
+<script src="estadisticas.js?v=31.01"></script>
+<script src="ads.js?v=31.01"></script>
+<script src="plantel.js?v=31.01"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.00"></script>
+<script src="analisis.js?v=31.01"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.00"></script>
+<script src="ayuda.js?v=31.01"></script>
 
 </body>
 </html>

@@ -149,6 +149,22 @@ si el evento todavía no llegó): **EP** → `gv_anular_picking_virgilio` (EPX +
   *"está bien que se quede en atrasados, pero que esté con el badge"* — **no** pasarlo al día de hoy de la Programación.
 - `sql/vista_control_remitos_ciclo_v2595.sql`, `tests/rr-volvio-ciclo.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-15, v31.01): Terminar Día NO PREGUNTA — avisa qué se cierra y cómo
+
+**Luis:** *"Cuando terminan el día con tareas abiertas, tiene que avisar que se van a cerrar y cómo. Cuando cierran un
+armado o picking en curso, debería simplemente decirles que queda registrado lo que hicieron hasta ahí y se puede retomar
+por ellos (o por otra persona) al día siguiente."*
+
+| abierto al Terminar Día | qué ve | qué pasa |
+|---|---|---|
+| picking / armado | «⏸ Tanda en curso — queda frenada»: *queda registrado lo que pickeaste/armaste hasta acá. Mañana lo podés retomar vos u otra persona* | sigue «continúa» en el celular (`st.continuar`); el cron 129 la **frena** al fichar salida (regla de frenar, `REGLAS-PICKING-ARMADO.md`). Ya no hay «Finalizar ahora»: no sale TP/TAP desde el FJ |
+| CR / RR | en «⛔ Se cierran ahora, con la hora de este momento» | cierre del toggle con su `ts_inicio` |
+| tareas de módulo vivas (`racks`, `ir`, `mg`, `tmov`, `tcp`, `trc`, `tins`) | idem | `tdCerrarModulos`, ANTES del FJ, con su cierre de siempre: RKB «sin bajar», IRT «N palet(s)», MDT (texto = código), MG del Historial |
+| tarea de módulo vencida (> 12 h) | no se lista | se limpia sin evento (como ya hacían sus cierres) |
+
+Hasta la v31.00 esas tareas de módulo no se cerraban con el FJ: en la base quedaba la apertura sin cierre.
+`tests/td-cierra-tareas.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-10-05, v26.57): un picking o armado abierto al terminar el día se RETOMA con su avance
 
 **Luis:** *"si uno termina el día con un picking o armado abierto, queda guardado con la data que se llegó a

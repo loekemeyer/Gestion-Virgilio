@@ -282,8 +282,11 @@ se cierran solas a las 17:00. Si no marcás nada, ese tiempo cuenta como tiempo 
 
 Al irte tocá **Terminar Día**: muestra lo que tenés abierto y se confirma con **«Sí, terminar
 día»**.
-- Picking, armado, CR y RR abiertos: elegís **«Continúa mañana»** (queda guardado y al otro día
-  sale para seguir) o **«Finalizar ahora»**.
+- Picking o armado en curso: no se pregunta nada. Queda registrado lo que hiciste hasta ahí y la
+  tanda queda frenada: al otro día la podés retomar vos u otra persona.
+- CR, RR y las tareas de módulo abiertas (Bajar de racks, Ingreso a racks, Guardado, Mover racks,
+  Completar Pedido, Pasar a urgente, Insumos) se cierran con la hora de ese momento: el tiempo
+  trabajado queda registrado.
 - CC, Recibir y Entregar insumos te piden la cantidad; RT viene calculado.
 - Las pausas se cierran solas.
 

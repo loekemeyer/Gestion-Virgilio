@@ -15482,6 +15482,12 @@ botones se arman en **5 filas** (`row1`…`row5` en el HTML de la grilla de opci
 
 ### Continuar tarea al día siguiente (v2.44)
 
+> ⚠ **v31.01 (Luis, 15/10/2026)**: Terminar Día **ya no pregunta**. Picking / Armado en curso quedan «continúa» con el
+> aviso *«Queda registrado lo que pickeaste/armaste hasta acá. Mañana lo podés retomar vos u otra persona»* (la tanda la
+> frena el cron 129 al fichar salida). `CR` / `RR` y las tareas de módulo abiertas (`racks`, `ir`, `mg`, `tmov`, `tcp`,
+> `trc`, `tins`) se cierran con su cierre de siempre (RKB «sin bajar», IRT «N palet(s)», MDT, MG) antes del FJ
+> (`tdCerrarModulos`). Lo de abajo es la historia.
+
 Al **Terminar Día**, por cada tarea abierta que sobrevive (Picking, Armado,
 `CR`, `RR`, `MG`) el operario elige **Continúa mañana** o **Finalizar ahora**:
 - **Continúa** → se marca `st.continuar[<tipo>] = <YYYY-MM-DD>` y la tarea se

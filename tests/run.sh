@@ -278,6 +278,8 @@ echo "== mg-reentrada (v7.68: MG ya no es toggle — entrar/salir sin rojo pegad
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-reentrada.cjs
 echo "== mg-tarea-vencida (v26.56: guardado abierto de otro día no cuenta tiempo muerto ni hace saltar la alarma) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-tarea-vencida.cjs
+echo "== td-cierra-tareas (v31.01: Terminar Día sin pregunta — la tanda queda frenada, CR/RR y los módulos se cierran) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/td-cierra-tareas.cjs
 echo "== modulo-minimizar-anular (v26.83: Cerrar minimiza BR/MG/IR sin cortar el tramo; Anular sale con ANULADO) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/modulo-minimizar-anular.cjs
 
