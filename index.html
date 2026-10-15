@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.01">
+<link rel="stylesheet" href="gv-ui.css?v=31.02">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.01"></script>
+<script type="module" src="recepcion.js?v=31.02"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10783,7 +10783,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.01";
+const APP_VERSION = "v31.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -28997,12 +28997,16 @@ function _insQtyHtml(it, i, isIn) {
       '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + (isIn && it.qty > 0 && !it.marca ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
       '</div></div>';
   }
-  let chips = _mcSolo ? ('<button class="ins-uchip on">' + escapeHtml(_mcSolo) + '</button> <span style="font-size:12px;color:#64748b;">sale siempre en MC enteras</span>') : _insUnitsFor(it, insLoadUnits()).map(function (u) {
+  // v31.02 (Luis, 15/10): abre en MC, pero se puede mover fino en las otras unidades del insumo (Cajas / Uni):
+  // con 0,75 MC en stock (3 cajas de 4) no había forma de mandarlas.
+  let chips = _mcSolo ? (_insUnisFactor(it).map(function (u) {
+    return '<button class="ins-uchip' + (_insUEq(it.unidad, u) ? " on" : "") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')">' + escapeHtml(u) + '</button>';
+  }).join("") + ' <span style="font-size:12px;color:#64748b;">abre en MC; para mover fino, Cajas o Uni</span>') : _insUnitsFor(it, insLoadUnits()).map(function (u) {
     const ok = insUniPermitida(_k, u);
     return '<button class="ins-uchip' + (it.unidad === u ? " on" : "") + (ok ? "" : " no") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')"' +
       (ok ? "" : ' title="No permitida en esta categoría"') + '>' + escapeHtml(u) + (ok ? "" : " ⛔") + '</button>';
   }).join("") + '<button class="ins-uchip ins-uadd" onclick="insAddUnidad(' + i + ')" title="Agregar unidad">+</button>';
-  if (_mcSolo && it.qty > 0) { const _fmc = insFactorDe(it.cod, _mcSolo); if (_fmc) chips += '<div style="font-size:12px;color:#475569;margin-top:4px;">= ' + _insNum(it.qty * _fmc) + ' ' + escapeHtml((insFactDe(it.cod) || {}).base || "u") + '</div>'; }
+  if (_mcSolo && it.qty > 0) { const _fmc = insFactorDe(it.cod, it.unidad); if (_fmc && _fmc !== 1) if (_fmc) chips += '<div style="font-size:12px;color:#475569;margin-top:4px;">= ' + _insNum(it.qty * _fmc) + ' ' + escapeHtml((insFactDe(it.cod) || {}).base || "u") + '</div>'; }
   return '<div class="ins-qov" onclick="if(event.target===this)insCloseQty()"><div class="ins-qc">' +
     '<div class="ins-qh"><div><div class="ins-qcod">' + escapeHtml(_insBtnCod(it)) + '</div>' +
     (it.nombre ? '<div class="ins-qnom">' + escapeHtml(it.nombre) + '</div>' : "") +
@@ -29051,6 +29055,11 @@ function _insKgBolsas(n) { return Math.round((Number(n) || 0) * _insKgXBolsa() *
 /* v24.69 (Thomas, 30/09, D11): un insumo que tiene MC (Insumos_Factores) SALE siempre en MC
    enteras — a Cervantes o bajado de racks: *"lo mínimo que se le manda es 1 MC… no bajan uni
    sueltas, siempre por MC"*. El stock queda en su unidad base y el movimiento dice las MC. */
+/* Unidades del insumo según Insumos_Factores: MC primero, después de mayor a menor factor (Cajas, Uni). */
+function _insUnisFactor(it) {
+  const f = insFactDe(it && it.cod); if (!f || !f.unis) return [];
+  return f.unis.slice().sort(function (a, b) { return (_insUEq(b.u, "MC") ? 1 : 0) - (_insUEq(a.u, "MC") ? 1 : 0) || (Number(b.f) || 0) - (Number(a.f) || 0); }).map(function (u) { return u.u; });
+}
 function _insSaleMC(it) {
   if (!_ins || _ins.mode !== "EI" || !it) return "";
   const f = insFactDe(it.cod); if (!f || !f.unis) return "";
@@ -29073,7 +29082,7 @@ async function insConfirmar() {
   // en dos unidades distintas (es lo que pasó con PP: 151 Bolsas + 24 Uni).
   const sinCod = sel.filter(function (it) { return !it.cod; });
   if (sinCod.length) { try { alert("Esperá un segundo: el sistema todavía le está asignando el número a un insumo nuevo."); } catch (_e) {} return; }
-  const mal = sel.filter(function (it) { return it.unidad && !insUniPermitida(insCatOf(it), it.unidad); });
+  const mal = sel.filter(function (it) { return it.unidad && !insUniPermitida(insCatOf(it), it.unidad) && !(!isIn && _insSaleMC(it) && insFactorDe(it.cod, it.unidad) != null); });
   if (mal.length) {
     const it0 = mal[0], c0 = insCatDef(insCatOf(it0));
     try { alert("⛔ Unidad no permitida\n\n" + _insBtnCod(it0) + (it0.nombre ? " · " + it0.nombre : "") +
@@ -29084,7 +29093,8 @@ async function insConfirmar() {
     insRender(); return;
   }
   // v24.69: lo que tiene MC sale en MC — si quedó otra unidad (cargada antes), se corrige acá
-  if (!isIn) sel.forEach(function (it) { const mc = _insSaleMC(it); if (mc) it.unidad = mc; });
+  // v31.02 (Luis, 15/10): también Cajas / Uni si son unidades del insumo (Insumos_Factores)
+  if (!isIn) sel.forEach(function (it) { const mc = _insSaleMC(it); if (mc && insFactorDe(it.cod, it.unidad) == null) it.unidad = mc; });
   // v29.31 (Thomas, D26) · v29.56 (Luis, 13/10): insumo recibido sin marca no se registra
   const sinMarca = isIn ? sel.filter(function (it) { return !it.marca; }) : [];
   if (sinMarca.length) {
@@ -63933,7 +63943,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.01"></script>
+<script src="importacion.js?v=31.02"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67252,15 +67262,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.01"></script>
-<script src="hotsale.js?v=31.01"></script>
-<script src="estadisticas.js?v=31.01"></script>
-<script src="ads.js?v=31.01"></script>
-<script src="plantel.js?v=31.01"></script>
+<script src="cobranzas.js?v=31.02"></script>
+<script src="hotsale.js?v=31.02"></script>
+<script src="estadisticas.js?v=31.02"></script>
+<script src="ads.js?v=31.02"></script>
+<script src="plantel.js?v=31.02"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.01"></script>
+<script src="analisis.js?v=31.02"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.01"></script>
+<script src="ayuda.js?v=31.02"></script>
 
 </body>
 </html>
