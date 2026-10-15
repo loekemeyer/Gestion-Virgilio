@@ -89,7 +89,7 @@ catch (_e) {
     out.persiste = out.orden3 === out.orden2;
 
     // --- (4) sin fletero no termina --- (ccFinish relee el INPUT, no la variable)
-    const camInp = () => document.getElementById("ccCamioneroInput");
+    const camInp = () => document.getElementById("ccCamioneroSel");   // v31.31: desplegable cerrado
     camInp().value = "";
     ccFinish();
     out.bloqueaSinFletero = leerCola().length === 0 && out.alerts.some(a => /fletero/i.test(a));
@@ -111,7 +111,7 @@ catch (_e) {
     await showCargaCamion("104", "retira");
     ccToggle("98700");
     out.retiraChk = (chips()[0] || {}).chk;
-    out.retiraSinInput = !document.getElementById("ccCamioneroInput");
+    out.retiraSinInput = !document.getElementById("ccCamioneroSel");
     ccFinish();
     out.retiraEnvio = leerCola()[0] || "";
     out.retiraCrn = leerCrn().join(",");
