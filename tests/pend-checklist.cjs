@@ -80,6 +80,15 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     // sin "Faltantes x Día" (v12.03): 3 filas de pasos, no 4
     out.tresPasos = card.querySelectorAll(".pcActs .pcRow:not(.pcRecibidoRow)").length === 3;   // + el tilde Recibido (v22.51)
 
+    // ---- v31.28 (Thomas): acordeón — ISIS + Control Partes colapsados hasta tildar Recibido ----
+    const _col = card.querySelector(".pcCollapse");
+    const _recRow = card.querySelector(".pcRecibidoRow");
+    out.acordeon_cerrado = !!_col && !_col.classList.contains("open");
+    R.pendRows[55].recibido = "Nora"; _recRow._pendSync();
+    out.acordeon_abre = _col.classList.contains("open");
+    R.pendRows[55].recibido = null; _recRow._pendSync();
+    out.acordeon_cierra = !_col.classList.contains("open");   // destildar lo vuelve a cerrar
+
     // ---- tildar ISIS persiste y sigue bloqueado (faltan partes + foto) ----
     card.querySelectorAll(".pcActs .pcRow:not(.pcRecibidoRow)")[0].querySelector(".tickBtn").click();
     await wait(30);
