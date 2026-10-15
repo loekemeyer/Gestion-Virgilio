@@ -184,13 +184,30 @@ proponer "trasladar de la góndola LK a la de Chef" para ahorrarse la compra**. 
 consecuencia del código compartido es la de siempre: la empresa la da de qué pila salió la caja
 (el pedido), no el artículo.
 
+### ⚠ CAJAS POR MASTER: UNA tabla canónica, `GV_Rack_CxM` (Luis, 15/10, v31.13)
+
+*"Hay que hacer una tabla que sea la canónica y unificar para que todas las funciones y cosas que busquen el dato
+lo busquen de ahí."* El dato estaba en 6 lugares que no coincidían. Quedó así:
+
+| fuente | estado |
+|---|---|
+| `GV_Rack_CxM` (`cod`, `emp`, `cxm`, `sin_master`, `fuente`, `nota`) | **CANÓNICA**. Front: `gvFetchCxM()` (index) y `_racksFactors` (recepcion.js). Base: `Racks_Planimetria`, `vista_racks_bajadas_pendientes`. Escribe: `gv_rack_cxm_anotar` (ingreso a racks) y el trigger `trg_cxm_desde_importados_volumen` (alta de importado, sólo si el código no tiene fila) |
+| `Articulos Virgilio X Tallerista.Cajas_x_Master` | **RETIRADA** (se migró; comentario en la columna). No leer ni escribir |
+| ratio inner/master de la planimetría en el front | **RETIRADO** (era la misma canónica con ruido de las filas «a contar») |
+| `Importados_Volumen.uni_master / uni_inner` | sigue: son UNIDADES para importación; si no coinciden con la canónica salen en `gv_cxm_conflictos` |
+| `impo_comex.productos_referencia` (planilla COMEX) | sólo referencia, en `gv_cxm_conflictos` (el «1» = master igual al inner es basura y no se cuenta) |
+| `Insumos_Factores` (MC de insumos, en unidades) | otro dato (insumos), no se toca |
+
+`sin_master = true` (cxm vacío) = va suelto, se baja 1:1 (505I, 504, 505, 501). Para ver qué falta decidir:
+`select * from public.gv_cxm_conflictos order by cod;`. `sql/gv_cxm_canonica_v3113.sql`, `tests/cxm-canonica.cjs`.
+
 ### ⚠ RACKS: una fuente por dato (Luis, 25/09, v22.77)
 
 | dato | dónde vive |
 |---|---|
 | qué posiciones hay y si están reservadas | `GV_Lugar` (tipo `rack`, `uso` pedidos / cajas / bastidor) |
 | cuántas cajas de cada código hay en cada posición | **`Movimientos_Stock`**, depósito racks / racks_ch, **`ubicacion` = sector** |
-| cajas por master (para mostrar MC) | `GV_Rack_CxM` |
+| cajas por master (para mostrar MC) | `GV_Rack_CxM` — **CANÓNICA de TODO el sistema desde la v31.13** (abajo) |
 | lo que la planimetría vieja decía y el stock no respalda | `GV_Rack_Revisar` → «🔎 a contar» en el Mapa |
 
 `Racks_Planimetria` es una **vista** con las mismas columnas (+ `fuente` stock / a_contar, `motivo`). Escriben
@@ -898,6 +915,34 @@ select m.id, m.creado, m.cod_art, m.delta, m.ref, m.legajo
 **Chequeo:** `node tests/ir-codigo-candado.cjs` (bloque **H**: el aviso, que no frena, que el botón
 cambia de modo con el código puesto, y los dos rótulos nuevos; verificado que falla contra la v30.00).
 
+
+## ⚠ REGLA (Luis, 2026-10-15, v31.12, D2): BAJAR DE RACKS sólo desde una posición que ES RACK
+
+Caso 438E (14/10): el legajo 94 bajó 54 cajas con posición **«F15»**, que es la **góndola**. `registrar_baja_racks` lo
+grabó **sin posición**: el Mapa mostró «438E LK · −54 caj» y AD11 siguió en 78 cuando tenía 24 (corregido el 15/10).
+Problema de auditoría «Bajar de racks acepta una góndola (o posición inexistente)…».
+
+- **Base**: si viene posición y `gv_rack_pos()` no la reconoce → `RACKS_NO_ES_RACK`, no se graba nada. Sin posición
+  (null) sigue pasando: lo usa la bajada por orden (`brConfirmar`), y el front de Bajar de racks ya la exige.
+- **Front**: `_rkbPosNoRack` pregunta `gv_rack_sector` antes de abrir el código de verificación y avisa. Sin red no frena.
+- **Un rechazo ya no es silencioso**: `postBajaRacks` avisaba «✓ Bajaste» y descartaba el 400 con `console.error`. Ahora
+  dice qué no se grabó y por qué. Y la cola offline (`vir_baja_racks_pend`), que va en UNA transacción, con un 400 se
+  reenvía **de a uno**: antes un ítem malo trababa la cola entera para siempre.
+- Marcador `v31.12-no-es-rack`, centinela 493, `tests/rkb-pos-no-rack.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-15, v31.11; la base dice v31.10-gondola): tercer modo de INGRESO A RACKS — «🗄 Desde góndola»
+
+**Luis:** *"Agrega al «Ingreso a Racks» una tercera pestaña que sea «Desde góndola» que permita enviar cajas desde
+góndola a racks y que tenga el conversor de masters"*.
+
+- **Traslado, no crea stock**: descuenta de `terminado` (la góndola) y suma al rack en la DIRECCIÓN. Mismo RPC que
+  «Desde A guardar»: `racks_plani_ingreso_nacional(p_origen => 'terminado')`. Front: modo `gondola`, `_irTras()`.
+- **Conversor de masters**: masters × CxM = cajas (como en Ingreso directo); al RPC va el master que puso el operario.
+- **Duales** (437E, 438E, 439E, 809E): el saldo de góndola cuenta **sólo la empresa elegida**; la empresa la trae la
+  fila elegida («438E LK») y no se vuelve a preguntar. Arregla de paso «Desde A guardar» con duales: el código iba
+  como «438ELK» (sin espacio) y el RPC contestaba `sin_stock` (`_irCodSplit`).
+- Movimientos: `terminado −N` ref `gondola a racks <pos>` + `racks +N` ref `nacional desde gondola a <pos>`.
+- `sql/gv_ir_desde_gondola_v3111.sql`, centinelas 431 y 489, `tests/ir-desde-gondola.cjs`.
 ## ⚠ REGLA (Luis, 2026-10-13, v29.67 + v29.77 + v29.78, D2): en INGRESO A RACKS el CÓDIGO SE ELIGE — se sugiere mientras se escribe
 
 **Luis:** *"956E · va a terminar en AB10 · el operario lo puso mal · ponele candado"* y, después del candado:

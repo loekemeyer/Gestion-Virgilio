@@ -7,6 +7,8 @@
    D) v31.05: con la ventana sin foco (minimizada) igual consulta, manda el aviso de Windows
       (requireInteraction, tag gv-popup), pone el número en el ícono y suena; sw.js trae la app al
       frente al tocar el aviso; elegir el rol «luis» pide el permiso.
+   F) v31.10: pide sólo los de ESTE dispositivo (gv_popup_pendientes_disp), un click marca actividad
+      (gv_popup_actividad, como mucho 1 por minuto) y sw.js atiende el Web Push.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -26,7 +28,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       url = String(url);
       const m = url.match(/rpc\/(gv_popup_\w+)/);
       if (m) calls.push({ fn: m[1], body: JSON.parse((opt && opt.body) || "{}"), auth: opt && opt.headers && opt.headers.Authorization });
-      const data = m && m[1] === "gv_popup_pendientes" ? avisos : null;
+      const data = m && m[1] === "gv_popup_pendientes_disp" ? avisos : null;
       return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(data ? JSON.stringify(data) : ""), json: () => Promise.resolve(data || []) });
     };
     const out = {};
@@ -81,6 +83,14 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     document.getElementById("gvPopupAceptar").click();
     await new Promise((res) => setTimeout(res, 50));
     out.badgeFin = badges[badges.length - 1];
+    // F) actividad: dos clicks seguidos → una sola llamada
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+    _gvPopupActUlt = 0;
+    const a0 = calls.filter((c) => c.fn === "gv_popup_actividad").length;
+    document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    await new Promise((res) => setTimeout(res, 50));
+    out.actividad = calls.filter((c) => c.fn === "gv_popup_actividad").slice(a0);
     out.calls = calls;
     return out;
   });
@@ -88,7 +98,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const ok = {
     "C sin sesión no llama": r.sinSesionCalls === 0,
     "B otro rol no llama": r.otroRolCalls === 0 && !r.otroRolVis,
-    "A pide pendientes de luis con la sesión": r.calls.some((c) => c.fn === "gv_popup_pendientes" && c.body.p_persona === "luis" && c.auth === "Bearer tok-google"),
+    "A pide pendientes de luis con la sesión": r.calls.some((c) => c.fn === "gv_popup_pendientes_disp" && c.body.p_persona === "luis" && c.body.p_dispositivo && c.auth === "Bearer tok-google"),
     "A salta el primero (C4)": r.vis1 && /C4/.test(r.txt1) && /2 OPERARIOS/.test(r.txt1) && /quedan 1/.test(r.txt1),
     "A no inyecta HTML del texto": !r.inyecta,
     "A al aceptar pasa al segundo (C2)": /Racks_Bajadas/.test(r.txt2),
@@ -100,6 +110,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const sw = fs.readFileSync(path.join(__dirname, "..", "sw.js"), "utf8");
   const html = fs.readFileSync(path.join(__dirname, "..", "index.html")).toString("utf8");
   ok["E aceptado en otra página se cierra acá"] = r.eAbierto && r.eCerrado;
+  ok["F un click marca actividad de este dispositivo (1 por minuto)"] = r.actividad.length === 1 && r.actividad[0].body.p_persona === "luis" && !!r.actividad[0].body.p_dispositivo;
+  ok["F sw.js atiende el push: aviso fijo + avisa a la página"] = /addEventListener\("push"[\s\S]{0,600}showNotification[\s\S]{0,300}requireInteraction: true[\s\S]{0,400}GV_POPUP_TICK/.test(sw);
+  ok["F se suscribe con la VAPID pública"] = /pushManager\.subscribe\(\{ userVisibleOnly: true, applicationServerKey: _gvB64u\(GV_VAPID_PUBLIC\)/.test(html);
   ok["D minimizada igual consulta"] = r.minPide;
   ok["D aviso de Windows fijo (requireInteraction, tag gv-popup) con C5"] = r.notifs.length === 1 && r.notifs[0].o.requireInteraction === true && r.notifs[0].o.tag === "gv-popup" && /C5/.test(r.notifs[0].t);
   ok["D número en el ícono y vuelve a 0 al aceptar"] = r.badges[0] === 1 && r.badgeFin === 0;
