@@ -36,6 +36,12 @@ solo en el front"*.
   70 de TRANSITO + 50 de X20. `sql/gv_entrega_transito_v3091.sql`, centinela `gv_insumo_entrega_transito`.
 - **D4 (Luis): «Caja P» queda** («ponela por si acaso»). **D7: las cajas TMP las cruza Naza** (Nazareno Rodríguez,
   tarea en su Planify), junto con el código de Cervantes de los `CJ<n>`.
+- **D8 (Luis, 15/10: *"que aparezca mientras haya"*) — aviso de cajas con código temporal**: RPC
+  **`gv_cajas_codigo_temporal()`** (cajas `TMP-` de Virgilio escritas a mano + cajas de GP2 Sector Caja con código `CJ…`).
+  Contador **naranja** arriba a la izquierda del botón «Stock y Compras» (`stkCjBadge`) y cartel fijo arriba de la
+  solapa **Insumos**, mientras haya alguna. Si la lectura falla queda lo último leído (no un 0). Se apaga solo cuando
+  Naza acepta la TMP o le cambia el código `CJ…` en GP2. `sql/gv_cajas_codigo_temporal_v3092.sql`,
+  `tests/ins-cajas-tmp-aviso.cjs`.
 - **D2 (Luis): no** — los 19 insumos con stock y sin lugar no se pasan a TRANSITO. Forward-facing.
 - `sql/gv_transito_v3081.sql` + `sql/gv_transito_saldo_v3087.sql` (centinelas `gv_insumo_recepcion_transito`, `gv_insumo_sector`, `gv_transito_ubicar`) ·
   `tests/ins-envio-tipo.cjs` · `tests/ins-transito-cajas.cjs`.

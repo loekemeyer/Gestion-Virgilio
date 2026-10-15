@@ -1,3 +1,8 @@
+## Nota v30.92 (2026-10-15) — Aviso de cajas con código temporal sin cruzar
+
+- `gv_cajas_codigo_temporal()` (TMP de Virgilio + CJ… de GP2): contador naranja en «Stock y Compras» y cartel arriba
+  de la solapa Insumos mientras haya alguna. Las cruza Naza.
+
 ## Nota v30.91 (2026-10-15) — La entrega de insumos descuenta primero de Tránsito
 
 - Trigger `zy_gv_insumo_entrega_transito`: si hay saldo en Tránsito, la entrega sale de ahí; si no alcanza, se parte

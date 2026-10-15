@@ -995,6 +995,8 @@ echo "== ins-envio-tipo (v30.86: Entregar insumos → Cervantes / Otros) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-envio-tipo.cjs
 echo "== ins-transito-cajas (v30.86: pestaña Tránsito, recepción → TRANSITO, cajas de GP2 al entregar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-transito-cajas.cjs
+echo "== ins-cajas-tmp-aviso (v30.92: aviso de cajas con código temporal, mientras haya) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-cajas-tmp-aviso.cjs
 
 
 # ── v21.77 — los 53 que estaban en tests/ y NO los corria nadie. La suite listaba 218
