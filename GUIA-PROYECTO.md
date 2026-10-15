@@ -11,6 +11,8 @@ intentó escribir en una tabla cerrada, `anon-bloqueo:…`), **C4** (celular nue
 - **"Logueado como Luis"** = sesión de supervisor (Google) + «Luis» elegido en el selector de rol (`gv_sup_quien`).
   El mail de Google es compartido, así que no hay otra forma de saberlo.
 - **Sólo notifica**: botón «Aceptar». Aceptar en una página lo cierra en todas.
+- ⚠ **Telegram y pop-up CONVIVEN** hasta que Luis diga lo contrario (Luis, 15/10: *"no lo preguntes más"*). No proponer apagar el Telegram de un aviso que pasó a pop-up.
+- **C3** (monitor GT abierto fuera de horario) queda **sólo en Telegram** (Luis, D4). Lo mismo B (informes) y C1 (salud del outbox).
 - **Log** (`GV_Popup_Log`): un `mostrado` cada vez que salta en una página, un `aceptado` con rol, mail, dispositivo
   y versión. Review: `select * from public.gv_popup_review order by creado_at desc;`
 - RPC `gv_popup_pendientes(persona)` y `gv_popup_evento(...)` con `gv_rpc_guard` (sólo supervisor); anon → 401 (medido).
