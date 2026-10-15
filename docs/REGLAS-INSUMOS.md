@@ -87,6 +87,19 @@ solo en el front"*.
   Naza acepta la TMP o le cambia el código `CJ…` en GP2. `sql/gv_cajas_codigo_temporal_v3092.sql`,
   `tests/ins-cajas-tmp-aviso.cjs`.
 - **D2 (Luis): no** — los 19 insumos con stock y sin lugar no se pasan a TRANSITO. Forward-facing.
+- ⚠ **v31.05 (Luis, 15/10): esos insumos SÍ se VEN en Tránsito** (*"quiero que todos los insumos que tengan stock pero
+  no lugar en GV aparezcan en tránsito … que al apretarlos permita ubicarlos en un lugar góndola, rack o SC y SP"*).
+  **No se movió ningún dato** (D2 sigue: no hay movimiento a TRANSITO): `gv_transito_celda` suma una tercera rama
+  `origen='sin_lugar'` (las filas `insumo` de `gv_mapa_stock_sin_lugar`, menos lo que ya está en el saldo de Tránsito) y
+  el cartel «Stock sin lugar» del Mapa deja de listarlos. Al tocarlos: lo **recibido** sale por `gv_transito_ubicar`; lo
+  **sin lugar** se anota por `gv_insumo_posicion_guardar` (con `p_reemplaza_id` si estaba en un lugar inexistente).
+  - **Góndola es posición válida de un insumo**: `gv_gondola_sector` va al FINAL de `gv_insumo_sector` (0 de 685 celdas de
+    góndola chocan con un rack o una celda IN-). El modal pide la **clase** (Góndola · Rack · SC y SP) y valida la posición
+    contra esa clase en el front: «F3» con Góndola va a F03, no a IN-F3. La celda de góndola muestra «+ insumo …».
+  - Mapa: sin emojis en todo el módulo; las solapas de **Tránsito** y de **SC y SP** son sub-pestañas del mismo tamaño
+    que los cuatro modos (`#pmapTabs.pmap-subtabs`, siguen siendo `.lug-tab`); en Tránsito cada código es un botón-celda.
+  - `sql/gv_mapa_transito_v3105.sql` (centinelas `gv_transito_celda`/`sin_lugar`, `gv_insumo_sector`/`gv_gondola_sector`) ·
+    `tests/ins-transito-cajas.cjs`.
 - `sql/gv_transito_v3081.sql` + `sql/gv_transito_saldo_v3087.sql` (centinelas `gv_insumo_recepcion_transito`, `gv_insumo_sector`, `gv_transito_ubicar`) ·
   `tests/ins-envio-tipo.cjs` · `tests/ins-transito-cajas.cjs`.
 
@@ -136,6 +149,8 @@ H201part ... que no se mezclen"* · *"si ayer se unifico algo que quede marcadam
 ## ⚠ REGLA (Thomas, 2026-09-30, v24.69): un insumo con MC SALE siempre en MC — el stock queda en unidades
 
 *"Lo mínimo que se le manda es 1 MC… no bajan uni sueltas. Siempre por MC."* En Entrega de insumos (a Cervantes o bajado de racks), un insumo con MC en `Insumos_Factores` abre fijo en MC (`_insSaleMC`). El movimiento se guarda en la unidad BASE y la descripción dice lo cargado (`· cargado 3 MC × 4000`). Lo sostiene también el trigger **`gv_insumo_unidad_base`** (BEFORE INSERT, deposito `insumos`), que convierte cualquier carga en MC que llegue sin convertir. Los movimientos viejos en MC no se tocaron: la pantalla de insumos ya los suma con el factor. `sql/gv_insumo_unidad_base_v2469.sql`, `tests/ins-sale-mc.cjs`.
+
+⚠ **v31.06 (Luis, 15/10): se mueve FINO sólo si queda MENOS de 1 MC** (`_insFinoOk`): ahí se habilitan las otras unidades del insumo (`Insumos_Factores`: Cajas, Uni; `_insUnisFactor`). Con 1 MC o más, sigue fijo en MC enteras. Sin MC definida no hay restricción. Caso: 944P con 0,75 MC (3 cajas de una master de 4) no se podía mandar. Se sigue guardando en la base con `· cargado 3 Cajas × 36`.
 
 ## ⚠ REGLA (Luis, 2026-10-09, v29.22): INSUMOS del operario — RECIBIR arranca por la CATEGORÍA; a un INYECTOR sólo van las BOLSAS
 

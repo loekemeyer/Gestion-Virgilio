@@ -1,3 +1,30 @@
+## Nota v31.03 (2026-10-15) — Avisos de sistema C2 / C4 / C5 también en POP-UP para Luis
+
+Luis pidió canalizar avisos de Telegram a pop-ups en la app. Primer tramo (B y C del inventario de 30 días
+del `telegram_outbox`): los informes (B) quedan en Telegram; de los técnicos (C), **C2** (la clave pública
+intentó escribir en una tabla cerrada, `anon-bloqueo:…`), **C4** (celular nuevo / un celular con 2 operarios,
+`gv_disp…` y `gt-disp…`) y **C5** (login rechazado por red / ISIS sin facturas, `login_op…` y `gv_ingesta…`)
+**además** saltan en pop-up.
+
+- **Origen**: trigger `trg_gv_popup_desde_outbox` (AFTER INSERT en `telegram_outbox`) → `GV_Popup_Aviso`.
+  No se tocó ninguna función generadora; Telegram sigue igual. Si el insert del pop-up falla, el Telegram no se frena.
+- **"Logueado como Luis"** = sesión de supervisor (Google) + «Luis» elegido en el selector de rol (`gv_sup_quien`).
+  El mail de Google es compartido, así que no hay otra forma de saberlo.
+- **Sólo notifica**: botón «Aceptar». Aceptar en una página lo cierra en todas.
+- ⚠ **Telegram y pop-up CONVIVEN** hasta que Luis diga lo contrario (Luis, 15/10: *"no lo preguntes más"*). No proponer apagar el Telegram de un aviso que pasó a pop-up.
+- **v31.05 — app instalada y minimizada**: la ventana **no se puede restaurar sola** (Chrome bloquea `window.focus()` sin
+  click). En su lugar: aviso de Windows con su sonido, fijo hasta tocarlo (`requireInteraction`), que al tocarlo trae
+  la app al frente (`notificationclick` en `sw.js`); pitido de la página; número en el ícono de la barra de tareas
+  (`setAppBadge`). El permiso se pide al elegir «Luis» en el selector o al apretar Aceptar. Con la app CERRADA no
+  llega nada (haría falta Web Push, no está).
+- **C3** (monitor GT abierto fuera de horario) queda **sólo en Telegram** (Luis, D4). Lo mismo B (informes) y C1 (salud del outbox).
+- **Log** (`GV_Popup_Log`): un `mostrado` cada vez que salta en una página, un `aceptado` con rol, mail, dispositivo
+  y versión. Review: `select * from public.gv_popup_review order by creado_at desc;`
+- RPC `gv_popup_pendientes(persona)` y `gv_popup_evento(...)` con `gv_rpc_guard` (sólo supervisor); anon → 401 (medido).
+- Centinelas: `gv_popup_desde_outbox` (patrón `popup-c2c4c5-v3101`) y `trg_gv_popup_desde_outbox`.
+- `sql/gv_popup_avisos_luis_v3101.sql` · `tests/popup-avisos-luis.cjs`. (Los marcadores dicen v31.01: se trabajó
+  con ese número y salió en la v31.03 porque `main` avanzó en el medio.)
+
 ## Nota v30.99 (2026-10-15) — El bot de WhatsApp lee `gv_pedido_web_estado_pagina`, no `gv_remitos_controlados`
 
 Luis: *"lo que sea más seguro y menos propenso a problemas… traete el repo de GestOpClientes"*. Leído el repo

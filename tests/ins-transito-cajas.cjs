@@ -1,4 +1,5 @@
-/* v30.86 (Luis, 14/10) — tres cosas del mismo pedido (v30.87: + el 📍 Ubicar de Tránsito):
+/* v30.86 (Luis, 14/10) — tres cosas del mismo pedido (v30.87: + Ubicar de Tránsito; v31.05: códigos como botones,
+   sub-pestañas, los insumos con stock sin lugar también en Tránsito, clase de lugar góndola/rack/SC y SP, sin emojis):
    (a) el Mapa tiene la pestaña 🚚 Tránsito con sus DOS sectores (A guardar · Tránsito), leídos de gv_transito_celda;
    (b) la RECEPCIÓN de un insumo se graba con ubicacion = 'TRANSITO' (la base lo sostiene con aa_gv_insumo_recepcion_transito);
    (c) al ENTREGAR, la lista de cajas trae TODAS las cajas de GP2 (Sector Caja), no sólo las que Virgilio ya tiene;
@@ -18,12 +19,18 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
     // (a) pestaña Tránsito
     window.supaFetchAllSafe = async function (u) {
       if (/gv_transito_celda/.test(u)) return [
-        { sector: "AGUARDAR", cod: "328E", emp: "LK", descripcion: "art", cantidad: 12, unidad: "caj" },
-        { sector: "TRANSITO", cod: "N°19", emp: "IN", descripcion: "Fleje 13,6", cantidad: 144, unidad: "Kg" },
-        { sector: "TRANSITO", cod: "Caja Nº 8", emp: "IN", descripcion: "caja", cantidad: 50, unidad: "Cajas" }];
+        { sector: "AGUARDAR", cod: "328E", emp: "LK", descripcion: "art", cantidad: 12, unidad: "caj", origen: "a_guardar" },
+        { sector: "TRANSITO", cod: "N°19", emp: "IN", descripcion: "Fleje 13,6", cantidad: 144, unidad: "Kg", origen: "transito" },
+        { sector: "TRANSITO", cod: "Caja Nº 8", emp: "IN", descripcion: "caja", cantidad: 50, unidad: "Cajas", origen: "transito" },
+        { sector: "TRANSITO", cod: "N°94", emp: "IN", descripcion: "Fleje", cantidad: 835, unidad: "Kg", origen: "sin_lugar", ref_id: 77 },
+        { sector: "TRANSITO", cod: "FLEJE PROLIPROPILENO·SUNCHOS 12 MM", emp: "IN", descripcion: "", cantidad: 72, unidad: "Kg", origen: "sin_lugar" }];
+      if (/gv_rack_celda/.test(u)) return [{ sector: "X20", rack: "X", estado: "libre" }, { sector: "IN-F3", rack: "IN", estado: "libre" }];
+      if (/gv_scp_celda/.test(u)) return [{ sector: "IN-F3", col: "F", fila: 3, estado: "libre" }];
+      if (/gv_planimetria_celda/.test(u)) return [{ sector: "F03", gondola: "F", celda: 3, estado: "libre" }];
       return [];
     };
-    try { openPlanimMapa(); } catch (_e) {}
+    window.__isSupervisor = true;
+    try { await openPlanimMapa(); } catch (_e) {}
     const modos = Array.from(document.querySelectorAll(".pmap-modos .pmap-modo")).map(function (x) { return x.textContent; });
     pmapModo("transito");
     for (let i = 0; i < 50 && !_ptr; i++) await new Promise(function (s) { setTimeout(s, 20); });
@@ -32,15 +39,36 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
     ptrGo("TRANSITO");
     const grid2 = document.getElementById("pmapGrid").innerText;
     // v30.87: de Tránsito se sale UBICANDO (gv_transito_ubicar), con posición y cantidad, sin pasarse de lo que hay
-    let rpc = null; window.pmapRpc = async function (fn, body) { rpc = { fn: fn, body: body }; return { ok: true, data: { sector: "X20" } }; };
+    // v31.05: cada código es un BOTÓN (como las celdas de los otros modos); A guardar se ve pero no se ubica desde acá
+    out.btnsTr = document.querySelectorAll("#pmapGrid button.ptr-cell").length;
+    out.subtabs = document.getElementById("pmapTabs").classList.contains("pmap-subtabs");
+    // v31.08 (pase GV-UI): un nombre largo no se corta ni pisa la cantidad; la celda crece
+    out.celdaLarga = (function () { const c = [...document.querySelectorAll("#pmapGrid button.ptr-cell")].filter(function (b) { return /SUNCHOS/.test(b.textContent); })[0];
+      return c ? { alto: c.offsetHeight, sobra: c.scrollHeight - c.clientHeight, q: getComputedStyle(c.querySelector(".ptr-q")).fontSize } : null; })();
+    out.celdaOk = !!out.celdaLarga && out.celdaLarga.sobra <= 0;
+    ptrGo("AGUARDAR"); out.btnsAg = document.querySelectorAll("#pmapGrid button.ptr-cell").length; ptrGo("TRANSITO");
+    let rpc = null; window.pmapRpc = async function (fn, body) { rpc = { fn: fn, body: body }; return { ok: true, data: { sector: body.p_sector } }; };
     const iN = _ptr.findIndex(function (x) { return x.cod === "N°19"; });
-    ptrUbicarAbrir(iN);
+    ptrUbicarAbrir(iN); ptrClase("rack");
     document.getElementById("ptrUbSec").value = "X20"; document.getElementById("ptrUbCant").value = "500";
     await ptrUbicarOk(); const frenoTope = rpc === null;
     document.getElementById("ptrUbCant").value = "100";
     await ptrUbicarOk();
-    out.ubicar = /📍 Ubicar/.test(grid2) && !/Ubicar/.test(grid1) && frenoTope && !!rpc && rpc.fn === "gv_transito_ubicar" &&
+    out.ubicar = out.btnsTr === 4 && out.btnsAg === 0 && frenoTope && !!rpc && rpc.fn === "gv_transito_ubicar" &&
       rpc.body.p_cod === "N°19" && rpc.body.p_cantidad === 100 && rpc.body.p_sector === "X20" && rpc.body.p_unidad === "Kg";
+    // v31.05: el insumo con stock SIN LUGAR se ubica por gv_insumo_posicion_guardar y reemplaza el lugar inexistente;
+    // la clase elegida manda: «F3» con Góndola va a la celda F03, no a la IN-F3 de SC y SP
+    rpc = null;
+    const iS = _ptr.findIndex(function (x) { return x.cod === "N°94"; });
+    ptrUbicarAbrir(iS); ptrClase("gondola");
+    document.getElementById("ptrUbSec").value = "Z99"; await ptrUbicarOk(); const frenoClase = rpc === null;
+    document.getElementById("ptrUbSec").value = "F3"; await ptrUbicarOk();
+    out.sinLugar = frenoClase && !!rpc && rpc.fn === "gv_insumo_posicion_guardar" && rpc.body.p_sector === "F03" &&
+      rpc.body.p_cod === "N°94" && rpc.body.p_cantidad === 835 && rpc.body.p_reemplaza_id === 77;
+    out.rpcSin = rpc;
+    // y sin emojis en todo el módulo (Luis, 15/10)
+    const txtMod = document.getElementById("planimMapaOverlay").innerText + " " + document.getElementById("pmapSearch").placeholder;
+    out.sinEmoji = !/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFF0B\uFE62]/u.test(txtMod);
     out.a = /Tránsito/.test(modos[3] || "") && /A guardar/.test(tabs) && /Tránsito/.test(tabs) &&
             /328E/.test(grid1) && !/N°19/.test(grid1) && /N°19/.test(grid2) && /Caja Nº 8/.test(grid2);
     pmapModo("gondola");
@@ -82,7 +110,7 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
     return out;
   });
   await b.close();
-  const ok = r.a && r.ubicar && r.b && r.c && r.eiAlta && !errs.length;
+  const ok = r.a && r.ubicar && r.celdaOk && r.subtabs && r.sinLugar && r.sinEmoji && r.b && r.c && r.eiAlta && !errs.length;
   console.log("ins-transito-cajas:", JSON.stringify(r), errs.length ? "· errores: " + errs.join(" | ") : "· pageerrors: none", ok ? "· ✓ OK" : "· ✗ FALLA");
   process.exit(ok ? 0 : 1);
 })();
