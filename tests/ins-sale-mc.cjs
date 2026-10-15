@@ -3,7 +3,7 @@
    unidad base y el movimiento deja escrito lo que se cargó ("cargado 3 MC × 4000").
    Verifica: (a) en Entrega (EI) el pop-up abre fijo en MC; (b) aunque el ítem traiga "Uni", sale en
    MC; (c) el movimiento va en base (−12.000 Uni) con la nota; (d) en Recepción (RI) no se fuerza MC;
-   (e) un insumo sin MC (plástico) no se toca; (f) v31.02: se puede mover fino en Cajas. Sale 1 si falla. */
+   (e) un insumo sin MC (plástico) no se toca; (f) v31.06: con menos de 1 MC se puede mover fino en Cajas. Sale 1 si falla. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -21,22 +21,22 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     _insFactores = { "505C": { base: "Uni", unis: [{ u: "Uni", f: 1, base: true }, { u: "MC", f: 4000, base: false }, { u: "Cajas", f: 1000, base: false }] } };
     const out = {};
     _ins = { mode: "EI", legajo: "104", items: [
-      { cod: "505C", nombre: "cuchilla", cat: "importados", qty: 0, unidad: "Uni", stock: 0, stockByUni: [] },
+      { cod: "505C", nombre: "cuchilla", cat: "importados", qty: 0, unidad: "Uni", stock: 8000, stockByUni: [{ uni: "Uni", saldo: 8000 }] },
       { cod: "PP", nombre: "polipropileno", cat: "plastico", qty: 0, unidad: "Bolsas", stock: 0, stockByUni: [] }
     ], cat: "", filtro: "", qty: null };
     insOpenQty(0);
-    out.a = _ins.items[0].unidad === "MC" && /abre en MC/.test(body.innerHTML);
+    out.a = _ins.items[0].unidad === "MC" && /sale siempre en MC/.test(body.innerHTML) && !/insSetUnidad\(0,'Cajas'\)/.test(body.innerHTML);
     insOpenQty(1);
     out.e = _ins.items[1].unidad === "Bolsas";
     _ins.qty = null;
-    _ins.items[0].qty = 3; _ins.items[0].unidad = "Kg";   // (b) quedó una unidad que no es del insumo → MC
+    _ins.items[0].qty = 3; _ins.items[0].unidad = "Uni";   // (b) hay 2 MC: aunque quede Uni cargada, sale en MC
     await insConfirmar();
     const m = moved.filter(function (x) { return x.cod_art === "505C"; })[0] || {};
     out.b = !!m.cod_art;
     out.c = Number(m.delta) === -12000 && m.unidad === "Uni" && /cargado 3 MC × 4000/.test(m.descripcion || "");
-    // (f) v31.02 (Luis, 15/10): se puede mover fino en Cajas (unidad del insumo) y no se fuerza a MC
+    // (f) v31.06 (Luis, 15/10): con menos de 1 MC (3000 Uni) se puede mover fino en Cajas y no se fuerza a MC
     moved.length = 0;
-    _ins = { mode: "EI", legajo: "104", items: [{ cod: "505C", nombre: "cuchilla", cat: "importados", qty: 0, unidad: "Uni", stock: 0, stockByUni: [] }], cat: "", filtro: "", qty: null };
+    _ins = { mode: "EI", legajo: "104", items: [{ cod: "505C", nombre: "cuchilla", cat: "importados", qty: 0, unidad: "Uni", stock: 3000, stockByUni: [{ uni: "Uni", saldo: 3000 }] }], cat: "", filtro: "", qty: null };
     insOpenQty(0);
     out.f1 = /onclick="insSetUnidad\(0,'Cajas'\)"/.test(body.innerHTML);
     _ins.qty = null; _ins.items[0].qty = 3; _ins.items[0].unidad = "Cajas";

@@ -111,7 +111,7 @@ H201part ... que no se mezclen"* · *"si ayer se unifico algo que quede marcadam
 
 *"Lo mínimo que se le manda es 1 MC… no bajan uni sueltas. Siempre por MC."* En Entrega de insumos (a Cervantes o bajado de racks), un insumo con MC en `Insumos_Factores` abre fijo en MC (`_insSaleMC`). El movimiento se guarda en la unidad BASE y la descripción dice lo cargado (`· cargado 3 MC × 4000`). Lo sostiene también el trigger **`gv_insumo_unidad_base`** (BEFORE INSERT, deposito `insumos`), que convierte cualquier carga en MC que llegue sin convertir. Los movimientos viejos en MC no se tocaron: la pantalla de insumos ya los suma con el factor. `sql/gv_insumo_unidad_base_v2469.sql`, `tests/ins-sale-mc.cjs`.
 
-⚠ **v31.02 (Luis, 15/10): abre en MC, pero se puede mover FINO** en las otras unidades del insumo (`Insumos_Factores`: Cajas, Uni; `_insUnisFactor`). Caso: 944P con 0,75 MC (3 cajas de una master de 4) no se podía mandar. Sólo se fuerza a MC una unidad que no sea del insumo. Se sigue guardando en la base con `· cargado 3 Cajas × 36`.
+⚠ **v31.06 (Luis, 15/10): se mueve FINO sólo si queda MENOS de 1 MC** (`_insFinoOk`): ahí se habilitan las otras unidades del insumo (`Insumos_Factores`: Cajas, Uni; `_insUnisFactor`). Con 1 MC o más, sigue fijo en MC enteras. Sin MC definida no hay restricción. Caso: 944P con 0,75 MC (3 cajas de una master de 4) no se podía mandar. Se sigue guardando en la base con `· cargado 3 Cajas × 36`.
 
 ## ⚠ REGLA (Luis, 2026-10-09, v29.22): INSUMOS del operario — RECIBIR arranca por la CATEGORÍA; a un INYECTOR sólo van las BOLSAS
 
