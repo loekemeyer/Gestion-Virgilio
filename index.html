@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.26">
+<link rel="stylesheet" href="gv-ui.css?v=31.27">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6473,7 +6473,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.26"></script>
+<script type="module" src="recepcion.js?v=31.27"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10818,7 +10818,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.26";
+const APP_VERSION = "v31.27";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -21896,6 +21896,16 @@ var STK_POP_CSS =
   ".mva-tbl thead th{position:sticky;top:0;background:#f8fafc;color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.03em;font-weight:800;}" +
   ".mva-tbl th.num,.mva-tbl td.mva-cant,.mva-tbl td.mva-sal{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;width:15%;padding-top:8px;}" +
   ".mva-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}" +   // v8.92 — alinear números de la columna Cajas con su header
+  /* v31.27 (Thomas) — popup «Cajas pedidas»: 5 columnas con table-layout:fixed sin ancho propio se
+     repartían parejo (~20%) y la celda NP (nowrap, sin overflow:hidden) desbordaba sobre Razón Social.
+     Anchos acordes al contenido: NP deja bajar WEB/tanda/fecha, Razón Social toma el resto y trunca. */
+  ".mva-tbl.cp-tbl th{white-space:normal;}" +
+  ".mva-tbl.cp-tbl td,.mva-tbl.cp-tbl th{overflow:hidden;text-overflow:ellipsis;}" +
+  ".mva-tbl.cp-tbl td:first-child{white-space:normal;}" +
+  ".mva-tbl.cp-tbl td:first-child,.mva-tbl.cp-tbl th:first-child{width:34%;}" +
+  ".mva-tbl.cp-tbl td:nth-child(3),.mva-tbl.cp-tbl th:nth-child(3){width:46px;}" +
+  ".mva-tbl.cp-tbl td:nth-child(4),.mva-tbl.cp-tbl th:nth-child(4){width:58px;}" +
+  ".mva-tbl.cp-tbl td:nth-child(5),.mva-tbl.cp-tbl th:nth-child(5){width:52px;}" +
   // v11.70 — TABLA ANCHA (Pedidos Importación). Las 14 columnas no entran en el layout
   // por defecto de .mva-tbl: 11 columnas .num × 15% = 165% del ancho, así que con
   // table-layout:fixed el navegador achicaba Código/Descripción casi a 0 (se pisaban
@@ -23685,7 +23695,7 @@ async function stkOpenCajasPedidasArt(codEnc) {
   let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codDisp) + '</b>' + (_empFiltro ? ' <b style="color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empFiltro + '</b>' : '') + ' · pedido <b>PENDIENTE</b>: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s)' + (_yaTxt ? ' <small style="color:#94a3b8">(+' + _yaTxt + ' — no se muestran; verlas en 🕓 Historial)</small>' : '') + '.' + (_spRows.length > 0 ? '<br><small style="color:#b45309">⚠️ ' + _spRows.length + ' NP (' + _cSP + ' cajas) en la base pero SIN programar en el PPP — marcadas ⚠️ abajo (esto dispara el ⚠️ de la columna).</small>' : '') + '</div>';
   h += '<div style="margin-bottom:10px"><button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="stkCajasPedidasExport()">⬇ Exportar a Excel</button></div>';
   // v8.90: formato tabla en lugar de lista
-  h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>NP</th><th>Razón Social</th><th class="num">Cajas</th><th style="text-align:center">📦 Pick</th><th style="text-align:center">🧾 Arm</th></tr></thead><tbody>';
+  h += '<div class="mva-tblwrap"><table class="mva-tbl cp-tbl"><thead><tr><th>NP</th><th>Razón Social</th><th class="num">Cajas</th><th style="text-align:center">📦 Pick</th><th style="text-align:center">🧾 Arm</th></tr></thead><tbody>';
   h += rowsArr.map(function (r) {
     var pkCell = r.pickeado ? '<span style="color:#166534;font-weight:800">✓' + stkSigBadge(stkSigla(pickerByTanda[r.tanda]), "#166534") + '</span>' : '<span style="color:#b45309">—</span>';
     var spCell = r.separado ? '<span style="color:#1e40af;font-weight:800">✓' + stkSigBadge(stkSigla(sepByTanda[r.tanda]), "#1e40af") + '</span>' : '<span style="color:#94a3b8">—</span>';
@@ -64461,7 +64471,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.26"></script>
+<script src="importacion.js?v=31.27"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67782,15 +67792,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.26"></script>
-<script src="hotsale.js?v=31.26"></script>
-<script src="estadisticas.js?v=31.26"></script>
-<script src="ads.js?v=31.26"></script>
-<script src="plantel.js?v=31.26"></script>
+<script src="cobranzas.js?v=31.27"></script>
+<script src="hotsale.js?v=31.27"></script>
+<script src="estadisticas.js?v=31.27"></script>
+<script src="ads.js?v=31.27"></script>
+<script src="plantel.js?v=31.27"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.26"></script>
+<script src="analisis.js?v=31.27"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.26"></script>
+<script src="ayuda.js?v=31.27"></script>
 
 </body>
 </html>
