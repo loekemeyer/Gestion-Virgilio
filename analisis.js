@@ -376,33 +376,61 @@ function _anGlosarioHtml(d) {
     '<b>Rendimiento</b>: cuánto más rápido o más lento fue que su dificultad. 0 % = al ritmo esperado; +20 % = tardó un 20 % menos; −20 % = tardó un 20 % más.<br>' +
     '<b>Esperado</b>: el tamaño de la tanda según el esquema de dificultad (códigos, cajas, paradas, alturas).<br>' +
     '<b>Real</b>: de que tomó la tanda a que la cerró, menos pausas declaradas y huecos de más de 5 minutos, más la cola.<br>' +
-    '<b>Desde el anterior</b>: lo que pasó entre que confirmó el código de arriba y éste.<br>' +
-    '<b>Normal del código</b>: lo que tarda ese código habitualmente (mediana de 120 días, con sus cajas).<br>' +
+    '<b>Esperado</b>: lo que debería tardar ese código por su dificultad (su base histórica de 120 días más sus cajas).<br>' +
+    '<b>Real</b>: lo que pasó entre que confirmó el código de arriba y éste (incluye la caminata; no descuenta pausas).<br>' +
+    '<b>Dif</b>: Esperado − Real. En verde si fue más rápido de lo esperado (a favor), en rojo si fue más lento (en contra), 0 si quedó igual. La tabla ordena por la diferencia más grande arriba.<br>' +
     '<b>Frente a la góndola</b>: de que la pantalla mostró el código a que lo confirmó. Ésa es la que mide trabajo de verdad.<br>' +
     '<b>s por caja</b>: sale del momento en que se tocó OK, no de cuándo se levantó la caja. Un número chico solo no prueba nada.' +
     (d.nota_paso ? '<br><b>Ojo</b>: ' + _anEsc(d.nota_paso) : '') + '</div></details>';
 }
 
+/* Diferencia por código = esperado − real, en segundos con signo.
+   + (verde) = tardó menos de lo esperado (a favor) · − (rojo) = tardó más (en contra) · 0 = neutro. */
+function _anDif(esp, real) {
+  if (esp == null || real == null) return { txt: "—", col: "var(--gv-ink-2)", n: null };
+  var d = Number(esp) - Number(real), r = Math.round(d);
+  if (Math.abs(r) <= 1) return { txt: "0 s", col: "var(--gv-ink-2)", n: 0 };
+  return { txt: (d > 0 ? "+" : "−") + _anSeg(Math.abs(d)), col: d > 0 ? "var(--gv-ok)" : "var(--gv-error)", n: d };
+}
 function _anTablaHtml(L) {
+  // Más lejos de lo esperado, arriba (a favor o en contra); los códigos sin esperado van al final.
+  var R = L.slice().sort(function (a, b) {
+    var da = (a.esp_seg != null && a.seg != null) ? Math.abs(a.esp_seg - a.seg) : -1;
+    var db = (b.esp_seg != null && b.seg != null) ? Math.abs(b.esp_seg - b.seg) : -1;
+    return db - da;
+  });
   var h = '<details open><summary>Código por código<span class="n">' + L.length + '</span></summary>' +
     '<div class="gv-tblwrap"><table class="gv-tbl"><thead><tr>' +
     '<th>#</th><th>Código</th><th>Descripción</th><th>Góndola</th><th>Cajas</th>' +
-    '<th>Desde el<br>anterior</th><th>Normal<br>del código</th><th>Veces<br>lo normal</th>' +
+    '<th>Esperado</th><th>Real</th><th>Dif</th>' +
     '<th>Frente a<br>la góndola</th><th>s por<br>caja</th></tr></thead><tbody>';
-  L.forEach(function (x) {
+  var tE = 0, tR = 0, tn = 0;
+  R.forEach(function (x) {
+    if (x.esp_seg != null && x.seg != null) { tE += Number(x.esp_seg); tR += Number(x.seg); tn++; }
     var mala = (Number(x.ratio) > 6 && Number(x.seg) > 300) ||
                (x.seg_vista != null && Number(x.seg_vista) >= 0 && Number(x.seg_vista) < 2 && Number(x.cajas) >= 3) ||
                (Number(x.falto_armado) > 0 && Number(x.cajas) >= Number(x.pedidas));
+    var dif = _anDif(x.esp_seg, x.seg);
     h += '<tr' + (mala ? ' class="mala"' : '') + '><td>' + _anN(x.orden, 0) + '</td>' +
       '<td><b>' + _anEsc(x.cod) + '</b></td><td class="t">' + _anEsc(x["desc"] || "") + '</td>' +
       '<td>' + _anEsc(x.sector || "—") + (x.es_exc ? " ·EXC" : "") + '</td>' +
       '<td>' + _anN(x.cajas, 0) + (Number(x.pedidas) > Number(x.cajas) ? ' <span style="color:var(--gv-error)">de ' + _anN(x.pedidas, 0) + '</span>' : '') + '</td>' +
-      '<td>' + _anSeg(x.seg) + '</td><td>' + _anSeg(x.esp_seg) + '</td>' +
-      '<td' + (Number(x.ratio) > 6 ? ' style="color:var(--gv-error);font-weight:800"' : '') + '>' + (x.ratio != null ? _anN(x.ratio, 1) + "×" : "—") + '</td>' +
+      '<td>' + _anSeg(x.esp_seg) + '</td>' +
+      '<td' + (Number(x.ratio) > 6 ? ' style="color:var(--gv-error);font-weight:800"' : '') + '>' + _anSeg(x.seg) + '</td>' +
+      '<td style="color:' + dif.col + ';font-weight:700">' + dif.txt + '</td>' +
       '<td' + (x.seg_vista != null && Number(x.seg_vista) < 2 ? ' style="color:var(--gv-error);font-weight:800"' : '') + '>' + _anSeg(x.seg_vista) + '</td>' +
       '<td>' + (x.seg_caja != null ? _anN(x.seg_caja, 1) : "—") + '</td></tr>';
   });
-  return h + '</tbody></table></div></details>';
+  if (tn) {
+    var td = _anDif(tE, tR);
+    h += '</tbody><tfoot><tr><td></td><td colspan="4"><b>Total de los ' + tn + ' códigos</b></td>' +
+      '<td><b>' + _anSeg(tE) + '</b></td><td><b>' + _anSeg(tR) + '</b></td>' +
+      '<td style="color:' + td.col + ';font-weight:800">' + td.txt + '</td><td></td><td></td></tr></tfoot>';
+  } else { h += '</tbody>'; }
+  h += '</table></div>' +
+    '<div style="font-size:12px;color:var(--gv-ink-2);margin-top:6px;line-height:1.35">El «Real» de cada código es desde que confirmó el anterior (incluye la caminata, no descuenta pausas), así que este total NO cierra con el «real» de la fase, que sí resta pausas y huecos y suma la cola.</div>' +
+    '</details>';
+  return h;
 }
 
 function _anDetalleHtml() {

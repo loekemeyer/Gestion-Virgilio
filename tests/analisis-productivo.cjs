@@ -127,6 +127,8 @@ const DET = {
     out.filas = filas.length;
     out.malas = filas.filter((f) => f.classList.contains("mala")).map((f) => f.cells[1].textContent);
     out.f1 = filas[0] ? [...filas[0].cells].map((c) => c.textContent.trim()) : [];
+    out.primeraFila = filas[0] ? filas[0].cells[1].textContent.trim() : "";
+    out.difFila = filas[0] ? filas[0].cells[7].textContent.trim() : "";
     out.volver = !!document.querySelector("#anOv .an-top button[onclick='anVolver()']");
     out.concl = (document.querySelector("#anOv .gv-state .v") || {}).textContent || "";
     out.mkBotones = document.querySelectorAll("#anOv .an-mk-b").length;
@@ -236,7 +238,10 @@ const DET = {
   ok(r.cards.join(" ").indexOf("rendimiento") >= 0 && r.cards.join(" ").indexOf("dificultad") >= 0,
      "(c) faltan las tarjetas de rendimiento y dificultad: " + JSON.stringify(r.cards));
   ok(r.cols.join("|").indexOf("Frente a la góndola") >= 0, "(c) falta la columna «Frente a la góndola»: " + JSON.stringify(r.cols));
-  ok(r.cols.join("|").indexOf("Veces lo normal") >= 0, "(c) falta la columna «Veces lo normal»");
+  ok(["Esperado", "Real", "Dif"].every(function (c) { return r.cols.indexOf(c) >= 0; }),
+     "(c) faltan las columnas Esperado/Real/Dif del ítem por ítem: " + JSON.stringify(r.cols));
+  ok(/−|-/.test(r.difFila) && r.difFila !== "—", "(c) la columna Dif no muestra la diferencia con signo: «" + r.difFila + "»");
+  ok(/^(437E|865E)/.test(r.primeraFila), "(c) la tabla no ordenó por la diferencia más grande arriba: " + r.primeraFila);
   ok(r.filas === 2, "(c) filas de la tabla: " + r.filas);
   ok(r.malas.length === 2, "(c) las dos líneas raras tendrían que ir marcadas, van " + r.malas.length);
   ok(/timeout/.test(r.rota) && r.rotaNoVacio, "(d) una lectura rota no se dijo: «" + r.rota + "»");
