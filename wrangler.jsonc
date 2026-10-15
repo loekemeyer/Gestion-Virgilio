@@ -3,12 +3,12 @@
 // "name" tiene que coincidir con el nombre del Worker en el panel de Cloudflare.
 // El subdominio va ACÁ y no en el panel: cada deploy pisa las rutas con las de este archivo.
 {
-  "name": "gestion",
+  "name": "gestion-virgilio",
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./"
   },
   "routes": [
-    { "pattern": "gestion.loeke-erp.com", "custom_domain": true }
+    { "pattern": "gv.loeke-erp.com", "custom_domain": true }
   ]
 }
