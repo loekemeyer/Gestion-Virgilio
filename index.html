@@ -65987,6 +65987,31 @@ function _concilCompChip(np) {
     (fcs ? " en " + fcs : "") + (sinF ? ". " + sinF + " complemento(s) todavía sin factura en ISIS." : ".") +
     " La diferencia contra lo armado de hoy puede estar en esa factura, no en la original.") + '">♻ +' + cj + ' cj' + (sinF ? ' · sin FC' : '') + '</span>';
 }
+/* v30.96 (Luis, 15/10) — FACTURAS ANULADAS POR NC. ISIS no dice qué FC anula cada NC: el servidor
+   las aparea por firma (cliente + total + artículos × cantidades) como una pila — la NC anula la
+   última FC viva igual a ella (GV_FC_Anulada, gv_fc_nc_aparear) — y el cruce ya no las asigna.
+   Acá se muestran como chip en la NP: «refacturada» si tiene una FC viva, «anulada» si no. Su
+   propia llamada: si falla, la Conciliación carga igual, sin chip. */
+function _concilAnulCargar() {
+  var nps = (_concil.rows || []).map(function (r) { return String(r.np || ""); }).filter(Boolean);
+  if (!nps.length) return;
+  facRpc("gv_fc_anuladas_np", { p_nps: nps }).then(function (rows) {
+    var m = {};
+    (rows || []).forEach(function (x) { (m[String(x.np)] = m[String(x.np)] || []).push(x); });
+    _concil.anul = m; concilRender();
+  }).catch(function () { /* sin chip */ });
+}
+function _concilAnul(r) { return (_concil.anul || {})[String(r.np)] || null; }
+function _concilFcCorto(c) { var m = String(c || "").match(/(\d{4})-0*(\d+)$/); return m ? m[1] + "-" + m[2] : String(c || ""); }
+function _concilAnulChip(r) {
+  var ls = _concilAnul(r);
+  if (!ls || !ls.length) return "";
+  var viva = r.factura_neto != null;
+  var det = ls.map(function (x) { return "FC " + _concilFcCorto(x.fc_comprobante) + " anulada por NC " + _concilFcCorto(x.nc_comprobante); }).join(" · ");
+  return ' <span class="frec-chip ' + (viva ? 'comp' : 'sinfc') + '" title="' + escapeHtml(det + (viva
+      ? ". La NP quedó con la factura vigente " + (r.comprobante_id ? _concilFcCorto(r.comprobante_id) : "") + "."
+      : ". No hay otra factura vigente para esta NP.")) + '">⊘ ' + (viva ? 'refacturada ×' + ls.length : 'FC anulada') + '</span>';
+}
 async function _concilRefreshInner(cont, forzar) {
   _concilCompCargar();
   var rb = document.getElementById("concilBtnRefr"); if (rb) { rb.disabled = true; rb.textContent = "Actualizando…"; }
@@ -66020,6 +66045,7 @@ async function _concilRefreshInner(cont, forzar) {
     _concil.rows = pr[0].data || [];
     var tot = {}; (pr[1].data || []).forEach(function (r) { tot[r.estado] = { n: Number(r.n) || 0, suma: Number(r.suma_diff) || 0 }; });
     _concil.tot = tot;
+    _concilAnulCargar();
   } catch (e) {
     cont.innerHTML = '<div style="padding:20px;color:#b91c1c;">No se pudo cargar la conciliación: ' + escapeHtml((e && e.message) || String(e)) + '</div>';
     return;
@@ -66102,7 +66128,9 @@ function concilRender() {
       ? '<span style="color:#dc2626;font-weight:800;" title="La factura de ISIS no coincide con lo armado. Mirá ¿Por qué? y 🔍 Comparar.">⚠ Diferencia</span>'
       : ((r.estado === "diff" && dHoy != null)
           ? '<span style="color:#047857;font-weight:800;" title="' + escapeHtml(snapTxt) + ' · el cálculo actual de Gestión ya da igual que ISIS.">✔ Corregido</span>'
-          : '<span style="color:' + est[0] + '">' + est[1] + '</span>');
+          : ((r.factura_neto == null && _concilAnul(r))
+              ? '<span style="color:#b45309;font-weight:800;" title="La factura de esta NP se anuló con una nota de crédito y no hay otra vigente.">Anulada por NC</span>'
+              : '<span style="color:' + est[0] + '">' + est[1] + '</span>'));
     // v22.25: la diferencia de HOY (factura − cálculo actual); la del snapshot va en el tooltip.
     var diffCell = (dHoy == null) ? "—"
       : (esD ? '<span style="color:' + (dHoy > 0 ? "#dc2626" : "#b45309") + ';" title="' + escapeHtml(snapTxt) + '">' + _fmtPlata(dHoy) + '</span>'
@@ -66110,7 +66138,7 @@ function concilRender() {
     var needMot = esD;
     var motivoCell = r.motivo ? escapeHtml(r.motivo) : (needMot ? '<span style="color:#94a3b8;">…</span>' : "");
     return '<tr' + (esD ? ' style="background:#fef2f2;"' : '') + '>' +
-      '<td><b>' + escapeHtml(r.np || "") + '</b> ' + _npSrcChip(r.np) + _concilCompChip(r.np) + '</td>' +
+      '<td><b>' + escapeHtml(r.np || "") + '</b> ' + _npSrcChip(r.np) + _concilCompChip(r.np) + _concilAnulChip(r) + '</td>' +
       '<td>' + escapeHtml((r.cod_cliente || "") + " " + (r.razon_social || "—")) + (r.es_super ? " 🛒" : "") + '</td>' +
       '<td style="font-size:12px;color:#64748b;white-space:nowrap;">' + _concilFecha(r.registrado_at) + (r.tanda ? ' <span style="color:#94a3b8;">' + escapeHtml(r.tanda) + '</span>' : '') + '</td>' +
       '<td class="num">' + (r.cajas_ent != null ? Math.round(Number(r.cajas_ent)) : "—") + (r.factura_cajas != null ? ' <span style="color:#94a3b8;">/ ' + Math.round(Number(r.factura_cajas)) + '</span>' : '') + '</td>' +
