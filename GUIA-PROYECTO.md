@@ -1,3 +1,8 @@
+## Nota v30.91 (2026-10-15) — La entrega de insumos descuenta primero de Tránsito
+
+- Trigger `zy_gv_insumo_entrega_transito`: si hay saldo en Tránsito, la entrega sale de ahí; si no alcanza, se parte
+  (lo de Tránsito + el resto de la posición). `sql/gv_entrega_transito_v3091.sql`.
+
 ## Nota v30.90 (2026-10-15) — Cajas: todos los códigos y alta a mano al recibir y al entregar
 
 - En cajas, Recibir y Entregar muestran todos los códigos de Virgilio (incluidos los TMP) y de Cervantes, con o sin
