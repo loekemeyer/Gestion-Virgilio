@@ -16887,6 +16887,12 @@ function postBajaRacks(items) {
       var transient = (r.status === 401 || r.status === 403 || r.status === 404 || r.status === 409 || r.status === 429 || r.status >= 500);
       if (transient) throw new Error("HTTP " + r.status);
       try { console.error("postBajaRacks HTTP " + r.status + " — descartado", items); } catch (_e) {}
+      // v31.12 (D2): el operario veía «✓ Bajaste» y la bajada no existía. Ahora se le dice qué no se grabó y por qué.
+      return r.text().then(function (t) {
+        let msg = t; try { const j = JSON.parse(t); msg = j.message || t; } catch (_e) {}
+        const cods = items.map(function (it) { return it.cod_art + " " + (it.cajas || 0) + " cj" + (it.sector ? " (" + it.sector + ")" : ""); }).join(", ");
+        try { alert("⚠ La bajada de racks NO se registró: " + cods + ".\n\n" + String(msg || "").replace(/^RACKS_[A-Z_]+:\s*/, "") + "\n\nVolvé a cargarla con la posición correcta."); } catch (_e) {}
+      }).catch(function () {});
     })
     .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_baja_racks_pend") || "[]"); p.push.apply(p, items); localStorage.setItem("vir_baja_racks_pend", JSON.stringify(p.slice(-2000))); } catch (_e) {} });
 }
@@ -16894,7 +16900,12 @@ function bajaRacksFlushPend() {
   let p = []; try { p = JSON.parse(localStorage.getItem("vir_baja_racks_pend") || "[]"); } catch (_e) {}
   if (!p.length) return;
   fetch(SUPABASE_BAJARACKS_RPC, { method: "POST", headers: _bajaRacksHeaders(), body: JSON.stringify({ p_items: p }) })
-    .then(function (r) { if (r.ok) { try { localStorage.removeItem("vir_baja_racks_pend"); } catch (_e) {} } })
+    .then(function (r) {
+      if (r.ok) { try { localStorage.removeItem("vir_baja_racks_pend"); } catch (_e) {} return; }
+      // v31.12: el RPC es UNA transacción: un ítem rechazado (400) trababa la cola entera para siempre. Se reenvía de a
+      // uno: los buenos entran, el rechazado se avisa (postBajaRacks) y el que falla por red vuelve a la cola.
+      if (r.status === 400) { try { localStorage.removeItem("vir_baja_racks_pend"); } catch (_e) {} p.forEach(function (it) { postBajaRacks([it]); }); }
+    })
     .catch(function () {});
 }
 try { window.addEventListener("online", function () { try { bajaRacksFlushPend(); } catch (_e) {} }); bajaRacksFlushPend(); } catch (_e) {}
@@ -27413,7 +27424,7 @@ function _stkDep() { const e = document.getElementById("stkAjDep"); return (e &&
    MISMA tabla — se unificó para no tener que cambiar dos constantes si migra la tabla. */
 const SUPABASE_RACKS_ORD_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Ordenes";
 const SUPABASE_RACKS_BAJ_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Bajadas";
-/* v31.12 (Luis, 15/10): las CAJAS POR MASTER tienen UNA fuente: GV_Rack_CxM (sql/gv_cxm_canonica_v3112.sql).
+/* v31.13 (Luis, 15/10): las CAJAS POR MASTER tienen UNA fuente: GV_Rack_CxM (sql/gv_cxm_canonica_v3113.sql).
    Ni Articulos.Cajas_x_Master (retirada) ni el ratio inner/master de la planimetría. Devuelve
    { COD: cxm } (sin master = 0). Toda pantalla que necesite el dato pasa por acá. */
 async function gvFetchCxM() {
@@ -27430,7 +27441,7 @@ async function stockFetchArtFactors() {
     const rows = Array.isArray(res[0]) ? res[0] : [], cxm = res[1] || {};   // v22.32: es un array, no un Response
     const m = {};
     rows.forEach(function (x) { const k = String(x.Cod_Art || "").toUpperCase(); if (!k) return; if (!m[k]) m[k] = { cajasXMaster: cxm[k] || 0, uniXCaja: Number(x.Uni_x_Caja) || 0 }; else if (!m[k].uniXCaja && x.Uni_x_Caja) m[k].uniXCaja = Number(x.Uni_x_Caja); });
-    Object.keys(cxm).forEach(function (k) { if (!m[k]) m[k] = { cajasXMaster: cxm[k], uniXCaja: 0 }; });   // v31.12: cxm de la canónica
+    Object.keys(cxm).forEach(function (k) { if (!m[k]) m[k] = { cajasXMaster: cxm[k], uniXCaja: 0 }; });   // v31.13: cxm de la canónica
     return m;
   } catch (_e) { return {}; }
 }
@@ -27562,7 +27573,7 @@ function stkAutoBajadaCompute() {
   // CxM (cajas por master) derivado de la PLANIMETRÍA: por código, si todas las celdas
   // ocupadas con master>0 dan el MISMO ratio ENTERO inner/master, ese es el CxM. Así el
   // automático no depende de que esté cargado el maestro (mismo criterio que rkbFetchCxM).
-  // v31.12: el CxM sale de la canónica GV_Rack_CxM (vía factors); ya no se deriva de la planimetría.
+  // v31.13: el CxM sale de la canónica GV_Rack_CxM (vía factors); ya no se deriva de la planimetría.
   const cxmPlani = {};
   const bajar = [], sinMaster = [];
   Object.keys(capByCod).forEach(function (k) {
@@ -30420,7 +30431,7 @@ async function showGuardarOrden(legajo) {
       const aGuardar = Math.round(Number(a.a_guardar) || 0), exc = Math.round(Number(a.excedente) || 0), racks = Math.round(Number(a.racks) || 0);
       if (aGuardar + exc + racks <= 0) return null;   // nada esperando para bajar
       const cap = Math.round(_rkbCapDe(a.cod, capObj)), gond = Math.round(Number(a.terminado) || 0);
-      // v8.90 · v31.12: cxm de la canónica GV_Rack_CxM (las dos vías leen lo mismo)
+      // v8.90 · v31.13: cxm de la canónica GV_Rack_CxM (las dos vías leen lo mismo)
       // v30.27: el DUAL viene "438E LK" pero la planimetría/factores lo guardan pelado ("438E") →
       // se busca con sufijo y se cae al pelado (mismo criterio que «¿Qué bajar primero?», L29156).
       var _kkG = _cpNorm(a.cod), _kbG = _kkG.replace(/\s+(LK|CH)$/, "");
@@ -30583,7 +30594,7 @@ async function rkbFetchCxM() {
       if (inn > 0) { if (!locs[k]) locs[k] = []; locs[k].push({ sector: String(x.sector || "").trim(), master: mas, inner: inn }); }
     });
     Object.keys(locs).forEach(function (k) { locs[k].sort(function (a, b) { return b.inner - a.inner; }); });
-    // v22.77 · v31.12: las cajas por master viven SÓLO en la canónica GV_Rack_CxM (ya no se deriva de la planimetría).
+    // v22.77 · v31.13: las cajas por master viven SÓLO en la canónica GV_Rack_CxM (ya no se deriva de la planimetría).
     const map = {}, _cx = await gvFetchCxM();
     Object.keys(_cx).forEach(function (c) { if (_cx[c] > 0) map[_cpNorm(String(c).replace(/\s+/g, ""))] = _cx[c]; });
     return { cxm: map, locs: locs };
@@ -30647,7 +30658,7 @@ async function showRacksBajarModal(legajo, _resume) {
       .sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); })
       .map(function (a) {
         const kN = _cpNorm(a.cod), locs = (locsMap[kN] || []).slice().sort(function (x, y) { return x.inner - y.inner; });   // v24.68: la que MENOS tiene primero (se vacía y libera el lugar)
-        // v8.90 · v31.12: cxm de la canónica GV_Rack_CxM (las dos vías leen lo mismo)
+        // v8.90 · v31.13: cxm de la canónica GV_Rack_CxM (las dos vías leen lo mismo)
         var _cxmR = cxmMap[kN] || 0;
         if (!_cxmR) { var _fR = _facRkb[String(a.cod).toUpperCase()]; if (_fR && _fR.cajasXMaster > 0) _cxmR = _fR.cajasXMaster; }
         // sec preseleccionada = la ubicación con más stock (planimetría viva, v5.22)
@@ -30829,11 +30840,33 @@ function _gvAnularCss() {
   s.textContent = ".gv-anular{display:block;width:100%;margin:10px 0 0;padding:12px;border:1.5px solid #fca5a5;border-radius:12px;background:#fff;color:#b91c1c;font-size:15px;font-weight:800;cursor:pointer;box-sizing:border-box}.gv-anular:active{background:#fef2f2}";
   document.head.appendChild(s);
 }
+/* v31.12 (Luis, 15/10, D2) — cada posición elegida tiene que ser un RACK del Mapa (gv_rack_sector, anon). El 14/10 se
+   bajaron 54 cajas de 438E con «F15» (la góndola): la base lo grabó sin posición, el Mapa mostró −54 y AD11 quedó
+   inflado. La base ahora lo rechaza (RACKS_NO_ES_RACK); esto lo frena antes, con el operario todavía frente al rack.
+   ⚠ Si no se puede verificar (sin red), no frena: «no pude leer» no es «no es rack», y la base lo vuelve a mirar. */
+async function _rkbPosNoRack(sel) {
+  const malas = [], vistas = {};
+  for (let i = 0; i < sel.length; i++) {
+    const sec = String(sel[i].sec || "").trim().toUpperCase();
+    if (!sec || vistas[sec]) continue; vistas[sec] = true;
+    try {
+      const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_rack_sector", { method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: JSON.stringify({ p: sec }) });
+      if (!r.ok) continue;
+      const v = await r.json();
+      if (v === null || (typeof v === "string" && v.trim() === "")) malas.push(sec);
+    } catch (_e) {}
+  }
+  return malas;
+}
 async function rkbConfirmar() {
   if (!_rkb) return;
   const sel = _rkb.items.filter(function (it) { return it.baja > 0; });
   if (!sel.length) return;
   if (sel.some(function (it) { return !String(it.sec || "").trim(); })) { alert("Falta la posición de rack de algún código: sin posición no se registra."); return; }
+  // v31.12 (Luis, 15/10, D2): una posición que el Mapa no conoce como rack no se manda (F15 = góndola del 438E, 14/10)
+  const _rkbMalas = await _rkbPosNoRack(sel);
+  if (_rkbMalas.length) { alert("«" + _rkbMalas.join("», «") + "» no es una posición de rack (¿es la góndola?).\n\nDecí de qué RACK bajás. No se registró nada."); return; }
   // v24.68: lo que no entra en góndola va a EXCEDENTE, avisado antes
   const excTot = sel.reduce(function (s, it) { return s + rkbExc(it); }, 0);
   if (excTot > 0 && !confirm("⚠ No entran " + excTot + " caja(s) en góndola: van a EXCEDENTE.\n\nLo correcto es bajar sólo lo que entra. ¿Seguir igual?")) return;
@@ -31341,7 +31374,7 @@ async function irFetchCodigos() {
   return arr;
 }
 async function irFetchCxM(_plani) {
-  // v31.12: de la canónica GV_Rack_CxM (antes: Articulos.Cajas_x_Master + ratio de la planimetría)
+  // v31.13: de la canónica GV_Rack_CxM (antes: Articulos.Cajas_x_Master + ratio de la planimetría)
   const cx = {}, m = await gvFetchCxM();
   Object.keys(m).forEach(function (k) { const kk = _irNorm(k); if (kk && m[k] > 0 && !cx[kk]) cx[kk] = m[k]; });
   return cx;
