@@ -68,6 +68,8 @@ catch (_e) {
     out.headCajon = /Cajón según GP2/.test(head) && /Cód C/.test(head) && /Kg\/caj/.test(head) && /Kg\/uni/.test(head) && /Uni\/caj/.test(head);
     out.batidor = (fila("Batidor Pera p/Cromar") || []).join(" | ");
     out.sinVinc = (fila("Z26") || []).join(" | ");
+    // v31.02 (pase GV-UI): el que falta es «—» y el motivo va en el title
+    out.sinVincTitle = Array.from(document.querySelectorAll("#stkInsCatPopBody [title]")).some(e => e.title === "sin vincular en GP2");
     stkInsCatPopup("parte_procesado");
     out.a1 = (fila("A1") || []).join(" | ");
     stkInsCatPopup("fleje");
@@ -79,7 +81,7 @@ catch (_e) {
   });
   const pass = r.headCajon === true &&
     /GRJ10 \| 29,99 \| 0,098 \| 306 \| ≈ 4\.590/.test(r.batidor) &&
-    /sin vincular en GP2/.test(r.sinVinc) &&
+    /Z26 \| — \| Pieza sin vincular \| — \|/.test(r.sinVinc) && r.sinVincTitle === true &&
     /A1 \| 30,01 \| 0,0397 \| 756 \| ≈ 10\.584/.test(r.a1) &&
     r.flejeSinCajon === true && /no se pudo leer GP2/.test(r.rota) && !/sin vincular/.test(r.rota) &&
     r.posts === 0 && errs.length === 0;

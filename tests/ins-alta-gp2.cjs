@@ -133,7 +133,21 @@ catch (_e) {
     stkInsAltaCerrar();
     return out;
   });
-  const pass = r.colsDesc && r.descGp2 && r.editIds === "edNom,edQty" && r.sinFactBtn && r.editSoloNombre && r.editAjuste &&
+  // (g) pase GV-UI (v31.02): a 390 px todo lo tocable del alta mide ≥ 44 y el botón principal es el verde de la casa (5:1)
+  await p.setViewportSize({ width: 390, height: 800 });
+  const ui = await p.evaluate(async () => {
+    stkInsAltaAbrir("partes_crudo"); await stkInsAltaModo("gp2"); stkInsAltaElegir(1);
+    const m = document.getElementById("stkInsAltaModal");
+    const chicos = Array.from(m.querySelectorAll(".stk-btn, .stk-inp")).filter((e) => e.getBoundingClientRect().height < 44).map((e) => e.id || e.textContent.trim());
+    const ok = getComputedStyle(document.getElementById("stkAltaCrear")).backgroundColor;
+    const meta = getComputedStyle(document.getElementById("nvEquiv")).color;
+    const horiz = document.documentElement.scrollWidth > window.innerWidth;
+    stkInsAltaCerrar();
+    return { chicos: chicos, ok: ok, meta: meta, horiz: horiz };
+  });
+  r.ui = ui;
+  r.uiOk = ui.chicos.length === 0 && ui.ok === "rgb(21, 128, 61)" && ui.meta === "rgb(71, 85, 105)";
+  const pass = r.uiOk && r.colsDesc && r.descGp2 && r.editIds === "edNom,edQty" && r.sinFactBtn && r.editSoloNombre && r.editAjuste &&
     r.popupDosOpciones && r.listaN === 3 && r.vinculadoDeshabilitado && r.argCat === "partes_crudo" && r.buscar === 1 &&
     r.formGp2 && r.nomPrecargado === "Batidor Pera Mini" && /≈ 750 uni/.test(r.equiv) && r.creaDesdeGp2 && r.renombra &&
     r.stockInicial && r.cierra && r.factorManualGp2 && r.factorGuardado && r.rota && r.formManual && r.manual && r.manualStock &&

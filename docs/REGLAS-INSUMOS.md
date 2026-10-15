@@ -20,6 +20,12 @@ codigo de GP2 ya existente o introducir uno manualmente (la primera que figure c
 | a mano | código, Descripción GV, ISIS, cantidad inicial con unidad, unidad secundaria + factor. Queda sin vincular |
 
 - La pantalla de **Pendientes de identificar** (TMP del operario) no se tocó: es alta/identificación, no edición.
+- **Pase GV-UI (disenador-gvui, 15/10)**: el dato de GP2 y el error de lectura NO van en `.stk-sub` (10,5 px, 2,45:1):
+  `.stk-meta` (12 px, ink-2) y `.stk-err-l` (rojo); el que falta es «—» con el motivo en el `title`. Botón principal
+  verde `--gv-ok` (5:1), todo lo tocable del alta y de la fila en edición ≥ 44 px en celular, números centrados y
+  divisor de fila en la tabla de la categoría, popup ancho en Crudo / Procesado. Lo mide `tests/ins-alta-gp2.cjs` (g).
+  Quedó sin hacer (BAJA): el botón «+ Agregar insumo a esta categoría» conserva su rótulo y el `top:30px` del
+  encabezado de dos filas.
 - El ISIS y el vínculo se corrigen en **GP2 → Stock General → Virgilio** (GP2 es el canónico del ISIS, v29.75).
 - `sql/gv_insumo_gp2_info_v3102.sql` · `tests/ins-alta-gp2.cjs` · `tests/ins-admin.cjs` (al día).
 

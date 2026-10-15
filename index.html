@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.01">
+<link rel="stylesheet" href="gv-ui.css?v=31.02">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.01"></script>
+<script type="module" src="recepcion.js?v=31.02"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10783,7 +10783,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.01";
+const APP_VERSION = "v31.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -25632,6 +25632,7 @@ function stkBodySalidas() {
 let _stkIns = null;
 async function stkInsLoad() {
   insEnsureCss();   // los chips de categoría usan .ins-cchip
+  _stkInsCssV3102();   // v31.02: .stk-meta / .stk-err-l de las columnas de GP2
   _stk.insLoaded = true;
   _stkIns = { cat: "", abierta: "", filtro: "", edit: null, nuevoEn: "", msg: "", tf: {}, hf: { cod: "", grupo: "" }, abre: {} };   // v8.35 — todo cerrado al entrar
   const body = document.getElementById("stkBody");
@@ -25654,13 +25655,28 @@ async function _stkInsFetchCajonGp2() {
     return m;
   } catch (_e) { return null; }
 }
+/* v31.02 — pase GV-UI (disenador-gvui, 15/10): el dato de GP2 y el error de lectura NO van en .stk-sub (10,5 px,
+   #94a3b8, 2,45:1): .stk-meta (12 px, ink-2, 7:1) y .stk-err-l (rojo). En la tabla de la categoría: divisor de fila y
+   números centrados; en el celular, blanco de toque de 44 px en la fila en edición y en el alta. */
+function _stkInsCssV3102() {
+  if (document.getElementById("stkInsV3102Css")) return;
+  const st = document.createElement("style"); st.id = "stkInsV3102Css";
+  st.textContent = ".stk-meta{font-size:var(--gv-fs-sm,12px);color:var(--gv-ink-2,#475569)}" +
+    ".stk-err-l{color:var(--gv-error,#b91c1c);font-weight:700}" +
+    "#stkInsCatPopBody .stk-tbl tbody td{border-bottom:1px solid var(--gv-line-soft,#eef2f7)}" +
+    "#stkInsCatPopBody .stk-tbl td.num,#stkInsCatPopBody .stk-tbl th.num{text-align:center}" +
+    "@media (max-width:560px){#stkInsCatPopBody .stk-inp,#stkInsCatPopBody .stk-btn,#stkBody .stk-tbl .stk-inp,#stkBody .stk-tbl .stk-btn{min-height:var(--gv-tap,44px)}}";
+  document.head.appendChild(st);
+}
 /* v31.02 (Luis, 15/10): "los insumos en las tablas deberían tener «Descripcion GV» y «Descripción GP2»". */
 function _stkInsDescGp2(it) {
   var g = _stkIns && _stkIns.gp2caj;
-  if (g == null) return '<span class="stk-sub">⚠ no se pudo leer GP2</span>';
+  if (g == null) return '<span class="stk-err-l">no se pudo leer GP2</span>';
   var x = g[String(it.cod)];
-  if (!x) return '<span class="stk-sub">sin vincular en GP2</span>';
-  return escapeHtml(x.desc_c || "—") + (x.cod_c ? '<div class="stk-sub">' + escapeHtml(x.cod_c) + '</div>' : '');
+  if (!x) return '<span class="stk-meta" title="sin vincular en GP2">—</span>';
+  // en Crudo / Procesado el código ya está en la columna «Cód C» del cajón: no se repite
+  var conCodC = !(_stkIns.abierta && INS_CAT_CAJON_GP2.indexOf(_stkIns.abierta) >= 0);
+  return escapeHtml(x.desc_c || "—") + (x.cod_c && conCodC ? '<div class="stk-meta">' + escapeHtml(x.cod_c) + '</div>' : '');
 }
 /* Sector Crudo y Sector Procesado muestran el cajón de GP2 al lado del stock. */
 var INS_CAT_CAJON_GP2 = ["partes_crudo", "parte_procesado"];
@@ -25678,9 +25694,9 @@ function _insCajonesDe(du) {
 function _stkInsCajonCeldas(it, du) {
   var sep = ' style="border-left:1px solid #eef2f7;"';
   var g = _stkIns.gp2caj;
-  if (g == null) return '<td colspan="5" class="stk-sub"' + sep + '>⚠ no se pudo leer GP2</td>';
+  if (g == null) return '<td colspan="5" class="stk-err-l"' + sep + '>no se pudo leer GP2</td>';
   var x = g[String(it.cod)];
-  if (!x) return '<td colspan="5" class="stk-sub"' + sep + '>sin vincular en GP2</td>';
+  if (!x) return '<td colspan="5" class="stk-meta"' + sep + ' title="sin vincular en GP2">—</td>';
   var caj = _insCajonesDe(du), uxc = Number(x.uni_x_cajon) || 0;
   var aprox = (caj != null && uxc > 0) ? _insNumAR(Math.round(caj * uxc), 0) : "";
   return '<td' + sep + '><b>' + escapeHtml(x.cod_c || "—") + '</b></td>' +
@@ -26045,7 +26061,8 @@ function stkInsCatPopup(k) {
   _stkIns.abierta = k;
   _stkIns.filtro = "";
   _stkIns.nuevoEn = "";
-  _stkPopShell("📦 " + titulo, "stkInsCatPopBody");
+  _stkInsCssV3102();
+  _stkPopShell("📦 " + titulo, "stkInsCatPopBody", INS_CAT_CAJON_GP2.indexOf(k) >= 0 ? true : undefined);   // v31.02: el cajón de GP2 no entra en el ancho normal
   const body = document.getElementById("stkInsCatPopBody");
   if (!body) return;
   body.innerHTML = _stkInsListado(k, _stkIns.items);
@@ -26134,7 +26151,7 @@ function _stkInsListado(k, items) {
       const du = _insDosUnidades(it);
       return '<tr>' +
         '<td><b>' + escapeHtml(it.cod) + '</b></td>' +
-        '<td class="stk-sub">' + escapeHtml(it.isis || "—") + '</td>' +
+        '<td class="stk-meta">' + escapeHtml(it.isis || "—") + '</td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:170px;" title="Descripción en Gestión Virgilio"></td>' +
         '<td>' + _stkInsDescGp2(it) + '</td>' +
         '<td>' + _stkInsUbicMapa(it) + '</td>' +
@@ -26229,7 +26246,7 @@ function _stkInsTodos(items) {
     if (ed) {
       // ---------- fila en edición (v31.02): sólo descripción GV y cantidad (mismos IDs que _stkInsListado) ----------
       var du = _insDosUnidades(it);
-      return '<tr><td><b>' + escapeHtml(it.cod) + '</b>' + (it.isis ? '<div class="stk-sub">isis: ' + escapeHtml(it.isis) + '</div>' : '') + '</td>' +
+      return '<tr><td><b>' + escapeHtml(it.cod) + '</b>' + (it.isis ? '<div class="stk-meta">isis: ' + escapeHtml(it.isis) + '</div>' : '') + '</td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:160px;" title="Descripción en Gestión Virgilio"></td>' +
         '<td>' + _stkInsDescGp2(it) + '</td>' +
         '<td>' + escapeHtml(insCatLbl(insCatOf(it))) + '</td>' +
@@ -26699,54 +26716,59 @@ function _stkInsAltaLista() {
     const caj = Number(c.uni_x_cajon) > 0 ? _insNumAR(c.uni_x_cajon, 0) + " uni/caj" : "";
     return '<button class="stk-altaitem"' + (ya ? ' disabled title="Ya está en Virgilio como ' + escapeHtml(ya) + '"' : ' onclick="stkInsAltaElegir(' + x.i + ')"') + '>' +
       '<b>' + escapeHtml(c.codigo) + '</b> <span>' + escapeHtml(c.descripcion || "") + '</span>' +
-      '<span class="stk-sub">' + (ya ? "ya es " + escapeHtml(ya) : escapeHtml(caj)) + '</span></button>';
+      '<span class="stk-meta">' + (ya ? "ya es " + escapeHtml(ya) : escapeHtml(caj)) + '</span></button>';
   }).join("") : '<div class="stk-empty">' + (q ? "Nada con «" + escapeHtml(a.q) + "»." : "GP2 no tiene componentes en esta categoría.") + '</div>';
 }
 function stkInsAltaEquiv() {
+  const bl = document.getElementById("nvBaseLbl"), ub = _stkInsVal("nvUni");
+  if (bl) bl.textContent = ub || "de la unidad de la cantidad";   // «1 MC = [4] Cajones»
   const a = _stkIns && _stkIns.alta, el = document.getElementById("nvEquiv"); if (!a || !a.sel || !el) return;
   const q = parseFloat(String(_stkInsVal("nvQty")).replace(",", ".")) || 0, u = _stkInsVal("nvUni"), uxc = Number(a.sel.uni_x_cajon) || 0;
   el.textContent = (q > 0 && uxc > 0 && /^caj/i.test(u)) ? "≈ " + _insNumAR(Math.round(q * uxc), 0) + " uni según GP2" : "";
 }
 function _stkInsAltaRender() {
   const a = _stkIns && _stkIns.alta; if (!a) return;
+  _stkInsCssV3102();
   if (!document.getElementById("stkInsAltaCss")) {
     const st = document.createElement("style"); st.id = "stkInsAltaCss";
-    st.textContent = ".stk-altacard{background:#f8fafc;max-width:460px;width:100%;margin:auto;border-radius:14px;padding:16px;box-shadow:0 24px 70px rgba(0,0,0,.45);box-sizing:border-box;font-size:14px}" +
-      ".stk-altattl{font-size:17px;font-weight:800;margin-bottom:2px}.stk-altasub{font-size:13px;color:#64748b;margin-bottom:12px}" +
-      ".stk-altaop{display:block;width:100%;text-align:left;margin-bottom:8px;padding:12px 14px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;cursor:pointer;font-size:15px;font-weight:700}" +
-      ".stk-altaop.rec{border:2px solid #4f46e5}.stk-altaop[disabled]{opacity:.5;cursor:not-allowed}.stk-altaop small{display:block;font-weight:500;color:#64748b;font-size:12px;margin-top:2px}" +
-      ".stk-altarec{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#4f46e5;color:#fff;font-size:11px;vertical-align:middle}" +
-      ".stk-altalista{max-height:46vh;overflow:auto;margin:8px 0;border:1px solid #e2e8f0;border-radius:8px;background:#fff}" +
-      ".stk-altaitem{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;width:100%;text-align:left;padding:8px 10px;border:0;border-bottom:1px solid #eef2f7;background:none;cursor:pointer;font-size:14px}" +
+    st.textContent = ".stk-altacard{background:var(--gv-surface,#fff);max-width:460px;width:100%;margin:auto;border-radius:14px;padding:16px;box-shadow:0 24px 70px rgba(0,0,0,.45);box-sizing:border-box;font-size:var(--gv-fs-md,14px)}" +
+      ".stk-altattl{font-size:var(--gv-fs-lg,16px);font-weight:800;margin-bottom:2px}.stk-altasub{font-size:var(--gv-fs-md,14px);color:var(--gv-ink-2,#475569);margin-bottom:12px}" +
+      ".stk-altaop{display:block;width:100%;text-align:left;margin-bottom:8px;padding:12px 14px;min-height:var(--gv-tap,44px);border:1px solid var(--gv-line,#e2e8f0);border-radius:10px;background:#fff;cursor:pointer;font-size:var(--gv-fs-lg,16px);font-weight:700}" +
+      ".stk-altaop.rec{border:2px solid #4f46e5}.stk-altaop[disabled]{opacity:.5;cursor:not-allowed}.stk-altaop small{display:block;font-weight:500;color:var(--gv-ink-2,#475569);font-size:var(--gv-fs-sm,12px);margin-top:2px}" +
+      ".stk-altarec{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#4f46e5;color:#fff;font-size:var(--gv-fs-sm,12px);vertical-align:middle}" +
+      ".stk-altalista{max-height:46vh;overflow:auto;margin:8px 0;border:1px solid var(--gv-line,#e2e8f0);border-radius:8px;background:#fff}" +
+      ".stk-altaitem{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;width:100%;min-height:var(--gv-tap,44px);text-align:left;padding:8px 10px;border:0;border-bottom:1px solid var(--gv-line-soft,#eef2f7);background:none;cursor:pointer;font-size:var(--gv-fs-md,14px)}" +
       ".stk-altaitem[disabled]{opacity:.45;cursor:not-allowed}.stk-altaitem:not([disabled]):hover{background:#eef2ff}" +
-      ".stk-altaf{display:grid;grid-template-columns:max-content 1fr;gap:7px 10px;align-items:center;margin:6px 0 12px}.stk-altaf label{font-size:12px;font-weight:700;color:#475569}" +
-      ".stk-altabtns{display:flex;gap:8px;justify-content:flex-end}" +
+      ".stk-altaf{display:grid;grid-template-columns:max-content 1fr;gap:7px 10px;align-items:center;margin:6px 0 12px}.stk-altaf label{font-size:var(--gv-fs-sm,12px);font-weight:700;color:var(--gv-ink-2,#475569)}" +
+      ".stk-altabtns{display:flex;gap:8px;justify-content:flex-end}.stk-altabtns .stk-btn{white-space:nowrap}" +
       // el modal vive fuera de .stkpop-body: sin esto el botón toma el estilo global (100% de ancho, letra grande)
-      ".stk-altacard .stk-btn{width:auto;margin:0;min-height:40px;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 14px;font-size:14px;font-weight:800;cursor:pointer;color:#0f172a}" +
-      ".stk-altacard .stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a}.stk-altacard .stk-btn.stk-btn-x{color:#b91c1c;border-color:#fecaca}" +
-      ".stk-altacard .stk-btn[disabled]{opacity:.5}.stk-altacard .stk-inp{font-size:14px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:7px;box-sizing:border-box;max-width:100%}" +
-      ".stk-altacard input.stk-inp:not([type=number]){width:100%}";
+      ".stk-altacard .stk-btn{width:auto;margin:0;min-height:var(--gv-tap,44px);background:#fff;border:1px solid var(--gv-line,#e2e8f0);border-radius:9px;padding:8px 14px;font-size:var(--gv-fs-md,14px);font-weight:800;cursor:pointer;color:#0f172a}" +
+      ".stk-altacard .stk-btn.ok{background:var(--gv-ok,#15803d);color:#fff;border-color:var(--gv-ok,#15803d)}.stk-altacard .stk-btn.stk-btn-x{color:var(--gv-error,#b91c1c);border-color:#fecaca}" +
+      ".stk-altacard .stk-btn[disabled]{opacity:.5}.stk-altacard .stk-inp{min-height:var(--gv-tap,44px);font-size:var(--gv-fs-md,14px);padding:6px 8px;border:1px solid var(--gv-line,#e2e8f0);border-radius:7px;box-sizing:border-box;max-width:100%}" +
+      ".stk-altacard input.stk-inp:not([type=number]){width:100%}.stk-altacard .stk-meta{font-size:var(--gv-fs-md,14px)}" +
+      ".stk-altaerr{color:var(--gv-error,#b91c1c);font-weight:700;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}";
     document.head.appendChild(st);
   }
   let ov = document.getElementById("stkInsAltaModal");
   if (!ov) {
     ov = document.createElement("div"); ov.id = "stkInsAltaModal";
     ov.setAttribute("style", "position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:100000;display:flex;align-items:flex-start;justify-content:center;padding:18px;overflow:auto");
+    ov.addEventListener("click", function (ev) { if (ev.target === ov) stkInsAltaCerrar(); });   // como _stkPopShell
     document.body.appendChild(ov);
   }
   const cDef = insCatDef(a.k), cat = cDef ? cDef.lbl : a.k;
   const hayGp2 = INS_CAT_GP2.indexOf(a.k) >= 0;
   const cerrar = '<button class="stk-btn stk-btn-x" onclick="stkInsAltaCerrar()">Cancelar</button>';
-  let h = '<div class="stk-altacard"><div class="stk-altattl">+ Agregar insumo</div><div class="stk-altasub">' + escapeHtml(cat) + '</div>';
+  let h = '<div class="stk-altacard"><div class="stk-altattl">Agregar insumo</div><div class="stk-altasub">' + escapeHtml(cat) + '</div>';
   if (!a.modo) {
     h += '<button class="stk-altaop rec" id="stkAltaGp2"' + (hayGp2 ? ' onclick="stkInsAltaModo(\'gp2\')"' : ' disabled') + '>Tomar un código de GP2<span class="stk-altarec">Recomendado</span>' +
       '<small>' + (hayGp2 ? "Viene con el código y lo que GP2 tenga cargado; queda vinculado." : "Esta categoría no tiene sector en GP2.") + '</small></button>' +
       '<button class="stk-altaop" id="stkAltaManual" onclick="stkInsAltaModo(\'manual\')">Crear uno a mano<small>Código, descripción, ISIS, cantidad y unidades, todo a mano. Queda sin vincular a GP2.</small></button>' +
       '<div class="stk-altabtns">' + cerrar + '</div>';
   } else if (a.modo === "gp2" && !a.sel) {
-    if (a.comps === null) h += '<div class="stk-sub">Cargando componentes de GP2…</div>';
-    else if (a.comps === "err") h += '<div class="stk-sub">⚠ No se pudo leer GP2. <button class="stk-btn" onclick="_stkIns.alta.comps=null;stkInsAltaModo(\'gp2\')">Reintentar</button></div>';
-    else h += '<input class="stk-inp" id="stkAltaQ" style="width:100%;box-sizing:border-box;" placeholder="🔎 Buscar código o descripción de GP2" value="' + escapeHtml(a.q) + '" oninput="stkInsAltaBuscar(this.value)">' +
+    if (a.comps === null) h += '<div class="stk-meta">Cargando componentes de GP2…</div>';
+    else if (a.comps === "err") h += '<div class="stk-altaerr">No se pudo leer GP2 <button class="stk-btn" onclick="_stkIns.alta.comps=null;stkInsAltaModo(\'gp2\')">Reintentar</button></div>';
+    else h += '<input class="stk-inp" id="stkAltaQ" style="width:100%;box-sizing:border-box;" placeholder="Buscar código o descripción de GP2" value="' + escapeHtml(a.q) + '" oninput="stkInsAltaBuscar(this.value)">' +
       '<div class="stk-altalista" id="stkInsAltaLista"></div>';
     h += '<div class="stk-altabtns"><button class="stk-btn" onclick="stkInsAltaAtras()">‹ Atrás</button>' + cerrar + '</div>';
   } else if (a.modo === "gp2") {
@@ -26756,23 +26778,23 @@ function _stkInsAltaRender() {
       '<label>Código</label><b>' + escapeHtml(c.codigo) + '</b>' +
       '<label>Descripción GP2</label><span>' + escapeHtml(c.descripcion || "—") + '</span>' +
       '<label>Descripción GV</label><input class="stk-inp" id="nvNom" value="' + escapeHtml(c.nombre_gv || c.descripcion || "") + '">' +
-      '<label>Cantidad inicial</label><span><input class="stk-inp" id="nvQty" type="number" step="any" placeholder="0" style="width:90px;" oninput="stkInsAltaEquiv()"> ' + _stkInsUniSel("nvUni", uniDef).replace("<select ", '<select onchange="stkInsAltaEquiv()" ') + ' <span class="stk-sub" id="nvEquiv"></span></span>' +
+      '<label>Cantidad inicial</label><span><input class="stk-inp" id="nvQty" type="number" step="any" placeholder="0" style="width:90px;" oninput="stkInsAltaEquiv()"> ' + _stkInsUniSel("nvUni", uniDef).replace("<select ", '<select onchange="stkInsAltaEquiv()" ') + ' <span class="stk-meta" id="nvEquiv"></span></span>' +
       (uxc
         ? '<label>Cajón según GP2</label><span>1 cajón = <b>' + _insNumAR(c.uni_x_cajon, 0) + '</b> uni' + (Number(c.kg_x_uni) > 0 ? ' · ' + _insNumAR(c.kg_x_uni, 4) + ' kg/uni' : '') + (Number(c.kg_x_cajon) > 0 ? ' · ' + _insNumAR(c.kg_x_cajon, 2) + ' kg/caj' : '') + '</span>'
-        : '<label>Factor</label><span><span class="stk-sub">GP2 no tiene cajón cargado:</span> 1 ' + _stkInsUniSel("nvSecUni", "") + ' = <input class="stk-inp" id="nvFactor" type="number" step="any" style="width:80px;" placeholder="cuántas"> de la unidad de arriba</span>') +
+        : '<label title="GP2 no tiene cajón cargado para este componente">Otra unidad<br>(sin cajón en GP2)</label><span>1 ' + _stkInsUniSel("nvSecUni", "") + ' = <input class="stk-inp" id="nvFactor" type="number" step="any" style="width:80px;" placeholder="opcional"> <span id="nvBaseLbl">' + escapeHtml(uniDef || "de la unidad de la cantidad") + '</span></span>') +
       '</div>' +
       '<div class="stk-altabtns"><button class="stk-btn" onclick="stkInsAltaAtras()">‹ Atrás</button>' + cerrar +
-      '<button class="stk-btn ok" id="stkAltaCrear" onclick="stkInsAltaGp2Crear()">✓ Crear y vincular</button></div>';
+      '<button class="stk-btn ok" id="stkAltaCrear" onclick="stkInsAltaGp2Crear()">Crear y vincular</button></div>';
   } else {
     h += '<div class="stk-altaf">' +
       '<label>Código</label><input class="stk-inp" id="nvCod" placeholder="código">' +
       '<label>Descripción GV</label><input class="stk-inp" id="nvNom" placeholder="descripción">' +
       '<label>ISIS</label><input class="stk-inp" id="nvIsis" inputmode="numeric" placeholder="opcional" style="width:110px;">' +
-      '<label>Cantidad inicial</label><span><input class="stk-inp" id="nvQty" type="number" step="any" placeholder="0" style="width:90px;"> ' + _stkInsUniSel("nvUni", "") + '</span>' +
-      '<label>Unidad secundaria</label><span>1 ' + _stkInsUniSel("nvSecUni", "") + ' = <input class="stk-inp" id="nvFactor" type="number" step="any" style="width:80px;" placeholder="cuántas"> de la unidad de arriba <span class="stk-sub">(opcional)</span></span>' +
+      '<label>Cantidad inicial</label><span><input class="stk-inp" id="nvQty" type="number" step="any" placeholder="0" style="width:90px;"> ' + _stkInsUniSel("nvUni", "").replace("<select ", '<select onchange="stkInsAltaEquiv()" ') + '</span>' +
+      '<label>Otra unidad</label><span>1 ' + _stkInsUniSel("nvSecUni", "") + ' = <input class="stk-inp" id="nvFactor" type="number" step="any" style="width:80px;" placeholder="opcional"> <span id="nvBaseLbl">de la unidad de la cantidad</span></span>' +
       '</div>' +
       '<div class="stk-altabtns"><button class="stk-btn" onclick="stkInsAltaAtras()">‹ Atrás</button>' + cerrar +
-      '<button class="stk-btn ok" id="stkAltaCrear" onclick="stkInsAlta(\'' + a.k + '\')">✓ Crear</button></div>';
+      '<button class="stk-btn ok" id="stkAltaCrear" onclick="stkInsAlta(\'' + a.k + '\')">Crear</button></div>';
   }
   ov.innerHTML = h + '</div>';
   if (a.modo === "gp2" && !a.sel && Array.isArray(a.comps)) _stkInsAltaLista();
@@ -26823,7 +26845,7 @@ async function stkInsAltaGp2Crear() {
     stkInsAltaCerrar();
     _stkIns.msg = "✓ " + cod + " creado desde GP2 (" + a.sel.codigo + ")" + (q.qty > 0 ? " con " + q.qty + " " + q.uni : "") + ".";
     await stkInsRefresh(); stkRender();
-  } catch (e) { if (b) { b.disabled = false; b.textContent = "✓ Crear y vincular"; } alert("No se pudo: " + (e.message || e)); }
+  } catch (e) { if (b) { b.disabled = false; b.textContent = "Crear y vincular"; } alert("No se pudo: " + (e.message || e)); }
 }
 async function stkInsAlta(k) {
   const cod = _stkInsVal("nvCod");
@@ -64075,7 +64097,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.01"></script>
+<script src="importacion.js?v=31.02"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67394,15 +67416,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.01"></script>
-<script src="hotsale.js?v=31.01"></script>
-<script src="estadisticas.js?v=31.01"></script>
-<script src="ads.js?v=31.01"></script>
-<script src="plantel.js?v=31.01"></script>
+<script src="cobranzas.js?v=31.02"></script>
+<script src="hotsale.js?v=31.02"></script>
+<script src="estadisticas.js?v=31.02"></script>
+<script src="ads.js?v=31.02"></script>
+<script src="plantel.js?v=31.02"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.01"></script>
+<script src="analisis.js?v=31.02"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.01"></script>
+<script src="ayuda.js?v=31.02"></script>
 
 </body>
 </html>
