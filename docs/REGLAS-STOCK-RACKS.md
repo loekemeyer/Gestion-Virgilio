@@ -915,6 +915,20 @@ select m.id, m.creado, m.cod_art, m.delta, m.ref, m.legajo
 **Chequeo:** `node tests/ir-codigo-candado.cjs` (bloque **H**: el aviso, que no frena, que el botón
 cambia de modo con el código puesto, y los dos rótulos nuevos; verificado que falla contra la v30.00).
 
+
+## ⚠ REGLA (Luis, 2026-10-15, v31.11; la base dice v31.10-gondola): tercer modo de INGRESO A RACKS — «🗄 Desde góndola»
+
+**Luis:** *"Agrega al «Ingreso a Racks» una tercera pestaña que sea «Desde góndola» que permita enviar cajas desde
+góndola a racks y que tenga el conversor de masters"*.
+
+- **Traslado, no crea stock**: descuenta de `terminado` (la góndola) y suma al rack en la DIRECCIÓN. Mismo RPC que
+  «Desde A guardar»: `racks_plani_ingreso_nacional(p_origen => 'terminado')`. Front: modo `gondola`, `_irTras()`.
+- **Conversor de masters**: masters × CxM = cajas (como en Ingreso directo); al RPC va el master que puso el operario.
+- **Duales** (437E, 438E, 439E, 809E): el saldo de góndola cuenta **sólo la empresa elegida**; la empresa la trae la
+  fila elegida («438E LK») y no se vuelve a preguntar. Arregla de paso «Desde A guardar» con duales: el código iba
+  como «438ELK» (sin espacio) y el RPC contestaba `sin_stock` (`_irCodSplit`).
+- Movimientos: `terminado −N` ref `gondola a racks <pos>` + `racks +N` ref `nacional desde gondola a <pos>`.
+- `sql/gv_ir_desde_gondola_v3111.sql`, centinelas 431 y 489, `tests/ir-desde-gondola.cjs`.
 ## ⚠ REGLA (Luis, 2026-10-13, v29.67 + v29.77 + v29.78, D2): en INGRESO A RACKS el CÓDIGO SE ELIGE — se sugiere mientras se escribe
 
 **Luis:** *"956E · va a terminar en AB10 · el operario lo puso mal · ponele candado"* y, después del candado:
