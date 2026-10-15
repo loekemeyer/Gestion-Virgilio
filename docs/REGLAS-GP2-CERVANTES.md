@@ -206,3 +206,28 @@ de insumos de Virgilio en GP2 se rearma **desde cero y en blanco** cuando Luis l
 - Centinelas en `GV_Reglas_Centinela` (4 filas). `sql/gv_ingreso_cervantes_denegado_v2537.sql`,
   `tests/imp-cervantes-denegado.cjs`. Del lado GP2: `db/migracion_ingreso_virgilio_resolver.sql`, CONOCIMIENTO §4hf.
 
+
+## ⚠ LÓGICA DE NEGOCIO: por qué los catálogos de insumos NO se solapan del todo (Nazareno, 2026-10-14)
+
+**Cervantes y Virgilio son dos PLANTAS del mismo grupo de empresas, no dos sistemas que deban
+tener el mismo catálogo.** Antes de reportar un insumo "sin par" como un hueco a cerrar, aplicar
+esta lógica (vale sobre todo para flejes, y por extensión para el resto de los insumos):
+
+- **Cervantes es la FÁBRICA**: ahí se USAN los flejes (y demás insumos). Por eso el catálogo de
+  Cervantes es el completo de lo que se consume en producción.
+- **Virgilio ESTOQUEA lo que no entra en Cervantes**: cuando no entra todo el stock en la fábrica,
+  el excedente se guarda en Virgilio. Virgilio es depósito, no fábrica.
+
+Consecuencias al cruzar catálogos (no son errores, son lo esperado):
+
+1. **Fleje/insumo que está en Cervantes y NO en Virgilio** → NORMAL. Cervantes lo usa y le entra
+   todo en la fábrica; nunca hizo falta estoquearlo en Virgilio. **No es un link faltante.**
+2. **Fleje/insumo que está en Virgilio (con saldo) y NO tiene par en Cervantes** → la causa más
+   probable es que **es DISCONTINUO**: Cervantes ya no lo usa (lo sacó del catálogo o lo
+   discontinuó), pero quedó stock físico guardado en Virgilio. **Antes de proponer darlo de alta
+   en Cervantes, verificar si no es un discontinuado** (preguntar o mirar si el componente existía
+   y se dio de baja). Dar de alta un discontinuado en la fábrica es volver a meter basura.
+
+Por eso, al analizar el engranaje de insumos uno por uno: un "sin par" **no** se traduce
+automáticamente en "falta vincular" ni en "falta dar de alta". Primero se clasifica: ¿Cervantes lo
+usa (fábrica) o es excedente/descontinuado que sólo vive en Virgilio (depósito)?
