@@ -27363,12 +27363,24 @@ function _stkDep() { const e = document.getElementById("stkAjDep"); return (e &&
    MISMA tabla — se unificó para no tener que cambiar dos constantes si migra la tabla. */
 const SUPABASE_RACKS_ORD_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Ordenes";
 const SUPABASE_RACKS_BAJ_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Bajadas";
+/* v31.07 (Luis, 15/10): las CAJAS POR MASTER tienen UNA fuente: GV_Rack_CxM (sql/gv_cxm_canonica_v3107.sql).
+   Ni Articulos.Cajas_x_Master (retirada) ni el ratio inner/master de la planimetría. Devuelve
+   { COD: cxm } (sin master = 0). Toda pantalla que necesite el dato pasa por acá. */
+async function gvFetchCxM() {
+  const m = {};
+  try {
+    const r = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Rack_CxM", "select=cod,cxm,sin_master&order=cod.asc");
+    (Array.isArray(r) ? r : []).forEach(function (x) { const k = String(x.cod || "").toUpperCase().trim(); const v = x.sin_master ? 0 : (Number(x.cxm) || 0); if (k && (m[k] == null || v > m[k])) m[k] = v; });
+  } catch (_e) {}
+  return m;
+}
 async function stockFetchArtFactors() {
   try {
-    const r = await supaFetchAllSafe(SUPABASE_ART_ENDPOINT, "select=Cod_Art,Cajas_x_Master,Uni_x_Caja&order=Cod_Art.asc");
-    const rows = Array.isArray(r) ? r : [];   // v22.32: es un array, no un Response
+    const res = await Promise.all([supaFetchAllSafe(SUPABASE_ART_ENDPOINT, "select=Cod_Art,Uni_x_Caja&order=Cod_Art.asc"), gvFetchCxM()]);
+    const rows = Array.isArray(res[0]) ? res[0] : [], cxm = res[1] || {};   // v22.32: es un array, no un Response
     const m = {};
-    rows.forEach(function (x) { const k = String(x.Cod_Art || "").toUpperCase(); if (!k) return; if (!m[k]) m[k] = { cajasXMaster: Number(x.Cajas_x_Master) || 0, uniXCaja: Number(x.Uni_x_Caja) || 0 }; else { if (!m[k].cajasXMaster && x.Cajas_x_Master) m[k].cajasXMaster = Number(x.Cajas_x_Master); if (!m[k].uniXCaja && x.Uni_x_Caja) m[k].uniXCaja = Number(x.Uni_x_Caja); } });
+    rows.forEach(function (x) { const k = String(x.Cod_Art || "").toUpperCase(); if (!k) return; if (!m[k]) m[k] = { cajasXMaster: cxm[k] || 0, uniXCaja: Number(x.Uni_x_Caja) || 0 }; else if (!m[k].uniXCaja && x.Uni_x_Caja) m[k].uniXCaja = Number(x.Uni_x_Caja); });
+    Object.keys(cxm).forEach(function (k) { if (!m[k]) m[k] = { cajasXMaster: cxm[k], uniXCaja: 0 }; });   // v31.07: cxm de la canónica
     return m;
   } catch (_e) { return {}; }
 }
@@ -27500,20 +27512,8 @@ function stkAutoBajadaCompute() {
   // CxM (cajas por master) derivado de la PLANIMETRÍA: por código, si todas las celdas
   // ocupadas con master>0 dan el MISMO ratio ENTERO inner/master, ese es el CxM. Así el
   // automático no depende de que esté cargado el maestro (mismo criterio que rkbFetchCxM).
-  const _cxAgg = {};
-  (_stk.plani || []).forEach(function (r) {
-    if (String(r.estado) !== "ocupado") return;
-    const m = Number(r.master_cajas) || 0, inn = Number(r.innercajas) || 0;
-    if (m <= 0 || inn <= 0) return;
-    const k = _ocgNorm(r.cod_art); if (!k) return;
-    if (!_cxAgg[k]) _cxAgg[k] = { ratio: null, bad: false };
-    if (inn % m !== 0) { _cxAgg[k].bad = true; return; }
-    const ratio = inn / m;
-    if (_cxAgg[k].ratio == null) _cxAgg[k].ratio = ratio;
-    else if (_cxAgg[k].ratio !== ratio) _cxAgg[k].bad = true;
-  });
+  // v31.07: el CxM sale de la canónica GV_Rack_CxM (vía factors); ya no se deriva de la planimetría.
   const cxmPlani = {};
-  Object.keys(_cxAgg).forEach(function (k) { if (!_cxAgg[k].bad && _cxAgg[k].ratio > 0) cxmPlani[k] = _cxAgg[k].ratio; });
   const bajar = [], sinMaster = [];
   Object.keys(capByCod).forEach(function (k) {
     const capg = capByCod[k].cajas, sd = sN[k] || {};
@@ -30370,7 +30370,7 @@ async function showGuardarOrden(legajo) {
       const aGuardar = Math.round(Number(a.a_guardar) || 0), exc = Math.round(Number(a.excedente) || 0), racks = Math.round(Number(a.racks) || 0);
       if (aGuardar + exc + racks <= 0) return null;   // nada esperando para bajar
       const cap = Math.round(_rkbCapDe(a.cod, capObj)), gond = Math.round(Number(a.terminado) || 0);
-      // v8.90: cxm de planimetría; si no hay, fallback a Cajas_x_Master de la tabla de artículos
+      // v8.90 · v31.07: cxm de la canónica GV_Rack_CxM (las dos vías leen lo mismo)
       // v30.27: el DUAL viene "438E LK" pero la planimetría/factores lo guardan pelado ("438E") →
       // se busca con sufijo y se cae al pelado (mismo criterio que «¿Qué bajar primero?», L29156).
       var _kkG = _cpNorm(a.cod), _kbG = _kkG.replace(/\s+(LK|CH)$/, "");
@@ -30524,29 +30524,18 @@ async function rkbFetchCxM() {
     const r = await fetch(SUPABASE_URL + "/rest/v1/Racks_Planimetria?select=sector,cod_art,master_cajas,innercajas&estado=eq.ocupado", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     if (!r.ok) return { cxm: {}, locs: {} };
     const rows = await r.json();
-    const agg = {}, locs = {};
+    const locs = {};
     rows.forEach(function (x) {
       if (!x.cod_art) return;
       const k = _cpNorm(String(x.cod_art).replace(/\s+/g, ""));
       const inn = Number(x.innercajas) || 0, mas = Number(x.master_cajas) || 0;
       // Ubicaciones con stock (planimetría viva, v5.22): dónde está el código.
       if (inn > 0) { if (!locs[k]) locs[k] = []; locs[k].push({ sector: String(x.sector || "").trim(), master: mas, inner: inn }); }
-      if (!(mas > 0) || !(inn > 0)) return;
-      if (!agg[k]) agg[k] = { inner: 0, master: 0, ratios: {} };
-      agg[k].inner += inn; agg[k].master += mas;
-      agg[k].ratios[Math.round((inn / mas) * 1000)] = 1;
     });
     Object.keys(locs).forEach(function (k) { locs[k].sort(function (a, b) { return b.inner - a.inner; }); });
-    const map = {};
-    Object.keys(agg).forEach(function (k) {
-      const a = agg[k];
-      if (Object.keys(a.ratios).length === 1 && a.inner % a.master === 0) map[k] = a.inner / a.master;
-    });
-    // v22.77: las cajas por master viven en GV_Rack_CxM (la planimetría ya es una vista y su MC es derivado).
-    try {
-      const rc = await fetch(SUPABASE_URL + "/rest/v1/GV_Rack_CxM?select=cod,cxm", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-      if (rc.ok) (await rc.json()).forEach(function (x) { if (x.cod && Number(x.cxm) > 0) map[_cpNorm(String(x.cod).replace(/\s+/g, ""))] = Number(x.cxm); });
-    } catch (_e) {}
+    // v22.77 · v31.07: las cajas por master viven SÓLO en la canónica GV_Rack_CxM (ya no se deriva de la planimetría).
+    const map = {}, _cx = await gvFetchCxM();
+    Object.keys(_cx).forEach(function (c) { if (_cx[c] > 0) map[_cpNorm(String(c).replace(/\s+/g, ""))] = _cx[c]; });
     return { cxm: map, locs: locs };
   } catch (_e) { return { cxm: {}, locs: {} }; }
 }
@@ -30608,7 +30597,7 @@ async function showRacksBajarModal(legajo, _resume) {
       .sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); })
       .map(function (a) {
         const kN = _cpNorm(a.cod), locs = (locsMap[kN] || []).slice().sort(function (x, y) { return x.inner - y.inner; });   // v24.68: la que MENOS tiene primero (se vacía y libera el lugar)
-        // v8.90: cxm de planimetría; fallback a Cajas_x_Master de la tabla de artículos
+        // v8.90 · v31.07: cxm de la canónica GV_Rack_CxM (las dos vías leen lo mismo)
         var _cxmR = cxmMap[kN] || 0;
         if (!_cxmR) { var _fR = _facRkb[String(a.cod).toUpperCase()]; if (_fR && _fR.cajasXMaster > 0) _cxmR = _fR.cajasXMaster; }
         // sec preseleccionada = la ubicación con más stock (planimetría viva, v5.22)
@@ -31290,23 +31279,10 @@ async function irFetchCodigos() {
   } catch (_e) {}
   return arr;
 }
-async function irFetchCxM(plani) {
-  const cx = {};
-  try {
-    const r = await supaFetchAllSafe(SUPABASE_ART_ENDPOINT, "select=Cod_Art,Cajas_x_Master&order=Cod_Art.asc");
-    (Array.isArray(r) ? r : []).forEach(function (x) { const k = _irNorm(x.Cod_Art), v = Number(x.Cajas_x_Master) || 0; if (k && v > 0 && !cx[k]) cx[k] = v; });
-  } catch (_e) {}
-  const agg = {};
-  (plani || []).forEach(function (rr) {
-    if (String(rr.estado) !== "ocupado") return;
-    const m = Number(rr.master_cajas) || 0, inn = Number(rr.innercajas) || 0, k = _irNorm(rr.cod_art);
-    if (!k || m <= 0 || inn <= 0) return;
-    if (!agg[k]) agg[k] = { ratio: null, bad: false };
-    if (inn % m !== 0) { agg[k].bad = true; return; }
-    const ratio = inn / m;
-    if (agg[k].ratio == null) agg[k].ratio = ratio; else if (agg[k].ratio !== ratio) agg[k].bad = true;
-  });
-  Object.keys(agg).forEach(function (k) { if (!cx[k] && !agg[k].bad && agg[k].ratio > 0) cx[k] = agg[k].ratio; });
+async function irFetchCxM(_plani) {
+  // v31.07: de la canónica GV_Rack_CxM (antes: Articulos.Cajas_x_Master + ratio de la planimetría)
+  const cx = {}, m = await gvFetchCxM();
+  Object.keys(m).forEach(function (k) { const kk = _irNorm(k); if (kk && m[k] > 0 && !cx[kk]) cx[kk] = m[k]; });
   return cx;
 }
 async function showIngresoRacksModal(legajo, _resume, _modoInit) {

@@ -1,5 +1,7 @@
 # Racks — inner cajas × master caja (pendiente de cargar)
 
+> ⚠ **v31.07 (15/10): este archivo es HISTORIA.** El dato vive en la canónica `GV_Rack_CxM` (ver `docs/REGLAS-STOCK-RACKS.md`). Lo pendiente: `select * from public.gv_cxm_conflictos;` y los códigos sin fila.
+
 Artículos con stock en **racks** que NO tienen cargado cuántas **inner cajas trae una master caja**
 (`cxm`). Sin ese dato, el módulo "¿Qué bajar primero?" los baja 1:1 y los marca **"s/master"**, y no
 puede aplicar la regla de "mínimo 1 master caja".

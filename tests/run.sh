@@ -23,6 +23,8 @@ node() {
   return 0
 }
 
+echo "== cxm-canonica (v31.07: cajas por master SOLO de GV_Rack_CxM; ni Articulos.Cajas_x_Master ni ratio de planimetria) =="
+node tests/cxm-canonica.cjs
 echo "== popup-avisos-luis (v31.05: avisos C2/C4/C5 en pop-up para Luis + aviso de Windows minimizada) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/popup-avisos-luis.cjs
 echo "== ins-cajon-gp2 (v31.00: Sector Crudo / Procesado muestran el cajon de GP2: Cod C, kg/caj, kg/uni, uni/caj) =="

@@ -184,13 +184,30 @@ proponer "trasladar de la góndola LK a la de Chef" para ahorrarse la compra**. 
 consecuencia del código compartido es la de siempre: la empresa la da de qué pila salió la caja
 (el pedido), no el artículo.
 
+### ⚠ CAJAS POR MASTER: UNA tabla canónica, `GV_Rack_CxM` (Luis, 15/10, v31.07)
+
+*"Hay que hacer una tabla que sea la canónica y unificar para que todas las funciones y cosas que busquen el dato
+lo busquen de ahí."* El dato estaba en 6 lugares que no coincidían. Quedó así:
+
+| fuente | estado |
+|---|---|
+| `GV_Rack_CxM` (`cod`, `emp`, `cxm`, `sin_master`, `fuente`, `nota`) | **CANÓNICA**. Front: `gvFetchCxM()` (index) y `_racksFactors` (recepcion.js). Base: `Racks_Planimetria`, `vista_racks_bajadas_pendientes`. Escribe: `gv_rack_cxm_anotar` (ingreso a racks) y el trigger `trg_cxm_desde_importados_volumen` (alta de importado, sólo si el código no tiene fila) |
+| `Articulos Virgilio X Tallerista.Cajas_x_Master` | **RETIRADA** (se migró; comentario en la columna). No leer ni escribir |
+| ratio inner/master de la planimetría en el front | **RETIRADO** (era la misma canónica con ruido de las filas «a contar») |
+| `Importados_Volumen.uni_master / uni_inner` | sigue: son UNIDADES para importación; si no coinciden con la canónica salen en `gv_cxm_conflictos` |
+| `impo_comex.productos_referencia` (planilla COMEX) | sólo referencia, en `gv_cxm_conflictos` (el «1» = master igual al inner es basura y no se cuenta) |
+| `Insumos_Factores` (MC de insumos, en unidades) | otro dato (insumos), no se toca |
+
+`sin_master = true` (cxm vacío) = va suelto, se baja 1:1 (505I, 504, 505, 501). Para ver qué falta decidir:
+`select * from public.gv_cxm_conflictos order by cod;`. `sql/gv_cxm_canonica_v3107.sql`, `tests/cxm-canonica.cjs`.
+
 ### ⚠ RACKS: una fuente por dato (Luis, 25/09, v22.77)
 
 | dato | dónde vive |
 |---|---|
 | qué posiciones hay y si están reservadas | `GV_Lugar` (tipo `rack`, `uso` pedidos / cajas / bastidor) |
 | cuántas cajas de cada código hay en cada posición | **`Movimientos_Stock`**, depósito racks / racks_ch, **`ubicacion` = sector** |
-| cajas por master (para mostrar MC) | `GV_Rack_CxM` |
+| cajas por master (para mostrar MC) | `GV_Rack_CxM` — **CANÓNICA de TODO el sistema desde la v31.07** (abajo) |
 | lo que la planimetría vieja decía y el stock no respalda | `GV_Rack_Revisar` → «🔎 a contar» en el Mapa |
 
 `Racks_Planimetria` es una **vista** con las mismas columnas (+ `fuente` stock / a_contar, `motivo`). Escriben
