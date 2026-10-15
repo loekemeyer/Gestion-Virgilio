@@ -32,7 +32,8 @@
    en su propio hoy). «Días anteriores» pasa a los 30 días previos SIN el de hoy (modo "ant").
    v30.21 (Luis): SÓLO esos dos botones, sin chips de período. */
 var _an = { modo: "hoy", dias: 30, q: "", lista: null, err: "", cargando: false, filtro: "todas",
-            tanda: null, det: null, detErr: "", detCargando: false, legajo: null, marcas: {} };
+            tanda: null, det: null, detErr: "", detCargando: false, legajo: null, marcas: {},
+            req: 0, detReq: 0 };   // tokens: descartan respuestas viejas que llegan tarde (ver _anCargar / anAbrir)
 
 function _anEsc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -201,12 +202,16 @@ function anBuscar(v) { _an.q = String(v || "").toUpperCase().trim(); _anRender()
 function anVolver() { _an.tanda = null; _an.det = null; _an.detErr = ""; _anRender(); }
 
 function _anCargar() {
-  if (_an.cargando) return;
+  // Token de esta lectura: si el supervisor toca «Días anteriores» o «Actualizar» mientras una
+  // carga anterior sigue en vuelo, la respuesta vieja llega con un token viejo y se DESCARTA. Antes
+  // un `if (cargando) return` dejaba pasar la respuesta de «hoy» pintada bajo el modo «ant» y daba un
+  // "no hay tandas" falso (regla «una lectura rota no es un cero», y acá tampoco un cambio de modo).
+  var tok = ++_an.req;
   _an.cargando = true; _an.err = ""; _an.lista = null; _anRender();
   _anRpc("gv_analisis_lista", { p_dias: _anPDias(), p_legajo: _an.legajo }).then(function (r) {
+    if (tok !== _an.req) return;   // llegó tarde: ya hay otra lectura más nueva
     if (r.error || !r.data) {
       var m = String((r.error && r.error.message) || "sin respuesta");
-      // Una lectura rota NO es "no hay tandas" (regla «una lectura ROTA no es un CERO»).
       _an.err = /ACCESO/.test(m)
         ? "El Análisis Productivo es para el supervisor y los legajos habilitados."
         : "No se pudo leer: " + m;
@@ -215,32 +220,40 @@ function _anCargar() {
   });
   // Las marcas van en su propia lectura: si falla, la lista se ve igual (sin los banderines).
   _anRpc("gv_analisis_marcas", { p_dias: _anPDias(), p_legajo: _an.legajo }).then(function (r) {
+    if (tok !== _an.req) return;
     if (r && !r.error && r.data && typeof r.data === "object") { _an.marcas = r.data; _anRender(); }
   });
 }
 function anFiltro(f) { _an.filtro = f; _anRender(); }
 function anMarcar(estado) {
-  if (!_an.tanda) return;
+  // Se marca la tanda que se está VIENDO (la del detalle cargado), no la última que se tocó:
+  // así una respuesta tardía no desvía la marca a otro operario.
+  var tanda = (_an.det && _an.det.tanda) || _an.tanda;
+  if (!tanda) return;
   var nota = null;
   if (estado === "anomala" || estado === "revisada") {
     nota = prompt(estado === "anomala"
       ? "¿Qué tiene de raro esta tanda? (queda anotado; se puede dejar vacío)"
-      : "¿Alguna nota? (se puede dejar vacío)", (_an.marcas[_an.tanda] || {}).nota || "");
+      : "¿Alguna nota? (se puede dejar vacío)", (_an.marcas[tanda] || {}).nota || "");
     if (nota === null) return;
   }
-  _anRpc("gv_analisis_marcar", { p_tanda: _an.tanda, p_estado: estado, p_nota: nota, p_legajo: _an.legajo })
+  _anRpc("gv_analisis_marcar", { p_tanda: tanda, p_estado: estado, p_nota: nota, p_legajo: _an.legajo })
     .then(function (r) {
       if (r && r.error) { alert("No se pudo marcar: " + (r.error.message || r.error)); return; }
-      if (estado === "sin") delete _an.marcas[_an.tanda];
-      else _an.marcas[_an.tanda] = { estado: estado, nota: nota, por: _an.legajo || "", at: new Date().toISOString() };
+      if (estado === "sin") delete _an.marcas[tanda];
+      else _an.marcas[tanda] = { estado: estado, nota: nota, por: _an.legajo || "", at: new Date().toISOString() };
       _anRender();
       try { anLoadBadge(); } catch (_e) {}
     });
 }
 
 function anAbrir(tanda) {
+  // Mismo token para el detalle: abrir A y después B no deja que la respuesta de A pise la de B
+  // (y con eso, que «Anómala/Revisada» marque la tanda equivocada).
+  var tok = ++_an.detReq;
   _an.tanda = tanda; _an.det = null; _an.detErr = ""; _an.detCargando = true; _anRender();
   _anRpc("gv_analisis_tanda", { p_tanda: tanda, p_legajo: _an.legajo }).then(function (r) {
+    if (tok !== _an.detReq) return;   // se abrió otra tanda mientras tanto
     if (r.error || !r.data) _an.detErr = "No se pudo leer la tanda: " + String((r.error && r.error.message) || "sin respuesta");
     else _an.det = r.data;
     _an.detCargando = false; _anRender();

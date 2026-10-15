@@ -178,6 +178,13 @@ const DET = {
     out.modosAnt = modos().join("|");
     document.getElementById("anBtnHoy").click(); await espera(80);
     out.volvioHoy = modos().join("|") === "Hoy*|Días anteriores" && /"p_dias":1\b/.test(out.pedidos.filter((x) => /^gv_analisis_lista:/.test(x)).pop() || "");
+    // (k) carrera: pedir «hoy» y cambiar a «ant» sin esperar la respuesta. El token descarta la
+    // respuesta vieja; antes el `if (cargando) return` dejaba «hoy» pintado bajo modo «ant» (falso vacío).
+    window._anCargar(); window.anModo("ant"); await espera(140);
+    out.raceModo = modos().join("|");
+    out.racePide = out.pedidos.filter((x) => /^gv_analisis_lista:/.test(x)).pop() || "";
+    out.raceCods = [...document.querySelectorAll("#anOv .an-t .cod")].map((x) => x.textContent).join(",");
+    window.anModo("hoy"); await espera(80);
     _an.tanda = "F13C"; _an.det = DET; _anRender(); await espera(40);
 
     // (f) el botón Cerrar no hereda el width:100% global
@@ -217,6 +224,9 @@ const DET = {
   ok(r.antTandas.join() === "F13C", "(j) en días anteriores quedan " + r.antTandas.join() + " (esperaba sólo F13C, sin la de hoy)");
   ok(r.modosAnt === "Hoy|Días anteriores*", "(j) en días anteriores la barra es «" + r.modosAnt + "»");
   ok(r.volvioHoy, "(j) «Hoy» no vuelve a la vista del día");
+  ok(/"p_dias":31\b/.test(r.racePide), "(k) cambiar a «Días anteriores» durante una carga no disparó su lectura: " + r.racePide);
+  ok(r.raceModo === "Hoy|Días anteriores*", "(k) tras la carrera la barra quedó «" + r.raceModo + "» (esperaba ant activo)");
+  ok(r.raceCods === "F13C", "(k) la carrera dejó la lista en «" + r.raceCods + "» (esperaba sólo F13C: ni falso vacío ni datos de hoy)");
   ok(r.tarjetas === 2, "(b) tarjetas: " + r.tarjetas + " (esperaba 2)");
   ok(r.primera === "F77A", "(b) la primera tanda es " + r.primera);
   ok(r.alerta.indexOf("2") >= 0, "(b) F13C tendría que mostrar ⚠ 2, muestra «" + r.alerta + "»");
