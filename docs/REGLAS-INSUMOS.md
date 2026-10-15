@@ -61,6 +61,19 @@ solo en el front"*.
   Naza acepta la TMP o le cambia el código `CJ…` en GP2. `sql/gv_cajas_codigo_temporal_v3092.sql`,
   `tests/ins-cajas-tmp-aviso.cjs`.
 - **D2 (Luis): no** — los 19 insumos con stock y sin lugar no se pasan a TRANSITO. Forward-facing.
+- ⚠ **v31.05 (Luis, 15/10): esos insumos SÍ se VEN en Tránsito** (*"quiero que todos los insumos que tengan stock pero
+  no lugar en GV aparezcan en tránsito … que al apretarlos permita ubicarlos en un lugar góndola, rack o SC y SP"*).
+  **No se movió ningún dato** (D2 sigue: no hay movimiento a TRANSITO): `gv_transito_celda` suma una tercera rama
+  `origen='sin_lugar'` (las filas `insumo` de `gv_mapa_stock_sin_lugar`, menos lo que ya está en el saldo de Tránsito) y
+  el cartel «Stock sin lugar» del Mapa deja de listarlos. Al tocarlos: lo **recibido** sale por `gv_transito_ubicar`; lo
+  **sin lugar** se anota por `gv_insumo_posicion_guardar` (con `p_reemplaza_id` si estaba en un lugar inexistente).
+  - **Góndola es posición válida de un insumo**: `gv_gondola_sector` va al FINAL de `gv_insumo_sector` (0 de 685 celdas de
+    góndola chocan con un rack o una celda IN-). El modal pide la **clase** (Góndola · Rack · SC y SP) y valida la posición
+    contra esa clase en el front: «F3» con Góndola va a F03, no a IN-F3. La celda de góndola muestra «+ insumo …».
+  - Mapa: sin emojis en todo el módulo; las solapas de **Tránsito** y de **SC y SP** son sub-pestañas del mismo tamaño
+    que los cuatro modos (`#pmapTabs.pmap-subtabs`, siguen siendo `.lug-tab`); en Tránsito cada código es un botón-celda.
+  - `sql/gv_mapa_transito_v3105.sql` (centinelas `gv_transito_celda`/`sin_lugar`, `gv_insumo_sector`/`gv_gondola_sector`) ·
+    `tests/ins-transito-cajas.cjs`.
 - `sql/gv_transito_v3081.sql` + `sql/gv_transito_saldo_v3087.sql` (centinelas `gv_insumo_recepcion_transito`, `gv_insumo_sector`, `gv_transito_ubicar`) ·
   `tests/ins-envio-tipo.cjs` · `tests/ins-transito-cajas.cjs`.
 
