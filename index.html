@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.17">
+<link rel="stylesheet" href="gv-ui.css?v=31.18">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6473,7 +6473,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.17"></script>
+<script type="module" src="recepcion.js?v=31.18"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10818,7 +10818,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.17";
+const APP_VERSION = "v31.18";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -19946,7 +19946,7 @@ function stkAsOfApply() {
   stkRender();
 }
 function stkAsOfLive() { if (!_stk) return; _stk.asOf = null; _stk.asOfPicking = false; _stk.openArt = null; stkRender(); }
-function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } if (t === "racks" && !_stk.planiLoaded) { stkPlaniLoad(); return; } if (t === "insumos" && !_stk.insLoaded) { stkInsLoad(); return; } if (t === "faltante" && !_stk.faltLoaded) { stkFaltLoad(); return; } if (t === "auditgon" && !_stk.agLoaded) { agLoad(); return; } stkRender(); }
+function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } if (t === "empaque" && !_stk.empLoaded) { stkEmpLoad(); return; } if (t === "racks" && !_stk.planiLoaded) { stkPlaniLoad(); return; } if (t === "insumos" && !_stk.insLoaded) { stkInsLoad(); return; } if (t === "faltante" && !_stk.faltLoaded) { stkFaltLoad(); return; } if (t === "auditgon" && !_stk.agLoaded) { agLoad(); return; } stkRender(); }
 function stkRender() {
   if (!_stk) return;
   if (_stk.soloConteo) {   // rol "solo conteo": sin solapas, directo al conteo físico
@@ -19954,13 +19954,13 @@ function stkRender() {
     const body0 = document.getElementById("stkBody"); if (body0) _renderKeepFocus(body0, stkBodyConteo());
     return;
   }
-  const tabs = [["estmadre", "📈 Est. Madre"], ["stocks", "📊 Stocks"], ["auditgon", "🔍 Góndola <25%"], ["faltante", "📉 Faltantes x día"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["insumos", "🧰 Insumos"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
+  const tabs = [["estmadre", "📈 Est. Madre"], ["stocks", "📊 Stocks"], ["auditgon", "🔍 Góndola <25%"], ["faltante", "📉 Faltantes x día"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["empaque", "📦 Empaque"], ["insumos", "🧰 Insumos"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + (t[0] === "compras" ? ocAlarmaBadge() : "") + '</button>'; }).join("");
   ocAlarmaCargar(false);   // v27.01: alarma de la solapa Compras (OCs); se relee cada 5 min
   if (_stkEmMostrar(_stk.tab === "estmadre")) { updateStkBadge(); return; }   // v25.65: Est. Madre = iframe del admin, fuera de #stkBody
   const body = document.getElementById("stkBody"); if (!body) return;
-  _renderKeepFocus(body, _stk.tab === "faltante" ? stkBodyFaltante() : _stk.tab === "auditgon" ? stkBodyAuditGon() : _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "insumos" ? stkBodyInsumos() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
+  _renderKeepFocus(body, _stk.tab === "faltante" ? stkBodyFaltante() : _stk.tab === "auditgon" ? stkBodyAuditGon() : _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "empaque" ? stkBodyEmpaque() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "insumos" ? stkBodyInsumos() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
   _stkInsCatPopupRefresh();   // v9.32: refresca popup de categoría si está abierto
   updateStkBadge();   // v10.32: actualiza badge de negativos en botón Stock y Compras
 }
@@ -25244,6 +25244,111 @@ async function stkCapLoad() {
     _stk.capLoaded = true;
   } catch (_e) { _stk.cap = _stk.cap || []; _stk.cmax = _stk.cmax || []; _stk.cproy = _stk.cproy || {}; _stk.capLoaded = true; }
   if (_stk) stkRender();
+}
+/* v31.18 (Luis, 15/10) — 📦 EMPAQUE: lo que falta definir de cada artículo (inner × master, unidades × inner,
+   unidades × master, o «sin inner» / «sin master»). Lee gv_cxm_estado y guarda con gv_cxm_guardar (supervisor),
+   que escribe la canónica GV_Rack_CxM y deja las mismas unidades en Importados_Volumen. Con dos datos sale el
+   tercero. sql/gv_cxm_pantalla_v3118.sql. */
+async function stkEmpLoad() {
+  if (!_stk) return;
+  _stk.empLoaded = "loading"; stkRender();
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_cxm_estado", "select=*&order=cod.asc");
+    if (!Array.isArray(rows)) throw new Error("respuesta inválida");
+    _stk.emp = rows; _stk.empErr = ""; _stk.empLoaded = true;
+  } catch (e) { _stk.emp = []; _stk.empErr = (e && e.message) || String(e); _stk.empLoaded = true; }
+  _stk.empEd = _stk.empEd || {};
+  if (_stk) stkRender();
+}
+function _empNum(v) { const n = Number(String(v == null ? "" : v).replace(",", ".")); return n > 0 ? n : null; }
+/* lo que el supervisor está escribiendo (o lo que hay guardado) + el dato que sale de los otros dos */
+function _empVal(r) {
+  const e = (_stk.empEd || {})[r.cod] || {};
+  const g = function (k, def) { return Object.prototype.hasOwnProperty.call(e, k) ? e[k] : def; };
+  const v = { cxm: _empNum(g("cxm", r.cxm)), ui: _empNum(g("ui", r.uni_x_inner)), um: _empNum(g("um", r.uni_x_master)),
+              si: !!g("si", r.sin_inner), sm: !!g("sm", r.sin_master), sucio: Object.keys(e).length > 0, der: "" };
+  if (v.si) { v.cxm = null; v.ui = null; }
+  if (v.sm) { v.cxm = null; v.um = null; }
+  if (!v.si && !v.sm) {
+    if (v.cxm == null && v.ui && v.um && v.um % v.ui === 0) { v.cxm = v.um / v.ui; v.der = "cxm"; }
+    else if (v.cxm && v.ui && v.um == null) { v.um = v.cxm * v.ui; v.der = "um"; }
+    else if (v.cxm && v.um && v.ui == null && v.um % v.cxm === 0) { v.ui = v.um / v.cxm; v.der = "ui"; }
+    if (v.cxm && v.ui && v.um && v.um !== v.cxm * v.ui) v.err = "no cierra: " + v.cxm + " × " + v.ui + " = " + (v.cxm * v.ui);
+  }
+  return v;
+}
+function empSet(cod, k, val) {
+  if (!_stk) return; _stk.empEd = _stk.empEd || {};
+  const e = _stk.empEd[cod] = _stk.empEd[cod] || {};
+  e[k] = val;
+  if (k === "si" && val) e.sm = false;
+  if (k === "sm" && val) e.si = false;
+  stkRender();
+}
+function empVer(v) { if (!_stk) return; _stk.empVer = v; stkRender(); }
+async function empGuardar(cod) {
+  if (!_stk || !_stk.emp) return;
+  const r = _stk.emp.find(function (x) { return x.cod === cod; }); if (!r) return;
+  const v = _empVal(r);
+  if (v.err) { try { alert(cod + ": " + v.err); } catch (_e) {} return; }
+  _stk.empSaving = cod; stkRender();
+  try {
+    const H = await gvWriteHdr();   // D15: sesión de supervisor (gv_rpc_guard)
+    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_cxm_guardar", { method: "POST", headers: H,
+      body: JSON.stringify({ p_cod: cod, p_cxm: v.cxm, p_uni_x_inner: v.ui, p_uni_x_master: v.um, p_sin_inner: v.si, p_sin_master: v.sm }) });
+    if (!res.ok) { let t = ""; try { const j = await res.json(); t = j.message || JSON.stringify(j); } catch (_e) {} throw new Error(t || ("HTTP " + res.status)); }
+    const fresh = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_cxm_estado", "select=*&cod=eq." + encodeURIComponent(cod));
+    if (Array.isArray(fresh) && fresh[0]) { const i = _stk.emp.indexOf(r); if (i >= 0) _stk.emp[i] = fresh[0]; }
+    delete _stk.empEd[cod];
+  } catch (e) { try { alert("No se guardó " + cod + ": " + ((e && e.message) || e)); } catch (_e) {} }
+  _stk.empSaving = ""; stkRender();
+}
+function stkBodyEmpaque() {
+  if (_stk.empLoaded === "loading") return '<div class="gv-msg">Cargando empaque…</div>';
+  if (_stk.empErr) return '<div class="gv-err">No se pudo leer el empaque: ' + escapeHtml(_stk.empErr) + '</div>';
+  const all = _stk.emp || [];
+  const pend = all.filter(function (r) { return r.pendiente; });
+  const cnt = {}; pend.forEach(function (r) { cnt[r.pendiente] = (cnt[r.pendiente] || 0) + 1; });
+  const ver = _stk.empVer === "todos" ? "todos" : "pend";
+  const f = (_stk.filtro || "").toLowerCase();
+  let rows = (ver === "todos" ? all : pend).filter(function (r) { return !f || stkMatchBusq(f, r.cod, r.descripcion || "", false); });
+  const peso = { "no coincide con importación": 3, "importación dice sin inner": 3, "sin dato": 2, "incompleto": 1 };
+  rows = rows.slice().sort(function (a, b) { return (peso[b.pendiente] || 0) - (peso[a.pendiente] || 0) || ((+b.racks || 0) + (+b.a_guardar || 0)) - ((+a.racks || 0) + (+a.a_guardar || 0)); });
+  let h = '<div class="gv-sub" style="margin:2px 0 8px;">Cajas por master de cada artículo: <b>inner × master</b>, <b>unidades × inner</b> y <b>unidades × master</b>. Con dos sale el tercero. ' +
+    '<b>Sin inner</b> = la master trae unidades sueltas (en racks cada caja es una master). <b>Sin master</b> = va suelto. Lo que se guarda impacta racks, bajadas, ingreso a racks e importación.</div>';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;">' +
+    '<button class="stk-tab' + (ver === "pend" ? " on" : "") + '" onclick="empVer(\'pend\')">Pendientes · ' + pend.length + '</button>' +
+    '<button class="stk-tab' + (ver === "todos" ? " on" : "") + '" onclick="empVer(\'todos\')">Todos · ' + all.length + '</button>' +
+    Object.keys(cnt).sort(function (a, b) { return (peso[b] || 0) - (peso[a] || 0); }).map(function (k) { return '<span class="gv-chip">' + escapeHtml(k) + ' <b>' + cnt[k] + '</b></span>'; }).join("") +
+    '<input class="stk-filtro" style="margin:0;flex:0 1 220px;" type="search" placeholder="Buscar código" value="' + escapeHtml(_stk.filtro || "") + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}"></div>';
+  if (!all.length) return h + '<div class="gv-msg">No hay artículos con stock en racks / a guardar ni importados activos.</div>';
+  if (!rows.length) return h + '<div class="gv-msg">' + (f ? 'Ningún código coincide con «' + escapeHtml(_stk.filtro) + '».' : (ver === "pend" ? 'No queda nada pendiente de definir.' : 'Sin artículos.')) + '</div>';
+  const n = function (x) { return x == null || x === "" ? "" : String(Math.round(Number(x) * 100) / 100); };
+  const inp = function (cod, k, val, dis, der) {
+    return '<input type="number" inputmode="numeric" min="1" style="width:58px;text-align:center;' + (der ? 'color:#64748b;font-style:italic;' : '') + '"' + (dis ? ' disabled' : '') +
+      ' value="' + n(val) + '" oninput="empSet(\'' + cod + '\',\'' + k + '\',this.value)">';
+  };
+  h += '<div class="gv-tblwrap" style="max-height:62vh;"><table class="gv-tbl"><thead><tr>' +
+    '<th>Cód</th><th>Artículo</th><th>Racks<br>cajas</th><th>A guardar<br>cajas</th><th>Inner<br>× master</th><th>Uni<br>× inner</th><th>Uni<br>× master</th>' +
+    '<th>Sin<br>inner</th><th>Sin<br>master</th><th>Importación<br>uni master / inner</th><th>Falta</th><th></th></tr></thead><tbody>';
+  h += rows.map(function (r) {
+    const v = _empVal(r), cod = String(r.cod).replace(/[^A-Za-z0-9 _.-]/g, "");
+    const imp = (r.iv_uni_master != null || r.iv_uni_inner != null) ? (n(r.iv_uni_master) + ' / ' + (Number(r.iv_uni_inner) === 0 ? 'suelto' : n(r.iv_uni_inner))) : '—';
+    const sug = (!v.ui && !v.si && !v.sm && r.sugerido_uni_x_inner) ? ' title="Uni × caja en Artículos: ' + n(r.sugerido_uni_x_inner) + '"' : '';
+    const mal = r.pendiente && r.pendiente !== "incompleto";
+    return '<tr' + (mal ? ' style="box-shadow:inset 4px 0 0 #dc2626;"' : '') + '>' +
+      '<td><b>' + escapeHtml(r.cod) + '</b></td><td style="text-align:left;max-width:200px;">' + escapeHtml(r.descripcion || "") + '</td>' +
+      '<td>' + (Number(r.racks) || "") + '</td><td>' + (Number(r.a_guardar) || "") + '</td>' +
+      '<td>' + inp(cod, "cxm", v.cxm, v.si || v.sm, v.der === "cxm") + '</td>' +
+      '<td' + sug + '>' + inp(cod, "ui", v.ui, v.si, v.der === "ui") + '</td>' +
+      '<td>' + inp(cod, "um", v.um, v.sm, v.der === "um") + '</td>' +
+      '<td><input type="checkbox"' + (v.si ? ' checked' : '') + ' onchange="empSet(\'' + cod + '\',\'si\',this.checked)"></td>' +
+      '<td><input type="checkbox"' + (v.sm ? ' checked' : '') + ' onchange="empSet(\'' + cod + '\',\'sm\',this.checked)"></td>' +
+      '<td>' + imp + '</td>' +
+      '<td style="' + (mal ? 'color:#b91c1c;font-weight:700;' : '') + '">' + escapeHtml(v.err || r.pendiente || "—") + '</td>' +
+      '<td>' + (v.sucio ? '<button class="stk-btn ok" style="padding:4px 10px;"' + (_stk.empSaving === r.cod ? ' disabled' : '') + ' onclick="empGuardar(\'' + cod + '\')">' + (_stk.empSaving === r.cod ? 'Guardando…' : 'Guardar') + '</button>' : '') + '</td></tr>';
+  }).join("");
+  return h + '</tbody></table></div>';
 }
 function stkBodyCapacidad() {
   if (_stk.capLoaded === "loading") return '<div class="stk-loading">Cargando capacidad…</div>';
@@ -64357,7 +64462,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.17"></script>
+<script src="importacion.js?v=31.18"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67678,15 +67783,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.17"></script>
-<script src="hotsale.js?v=31.17"></script>
-<script src="estadisticas.js?v=31.17"></script>
-<script src="ads.js?v=31.17"></script>
-<script src="plantel.js?v=31.17"></script>
+<script src="cobranzas.js?v=31.18"></script>
+<script src="hotsale.js?v=31.18"></script>
+<script src="estadisticas.js?v=31.18"></script>
+<script src="ads.js?v=31.18"></script>
+<script src="plantel.js?v=31.18"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.17"></script>
+<script src="analisis.js?v=31.18"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.17"></script>
+<script src="ayuda.js?v=31.18"></script>
 
 </body>
 </html>

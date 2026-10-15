@@ -26,6 +26,8 @@ node() {
 echo "== ins-alta-gp2 (v31.14: Insumos edita solo descripcion y cantidad; alta desde GP2 o a mano) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-alta-gp2.cjs
 echo "== popup-avisos-luis (v31.05: avisos C2/C4/C5 en pop-up para Luis + aviso de Windows minimizada) =="
+echo "== stk-empaque (v31.18: Stock → Empaque, inner×master / uni×inner / uni×master o sin inner; guarda con gv_cxm_guardar) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-empaque.cjs
 echo "== cxm-canonica (v31.13: cajas por master SOLO de GV_Rack_CxM; ni Articulos.Cajas_x_Master ni ratio de planimetria) =="
 node tests/cxm-canonica.cjs
 echo "== rkb-pos-no-rack (v31.12: Bajar de racks no registra una posicion que no es rack; el rechazo se avisa) =="

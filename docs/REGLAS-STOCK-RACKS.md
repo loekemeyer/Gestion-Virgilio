@@ -204,7 +204,17 @@ lo busquen de ahí."* El dato estaba en 6 lugares que no coincidían. Quedó as�
 Si están las tres, `uni_x_master = cxm × uni_x_inner` (constraint `gv_rack_cxm_cierra`). **MC sin inner** = `sin_inner`,
 `cxm` vacío y `uni_x_master` cargado (en racks cada caja es una master, 1:1): 590E, 890E, 323ES. Si un ingreso a racks
 cambia el `cxm` y las unidades dejan de cerrar, el trigger `trg_gv_rack_cxm_coherente` las limpia (manda el conteo
-físico) y el código aparece en `gv_cxm_conflictos`. `sql/gv_cxm_tres_relaciones_v3114.sql`. Para ver qué falta decidir:
+físico) y el código aparece en `gv_cxm_conflictos`. `sql/gv_cxm_tres_relaciones_v3114.sql`.
+
+**v31.18 (Luis, 15/10): «con 2 de los datos siempre podés sacar el tercero» — y se carga a mano en Stock → «📦 Empaque».**
+- `trg_gv_rack_cxm_coherente` **deriva el tercero** cuando hay dos (si da entero).
+- `gv_cxm_estado` (anon): por código con stock en racks / a guardar / excedente o importado activo, qué tiene y qué falta
+  (`pendiente`: `sin dato` · `incompleto` · `no coincide con importación` · `importación dice sin inner`; vacío = completo).
+- `gv_cxm_guardar` (supervisor, `gv_rpc_guard`): escribe **todas las filas del código** en la canónica, `fuente = a mano (<mail>)`,
+  y si el código está en `Importados_Volumen` le deja **las mismas unidades** (sin inner = `uni_inner 0`): resolver un
+  conflicto lo resuelve en los dos lados. Con la clave pública da 401 (probado por `net.http_post`).
+- Pantalla: tildes **Sin inner** (la master trae unidades sueltas; en racks cada caja es una master) y **Sin master**.
+  `sql/gv_cxm_pantalla_v3118.sql`, `tests/stk-empaque.cjs`. Para ver qué falta decidir:
 `select * from public.gv_cxm_conflictos order by cod;`. `sql/gv_cxm_canonica_v3113.sql`, `tests/cxm-canonica.cjs`.
 
 ### ⚠ RACKS: una fuente por dato (Luis, 25/09, v22.77)
