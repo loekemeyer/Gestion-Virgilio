@@ -143,7 +143,9 @@ H201part ... que no se mezclen"* · *"si ayer se unifico algo que quede marcadam
   (AD04) y 1000900 78.000 u (Y04). **No volver a mapear H201Part a 1000900 ni a D1** porque «parezcan» lo mismo.
 - El **`546P` pasó a llamarse `1546903`** (bastidor corta queso, X13). La equivalencia con GP2 quedó en UNA fila.
 - **v30.31**: `Mgo Pelador Ergonomico` pasó a llamarse **`PEP1`** (mango pelador negro calado sin grabar, N01 → GP2 PEP1).
-  El **440E de X21/X23 es PRODUCTO**, no insumo: salió de insumos y entró a racks con su posición.
+  ~~El 440E de X21/X23 es PRODUCTO~~ — **RETIRADO 15/10 (Luis: «mala mía, esos que hay son insumos»)**: volvió a insumos,
+  528 Uni (44 MC × 12) en X21/X23 (`sql/gv_440E_a_insumo_v3121.sql`). Lo de importación directa que se reenvasa es insumo; el
+  terminado que entrega García sí puede ir a racks como producto.
 - Conteo completo, verificación y rollback: `sql/gv_conteo_insumos_racks_v3030.sql`.
 
 ## ⚠ REGLA (Thomas, 2026-09-30, v24.69): un insumo con MC SALE siempre en MC — el stock queda en unidades
