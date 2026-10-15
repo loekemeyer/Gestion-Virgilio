@@ -922,8 +922,11 @@ Caso 438E (14/10): el legajo 94 bajó 54 cajas con posición **«F15»**, que es
 grabó **sin posición**: el Mapa mostró «438E LK · −54 caj» y AD11 siguió en 78 cuando tenía 24 (corregido el 15/10).
 Problema de auditoría «Bajar de racks acepta una góndola (o posición inexistente)…».
 
-- **Base**: si viene posición y `gv_rack_pos()` no la reconoce → `RACKS_NO_ES_RACK`, no se graba nada. Sin posición
-  (null) sigue pasando: lo usa la bajada por orden (`brConfirmar`), y el front de Bajar de racks ya la exige.
+- **Base**: si viene posición y `gv_rack_pos()` no la reconoce → `RACKS_NO_ES_RACK`, no se graba nada. **Sin posición
+  tampoco** (v31.15, D4: `RACKS_SIN_POSICION_BAJA`, marcador `v31.15-sin-posicion`, centinela 494).
+- **v31.15 (D4): se sacó la bajada por ORDEN** (botón «emitir orden de bajar racks» de Stock → Racks, la alarma de la
+  botonera y `showBajarRacks` / `brConfirmar`): era el único camino que mandaba la bajada sin posición, y `Racks_Ordenes`
+  estaba vacía. Bajar de racks es sólo «BR» (`rkbConfirmar`). `sql/gv_baja_racks_sin_posicion_v3115.sql`.
 - **Front**: `_rkbPosNoRack` pregunta `gv_rack_sector` antes de abrir el código de verificación y avisa. Sin red no frena.
 - **Un rechazo ya no es silencioso**: `postBajaRacks` avisaba «✓ Bajaste» y descartaba el 400 con `console.error`. Ahora
   dice qué no se grabó y por qué. Y la cola offline (`vir_baja_racks_pend`), que va en UNA transacción, con un 400 se
