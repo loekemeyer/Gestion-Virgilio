@@ -117,7 +117,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     let movG = null; const _smG = window.stockMove; window.stockMove = function (rows) { movG = rows; };
     window.alert = function () {}; insCloseQty(); await insConfirmar(); window.stockMove = _smG;
     const m0 = (movG || [])[0] || {};
-    // (h) v29.30 (Thomas): cajas sin TMP; se cargan en cajas o paquetes (×25) y se guardan en cajas
+    // (h) v29.30 (Thomas): se cargan en cajas o paquetes (×25) y se guardan en cajas
     window._insEnvioSub = null; window._insGp2 = null; window._insRiCat = "cajas";
     await showInsumoModal("RI", "104");
     const cjs = _ins.items.filter(function (x) { return x.cat === "cajas"; }).map(function (x) { return x.cod; }).sort();
@@ -132,7 +132,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const bloqueaSinMarca = movH === null && _ins.qty === ic;     // v29.31: sin marca no registra
     insSetCajaMarca(ic, "Chef"); insCloseQty(); await insConfirmar(); window.stockMove = _smH;
     const h0 = (movH || [])[0] || {};
-    out.h = JSON.stringify(cjs) === JSON.stringify(["Caja Nº 29"]) && !/ins-itbtn add/.test(htmlCj) && /= 50 cajas/.test(qc) &&
+    // v30.90 (Luis, 15/10): en cajas se ven TODOS los códigos de Virgilio (también los TMP escritos a mano) y hay
+    // «+ Agregar» para escribir el nombre de una caja que no está
+    out.h = JSON.stringify(cjs) === JSON.stringify(["Caja Nº 29", "TMP-0024"]) && /ins-itbtn add/.test(htmlCj) && /= 50 cajas/.test(qc) &&
       (qc.match(/ins-uchip/g) || []).length === 4 && h0.unidad === "Uni" && h0.delta === 50 && /2 paquetes × 25/.test(h0.descripcion || "") &&
       qcSinMarca && bloqueaSinMarca && /marca Chef/.test(h0.descripcion || "") && h0.cod_art === "Caja Nº 29";
     out.g = !/ins-uchip/.test(qh) && /Bolsas/.test(qh) && /= 100 kg/.test(qh) && m0.unidad === "Bolsas" && m0.delta === -4 && /4 bolsas = 100 kg/.test(m0.descripcion || "");

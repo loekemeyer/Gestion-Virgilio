@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.89">
+<link rel="stylesheet" href="gv-ui.css?v=30.90">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.89"></script>
+<script type="module" src="recepcion.js?v=30.90"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10761,7 +10761,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.89";
+const APP_VERSION = "v30.90";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27805,7 +27805,10 @@ function insChooserGo(which) {
    quieren recibir con las categorías que tenemos en insumos (sin contar importados)". */
 const INS_RI_SIN = ["importados"];
 /* v29.25/29.30 (Thomas): categorías con lista CERRADA — el operario no da de alta nada nuevo ahí. */
-const INS_CAT_CERRADA = ["plastico", "cajas"];
+/* v30.90 (Luis, 15/10): las CAJAS dejan de ser cerradas — "que también puedan poner el nombre manualmente del
+   código para cajas (tengan stock o no)", al RECIBIR y al ENTREGAR (INS_CAT_ALTA_EI). Bolsas sigue cerrada. */
+const INS_CAT_CERRADA = ["plastico"];
+const INS_CAT_ALTA_EI = ["cajas"];
 /* v29.87 (Luis, 13/10: "crea tabla si sólo está en el front el dato") — estos tres son DATOS del
    negocio, no código: viven en `GV_Insumo_Config` (cajas por paquete, marcas) y en
    `GV_Insumo_Origen_Apodo` (el apodo del inyector), y los hidrata `insLoadMeta`. Lo que queda
@@ -28391,7 +28394,9 @@ async function showInsumoModal(mode, legajo, _resume) {
       lista.push({ cod: "", gp2Comp: g.comp_id, gp2Cod: g.codigo, nombre: g.nombre || "", sector: "", ubic: "", cat: g.categoria, orden: null, noCode: false, stock: 0, stockByUni: null, qty: 0, unidad: _defUni(null, g.categoria) });
     });
     // v29.30 (Thomas): de CAJAS se tocan sólo las 11 cajas reales (Caja Nº 1 … Nº 29), ningún TMP-.
-    lista = lista.filter(function (x) { return insCatOf(x) !== "cajas" || (!_insEsTmp(x) && !x.noCode); });
+    // v30.90 (Luis, 15/10): "todos los códigos que figuran en Virgilio, en Cervantes" — también los TMP de cajas
+    // que un operario escribió a mano (se cruzan después). Sólo quedan afuera los sin código.
+    lista = lista.filter(function (x) { return insCatOf(x) !== "cajas" || !x.noCode; });
     // v29.22 (Luis): envío a un INYECTOR = sólo las bolsas plásticas reales (las que tienen
     // ubicación en el Mapa; ni los TMP- ni los códigos viejos), nada más.
     const gp2Ei = (mode === "EI" && window._insGp2 && window._insGp2.modo === "EI");
@@ -28659,7 +28664,7 @@ function insRender() {
       }).join("") +
         // v30.05: y también dentro de la categoría. Las CERRADAS (bolsas y cajas) siguen sin
         // alta: su catálogo es conocido y completo (Thomas, v29.25/30).
-        (cat && isIn && INS_CAT_CERRADA.indexOf(cat) < 0 ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
+        (cat && (isIn ? INS_CAT_CERRADA.indexOf(cat) < 0 : INS_CAT_ALTA_EI.indexOf(cat) >= 0) ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
         '</div>';
     }
   }
@@ -28684,7 +28689,7 @@ function insNuevoOpen(cat) {
   // v30.05 (Luis, 13/10): el alta VUELVE — pero SÓLO al RECIBIR ("hay que darles la opción de
   // poder crear códigos nuevos CUANDO RECIBEN"). Al ENTREGAR nunca hubo botón y la guarda queda:
   // dar de alta algo al sacarlo sería sacar stock de algo que nunca entró.
-  if (_ins.mode !== "RI") {
+  if (_ins.mode !== "RI" && INS_CAT_ALTA_EI.indexOf(cat) < 0) {   // v30.90: al ENTREGAR, sólo cajas
     try { alert("No se puede agregar un insumo nuevo acá.\n\nAl ENTREGAR sale sólo lo que ya está en la lista. Si llegó algo que no figura, cargá la RECEPCIÓN primero."); } catch (_e) {}
     return;
   }
@@ -28723,12 +28728,13 @@ function _insNuevoHtml(isIn) {
   const units = insCatUnis(n.cat).concat(n.uni && insCatUnis(n.cat).indexOf(n.uni) < 0 ? [n.uni] : []);
   let h = '<div class="ins-bar"><button class="ins-back" onclick="insNuevoCancel()">‹ Atrás</button>' +
     '<span class="ins-bar-t">+ Insumo nuevo</span></div>';
-  h += '<div class="ins-hint">Llegó algo que no está en la lista. Describilo y listo: el código se lo ponen después desde Stock y Compras.</div>';
+  h += '<div class="ins-hint">' + (isIn ? 'Llegó algo que no está en la lista. Describilo y listo: el código se lo ponen después desde Stock y Compras.'
+                                      : 'Sale una caja que no está en la lista. Escribí cuál es (ej: Caja N° 31): queda con un código temporal y se cruza después.') + '</div>';   // v30.90
   // El DETALLE va primero: es lo único que el operario sabe seguro.
   h += '<div class="ins-nvl">Detalle <span class="ins-cbadge">— qué es, en tus palabras</span></div>' +
     '<textarea id="insNvDet" class="ins-nvt" rows="3" placeholder="Ej: alambre finito que trajo Pérez, bolsa gris sin etiqueta…" oninput="insNuevoSet(\'det\',this.value)">' + escapeHtml(n.det) + '</textarea>';
   h += '<div class="ins-nvl">Elegí la categoría</div><div class="ins-cats">' +
-    INS_CATS.filter(function (c) { return INS_RI_SIN.indexOf(c.k) < 0 && INS_CAT_CERRADA.indexOf(c.k) < 0; }).map(function (c) {   // v29.25/30: bolsas y cajas no las da de alta el operario
+    INS_CATS.filter(function (c) { return INS_RI_SIN.indexOf(c.k) < 0 && INS_CAT_CERRADA.indexOf(c.k) < 0 && (isIn || INS_CAT_ALTA_EI.indexOf(c.k) >= 0); }).map(function (c) {   // v29.25/30: bolsas y cajas no las da de alta el operario
       return '<button class="ins-cchip' + (n.cat === c.k ? " on" : "") + '" onclick="insNuevoPick(\'cat\',\'' + c.k + '\')">' + c.lbl + '</button>';
     }).join("") +
     '<button class="ins-cchip' + (n.cat === "" ? " on" : "") + '" onclick="insNuevoPick(\'cat\',\'\')">❓ Sin categoría clara</button>' +
@@ -63810,7 +63816,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.89"></script>
+<script src="importacion.js?v=30.90"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67101,15 +67107,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.89"></script>
-<script src="hotsale.js?v=30.89"></script>
-<script src="estadisticas.js?v=30.89"></script>
-<script src="ads.js?v=30.89"></script>
-<script src="plantel.js?v=30.89"></script>
+<script src="cobranzas.js?v=30.90"></script>
+<script src="hotsale.js?v=30.90"></script>
+<script src="estadisticas.js?v=30.90"></script>
+<script src="ads.js?v=30.90"></script>
+<script src="plantel.js?v=30.90"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.89"></script>
+<script src="analisis.js?v=30.90"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.89"></script>
+<script src="ayuda.js?v=30.90"></script>
 
 </body>
 </html>

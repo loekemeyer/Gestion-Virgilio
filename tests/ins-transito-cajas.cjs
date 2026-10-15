@@ -62,6 +62,13 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
     const cajas = _ins.items.filter(function (x) { return x.cat === "cajas"; }).map(function (x) { return x.cod || x.gp2Cod; }).sort();
     out.c = JSON.stringify(cajas) === JSON.stringify(["A99", "Caja Nº 1"]) && !_ins.items.some(function (x) { return x.gp2Cod === "FX"; });
     out.cajas = cajas;
+    // v30.90 (Luis, 15/10): al ENTREGAR también se puede escribir a mano una caja que no está; otra categoría, no
+    _ins.cat = "cajas"; insRender();
+    const htmlEiCj = document.getElementById("insBody").innerHTML;
+    insNuevoOpen("fleje"); const eiFlejeNo = _ins.nuevo === null;
+    insNuevoOpen("cajas"); const eiCajaSi = !!_ins.nuevo && /Sale una caja/.test(document.getElementById("insBody").innerHTML);
+    insNuevoCancel();
+    out.eiAlta = /ins-itbtn add/.test(htmlEiCj) && eiFlejeNo && eiCajaSi;
     insAnular && (function () { try { _ins = null; document.getElementById("insModal").classList.remove("show"); } catch (_e) {} })();
     window._insRiCat = "fleje"; window._insGp2 = null; window._insDoc = { tipo: "remito", remito: "R-1" };
     await showInsumoModal("RI", "104");
@@ -75,7 +82,7 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
     return out;
   });
   await b.close();
-  const ok = r.a && r.ubicar && r.b && r.c && !errs.length;
+  const ok = r.a && r.ubicar && r.b && r.c && r.eiAlta && !errs.length;
   console.log("ins-transito-cajas:", JSON.stringify(r), errs.length ? "· errores: " + errs.join(" | ") : "· pageerrors: none", ok ? "· ✓ OK" : "· ✗ FALLA");
   process.exit(ok ? 0 : 1);
 })();

@@ -1,3 +1,8 @@
+## Nota v30.90 (2026-10-15) — Cajas: todos los códigos y alta a mano al recibir y al entregar
+
+- En cajas, Recibir y Entregar muestran todos los códigos de Virgilio (incluidos los TMP) y de Cervantes, con o sin
+  stock, y «+ Agregar» para escribir a mano una caja que no está (queda TMP, se cruza después).
+
 ## Nota v30.88 (2026-10-14; la base dice v30.87) — Tránsito es un SALDO · 17 cajas en GP2
 
 - Toda recepción de insumo queda en **Tránsito** (`ubicacion='TRANSITO'`) hasta que un supervisor la **ubica** desde

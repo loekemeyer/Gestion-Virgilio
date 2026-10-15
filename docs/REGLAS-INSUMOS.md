@@ -26,6 +26,9 @@ solo en el front"*.
   las que `GP2.uni_x_articulo_x_caja` usaba sin componente: componente en sector 11 con código **provisorio `CJ<n>`**
   (no tienen lugar en Cervantes), inventario en 0 en *Sector Caja* (11) y *Sector Caja en Virgilio* (77), el insumo
   `Caja Nº n` / `Caja P` en Virgilio y su fila en `insumo_equivalencia`. `sql/gv_cajas_gp2_alta_v3087.sql`.
+- **v30.90 (Luis, 15/10)**: en cajas, RI y EI muestran **todos** los códigos de Virgilio (también los TMP escritos a
+  mano) y de Cervantes, con o sin stock, y **«+ Agregar»** para escribir una caja que no está. *"Si es un tema de que
+  están en Virgilio y no en Cervantes, asumí que son códigos que falta cruzar"*: los `CJ<n>` quedan como temporales.
 - **D2 (Luis): no** — los 19 insumos con stock y sin lugar no se pasan a TRANSITO. Forward-facing.
 - `sql/gv_transito_v3081.sql` + `sql/gv_transito_saldo_v3087.sql` (centinelas `gv_insumo_recepcion_transito`, `gv_insumo_sector`, `gv_transito_ubicar`) ·
   `tests/ins-envio-tipo.cjs` · `tests/ins-transito-cajas.cjs`.
@@ -290,8 +293,9 @@ dos filas, con su fecha y su tipo; sin papel no escribe `gv_doc`; anular no lo d
 | dónde | alta |
 |---|---|
 | **RI (recibir)**, categoría común | **SÍ** — el botón en los dos lugares |
-| **RI**, categoría **CERRADA** (bolsas, cajas) | **NO**: su catálogo es conocido y completo (Thomas, v29.25/30). El botón no se dibuja y `insNuevoOpen` se planta si lo llaman a mano |
-| **EI (entregar)** | **NO**, como siempre: dar de alta algo al sacarlo sería sacar stock de algo que nunca entró |
+| **RI**, categoría **CERRADA** (bolsas) | **NO**: su catálogo es conocido y completo (Thomas, v29.25). El botón no se dibuja y `insNuevoOpen` se planta si lo llaman a mano |
+| **RI y EI, CAJAS** | **SÍ** desde la v30.90 (Luis, 15/10: *"que también puedan poner el nombre manualmente del código para cajas (tengan stock o no)"*). Retira el «cajas cerrada» de Thomas v29.30. Queda TMP y se cruza después (`INS_CAT_ALTA_EI`) |
+| **EI (entregar)**, el resto | **NO**: dar de alta algo al sacarlo sería sacar stock de algo que nunca entró |
 
 **Y el alta AVISA antes de crear.** Es la lección del `TMP-0037` (arriba): el operario escribió `13.6 x 0.8`
 teniendo el fleje en la lista como `N°19` (*13,6 x 0,8*) y se creó un código que no existía para nadie. Ahora
