@@ -115,6 +115,13 @@ proyecto de LK) hoy **no lee CRN**: avisa facturas. Test: `tests/cc-orden-camion
   la PPP (`gv_ppp_prog_arbol`) ya trae la NP etiquetada y `popDiaBucket` (build-admin.cjs) le volvía a pegar el prefijo con
   `npLabel`. Ahora la muestra tal cual (una NP de ISIS sigue sin prefijo). `tests/mon-admin.cjs` (b').
 
+## Nota v31.11 (2026-10-15) — Ingreso a racks: tercera pestaña «🗄 Desde góndola»
+
+- Luis: sube cajas de la **góndola** (`terminado`) a un rack, con el **conversor de masters** (masters × CxM = cajas).
+  Es un traslado: `racks_plani_ingreso_nacional(p_origen => 'terminado')`; en duales cuenta sólo la góndola de la
+  empresa elegida. «Desde A guardar» con duales mandaba «438ELK» y daba `sin_stock`: corregido. Regla en
+  `docs/REGLAS-STOCK-RACKS.md`, test `tests/ir-desde-gondola.cjs`.
+
 ## Nota v26.83 (2026-10-05) — BR, Guardado e Ingreso a racks: «Cerrar» minimiza, «Anular» sale
 
 - Luis: el «Cerrar» de arriba de **Bajar de racks**, **Guardado a góndola** e **Ingreso a racks** ya no corta la
