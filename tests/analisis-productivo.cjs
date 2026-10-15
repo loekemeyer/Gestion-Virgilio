@@ -128,7 +128,7 @@ const DET = {
     out.malas = filas.filter((f) => f.classList.contains("mala")).map((f) => f.cells[1].textContent);
     out.f1 = filas[0] ? [...filas[0].cells].map((c) => c.textContent.trim()) : [];
     out.primeraFila = filas[0] ? filas[0].cells[1].textContent.trim() : "";
-    out.difFila = filas[0] ? filas[0].cells[7].textContent.trim() : "";
+    out.difFila = filas[0] ? filas[0].cells[6].textContent.trim() : "";   // sin la columna Góndola, Dif es la 7ª (idx 6)
     out.volver = !!document.querySelector("#anOv .an-top button[onclick='anVolver()']");
     out.concl = (document.querySelector("#anOv .gv-state .v") || {}).textContent || "";
     out.mkBotones = document.querySelectorAll("#anOv .an-mk-b").length;

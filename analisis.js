@@ -414,7 +414,7 @@ function _anTablaHtml(L) {
   });
   var h = '<details open><summary>Código por código<span class="n">' + L.length + '</span></summary>' +
     '<div class="gv-tblwrap"><table class="gv-tbl"><thead><tr>' +
-    '<th>#</th><th>Código</th><th>Descripción</th><th>Góndola</th><th>Cajas</th>' +
+    '<th>#</th><th>Código</th><th>Descripción</th><th>Cajas</th>' +
     '<th>Esperado</th><th>Real</th><th>Dif</th>' +
     '<th>Frente a<br>la góndola</th><th>s por<br>caja</th></tr></thead><tbody>';
   var tE = 0, tR = 0, tn = 0;
@@ -425,8 +425,7 @@ function _anTablaHtml(L) {
                (Number(x.falto_armado) > 0 && Number(x.cajas) >= Number(x.pedidas));
     var dif = _anDif(x.esp_seg, x.seg);
     h += '<tr' + (mala ? ' class="mala"' : '') + '><td>' + _anN(x.orden, 0) + '</td>' +
-      '<td><b>' + _anEsc(x.cod) + '</b></td><td class="t">' + _anEsc(x["desc"] || "") + '</td>' +
-      '<td>' + _anEsc(x.sector || "—") + (x.es_exc ? " ·EXC" : "") + '</td>' +
+      '<td><b>' + _anEsc(x.cod) + '</b>' + (x.es_exc ? ' <small style="color:var(--gv-ink-2)">EXC</small>' : '') + '</td><td class="t">' + _anEsc(x["desc"] || "") + '</td>' +
       '<td>' + _anN(x.cajas, 0) + (Number(x.pedidas) > Number(x.cajas) ? ' <span style="color:var(--gv-error)">de ' + _anN(x.pedidas, 0) + '</span>' : '') + '</td>' +
       '<td>' + _anSeg(x.esp_seg) + '</td>' +
       '<td' + (Number(x.ratio) > 6 ? ' style="color:var(--gv-error);font-weight:800"' : '') + '>' + _anSeg(x.seg) + '</td>' +
