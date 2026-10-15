@@ -1,3 +1,15 @@
+## Nota v30.99 (2026-10-15) — El bot de WhatsApp lee `gv_pedido_web_estado_pagina`, no `gv_remitos_controlados`
+
+Luis: *"lo que sea más seguro y menos propenso a problemas… traete el repo de GestOpClientes"*. Leído el repo
+(`loekemeyer/gestopclientes`, BotWA-LK): el bot ya toma el entregado de Gestión por FDW desde
+**`gv_pedido_web_estado_pagina`** (`entregado`, `entregado_at` = primer CRN de las NP del pedido), con
+`bot_estado_pedidos_gv` (security definer, sólo `service_role`). Ese contrato ya recibe el CRN del retira de la v30.95:
+medido, los pedidos 1669, 1647, 1631 y 1581 (retira) figuran `entregado` con la hora del retiro.
+Por eso **el bot no usa `gv_remitos_controlados`** (queda para consulta) y se le quitó el acceso `anon` a la vista y a
+`gv_legajo_nombre` (nadie las lee desde la app). La nota de la v30.96 que la presentaba como fuente del bot queda retirada.
+En el bot, hoy **el retiro no se avisa**: el aviso de entregado sale sólo para reparto y expreso
+(`trg_order_tracking_notify`, sql/084); la plantilla `pedido_retirado` está definida pero no está en Meta ni tiene disparador.
+
 ## Nota v30.96 (2026-10-15) — Vista `gv_remitos_controlados`: entregados y retirados en un solo lugar
 
 Luis: *"dejale bien claro y fácil de encontrar los remitos controlados en una vista"*.

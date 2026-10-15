@@ -505,9 +505,12 @@ instrucciones del proyecto.
   con cod/razón social/tanda/m³ resueltos desde la programación viva y, si no está, desde
   `Facturacion_NP` (v16.44). La columna `fuente` dice `hoja` o `remito`.
   La tabla `PPP_Pedidos_Entregados` (espejo duplicado vía Apps Script) se **borró en v10.25** — no citarla.
-- **Remitos controlados (entregado / retirado), para el bot de avisos**: `select * from public.gv_remitos_controlados
+- **Remitos controlados (entregado / retirado), para consultar**: `select * from public.gv_remitos_controlados
   order by controlado_at desc;` — un renglón por NP con `tipo` (`entregado` | `retirado`), `controlado_at`, operario,
-  remito y fletero (v30.96, `sql/gv_remitos_controlados.sql`). El retira queda controlado en Carga → Retira (v30.95).
+  remito y fletero (v30.96, `sql/gv_remitos_controlados.sql`, sin anon). El retira queda controlado en Carga → Retira (v30.95).
+  ⚠ **El bot de WhatsApp (repo `loekemeyer/gestopclientes`, BotWA-LK) NO lee esta vista**: lee `gv_pedido_web_estado_pagina`
+  por FDW (`entregado` / `entregado_at` = primer CRN) vía `bot_estado_pedidos_gv`. Ése es el contrato con el bot: no se le cambian
+  columnas sin avisar a ese repo.
 - **Zona horaria**: `America/Argentina/Buenos_Aires`, UTC-3 fijo.
 - **Versión**: `APP_VERSION` en `index.html` y `SW_VERSION` en `sw.js`.
 - Legajos `0` y `1` (Pruebas) son test/basura: excluir de reportes.

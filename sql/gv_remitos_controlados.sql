@@ -3,7 +3,9 @@
 --   select * from public.gv_remitos_controlados order by controlado_at desc;
 --
 -- UN renglón por NP con el remito controlado (evento CRN) = el pedido está ENTREGADO o RETIRADO.
--- Es la constancia que tiene que leer el bot de avisos al cliente.
+-- Es para CONSULTA. ⚠ NO es la fuente del bot de WhatsApp (repo loekemeyer/gestopclientes): el bot lee
+-- gv_pedido_web_estado_pagina por FDW (entregado / entregado_at = primer CRN), vía bot_estado_pedidos_gv.
+-- Ese contrato ya existía y ya recibe el CRN del retira (v30.95). v30.99: sin acceso anon (nadie la usa desde la app).
 --
 --   tipo           'retirado'  = el cliente lo retiró en Virgilio (Carga → Retira, desde v30.95,
 --                                o una NP Retira controlada por Recepción Remitos antes de eso)
@@ -30,7 +32,7 @@ returns text language sql stable security definer set search_path = public, pg_t
 $$;
 comment on function public.gv_legajo_nombre(text) is 'Nombre del operario por legajo (último del plantel; si no, Fichadas_Estructura). Sólo devuelve el nombre. v30.96.';
 revoke all on function public.gv_legajo_nombre(text) from public;
-grant execute on function public.gv_legajo_nombre(text) to anon, authenticated;
+grant execute on function public.gv_legajo_nombre(text) to authenticated;   -- v30.99: sin anon
 
 create or replace view public.gv_remitos_controlados with (security_invoker = true) as
 with crn as (
@@ -88,5 +90,5 @@ select e.np,
  where not coalesce(public.gv_es_cliente_prueba(e.empresa, e.cod_cliente), false);
 
 comment on view public.gv_remitos_controlados is
-  'Remitos controlados (CRN): un renglón por NP entregada o retirada. tipo = retirado | entregado; controlado_at = cuándo. Fuente para el bot de avisos. v30.96.';
-grant select on public.gv_remitos_controlados to anon, authenticated;
+  'Remitos controlados (CRN): un renglón por NP entregada o retirada, para CONSULTA (tipo, controlado_at, operario, remito, fletero). NO es la fuente del bot de WhatsApp: el bot (repo gestopclientes) lee gv_pedido_web_estado_pagina por FDW. Sin acceso anon. v30.99.';
+grant select on public.gv_remitos_controlados to authenticated;   -- v30.99: sin anon
