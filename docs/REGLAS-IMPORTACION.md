@@ -731,3 +731,11 @@ chinos y para avisar en la página que no tenemos stock"*.
 - ~~**v26.99 (Thomas, 06/10): GRJ31 es un POOL COMPARTIDO.**~~ **RETIRADO en la v28.43 (Luis, 07/10: *"habíamos determinado que 100 % iba para el 838E"*)**: ver la regla «PIEZAS E INSUMOS COMPARTIDOS» más abajo. Texto viejo: Tanto 323E como 838E cuentan **GRJ31 (totalidad) + 323E terminado (totalidad) + 838E terminado (totalidad)**, los tres a factor 1 — así los dos ven el pool neteado por lo ya despachado como cualquiera de los dos (3000 − 600 − 396 = 2.004 para ambos). La leyenda del pop-up los lista a los tres (se arma sola de `GV_Importados_Equiv_GP2`). **El 323ES ya NO ve GRJ31** (*"no va más"*): se borró su fila `(323ES, GRJ31)`. Esto **RETIRA** la regla D13 (Luis, 01/10, 20/80 + 323ES 100%): Thomas la dio vuelta — no volver al 20/80. Que GRJ31 figure entero en 323E y en 838E a la vez es a propósito (cada ítem ve el pool compartido; no se suman entre sí para comprar). Backup de las 3 filas viejas en el chat de la sesión 01RNVK8H (323E/GRJ31/0,2 · 838E/GRJ31/0,8 · 323ES/GRJ31/1).
 
 - v23.95: «el sobrante del ancho de la tabla de Pedidos se lo lleva Descripción (col sin width)». Retirada por la v24.32: la tabla mide lo que suman sus columnas.
+
+
+## ⚠ REGLA (Luis, 2026-10-15, v31.20): lo que se reenvasa entra de importación como INSUMO
+
+*"Si hay que reenvasar el artículo, no entra de impo directo para la venta: entra como insumo y después se manda a la
+fábrica o a un proveedor para reenvasar. 440E en racks siempre es insumo cuando entra de impo directo. Si García entrega,
+ése es el terminado y puede ir a racks."* El empaque de importación (`Importados_Volumen`) de esos artículos no es el del
+terminado: no se compara ni se pisa con la canónica de empaque. Detalle: `docs/REGLAS-STOCK-RACKS.md` (v31.19).

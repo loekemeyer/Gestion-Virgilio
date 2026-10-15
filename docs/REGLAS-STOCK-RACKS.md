@@ -214,7 +214,17 @@ físico) y el código aparece en `gv_cxm_conflictos`. `sql/gv_cxm_tres_relacione
   y si el código está en `Importados_Volumen` le deja **las mismas unidades** (sin inner = `uni_inner 0`): resolver un
   conflicto lo resuelve en los dos lados. Con la clave pública da 401 (probado por `net.http_post`).
 - Pantalla: tildes **Sin inner** (la master trae unidades sueltas; en racks cada caja es una master) y **Sin master**.
-  `sql/gv_cxm_pantalla_v3118.sql`, `tests/stk-empaque.cjs`. Para ver qué falta decidir:
+  `sql/gv_cxm_pantalla_v3118.sql`, `tests/stk-empaque.cjs`.
+
+**⚠ v31.20 (Luis, 15/10): LO QUE SE REENVASA ENTRA DE IMPORTACIÓN COMO INSUMO.** *"Si hay que reenvasar el artículo, no
+entra de impo directo para la venta: entra como insumo y después se manda a la fábrica o a un proveedor para reenvasar.
+440E en racks siempre es insumo cuando entra de impo directo. Si García entrega, ése es el terminado y puede ir a racks."*
+- La canónica (`GV_Rack_CxM`) describe el **terminado** en racks / góndola. `Importados_Volumen` describe la **importación**.
+- Insumo de importación = `gv_cxm_es_insumo_impo(cod)`: está en **`GV_Importados_Insumo_Map`** o viene suelto (`uni_inner = 0`).
+  Para esos, la diferencia con importación **no es conflicto**, la pantalla **no pisa** `Importados_Volumen` y el alta
+  automática desde importación **no crea** fila de producto. Por eso 437E y 440E salieron de los conflictos.
+- **«Sin inner» ya no se carga** como producto (la RPC lo rechaza): una master con unidades sueltas es un insumo a reenvasar.
+  `sql/gv_cxm_reenvasado_v3120.sql`. Para ver qué falta decidir:
 `select * from public.gv_cxm_conflictos order by cod;`. `sql/gv_cxm_canonica_v3113.sql`, `tests/cxm-canonica.cjs`.
 
 ### ⚠ RACKS: una fuente por dato (Luis, 25/09, v22.77)

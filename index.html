@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.19">
+<link rel="stylesheet" href="gv-ui.css?v=31.20">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6473,7 +6473,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.19"></script>
+<script type="module" src="recepcion.js?v=31.20"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10818,7 +10818,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.19";
+const APP_VERSION = "v31.20";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -25246,7 +25246,7 @@ async function stkCapLoad() {
   if (_stk) stkRender();
 }
 /* v31.18 (Luis, 15/10) — 📦 EMPAQUE: lo que falta definir de cada artículo (inner × master, unidades × inner,
-   unidades × master, o «sin inner» / «sin master»). Lee gv_cxm_estado y guarda con gv_cxm_guardar (supervisor),
+   unidades × master, o «sin master»). v31.20: sin «sin inner» — una master con unidades sueltas es insumo a reenvasar. Lee gv_cxm_estado y guarda con gv_cxm_guardar (supervisor),
    que escribe la canónica GV_Rack_CxM y deja las mismas unidades en Importados_Volumen. Con dos datos sale el
    tercero. sql/gv_cxm_pantalla_v3118.sql. */
 async function stkEmpLoad() {
@@ -25266,7 +25266,7 @@ function _empVal(r) {
   const e = (_stk.empEd || {})[r.cod] || {};
   const g = function (k, def) { return Object.prototype.hasOwnProperty.call(e, k) ? e[k] : def; };
   const v = { cxm: _empNum(g("cxm", r.cxm)), ui: _empNum(g("ui", r.uni_x_inner)), um: _empNum(g("um", r.uni_x_master)),
-              si: !!g("si", r.sin_inner), sm: !!g("sm", r.sin_master), sucio: Object.keys(e).length > 0, der: "" };
+              si: false, sm: !!g("sm", r.sin_master), sucio: Object.keys(e).length > 0, der: "" };
   if (v.si) { v.cxm = null; v.ui = null; }
   if (v.sm) { v.cxm = null; v.um = null; }
   if (!v.si && !v.sm) {
@@ -25281,7 +25281,6 @@ function empSet(cod, k, val) {
   if (!_stk) return; _stk.empEd = _stk.empEd || {};
   const e = _stk.empEd[cod] = _stk.empEd[cod] || {};
   e[k] = val;
-  if (k === "si" && val) e.sm = false;
   if (k === "sm" && val) e.si = false;
   stkRender();
 }
@@ -25312,10 +25311,10 @@ function stkBodyEmpaque() {
   const ver = _stk.empVer === "todos" ? "todos" : "pend";
   const f = (_stk.filtro || "").toLowerCase();
   let rows = (ver === "todos" ? all : pend).filter(function (r) { return !f || stkMatchBusq(f, r.cod, r.descripcion || "", false); });
-  const peso = { "no coincide con importación": 3, "importación dice sin inner": 3, "sin dato": 2, "incompleto": 1 };
+  const peso = { "no coincide con importación": 3, "sin dato": 2, "incompleto": 1 };
   rows = rows.slice().sort(function (a, b) { return (peso[b.pendiente] || 0) - (peso[a.pendiente] || 0) || ((+b.racks || 0) + (+b.a_guardar || 0)) - ((+a.racks || 0) + (+a.a_guardar || 0)); });
   let h = '<div class="gv-sub" style="margin:2px 0 8px;">Cajas por master de cada artículo: <b>inner × master</b>, <b>unidades × inner</b> y <b>unidades × master</b>. Con dos sale el tercero. ' +
-    '<b>Sin inner</b> = la master trae unidades sueltas (en racks cada caja es una master). <b>Sin master</b> = va suelto. Lo que se guarda impacta racks, bajadas, ingreso a racks e importación.</div>';
+    '<b>Sin master</b> = va suelto. Lo que se reenvasa entra de importación como <b>insumo</b> (Luis 15/10): su empaque de importación no es el del terminado y no se pisa. Lo que se guarda impacta racks, bajadas, ingreso a racks e importación directa.</div>';
   h += '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;">' +
     '<button class="stk-tab' + (ver === "pend" ? " on" : "") + '" onclick="empVer(\'pend\')">Pendientes · ' + pend.length + '</button>' +
     '<button class="stk-tab' + (ver === "todos" ? " on" : "") + '" onclick="empVer(\'todos\')">Todos · ' + all.length + '</button>' +
@@ -25330,19 +25329,19 @@ function stkBodyEmpaque() {
   };
   h += '<div class="gv-tblwrap" style="max-height:62vh;"><table class="gv-tbl"><thead><tr>' +
     '<th>Cód</th><th>Artículo</th><th>Racks<br>cajas</th><th>A guardar<br>cajas</th><th>Inner<br>× master</th><th>Uni<br>× inner</th><th>Uni<br>× master</th>' +
-    '<th>Sin<br>inner</th><th>Sin<br>master</th><th>Importación<br>uni master / inner</th><th>Falta</th><th></th></tr></thead><tbody>';
+    '<th>Sin<br>master</th><th>Importación<br>uni master / inner</th><th>Falta</th><th></th></tr></thead><tbody>';
   h += rows.map(function (r) {
     const v = _empVal(r), cod = String(r.cod).replace(/[^A-Za-z0-9 _.-]/g, "");
-    const imp = (r.iv_uni_master != null || r.iv_uni_inner != null) ? (n(r.iv_uni_master) + ' / ' + (Number(r.iv_uni_inner) === 0 ? 'suelto' : n(r.iv_uni_inner))) : '—';
+    const imp = r.importa_como_insumo ? '<span title="Se importa como insumo y se reenvasa: su empaque de importación no es el del terminado">insumo · reenvasa</span>'
+      : ((r.iv_uni_master != null || r.iv_uni_inner != null) ? (n(r.iv_uni_master) + ' / ' + n(r.iv_uni_inner)) : '—');
     const sug = (!v.ui && !v.si && !v.sm && r.sugerido_uni_x_inner) ? ' title="Uni × caja en Artículos: ' + n(r.sugerido_uni_x_inner) + '"' : '';
     const mal = r.pendiente && r.pendiente !== "incompleto";
     return '<tr' + (mal ? ' style="box-shadow:inset 4px 0 0 #dc2626;"' : '') + '>' +
       '<td><b>' + escapeHtml(r.cod) + '</b></td><td style="text-align:left;max-width:200px;">' + escapeHtml(r.descripcion || "") + '</td>' +
       '<td>' + (Number(r.racks) || "") + '</td><td>' + (Number(r.a_guardar) || "") + '</td>' +
-      '<td>' + inp(cod, "cxm", v.cxm, v.si || v.sm, v.der === "cxm") + '</td>' +
-      '<td' + sug + '>' + inp(cod, "ui", v.ui, v.si, v.der === "ui") + '</td>' +
+      '<td>' + inp(cod, "cxm", v.cxm, v.sm, v.der === "cxm") + '</td>' +
+      '<td' + sug + '>' + inp(cod, "ui", v.ui, false, v.der === "ui") + '</td>' +
       '<td>' + inp(cod, "um", v.um, v.sm, v.der === "um") + '</td>' +
-      '<td><input type="checkbox"' + (v.si ? ' checked' : '') + ' onchange="empSet(\'' + cod + '\',\'si\',this.checked)"></td>' +
       '<td><input type="checkbox"' + (v.sm ? ' checked' : '') + ' onchange="empSet(\'' + cod + '\',\'sm\',this.checked)"></td>' +
       '<td>' + imp + '</td>' +
       '<td style="' + (mal ? 'color:#b91c1c;font-weight:700;' : '') + '">' + escapeHtml(v.err || r.pendiente || "—") + '</td>' +
@@ -64462,7 +64461,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.19"></script>
+<script src="importacion.js?v=31.20"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67783,15 +67782,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.19"></script>
-<script src="hotsale.js?v=31.19"></script>
-<script src="estadisticas.js?v=31.19"></script>
-<script src="ads.js?v=31.19"></script>
-<script src="plantel.js?v=31.19"></script>
+<script src="cobranzas.js?v=31.20"></script>
+<script src="hotsale.js?v=31.20"></script>
+<script src="estadisticas.js?v=31.20"></script>
+<script src="ads.js?v=31.20"></script>
+<script src="plantel.js?v=31.20"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.19"></script>
+<script src="analisis.js?v=31.20"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.19"></script>
+<script src="ayuda.js?v=31.20"></script>
 
 </body>
 </html>
