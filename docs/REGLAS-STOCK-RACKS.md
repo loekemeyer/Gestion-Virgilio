@@ -198,7 +198,13 @@ lo busquen de ahí."* El dato estaba en 6 lugares que no coincidían. Quedó as�
 | `impo_comex.productos_referencia` (planilla COMEX) | sólo referencia, en `gv_cxm_conflictos` (el «1» = master igual al inner es basura y no se cuenta) |
 | `Insumos_Factores` (MC de insumos, en unidades) | otro dato (insumos), no se toca |
 
-`sin_master = true` (cxm vacío) = va suelto, se baja 1:1 (505I, 504, 505, 501). Para ver qué falta decidir:
+`sin_master = true` (cxm vacío) = va suelto, se baja 1:1 (505I, 504, 505, 501).
+
+**v31.14 (Luis, 15/10): las TRES relaciones en la misma fila** — `cxm` (inner × master), `uni_x_inner`, `uni_x_master`.
+Si están las tres, `uni_x_master = cxm × uni_x_inner` (constraint `gv_rack_cxm_cierra`). **MC sin inner** = `sin_inner`,
+`cxm` vacío y `uni_x_master` cargado (en racks cada caja es una master, 1:1): 590E, 890E, 323ES. Si un ingreso a racks
+cambia el `cxm` y las unidades dejan de cerrar, el trigger `trg_gv_rack_cxm_coherente` las limpia (manda el conteo
+físico) y el código aparece en `gv_cxm_conflictos`. `sql/gv_cxm_tres_relaciones_v3114.sql`. Para ver qué falta decidir:
 `select * from public.gv_cxm_conflictos order by cod;`. `sql/gv_cxm_canonica_v3113.sql`, `tests/cxm-canonica.cjs`.
 
 ### ⚠ RACKS: una fuente por dato (Luis, 25/09, v22.77)
