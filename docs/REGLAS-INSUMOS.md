@@ -472,6 +472,15 @@ al entregar ni «cerrar el círculo» por empresa.**
 - ⚠ **590E (Pincel Silicona) NO se espeja**: es categoría `importados` en Virgilio y los importados están fuera del alcance a
   propósito (tienen su propio circuito, `Importados_Stock_Parte` / `gv_importados_stock_insumos`).
 - `sql/gv_gp2_espejo_insumos_v2932.sql`.
+- ⚠ **v31.22 (Luis, 15/10): Kg de Virgilio contra un componente de GP2 en UNIDADES se convierte con `kg_x_uni`**
+  (`round(Kg / kg_x_uni)`). Caso: `ALAMBRE·F. CAFE N° 16` (560 Kg) vinculado a mano a IC3V (Fleje N° 90 Largo, 0,0134
+  kg/u) → **41.791 u** en «Sector Fleje en Virgilio». Antes daba «unidad no convertible» y GP2 quedaba en 0. Varios
+  códigos de Virgilio contra el mismo componente **suman** (medido: B13 + B13 MALAS, I6 + MGO PLANO 512 CRUDO).
+  Centinela `v31-kg-a-uni`. `sql/gv_gp2_espejo_kg_a_uni_v3122.sql`.
+- **Relevamiento de flejes 15/10 (Luis)**: el Excel es la verdad. Lo que tenía stock y no figura → 0 (el código queda,
+  se puede recibir); lo que figura y no estaba → se carga tal cual, con su lugar. Cruce por MEDIDA, no por la columna
+  «Cod.» (6 renglones la contradecían). Ajustes `ref='RELEVAMIENTO FLEJES 15/10'`, posiciones en
+  `Insumos_Ubicaciones` (16 racks dados de alta), backups `zz_backups.*_flejes_20261015`. Total 15.534,05 Kg.
 
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
 

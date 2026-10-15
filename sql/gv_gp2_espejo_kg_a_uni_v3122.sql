@@ -1,0 +1,19 @@
+-- v31.22 (Luis, 15/10/2026): el espejo de insumos a GP2 convierte Kg -> unidades.
+-- Caso: ALAMBRE·F. CAFE N° 16 (560 Kg en Virgilio, relevamiento de flejes 15/10) se vinculó a mano a IC3V
+-- (Fleje N° 90 Largo), que en GP2 está en UNIDADES (kg_x_uni 0,0134). El espejo daba
+-- "unidad no convertible" y GP2 quedaba en 0. Ahora: Kg / kg_x_uni redondeado = 41.791 u.
+-- Es el ÚNICO cambio sobre la definición viva (marcadores v29.32-espejo-gp2 / v29.61-ubic / v29.61-ubic3 intactos).
+-- Centinela: GV_Reglas_Centinela version 'v31-kg-a-uni', patrón 'saldo\s*/\s*c\.kg_x_uni'.
+-- Aplicado el 15/10 17:08; probado: simulación 'ajustaría' 41.791 -> ejecutado 'ajustado',
+-- GP2.inventario (373, Sector Fleje en Virgilio) = 41.791; resto de filas sin cambio (todas 'ok').
+--
+-- Rama nueva dentro de _ge_conv (componente con unidad_medida <> 'kg'):
+--
+--   case when s.unidad = 'Uni'      then s.saldo
+--        when s.unidad = 'Cajones'  then s.saldo * c.uni_x_cajon
+--        when s.unidad = 'Paquetes' then s.saldo * 25
+--        -- v31-kg-a-uni (Luis 15/10): Kg en Virgilio contra componente en unidades de GP2 -> Kg / kg_x_uni
+--        when s.unidad = 'Kg' and coalesce(c.kg_x_uni, 0) > 0 then round(s.saldo / c.kg_x_uni) end
+--
+-- Lectura:  select * from public.gv_gp2_espejo_insumos(null, true) where resultado <> 'ok';
+-- Rollback: sacar esa línea (vuelve a "unidad no convertible") y desactivar el centinela v31-kg-a-uni.
