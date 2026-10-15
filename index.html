@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.02">
+<link rel="stylesheet" href="gv-ui.css?v=31.03">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.02"></script>
+<script type="module" src="recepcion.js?v=31.03"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10783,7 +10783,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.02";
+const APP_VERSION = "v31.03";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10842,6 +10842,81 @@ function gvRegistrarIngreso(ident, metodo) {
     }).then(function (r) { if (r && r.ok) { try { localStorage.setItem(clave, "1"); } catch (_e) {} } }).catch(function () {});
   } catch (_e) {}
 }
+/* v31.01 (Luis, 15/10): avisos de sistema en POP-UP para Luis — C2 (la clave pública intentó
+   escribir en una tabla cerrada), C4 (celular nuevo / un celular con 2 operarios) y C5 (login
+   rechazado por red / ISIS sin facturas). Los genera la base: el trigger gv_popup_desde_outbox
+   copia esos avisos del outbox de Telegram (que siguen saliendo igual) a GV_Popup_Aviso.
+   "Logueado como Luis" = sesión de supervisor (Google) + «Luis» elegido en el selector de rol
+   (gv_sup_quien, el mismo del panel de rol: el mail de Google es compartido). Sólo notifica:
+   «Aceptar» lo cierra en todas las páginas. Queda log de cada vez que saltó y de quién aceptó:
+     select * from public.gv_popup_review order by creado_at desc;
+   sql/gv_popup_avisos_luis_v3101.sql */
+var GV_POPUP_NOMBRE = { C2: "Clave pública bloqueada", C4: "Dispositivo", C5: "Login / ingesta ISIS" };
+var _gvPopupCola = [], _gvPopupVisto = {}, _gvPopupActual = null, _gvPopupTimer = null;
+function gvPopupPersona() { try { return localStorage.getItem("gv_sup_quien") === "luis" ? "luis" : ""; } catch (_e) { return ""; } }
+async function _gvPopupRpc(fn, body) {
+  const h = await facAuthWriteHeaders();
+  if (!h) return null;   // sin sesión de Google no se pide nada: las 3 RPC exigen supervisor (gv_rpc_guard)
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, { method: "POST", headers: h, body: JSON.stringify(body), cache: "no-store" });
+  if (!r.ok) throw new Error(fn + " HTTP " + r.status);
+  const t = await r.text();
+  return t ? JSON.parse(t) : null;
+}
+function _gvPopupEsc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+function _gvPopupMostrar() {
+  if (_gvPopupActual || !_gvPopupCola.length) return;
+  const a = _gvPopupActual = _gvPopupCola.shift();
+  let ov = document.getElementById("gvPopupOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "gvPopupOverlay"; document.body.appendChild(ov); }
+  ov.style.cssText = "position:fixed;inset:0;z-index:6000;background:rgba(2,6,23,.6);display:flex;align-items:center;justify-content:center;padding:16px;";
+  let hora = "";
+  try { hora = new Date(a.creado_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (_e) {}
+  const resto = _gvPopupCola.length ? " · quedan " + _gvPopupCola.length : "";
+  ov.innerHTML = '<div role="alertdialog" aria-modal="true" style="background:var(--gv-surface,#fff);color:var(--gv-ink,#0f172a);border-radius:var(--gv-r,14px);max-width:520px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,.45);font-family:var(--gv-font,system-ui);">' +
+    '<div style="padding:12px 16px;border-bottom:1px solid var(--gv-line,#e2e8f0);font-size:var(--gv-fs-sm,12px);color:var(--gv-ink-2,#475569);font-weight:700;">' +
+      'AVISO DE SISTEMA · ' + _gvPopupEsc(a.codigo) + ' ' + _gvPopupEsc(GV_POPUP_NOMBRE[a.codigo] || "") + ' · ' + _gvPopupEsc(hora) + _gvPopupEsc(resto) + '</div>' +
+    '<div style="padding:14px 16px;font-size:var(--gv-fs-md,14px);line-height:1.4;white-space:pre-wrap;word-break:break-word;max-height:55vh;overflow:auto;">' + _gvPopupEsc(a.texto) + '</div>' +
+    '<div style="padding:10px 16px 14px;text-align:center;"><button id="gvPopupAceptar" onclick="gvPopupAceptar()" style="min-width:160px;min-height:44px;border:none;border-radius:var(--gv-r-sm,10px);background:#1d4ed8;color:#fff;font-size:var(--gv-fs-lg,16px);font-weight:800;cursor:pointer;">Aceptar</button></div>' +
+  '</div>';
+  ov.style.display = "flex";
+  _gvPopupRpc("gv_popup_evento", { p_id: a.id, p_evento: "mostrado", p_quien: "luis", p_dispositivo: gvDispositivoId(), p_app_version: APP_VERSION }).catch(function () {});
+}
+window.gvPopupAceptar = async function () {
+  const a = _gvPopupActual;
+  if (!a) return;
+  const btn = document.getElementById("gvPopupAceptar");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando…"; }
+  try {
+    await _gvPopupRpc("gv_popup_evento", { p_id: a.id, p_evento: "aceptado", p_quien: "luis", p_dispositivo: gvDispositivoId(), p_app_version: APP_VERSION });
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "Aceptar"; }
+    alert("No se pudo guardar el Aceptar (" + (e && e.message || e) + "). Probá de nuevo.");
+    return;
+  }
+  _gvPopupActual = null;
+  const ov = document.getElementById("gvPopupOverlay");
+  if (ov) ov.style.display = "none";
+  _gvPopupMostrar();
+};
+async function gvPopupTick() {
+  try {
+    if (!gvPopupPersona()) return;
+    if (document.visibilityState === "hidden") return;
+    const rows = await _gvPopupRpc("gv_popup_pendientes", { p_persona: gvPopupPersona() });
+    (rows || []).forEach(function (a) {
+      if (_gvPopupVisto[a.id]) return;
+      _gvPopupVisto[a.id] = 1;
+      _gvPopupCola.push(a);
+    });
+    _gvPopupMostrar();
+  } catch (_e) {}
+}
+function gvPopupArrancar() {
+  if (_gvPopupTimer) return;
+  _gvPopupTimer = setInterval(gvPopupTick, 60000);
+  setTimeout(gvPopupTick, 8000);
+}
+gvPopupArrancar();
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -63943,7 +64018,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.02"></script>
+<script src="importacion.js?v=31.03"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67262,15 +67337,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.02"></script>
-<script src="hotsale.js?v=31.02"></script>
-<script src="estadisticas.js?v=31.02"></script>
-<script src="ads.js?v=31.02"></script>
-<script src="plantel.js?v=31.02"></script>
+<script src="cobranzas.js?v=31.03"></script>
+<script src="hotsale.js?v=31.03"></script>
+<script src="estadisticas.js?v=31.03"></script>
+<script src="ads.js?v=31.03"></script>
+<script src="plantel.js?v=31.03"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.02"></script>
+<script src="analisis.js?v=31.03"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.02"></script>
+<script src="ayuda.js?v=31.03"></script>
 
 </body>
 </html>
