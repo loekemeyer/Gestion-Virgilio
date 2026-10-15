@@ -23,7 +23,7 @@ node() {
   return 0
 }
 
-echo "== popup-avisos-luis (v31.05: avisos C2/C4/C5 en pop-up para Luis + aviso de Windows minimizada) =="
+echo "== popup-avisos-luis (v31.10: avisos C2/C4/C5 en pop-up y Web Push al ultimo dispositivo activo de Luis) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/popup-avisos-luis.cjs
 echo "== ins-cajon-gp2 (v31.00: Sector Crudo / Procesado muestran el cajon de GP2: Cod C, kg/caj, kg/uni, uni/caj) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-cajon-gp2.cjs

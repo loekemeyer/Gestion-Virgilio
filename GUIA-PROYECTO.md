@@ -17,6 +17,15 @@ intentó escribir en una tabla cerrada, `anon-bloqueo:…`), **C4** (celular nue
   la app al frente (`notificationclick` en `sw.js`); pitido de la página; número en el ícono de la barra de tareas
   (`setAppBadge`). El permiso se pide al elegir «Luis» en el selector o al apretar Aceptar. Con la app CERRADA no
   llega nada (haría falta Web Push, no está).
+- **v31.10 — Web Push al ÚLTIMO dispositivo activo** (Luis, 15/10): un click o una tecla en la app (como mucho 1 por
+  minuto) marca ese dispositivo como el último activo de Luis (`GV_Popup_Disp.ultima_actividad`, `gv_popup_actividad`).
+  El pop-up y el push van SÓLO ahí (`gv_popup_destino`, `gv_popup_pendientes_disp`); en los demás se cierra solo.
+  Con el permiso dado, cada dispositivo guarda su suscripción de push; al entrar un aviso, `trg_gv_popup_push` →
+  Edge Function `gv-popup-push` (VAPID privada en Vault `gv_popup_vapid_priv`) → aviso de Windows aunque la app esté
+  **cerrada** (con Chrome corriendo). Resultado del envío en `GV_Popup_Aviso.push_estado` (201 = entregado a Google;
+  404/410 = suscripción vencida, se descarta). **D6**: `9a59c479-…` quedó `bloqueado` (no recibe los avisos de Luis).
+  La firma vieja `gv_popup_pendientes(text)` devuelve vacío: las apps v31.03–v31.09 dejan de mostrar hasta actualizar.
+  `sql/gv_popup_push_v3108.sql` · `supabase/functions/gv-popup-push/`.
 - **C3** (monitor GT abierto fuera de horario) queda **sólo en Telegram** (Luis, D4). Lo mismo B (informes) y C1 (salud del outbox).
 - **Log** (`GV_Popup_Log`): un `mostrado` cada vez que salta en una página, un `aceptado` con rol, mail, dispositivo
   y versión. Review: `select * from public.gv_popup_review order by creado_at desc;`
