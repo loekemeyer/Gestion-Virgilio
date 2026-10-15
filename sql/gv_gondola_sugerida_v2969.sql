@@ -109,7 +109,7 @@ language sql stable security definer set search_path = public as $$
                   where regexp_replace(upper(btrim(i.cod)), '^0+(?=.)', '') = x.ck and coalesce(i.activo, true)
                     and l.tipo = 'gondola' and coalesce(l.activo, true)),
          (select count(*)::int from x y where y.ck = x.ck and y.sec is not distinct from x.sec),
-         (select coalesce(sum(case when split_part(r2.texto, '|', 4) ~ '^[0-9.]+$' then split_part(r2.texto, '|', 4)::numeric else 0 end), 0)
+         (select coalesce(sum(case when split_part(r2.texto, '|', 4) ~ '^[0-9]+(\.[0-9]+)?$' then split_part(r2.texto, '|', 4)::numeric else 0 end), 0)
             from public."Registros_Produccion_Virgilio" r2
            where r2.opcion = 'PKC' and upper(btrim(split_part(r2.texto, '|', 1))) = x.tanda
              and regexp_replace(regexp_replace(regexp_replace(upper(btrim(split_part(r2.texto, '|', 2))), '\s+(LK|CH)$', ''), '([0-9E])L$', '\1'), '^0+(?=.)', '') = x.ck)
@@ -246,8 +246,8 @@ begin
     select upper(btrim(split_part(r.texto, '|', 1))) tanda,
            regexp_replace(regexp_replace(regexp_replace(upper(btrim(split_part(r.texto, '|', 2))),
              '\s+(LK|CH)$', ''), '([0-9E])L$', '\1'), '^0+(?=.)', '') ck,
-           max(case when split_part(r.texto, '|', 3) ~ '^[0-9.]+$' then split_part(r.texto, '|', 3)::numeric else 0 end) esp,
-           max(case when split_part(r.texto, '|', 4) ~ '^[0-9.]+$' then split_part(r.texto, '|', 4)::numeric else 0 end) re
+           max(case when split_part(r.texto, '|', 3) ~ '^[0-9]+(\.[0-9]+)?$' then split_part(r.texto, '|', 3)::numeric else 0 end) esp,
+           max(case when split_part(r.texto, '|', 4) ~ '^[0-9]+(\.[0-9]+)?$' then split_part(r.texto, '|', 4)::numeric else 0 end) re
       from public."Registros_Produccion_Virgilio" r
      where r.opcion = 'PKC' and r.ts_cliente > (v_desde - 2)::timestamptz and not public.es_legajo_test(r.legajo)
        and upper(btrim(split_part(r.texto, '|', 1))) in (select u.tanda from u)
