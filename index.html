@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=30.99">
+<link rel="stylesheet" href="gv-ui.css?v=31.00">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6437,7 +6437,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.99"></script>
+<script type="module" src="recepcion.js?v=31.00"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10761,7 +10761,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.99";
+const APP_VERSION = "v31.00";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -25617,6 +25617,47 @@ async function stkInsLoad() {
   await stkInsRefresh();
   stkRender();
 }
+/* v31.00 (Luis, 15/10): "en GP2 tenemos lo que significa un cajon (un cajon de batidores son 29.99kg y cada unidad
+   son 0.098kg…) y quiero que se vea esa conversion en GV". SOLO SE MUESTRA: el stock sigue en cajones.
+   gv_insumo_gp2_cajon = insumo vinculado en GP2.insumo_equivalencia → componente de Cervantes y su cajón.
+   Una lectura rota devuelve null (no {}): la tabla lo dice en vez de mostrar «sin vincular» en todo. */
+async function _stkInsFetchCajonGp2() {
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_insumo_gp2_cajon", { method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: "{}", cache: "no-store" });
+    if (!r.ok) return null;
+    var m = {};
+    (await r.json()).forEach(function (x) { m[String(x.cod)] = x; });
+    return m;
+  } catch (_e) { return null; }
+}
+/* Sector Crudo y Sector Procesado muestran el cajón de GP2 al lado del stock. */
+var INS_CAT_CAJON_GP2 = ["partes_crudo", "parte_procesado"];
+function _insNumAR(v, dec) {
+  var n = Number(v);
+  if (v == null || v === "" || !isFinite(n)) return "";
+  return n.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: dec });
+}
+/* cajones del insumo (primaria o secundaria, la que se llame «Cajon…») */
+function _insCajonesDe(du) {
+  if (/^caj/i.test(String(du.uniP || ""))) return Number(du.cantP) || 0;
+  if (/^caj/i.test(String(du.uniS || ""))) return Number(du.cantS) || 0;
+  return null;
+}
+function _stkInsCajonCeldas(it, du) {
+  var sep = ' style="border-left:1px solid #eef2f7;"';
+  var g = _stkIns.gp2caj;
+  if (g == null) return '<td colspan="5" class="stk-sub"' + sep + '>⚠ no se pudo leer GP2</td>';
+  var x = g[String(it.cod)];
+  if (!x) return '<td colspan="5" class="stk-sub"' + sep + '>sin vincular en GP2</td>';
+  var caj = _insCajonesDe(du), uxc = Number(x.uni_x_cajon) || 0;
+  var aprox = (caj != null && uxc > 0) ? _insNumAR(Math.round(caj * uxc), 0) : "";
+  return '<td' + sep + '><b>' + escapeHtml(x.cod_c || "—") + '</b></td>' +
+    '<td class="num">' + (_insNumAR(x.kg_x_cajon, 2) || '<span class="stk-sub">—</span>') + '</td>' +
+    '<td class="num">' + (_insNumAR(x.kg_x_uni, 4) || '<span class="stk-sub">—</span>') + '</td>' +
+    '<td class="num">' + (_insNumAR(x.uni_x_cajon, 0) || '<span class="stk-sub">—</span>') + '</td>' +
+    '<td class="num" title="' + (aprox ? "cajones × uni por cajón de GP2 (sólo referencia: el stock sigue en cajones)" : "el stock no está en cajones") + '">' + (aprox ? "≈ " + aprox : '<span class="stk-sub">—</span>') + '</td>';
+}
 /* v11.34 — fetch ubicaciones con cantidad desde Insumos_Ubicaciones */
 async function _stkInsFetchUbics() {
   // v22.80: se leen RESUELTAS contra el Mapa (gv_insumo_ubicacion): R1Ad → R01AD, W1 → W01. estado 'sin_lugar' =
@@ -25635,8 +25676,10 @@ async function stkInsRefresh() {
       supaFetchAll(SUPABASE_URL + "/rest/v1/vista_insumos", "select=cod,nombre,categoria,ubicacion,isis,creado_por,creado"),
       insFetchSaldosXUni(),
       _stkInsHistFetch(),
-      _stkInsFetchUbics()
+      _stkInsFetchUbics(),
+      _stkInsFetchCajonGp2()
     ]);
+    _stkIns.gp2caj = r[4];   // v31.00: el cajón de GP2 por código de Virgilio (null = no se pudo leer)
     // v11.34 — armar mapa de ubicaciones por cod
     var ubicsMap = {};
     (r[3] || []).forEach(function (u) {
@@ -26029,15 +26072,20 @@ function _stkInsListado(k, items) {
         '<button class="stk-btn stk-btn-x" onclick="if(_stkIns){_stkIns.nuevoEn=\'\';stkRender();}">Cancelar</button>' +
       '</span>'
     : (k === "?" ? "" : '<button class="stk-btn" onclick="if(_stkIns){_stkIns.nuevoEn=\'' + k + '\';stkRender();}">+ Agregar insumo a esta categoría</button>')) + '</div>';
+  const conCaj = INS_CAT_CAJON_GP2.indexOf(k) >= 0;   // v31.00: cajón de GP2 sólo en Sector Crudo / Procesado
   if (!lista.length) h += '<div class="stk-empty">Sin insumos' + (f ? " con ese filtro" : "") + '.</div>';
   else {
     h += '<div class="stk-tblwrap"><table class="stk-tbl"><thead>' +
       '<tr><th rowspan="2">Cód</th><th rowspan="2">ISIS</th><th rowspan="2">Detalle</th><th rowspan="2">Ubic.</th>' +
       '<th colspan="2" style="text-align:center;border-left:1px solid #cbd5e1;">Primaria</th>' +
       '<th colspan="2" style="text-align:center;border-left:1px solid #cbd5e1;">Secundaria</th>' +
-      '<th rowspan="2" class="num" style="border-left:1px solid #cbd5e1;">Factor</th><th rowspan="2"></th></tr>' +
+      '<th rowspan="2" class="num" style="border-left:1px solid #cbd5e1;">Factor</th>' +
+      (conCaj ? '<th colspan="5" style="text-align:center;border-left:1px solid #cbd5e1;" title="Lo que GP2 (Cervantes) dice que es un cajón de esta pieza. Sólo referencia: el stock sigue en cajones">Cajón según GP2</th>' : '') +
+      '<th rowspan="2"></th></tr>' +
       '<tr><th class="num" style="border-left:1px solid #cbd5e1;top:30px;">Cant</th><th style="top:30px;">Un.</th>' +
-      '<th class="num" style="border-left:1px solid #cbd5e1;top:30px;">Cant</th><th style="top:30px;">Un.</th></tr>' +
+      '<th class="num" style="border-left:1px solid #cbd5e1;top:30px;">Cant</th><th style="top:30px;">Un.</th>' +
+      (conCaj ? '<th style="border-left:1px solid #cbd5e1;top:30px;">Cód C</th><th class="num" style="top:30px;">Kg/caj</th><th class="num" style="top:30px;">Kg/uni</th><th class="num" style="top:30px;">Uni/caj</th><th class="num" style="top:30px;">Uni</th>' : '') +
+      '</tr>' +
       '</thead><tbody>';
     h += lista.map(function (it) {
       const ed = _stkIns.edit === "art:" + it.cod;
@@ -26054,6 +26102,7 @@ function _stkInsListado(k, items) {
           '<td class="num" style="border-left:1px solid #eef2f7;">' + (du.cantS !== "" ? du.cantS : '<span class="stk-sub">—</span>') + '</td>' +
           '<td>' + (du.uniS ? escapeHtml(du.uniS) : '<span class="stk-sub">—</span>') + '</td>' +
           '<td class="num" style="border-left:1px solid #eef2f7;">' + (du.factor !== "" ? du.factor : '<span class="stk-sub">—</span>') + '</td>' +
+          (conCaj ? _stkInsCajonCeldas(it, du) : '') +
           '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button></td></tr>';
       }
       const du = _insDosUnidades(it);   // v8.35 — prellenar secundaria/factor en la edición
@@ -26067,6 +26116,7 @@ function _stkInsListado(k, items) {
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edSecQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.cantS) + '" style="width:66px;" placeholder="cant" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'sec\')" title="Cargá Cant secundaria O el Factor: el otro se completa solo"></td>' +
         '<td>' + _stkInsUniSel("edSecUni_" + it.cod, du.uniS) + '</td>' +
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edFactor_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.factor) + '" style="width:58px;" placeholder="factor" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'factor\')" title="Cuántas ' + escapeHtml(du.uniP || "base") + ' hay en 1 de la secundaria"></td>' +
+        (conCaj ? _stkInsCajonCeldas(it, du) : '') +
         '<td><div style="display:flex;gap:6px;flex-wrap:nowrap;white-space:nowrap;">' +
         '<button class="stk-btn" style="white-space:nowrap;" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button>' +
         '<button class="stk-btn stk-btn-x" style="white-space:nowrap;" onclick="stkInsEdit(null)">Cancelar</button>' +
@@ -26352,7 +26402,7 @@ function _stkInsFactRow(it) {
       '<button class="stk-btn stk-btn-x" onclick="stkInsFactDel(' + i + ')" style="padding:2px 8px;">✕</button>' +
       '</div>';
   }).join("");
-  return '<tr class="stk-detrow"><td colspan="12"><div class="stk-det">' +
+  return '<tr class="stk-detrow"><td colspan="16"><div class="stk-det">' +
     '<div style="font-weight:800;margin-bottom:6px;">⚖ Unidades de <b>' + escapeHtml(it.cod) + '</b> — el <b>mismo stock</b> en distintas unidades (no se suman).</div>' +
     '<div style="margin-bottom:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
     '<b style="font-size:13px;">Unidad base</b> <span class="stk-sub">(la más chica, ej. Uni)</span>: ' +
@@ -63861,7 +63911,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=30.99"></script>
+<script src="importacion.js?v=31.00"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67180,15 +67230,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=30.99"></script>
-<script src="hotsale.js?v=30.99"></script>
-<script src="estadisticas.js?v=30.99"></script>
-<script src="ads.js?v=30.99"></script>
-<script src="plantel.js?v=30.99"></script>
+<script src="cobranzas.js?v=31.00"></script>
+<script src="hotsale.js?v=31.00"></script>
+<script src="estadisticas.js?v=31.00"></script>
+<script src="ads.js?v=31.00"></script>
+<script src="plantel.js?v=31.00"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=30.99"></script>
+<script src="analisis.js?v=31.00"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=30.99"></script>
+<script src="ayuda.js?v=31.00"></script>
 
 </body>
 </html>

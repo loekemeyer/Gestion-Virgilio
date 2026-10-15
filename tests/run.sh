@@ -23,6 +23,8 @@ node() {
   return 0
 }
 
+echo "== ins-cajon-gp2 (v31.00: Sector Crudo / Procesado muestran el cajon de GP2: Cod C, kg/caj, kg/uni, uni/caj) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-cajon-gp2.cjs
 echo "== ppp-res-demora-camion (v21.72: Resumen = MAYOR demora por camion, y camiones sin tope de m3) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-demora-camion.cjs
 echo "== ppp-res-origen (v27.01: Resumen dice el orden del armado y como llego cada NP a su dia) =="

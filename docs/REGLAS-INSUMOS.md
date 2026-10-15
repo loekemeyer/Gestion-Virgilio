@@ -3,6 +3,24 @@
 > Movido de `CLAUDE.md` el 2026-10-13 (poda 3ra tanda, pedido de Luis) **sin cambiar una palabra**.
 > **Leerlo ENTERO antes de tocar algo de este tema.** Las reglas siguen valiendo igual que cuando estaban en CLAUDE.md.
 
+## ⚠ REGLA (Luis, 2026-10-15, v31.00): Sector Crudo y Procesado muestran el CAJÓN DE GP2 — sólo se ve, el stock sigue en cajones
+
+**Luis:** *"en GP2 tenemos lo que significa un cajon (ejemplo, un cajon de batidores son 29.99kg y cada unidad son
+0.098kg por lo que podemos saber cuantas unidades hay por cajon) y quiero que se vea esa conversion en GV. (sigue
+funcionando en base a unidad de medida cajones, esto es simplemente para que se vea y quede vinculada la relacion)"*.
+
+- Stock y Compras → 🧰 Insumos → tarjeta **Sector Crudo** / **Sector Procesado**: bloque **«Cajón según GP2»** con
+  **Cód C · Kg/caj · Kg/uni · Uni/caj · Uni** (Uni = cajones × uni/caj, con «≈»: es referencia). Las otras
+  categorías no lo muestran (`INS_CAT_CAJON_GP2`).
+- Sale de **`gv_insumo_gp2_cajon()`** (anon, SECURITY DEFINER, solo lectura): `Insumos` → `GP2.insumo_equivalencia`
+  (sin mayúsculas ni espacios, como el espejo) → `GP2.componente.kg_x_uni` / `uni_x_cajon`; kg/caj = el producto.
+  Es la **misma** relación que usa el espejo para pasar cajones a unidades de GP2 (`Cajones × uni_x_cajon`).
+- **No toca stock, unidades ni factores de Virgilio.** Un insumo sin vínculo dice «sin vincular en GP2»; si la RPC
+  falla dice «⚠ no se pudo leer GP2» (una lectura rota no es «sin vincular»).
+- Al 15/10: crudo y procesado tienen 31 de 50 vinculados (batidor pera → GRJ10: 29,99 kg/caj · 0,098 kg/uni ·
+  306 uni/caj). Lo que falta vincular se hace en GP2 → Stock General → Virgilio (Luis, Thomas y Naza).
+- `sql/gv_insumo_gp2_cajon_v3100.sql` · `tests/ins-cajon-gp2.cjs`.
+
 ## ⚠⚠ REGLA (Luis, 2026-10-14, v30.86; la base dice v30.81, llave): ENTREGAR = Cervantes / Otros · cajas de GP2 · todo insumo que entra va a TRÁNSITO
 
 **Luis:** *"entregar insumos … tienen que salir dos opciones: Cervantes y Otros. Si aprietan Otros que tengan que
