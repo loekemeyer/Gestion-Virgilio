@@ -1,4 +1,4 @@
-/* v31.07 (Luis, 15/10): las CAJAS POR MASTER tienen UNA fuente, la canónica GV_Rack_CxM.
+/* v31.12 (Luis, 15/10): las CAJAS POR MASTER tienen UNA fuente, la canónica GV_Rack_CxM.
    Falla si el front vuelve a leer Articulos.Cajas_x_Master o a derivar el CxM de la planimetría
    (ratio innercajas/master_cajas), o si desaparece el lector único gvFetchCxM. Estático. Sale 1 si falla. */
 const fs = require("fs"), path = require("path");

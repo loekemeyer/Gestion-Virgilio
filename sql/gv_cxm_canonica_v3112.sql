@@ -1,4 +1,4 @@
--- v31.07 (Luis, 15/10/2026): UNA tabla canónica para las CAJAS POR MASTER (cxm) de cada artículo.
+-- v31.12 (Luis, 15/10/2026): UNA tabla canónica para las CAJAS POR MASTER (cxm) de cada artículo.
 -- «Hay que hacer una tabla que sea la canónica y unificar para que todas las funciones y cosas que
 --  busquen el dato lo busquen de ahí.»
 --
@@ -15,8 +15,8 @@
 -- Nada cambia de comportamiento: se cargó con el MISMO valor que la app usaba hoy.
 
 -- 0) backups
-create table if not exists zz_backups."GV_Rack_CxM_v3107" as select * from public."GV_Rack_CxM";
-create table if not exists zz_backups."Articulos_cxm_v3107" as
+create table if not exists zz_backups."GV_Rack_CxM_v3112" as select * from public."GV_Rack_CxM";
+create table if not exists zz_backups."Articulos_cxm_v3112" as
   select id, "Cod_Art", "Cajas_x_Master" from public."Articulos Virgilio X Tallerista" where coalesce("Cajas_x_Master",0) <> 0;
 
 -- 1) columnas: sin_master (va suelto, 1:1), fuente y nota; cxm puede ir vacío sólo si sin_master
@@ -28,13 +28,13 @@ alter table public."GV_Rack_CxM" drop constraint if exists "GV_Rack_CxM_cxm_chec
 alter table public."GV_Rack_CxM" add constraint gv_rack_cxm_valor
   check ((sin_master and cxm is null) or (not sin_master and cxm > 0));
 update public."GV_Rack_CxM" set fuente = 'ingreso a racks' where fuente is null;
-comment on table public."GV_Rack_CxM" is 'CANÓNICA (v31.07): cajas (inner) por master de cada artículo. Toda pantalla/función que necesite el dato lee de acá. sin_master = va suelto (1:1).';
+comment on table public."GV_Rack_CxM" is 'CANÓNICA (v31.12): cajas (inner) por master de cada artículo. Toda pantalla/función que necesite el dato lee de acá. sin_master = va suelto (1:1).';
 
 -- 2) carga inicial (sólo códigos que NO tenían fila)
 -- 2a) lo que la app leía de Articulos.Cajas_x_Master (entero)
 insert into public."GV_Rack_CxM"(cod, emp, cxm, fuente)
 select upper(btrim(a."Cod_Art")), coalesce(public.gv_empresa_de_articulo(upper(btrim(a."Cod_Art"))), 'LK'), max(a."Cajas_x_Master"),
-       'Articulos Virgilio X Tallerista (v31.07)'
+       'Articulos Virgilio X Tallerista (v31.12)'
 from public."Articulos Virgilio X Tallerista" a
 where a."Cajas_x_Master" > 0 and a."Cajas_x_Master" = trunc(a."Cajas_x_Master")
   and not exists (select 1 from public."GV_Rack_CxM" g where g.cod = upper(btrim(a."Cod_Art")))
@@ -43,7 +43,7 @@ on conflict (cod, emp) do nothing;
 -- 2b) importación: uni_master / uni_inner entero (sin L: el stock no usa la L)
 insert into public."GV_Rack_CxM"(cod, emp, cxm, fuente)
 select upper(btrim(v.cod)), coalesce(public.gv_empresa_de_articulo(upper(btrim(v.cod))), 'LK'), v.uni_master / v.uni_inner,
-       'Importados_Volumen (v31.07)'
+       'Importados_Volumen (v31.12)'
 from public."Importados_Volumen" v
 where v.uni_master > 0 and v.uni_inner > 0 and v.uni_master % v.uni_inner = 0
   and upper(btrim(v.cod)) !~ '\dE?L$'
@@ -114,19 +114,21 @@ where (iv.uni_inner > 0 and iv.uni_master > 0 and (can.cxm is null or abs(iv.uni
    or (iv.uni_inner = 0 and can.cxm is not null)
    or (pr.r is not null and (can.cxm is null or abs(pr.r - can.cxm) > 0.001))
    or (art.v is not null and (can.cxm is null or abs(art.v - can.cxm) > 0.001));
-grant select on public.gv_cxm_conflictos to anon, authenticated;
+-- sin grant a anon/authenticated: cruza impo_comex (que no es público). Se consulta desde la sesión (MCP).
+revoke select on public.gv_cxm_conflictos from anon, authenticated;
 
 comment on column public."Articulos Virgilio X Tallerista"."Cajas_x_Master" is
-  'RETIRADA como fuente (v31.07): las cajas por master viven en GV_Rack_CxM. No leer ni escribir acá.';
+  'RETIRADA como fuente (v31.12): las cajas por master viven en GV_Rack_CxM. No leer ni escribir acá.';
 
--- 7) centinelas
+-- 7) centinelas (aplicadas con la etiqueta 'v31.07': la sesión arrancó con ese número y el guardián no deja
+--    retocar GV_Reglas_Centinela sin un «sí»; son estas 3 filas)
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
 select * from (values
- ('vista_racks_bajadas_pendientes','vista','GV_Rack_CxM','Las cajas por master salen de la canónica GV_Rack_CxM, no de Articulos.Cajas_x_Master','Luis','v31.07'),
- ('gv_rack_cxm_anotar','funcion','sin_master = false','El ingreso a racks anota cajas por master en la canónica GV_Rack_CxM','Luis','v31.07'),
- ('gv_cxm_desde_importados_volumen','funcion','GV_Rack_CxM','Un importado nuevo con uni_master/uni_inner entra a la canónica de cajas por master','Luis','v31.07')
+ ('vista_racks_bajadas_pendientes','vista','GV_Rack_CxM','Las cajas por master salen de la canónica GV_Rack_CxM, no de Articulos.Cajas_x_Master','Luis','v31.12'),
+ ('gv_rack_cxm_anotar','funcion','sin_master = false','El ingreso a racks anota cajas por master en la canónica GV_Rack_CxM','Luis','v31.12'),
+ ('gv_cxm_desde_importados_volumen','funcion','GV_Rack_CxM','Un importado nuevo con uni_master/uni_inner entra a la canónica de cajas por master','Luis','v31.12')
 ) v(objeto, clase, patron, regla, quien_pidio, version)
 where not exists (select 1 from public."GV_Reglas_Centinela" c where c.objeto = v.objeto and c.patron = v.patron);
 
--- ROLLBACK: restaurar GV_Rack_CxM desde zz_backups."GV_Rack_CxM_v3107" (las columnas nuevas quedan inertes);
+-- ROLLBACK: restaurar GV_Rack_CxM desde zz_backups."GV_Rack_CxM_v3112" (las columnas nuevas quedan inertes);
 -- vista_racks_bajadas_pendientes vuelve a leer a."Cajas_x_Master" (definición en el git log de este archivo).

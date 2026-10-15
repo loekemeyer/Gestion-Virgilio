@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.11">
+<link rel="stylesheet" href="gv-ui.css?v=31.12">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6473,7 +6473,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.11"></script>
+<script type="module" src="recepcion.js?v=31.12"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10819,7 +10819,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.11";
+const APP_VERSION = "v31.12";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11029,7 +11029,7 @@ async function gvPopupTick() {
     // v31.10: sólo el ÚLTIMO dispositivo activo de Luis recibe (gv_popup_destino); los bloqueados nunca.
     const rows = await _gvPopupRpc("gv_popup_pendientes_disp", { p_persona: gvPopupPersona(), p_dispositivo: gvDispositivoId() });
     if (!rows) return;
-    // v31.07: lo que ya se aceptó en OTRA página/dispositivo se cierra acá también (antes quedaba abierto).
+    // v31.12: lo que ya se aceptó en OTRA página/dispositivo se cierra acá también (antes quedaba abierto).
     const vivos = {}; rows.forEach(function (x) { vivos[x.id] = 1; });
     _gvPopupCola = _gvPopupCola.filter(function (x) { return vivos[x.id]; });
     if (_gvPopupActual && !vivos[_gvPopupActual.id]) {
@@ -27413,7 +27413,7 @@ function _stkDep() { const e = document.getElementById("stkAjDep"); return (e &&
    MISMA tabla — se unificó para no tener que cambiar dos constantes si migra la tabla. */
 const SUPABASE_RACKS_ORD_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Ordenes";
 const SUPABASE_RACKS_BAJ_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Bajadas";
-/* v31.07 (Luis, 15/10): las CAJAS POR MASTER tienen UNA fuente: GV_Rack_CxM (sql/gv_cxm_canonica_v3107.sql).
+/* v31.12 (Luis, 15/10): las CAJAS POR MASTER tienen UNA fuente: GV_Rack_CxM (sql/gv_cxm_canonica_v3112.sql).
    Ni Articulos.Cajas_x_Master (retirada) ni el ratio inner/master de la planimetría. Devuelve
    { COD: cxm } (sin master = 0). Toda pantalla que necesite el dato pasa por acá. */
 async function gvFetchCxM() {
@@ -27430,7 +27430,7 @@ async function stockFetchArtFactors() {
     const rows = Array.isArray(res[0]) ? res[0] : [], cxm = res[1] || {};   // v22.32: es un array, no un Response
     const m = {};
     rows.forEach(function (x) { const k = String(x.Cod_Art || "").toUpperCase(); if (!k) return; if (!m[k]) m[k] = { cajasXMaster: cxm[k] || 0, uniXCaja: Number(x.Uni_x_Caja) || 0 }; else if (!m[k].uniXCaja && x.Uni_x_Caja) m[k].uniXCaja = Number(x.Uni_x_Caja); });
-    Object.keys(cxm).forEach(function (k) { if (!m[k]) m[k] = { cajasXMaster: cxm[k], uniXCaja: 0 }; });   // v31.07: cxm de la canónica
+    Object.keys(cxm).forEach(function (k) { if (!m[k]) m[k] = { cajasXMaster: cxm[k], uniXCaja: 0 }; });   // v31.12: cxm de la canónica
     return m;
   } catch (_e) { return {}; }
 }
@@ -27562,7 +27562,7 @@ function stkAutoBajadaCompute() {
   // CxM (cajas por master) derivado de la PLANIMETRÍA: por código, si todas las celdas
   // ocupadas con master>0 dan el MISMO ratio ENTERO inner/master, ese es el CxM. Así el
   // automático no depende de que esté cargado el maestro (mismo criterio que rkbFetchCxM).
-  // v31.07: el CxM sale de la canónica GV_Rack_CxM (vía factors); ya no se deriva de la planimetría.
+  // v31.12: el CxM sale de la canónica GV_Rack_CxM (vía factors); ya no se deriva de la planimetría.
   const cxmPlani = {};
   const bajar = [], sinMaster = [];
   Object.keys(capByCod).forEach(function (k) {
@@ -30420,7 +30420,7 @@ async function showGuardarOrden(legajo) {
       const aGuardar = Math.round(Number(a.a_guardar) || 0), exc = Math.round(Number(a.excedente) || 0), racks = Math.round(Number(a.racks) || 0);
       if (aGuardar + exc + racks <= 0) return null;   // nada esperando para bajar
       const cap = Math.round(_rkbCapDe(a.cod, capObj)), gond = Math.round(Number(a.terminado) || 0);
-      // v8.90 · v31.07: cxm de la canónica GV_Rack_CxM (las dos vías leen lo mismo)
+      // v8.90 · v31.12: cxm de la canónica GV_Rack_CxM (las dos vías leen lo mismo)
       // v30.27: el DUAL viene "438E LK" pero la planimetría/factores lo guardan pelado ("438E") →
       // se busca con sufijo y se cae al pelado (mismo criterio que «¿Qué bajar primero?», L29156).
       var _kkG = _cpNorm(a.cod), _kbG = _kkG.replace(/\s+(LK|CH)$/, "");
@@ -30583,7 +30583,7 @@ async function rkbFetchCxM() {
       if (inn > 0) { if (!locs[k]) locs[k] = []; locs[k].push({ sector: String(x.sector || "").trim(), master: mas, inner: inn }); }
     });
     Object.keys(locs).forEach(function (k) { locs[k].sort(function (a, b) { return b.inner - a.inner; }); });
-    // v22.77 · v31.07: las cajas por master viven SÓLO en la canónica GV_Rack_CxM (ya no se deriva de la planimetría).
+    // v22.77 · v31.12: las cajas por master viven SÓLO en la canónica GV_Rack_CxM (ya no se deriva de la planimetría).
     const map = {}, _cx = await gvFetchCxM();
     Object.keys(_cx).forEach(function (c) { if (_cx[c] > 0) map[_cpNorm(String(c).replace(/\s+/g, ""))] = _cx[c]; });
     return { cxm: map, locs: locs };
@@ -30647,7 +30647,7 @@ async function showRacksBajarModal(legajo, _resume) {
       .sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); })
       .map(function (a) {
         const kN = _cpNorm(a.cod), locs = (locsMap[kN] || []).slice().sort(function (x, y) { return x.inner - y.inner; });   // v24.68: la que MENOS tiene primero (se vacía y libera el lugar)
-        // v8.90 · v31.07: cxm de la canónica GV_Rack_CxM (las dos vías leen lo mismo)
+        // v8.90 · v31.12: cxm de la canónica GV_Rack_CxM (las dos vías leen lo mismo)
         var _cxmR = cxmMap[kN] || 0;
         if (!_cxmR) { var _fR = _facRkb[String(a.cod).toUpperCase()]; if (_fR && _fR.cajasXMaster > 0) _cxmR = _fR.cajasXMaster; }
         // sec preseleccionada = la ubicación con más stock (planimetría viva, v5.22)
@@ -31341,7 +31341,7 @@ async function irFetchCodigos() {
   return arr;
 }
 async function irFetchCxM(_plani) {
-  // v31.07: de la canónica GV_Rack_CxM (antes: Articulos.Cajas_x_Master + ratio de la planimetría)
+  // v31.12: de la canónica GV_Rack_CxM (antes: Articulos.Cajas_x_Master + ratio de la planimetría)
   const cx = {}, m = await gvFetchCxM();
   Object.keys(m).forEach(function (k) { const kk = _irNorm(k); if (kk && m[k] > 0 && !cx[kk]) cx[kk] = m[k]; });
   return cx;
@@ -64244,7 +64244,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.11"></script>
+<script src="importacion.js?v=31.12"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67565,15 +67565,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.11"></script>
-<script src="hotsale.js?v=31.11"></script>
-<script src="estadisticas.js?v=31.11"></script>
-<script src="ads.js?v=31.11"></script>
-<script src="plantel.js?v=31.11"></script>
+<script src="cobranzas.js?v=31.12"></script>
+<script src="hotsale.js?v=31.12"></script>
+<script src="estadisticas.js?v=31.12"></script>
+<script src="ads.js?v=31.12"></script>
+<script src="plantel.js?v=31.12"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.11"></script>
+<script src="analisis.js?v=31.12"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.11"></script>
+<script src="ayuda.js?v=31.12"></script>
 
 </body>
 </html>

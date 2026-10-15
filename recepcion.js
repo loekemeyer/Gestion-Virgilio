@@ -3235,7 +3235,7 @@ async function renderBajadasRacks() {
   try {
     res = await supabase.from("Racks_Bajadas").select("id,orden_id,cod_art,descripcion,cajas,estado,creada_por,ts,sector").eq("estado", "propuesta").order("ts", { ascending: true }).limit(500);
     fres = await supabase.from("Articulos Virgilio X Tallerista").select("Cod_Art,Uni_x_Caja").limit(20000);
-    cres = await supabase.from("GV_Rack_CxM").select("cod,cxm,sin_master").limit(20000);   // v31.07: cajas por master, de la canónica
+    cres = await supabase.from("GV_Rack_CxM").select("cod,cxm,sin_master").limit(20000);   // v31.12: cajas por master, de la canónica
   } catch (e) { res = { error: e }; }
   if (opState.step !== "racks") return;
   if (res.error) { opBody.innerHTML = '<div class="opEmpty" style="color:var(--danger)">No se pudo leer Racks_Bajadas.<br><small>' + (res.error.message || "") + '</small></div>'; return; }

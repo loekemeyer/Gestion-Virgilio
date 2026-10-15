@@ -23,7 +23,7 @@ node() {
   return 0
 }
 
-echo "== cxm-canonica (v31.07: cajas por master SOLO de GV_Rack_CxM; ni Articulos.Cajas_x_Master ni ratio de planimetria) =="
+echo "== cxm-canonica (v31.12: cajas por master SOLO de GV_Rack_CxM; ni Articulos.Cajas_x_Master ni ratio de planimetria) =="
 node tests/cxm-canonica.cjs
 echo "== ir-desde-gondola (v31.11: Ingreso a racks, pestaña Desde góndola con conversor de masters; duales al RPC pelados) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ir-desde-gondola.cjs

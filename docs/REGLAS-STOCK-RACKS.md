@@ -184,7 +184,7 @@ proponer "trasladar de la góndola LK a la de Chef" para ahorrarse la compra**. 
 consecuencia del código compartido es la de siempre: la empresa la da de qué pila salió la caja
 (el pedido), no el artículo.
 
-### ⚠ CAJAS POR MASTER: UNA tabla canónica, `GV_Rack_CxM` (Luis, 15/10, v31.07)
+### ⚠ CAJAS POR MASTER: UNA tabla canónica, `GV_Rack_CxM` (Luis, 15/10, v31.12)
 
 *"Hay que hacer una tabla que sea la canónica y unificar para que todas las funciones y cosas que busquen el dato
 lo busquen de ahí."* El dato estaba en 6 lugares que no coincidían. Quedó así:
@@ -199,7 +199,7 @@ lo busquen de ahí."* El dato estaba en 6 lugares que no coincidían. Quedó as�
 | `Insumos_Factores` (MC de insumos, en unidades) | otro dato (insumos), no se toca |
 
 `sin_master = true` (cxm vacío) = va suelto, se baja 1:1 (505I, 504, 505, 501). Para ver qué falta decidir:
-`select * from public.gv_cxm_conflictos order by cod;`. `sql/gv_cxm_canonica_v3107.sql`, `tests/cxm-canonica.cjs`.
+`select * from public.gv_cxm_conflictos order by cod;`. `sql/gv_cxm_canonica_v3112.sql`, `tests/cxm-canonica.cjs`.
 
 ### ⚠ RACKS: una fuente por dato (Luis, 25/09, v22.77)
 
@@ -207,7 +207,7 @@ lo busquen de ahí."* El dato estaba en 6 lugares que no coincidían. Quedó as�
 |---|---|
 | qué posiciones hay y si están reservadas | `GV_Lugar` (tipo `rack`, `uso` pedidos / cajas / bastidor) |
 | cuántas cajas de cada código hay en cada posición | **`Movimientos_Stock`**, depósito racks / racks_ch, **`ubicacion` = sector** |
-| cajas por master (para mostrar MC) | `GV_Rack_CxM` — **CANÓNICA de TODO el sistema desde la v31.07** (abajo) |
+| cajas por master (para mostrar MC) | `GV_Rack_CxM` — **CANÓNICA de TODO el sistema desde la v31.12** (abajo) |
 | lo que la planimetría vieja decía y el stock no respalda | `GV_Rack_Revisar` → «🔎 a contar» en el Mapa |
 
 `Racks_Planimetria` es una **vista** con las mismas columnas (+ `fuente` stock / a_contar, `motivo`). Escriben

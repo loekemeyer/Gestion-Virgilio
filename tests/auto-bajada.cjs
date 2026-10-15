@@ -2,7 +2,7 @@
    Función pura sobre _stk: por código con capacidad cargada calcula
    masters = min(piso(hueco/CxM), piso(racks/CxM)) y propone bajar masters×CxM cajas.
    Cubre: caso normal con factor del maestro · góndola llena (hueco 0) no propone ·
-   v31.07 (Luis, 15/10): el CxM sale SÓLO de la canónica GV_Rack_CxM (vía factors); la
+   v31.12 (Luis, 15/10): el CxM sale SÓLO de la canónica GV_Rack_CxM (vía factors); la
    planimetría ya NO es fuente: un código con ratio de planimetría pero sin CxM va a sinMaster ·
    racks insuficientes para 1 master → no aparece · orden por código numérico.
    Sale 1 si falla. */
@@ -38,7 +38,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
         { cod_art: "300", estado: "libre",   master_cajas: 1, innercajas: 99 },   // libre: se ignora
         { cod_art: "400", estado: "ocupado", master_cajas: 1, innercajas: 6 },    // ratio 6
         { cod_art: "400", estado: "ocupado", master_cajas: 1, innercajas: 8 },    // ratio 8 → inconsistente
-        { cod_art: "600", estado: "ocupado", master_cajas: 1, innercajas: 6 }     // ratio 6 limpio, pero NO es fuente (v31.07)
+        { cod_art: "600", estado: "ocupado", master_cajas: 1, innercajas: 6 }     // ratio 6 limpio, pero NO es fuente (v31.12)
       ]
     };
     const res = stkAutoBajadaCompute();
