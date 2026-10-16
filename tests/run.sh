@@ -23,9 +23,11 @@ node() {
   return 0
 }
 
-echo "== pk-liquidar-574 / 636 (v31.65: la liquidacion cambia la NP, el picking no se parte) =="
+echo "== pk-liquidar-574 / 636 (v31.69: la liquidacion cambia la NP, el picking no se parte) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-liquidar-574.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-liquidar-636.cjs
+echo "== stock-vivo-v3162 (v31.65: Stocks en vivo — el cron 57 no vuelve atras, pedidas solo si cambio, realtime para el supervisor) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stock-vivo-v3162.cjs
 echo "== mg-sin-gondola (v31.49: Guardar a góndola pregunta dónde si el código no tiene celda en el Mapa) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-sin-gondola.cjs
 echo "== tp-movs-filtrados (v31.38: el TP baja solo los movimientos de los codigos de la tanda, no la tabla entera) =="

@@ -1,9 +1,13 @@
-## Nota v31.65 (2026-10-16) — «Pidió X → pickear Y» cambia la NP (se arma y factura Y)
+## Nota v31.69 (2026-10-16) — «Pidió X → pickear Y» cambia la NP (se arma y factura Y)
 
 `gv_np_cambiar_codigo()` es la única puerta: escribe `GV_NP_Cambio_Codigo` + `PPP_Web_Base` (UxB y línea partida con
 `cajas_resto`). La usan el trigger `zz_gv_correccion_cambia_np` (panel 🔀 y cupo, NP web) y `gv_web_np_liquidar()` (cron
 `gv-np-liquidar`, pares de `GV_Pick_Liquidar`, contra pedido). `PK_LIQUIDAR_EN` del front quedó vacío. Edge Function
-`gv-ppp-web-tandas-diarias` v47 respeta `cajas_resto`. Regla: `docs/REGLAS-PICKING-ARMADO.md` (v31.65).
+`gv-ppp-web-tandas-diarias` v47 respeta `cajas_resto`. Regla: `docs/REGLAS-PICKING-ARMADO.md` (v31.69).
+
+## Nota v31.65 (2026-10-16) — Stocks en vivo: el cron 57 no vuelve atrás, las pedidas sólo si cambió, realtime para el supervisor
+
+`stocks_carga_rapida` ahora la lee también `authenticated` (el realtime de la pantalla no le llegaba al supervisor logueado). `refresh_stocks_carga_rapida` no pisa con la matview los saldos de un código movido después del último refresco y escribe sólo las filas que cambian. `cajas_pedidas` + columnas `ped_*` (neto, pickeadas, en curso, familia) las escribe el job `gv-stock-pedidas-vivo` (cada 30 s, calcula sólo si `gv_stock_pedidas_sucio_seq` se movió; triggers `zz_gv_pedvivo*`). `gv_importados_stock_dep` lee las pedidas de `stocks_carga_rapida`. Regla completa: `docs/MODULO-STOCK-REFRESH.md` (v31.65).
 
 ## Nota v31.54 (2026-10-16) — Stock: el código liquidado en el picking se imputa al del pedido (tipo `liquidacion`)
 

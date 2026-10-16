@@ -1,4 +1,4 @@
-/* Regresión v31.65 — 636E / 635E: la liquidación cambia la NP, no el picking (Luis, 16/10).
+/* Regresión v31.69 — 636E / 635E: la liquidación cambia la NP, no el picking (Luis, 16/10).
 
    v31.60 pickeaba 636 con la NP en 636E (se facturaba 636E, y encima 1:1 en cajas cuando el 636E
    es de 24 u y el 636 de 12 u). Ahora gv_web_np_liquidar cambia la NP y el picking pide lo que dice.

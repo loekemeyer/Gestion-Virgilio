@@ -1,7 +1,7 @@
-/* Regresión v31.65 — la liquidación del 574 ya NO se hace en el picking (Luis, 16/10).
+/* Regresión v31.69 — la liquidación del 574 ya NO se hace en el picking (Luis, 16/10).
 
    v30.29 partía el picking (574 + 574E) con la NP en 574E: se armaba y FACTURABA 574E. Desde
-   la v31.65 la liquidación cambia la NP (gv_web_np_liquidar → GV_NP_Cambio_Codigo) y el picking
+   la v31.69 la liquidación cambia la NP (gv_web_np_liquidar → GV_NP_Cambio_Codigo) y el picking
    pide lo que dice la NP, sin mirar el saldo del viejo.
 
    Chequea:

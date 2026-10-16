@@ -6,7 +6,7 @@
 --   B) v31.56 FACTURADO: ningún depósito del viejo > 0 y todas las NP de esas tandas con el
 --      código del pedido facturadas (Facturacion_NP.facturado_at).
 -- Si se cumple: sale de la lista (GV_Pick_Liquidar.activo = false) y alta en
--- Articulos_Discontinuados (libera la góndola F50). El faltante del pedido se completa
+-- Articulos_Discontinuados (saca sólo el código viejo del mapa; F50 es del 574E y no se toca). El faltante del pedido se completa
 -- con el código del pedido (574E) desde Completar pedido (pkLiqPedidoDe, index.html).
 -- Simular: select * from gv_liquidado_discontinuar(true);
 create or replace function public.gv_liquidado_discontinuar(p_simular boolean default false)
@@ -59,7 +59,7 @@ begin
   end loop;
 end $f$;
 
-update "GV_Reglas_Centinela" set regla = 'v31.64: cuando el código liquidado (574) queda en 0 en todos los depósitos y sus tandas están armadas (o se facturó la última NP, v31.56), sale de GV_Pick_Liquidar (activo=false) y queda en Articulos_Discontinuados. Sin esto el 574 sigue en la lista con la góndola F50 ocupada.', version = 'v31.64'
+update "GV_Reglas_Centinela" set regla = 'v31.64: cuando el código liquidado (574) queda en 0 en todos los depósitos y sus tandas están armadas (o se facturó la última NP, v31.56), sale de GV_Pick_Liquidar (activo=false) y queda en Articulos_Discontinuados. Sin esto el 574 sigue en la lista de liquidar.', version = 'v31.64'
  where objeto = 'gv_liquidado_discontinuar' and patron = 'set activo = false';
 
 -- Rollback: volver a correr sql/gv_liquidado_discontinuar_v3156.sql.

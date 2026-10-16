@@ -12,7 +12,7 @@
 --   3) cada una de esas tandas está armada (tiene entrega del código del pedido) y TODAS sus NP
 --      con ese código están facturadas (Facturacion_NP.facturado_at).
 -- Si se cumple: sale de la lista (GV_Pick_Liquidar.activo = false) y alta en
--- Articulos_Discontinuados → su trigger libera la góndola (F50) y deja de aparecer en stock/OC.
+-- Articulos_Discontinuados → su trigger saca SÓLO el código viejo del mapa (F50 es del 574E y no se toca) y deja de aparecer en stock/OC.
 -- `tanda` devuelta = la última facturada. Idempotente. Cron 160 cada 10 min de 8 a 20 (ART).
 -- Simular: select * from gv_liquidado_discontinuar(true);
 create or replace function public.gv_liquidado_discontinuar(p_simular boolean default false)
@@ -64,7 +64,7 @@ select cron.alter_job(160, schedule => '7-57/10 11-23 * * *');
 
 insert into "GV_Reglas_Centinela"(objeto, clase, patron, regla, quien_pidio, version, activo)
 values ('gv_liquidado_discontinuar', 'funcion', 'set activo = false',
-        'v31.56: cuando se factura la última NP con el código liquidado (574), sale de GV_Pick_Liquidar (activo=false) y queda en Articulos_Discontinuados. Sin esto el 574 sigue en la lista con la góndola F50 ocupada.',
+        'v31.56: cuando se factura la última NP con el código liquidado (574), sale de GV_Pick_Liquidar (activo=false) y queda en Articulos_Discontinuados. Sin esto el 574 sigue en la lista de liquidar.',
         'Luis', 'v31.56', true);
 
 -- Rollback: volver a correr sql/gv_liquidado_discontinuar_v3030.sql,

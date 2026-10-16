@@ -577,7 +577,7 @@ vacías) · `node tests/arm-mesa-inicio.cjs` (corre la pantalla: el AP con mesa 
 encola AUI, el cuadro que explota **no** traba el asistente) · `node tests/mon-tv.cjs`.
 `sql/gv_armado_mesa_aui_v2990.sql` (rollback al pie).
 
-## 🟥 REGLA (Luis, 2026-10-16, v31.65): «PIDIÓ X → PICKEAR Y» SE HACE CAMBIANDO LA NP — se pickea, arma y factura Y
+## 🟥 REGLA (Luis, 2026-10-16, v31.69): «PIDIÓ X → PICKEAR Y» SE HACE CAMBIANDO LA NP — se pickea, arma y factura Y
 
 **Luis:** *"Cuando se carga el pedido en el sistema, se tiene que cargar como Y. Se pickea Y. Se factura Y. Si ves el
 809 por ejemplo, le metió 8 cajas de un pedido de 809E para que pickee nacional … se arma 809, se factura 809E. Esto
@@ -587,7 +587,7 @@ comprometen el resto del stock, se cambia a normal"*.
 **El armado escribe Entregas con el código de la NP y el Excel ISIS sale de Entregas.** Todo camino que cambie sólo
 el picking (corrArt, PK_LIQUIDAR_EN) factura el código pedido. Por eso ya no existe ninguno:
 
-| regla | antes | desde v31.65 |
+| regla | antes | desde v31.69 |
 |---|---|---|
 | panel 🔀 Corregir códigos y cupo de sustituto (`Correcciones_Pedido`) | sólo picking | trigger `zz_gv_correccion_cambia_np` cambia la NP web (la de ISIS sigue por el ERP) |
 | liquidación 574E→574, 636E→636, 635E→635 (`GV_Pick_Liquidar`) | `PK_LIQUIDAR_EN` partía el picking | `gv_web_np_liquidar()` (cron `gv-np-liquidar`, `4-59/5 9-23`) cambia la NP |
@@ -613,7 +613,7 @@ el picking (corrArt, PK_LIQUIDAR_EN) factura el código pedido. Por eso ya no ex
 
 ## REGLA (Luis, 2026-10-14, v30.29): LIQUIDAR un código viejo dentro del picking de su reemplazo
 
-> ⚠ **v31.65: la liquidación ya NO se hace en el picking** — ver la regla de arriba. Lo de abajo es cómo era.
+> ⚠ **v31.69: la liquidación ya NO se hace en el picking** — ver la regla de arriba. Lo de abajo es cómo era.
 
 `PK_LIQUIDAR_EN` (index.html): `"574E" → 574 LK, F50`. Mientras el 574 tenga saldo terminado > 0
 (`vista_saldos_stock`), el picking que pida 574E levanta primero las cajas del 574 (paso propio, su
@@ -624,7 +624,7 @@ Test: `tests/pk-liquidar-574.cjs`.
 **v30.30 (Luis, 14/10): el 574 queda DISCONTINUADO cuando se fue.** `gv_liquidado_discontinuar()` (cron
 160 `gv-liquidado-discontinuar`, 05:13 ART) da de alta el 574 en `Articulos_Discontinuados` cuando hay un
 PKC del 574 con real > 0 desde el 14/10, su tanda tiene remito (CRN) y el saldo del 574 es 0 en todos los
-depósitos. El alta dispara la liberación de la góndola F50. `select * from gv_liquidado_discontinuar(true);`
+depósitos. El alta dispara la liberación de góndola, que saca SÓLO el código 574 del mapa (hoy no figura en ninguna celda: F49 y F50 son del 574E y no se tocan). `select * from gv_liquidado_discontinuar(true);`
 simula. `sql/gv_liquidado_discontinuar_v3030.sql`, centinela v30.30 (la app salió en la v30.31).
 
 **v31.54 (Luis, 16/10, D1 · problema 850): el armado ya NO devuelve a góndola el código liquidado.** El armado
@@ -644,7 +644,7 @@ discontinuado."* `gv_liquidado_discontinuar()` ya no mira el remito ni exige sal
 cumplía nunca): recorre `GV_Pick_Liquidar` activo y, cuando (1) ningún depósito del viejo tiene saldo **> 0** (el
 negativo es conteo, no mercadería), y (2) cada tanda donde se pickeó el viejo está armada y **todas** sus NP con el
 código del pedido tienen `Facturacion_NP.facturado_at`, pasa la fila a `activo = false` y da de alta el viejo en
-`Articulos_Discontinuados` (libera F50 y lo saca de stock y OC). Cron 160 cada 10 min de 8 a 20 ART.
+`Articulos_Discontinuados` (lo saca de stock y OC; la liberación de góndola saca sólo el código 574 del mapa — F50 está asignada al **574E** y no se toca). Cron 160 cada 10 min de 8 a 20 ART.
 Al 16/10 espera a F97A (armado + factura) y a las NP de F47A (LK 0263, LK 0285) y F48N (LK 0297).
 `select * from gv_liquidado_discontinuar(true);` simula. `sql/gv_liquidado_discontinuar_v3156.sql`, centinela v31.56.
 
@@ -667,6 +667,17 @@ en excedente que con sólo `terminado` quedaban varadas. La baja es la de la v31
 el código liquidado: los discontinuados que hoy siguen en el Mapa de góndolas no se tocan. Al 16/10: 636 = 5 góndola +
 9 excedente + 6 separadas; 635 = 11. `sql/gv_pick_liquidar_636_635_v3160.sql`, `tests/pk-liquidar-636.cjs`.
 
+**v31.66 (Luis, 16/10): en la página de Chef se ve el NACIONAL hasta que los pedidos lo comprometen entero; recién ahí
+aparece el importado.** *"en la pagina tienen que aparecer 636 y 635 (nacionales) y no el importado hasta que no se acabe
+el stock del nacional (… que haya suficientes pedidos que comprometan el total del stock)"*. `GV_Pick_Liquidar.web_switch`
+= true → `gv_pick_liquidar_web_ocultos()` entra en `lk_web_ocultos_feed()` (el feed de `GV_Web_Oculto`), y el sync de LK
+(`sync_web_ocultos_virgilio`, cada 5 min, también sobre `products` de Chef por el FDW) lo aplica:
+**libre = disponible del nacional (terminado + excedente + racks + racks_ch + a_guardar + para_envasar) − cajas pedidas
+sin pickear (`gv_stock_pedidas_neto.neto`) del nacional y del importado**. libre > 0 → se oculta el E; libre ≤ 0 → se
+oculta el nacional; par liquidado (`activo = false`) → el nacional queda oculto para siempre. Si la cuenta falla, queda el
+nacional. LK sólo reactiva lo que ocultó el feed. Al aplicarlo (16/10): 636 libre 14, 635 libre 9 → 636E y 635E ocultos.
+El 634E (no existe) se apagó a mano en `products` de Chef. `sql/gv_pick_liquidar_web_switch_v3166.sql`.
+
 ## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
 
 > Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
@@ -679,7 +690,7 @@ el código liquidado: los discontinuados que hoy siguen en el Mapa de góndolas 
 
 ## ⚠ REGLA (Luis, 2026-10-13, v30.24): CUPO DE SUSTITUTO — las próximas 9 cajas de 809E de Chef se pickean del 809 nacional
 
-> ⚠ **v31.65**: la corrección del cupo ahora CAMBIA LA NP (trigger `zz_gv_correccion_cambia_np`). «La NP y la factura siguen en 809E» era el error: CH 0063 se facturaba 809E con 809 pickeado.
+> ⚠ **v31.69**: la corrección del cupo ahora CAMBIA LA NP (trigger `zz_gv_correccion_cambia_np`). «La NP y la factura siguen en 809E» era el error: CH 0063 se facturaba 809E con 809 pickeado.
 
 **Luis:** *"las próximas 9 cajas que entren de pedidos para la 809E de chef manden al que pickea a pickear esas 9 de 809 nacional"*.
 
