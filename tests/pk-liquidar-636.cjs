@@ -1,11 +1,12 @@
-/* Regresión v31.60 — 636E / 635E de Chef se pickean del 636 / 635 nacional hasta liquidarlo (Luis, 16/10).
+/* Regresión v31.65 — 636E / 635E: la liquidación cambia la NP, no el picking (Luis, 16/10).
+
+   v31.60 pickeaba 636 con la NP en 636E (se facturaba 636E, y encima 1:1 en cajas cuando el 636E
+   es de 24 u y el 636 de 12 u). Ahora gv_web_np_liquidar cambia la NP y el picking pide lo que dice.
 
    Chequea:
-   - A: 636 con 5 en góndola + 9 en excedente, piden 20 de 636E (Chef) → se liquidan 14 del 636
-        (9 del excedente con su paso ·EXC, 5 de góndola) y 6 de 636E.
-   - B: 635 con 11, piden 3 de 635E → paso "635" con 3 y el 635E salteado.
-   - C: el mismo 636E en una NP de LK no se liquida (el par es de Chef).
-   - D: total pedido intacto (14 + 6 = 20).
+   - A: 636 con 5 en góndola + 9 en excedente, la NP pide 20 de 636E → 636E con 20, sin paso 636.
+   - B: la NP ya cambiada trae 636: 14 → paso 636·EXC con 9 y 636 con 5 (el excedente sale primero).
+   - C: 636E en una NP de LK → 636E con 4.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -51,12 +52,10 @@ catch (_e) {
     };
     lineas = [{ art: "636E", cajas: 20 }];
     const A = await correr();
-    out.A = A["636·EXC"] === 9 && A["636"] === 5 && A["636E"] === 6;
-    out.A_liqDe = _pk.items.filter(function (x) { return x.art === "636"; }).every(function (x) { return x.liqDe === "636E"; });
-    out.D_total = (A["636·EXC"] + A["636"] + A["636E"]) === 20;
-    lineas = [{ art: "635E", cajas: 3 }];
+    out.A = A["636E"] === 20 && !("636" in A) && !("636·EXC" in A);
+    lineas = [{ art: "636", cajas: 14 }];
     const B = await correr();
-    out.B = B["635"] === 3 && B["635E"] === "skip";
+    out.B = B["636·EXC"] === 9 && B["636"] === 5 && _pk.items.every(function (x) { return !x.liqDe; });
     NP = "98001"; lineas = [{ art: "636E", cajas: 4 }];
     const C = await correr();
     out.C = C["636E"] === 4 && !("636" in C);

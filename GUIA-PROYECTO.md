@@ -1,3 +1,10 @@
+## Nota v31.65 (2026-10-16) — «Pidió X → pickear Y» cambia la NP (se arma y factura Y)
+
+`gv_np_cambiar_codigo()` es la única puerta: escribe `GV_NP_Cambio_Codigo` + `PPP_Web_Base` (UxB y línea partida con
+`cajas_resto`). La usan el trigger `zz_gv_correccion_cambia_np` (panel 🔀 y cupo, NP web) y `gv_web_np_liquidar()` (cron
+`gv-np-liquidar`, pares de `GV_Pick_Liquidar`, contra pedido). `PK_LIQUIDAR_EN` del front quedó vacío. Edge Function
+`gv-ppp-web-tandas-diarias` v47 respeta `cajas_resto`. Regla: `docs/REGLAS-PICKING-ARMADO.md` (v31.65).
+
 ## Nota v31.54 (2026-10-16) — Stock: el código liquidado en el picking se imputa al del pedido (tipo `liquidacion`)
 
 Nuevo `tipo='liquidacion'` en `Movimientos_Stock` (ref = tanda): terminado del código viejo −L y a_facturar del
