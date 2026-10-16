@@ -43,7 +43,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       // el fallback de Razón Social sigue saliendo de la base de ISIS (no tiene las web)
       if (url.indexOf("ppp_base_pedidos") >= 0) return J([
         { pedido: "44458", cliente: "Dorinka S.R.L" },
-        { pedido: "44593", cliente: "Aguilar Maria Co" },
+        { pedido: "44593", cliente: "Aguilar Maria Co", fecha: "2026-09-01 00:00:00" },
         { pedido: "44600", cliente: "Dorinka S.R.L" },
         { pedido: "44700", cliente: "Facturado SA" }
       ]);
@@ -53,7 +53,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       // v19.65: las dos programaciones juntas, con la web incluida
       if (url.indexOf("gv_np_prog_info") >= 0) return J([
         { np: "44600",   tanda: "D58A", razon_social: "Dorinka S.R.L",   fecha_entrega: "2026-09-03" },
-        { np: "LK 0053", tanda: "E17B", razon_social: "Orfali Alfredo",  fecha_entrega: "2026-09-22" }
+        { np: "LK 0053", tanda: "E17B", razon_social: "Orfali Alfredo",  fecha_entrega: "2026-09-22", fecha_recep: "2026-09-15" }
       ]);
       return J([]);
     };
@@ -86,6 +86,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.rs44593 = byNp["44593"] && byNp["44593"].rs;
     out.rsOk = out.rs44600 === "Dorinka S.R.L" && out.rs44593 === "Aguilar Maria Co";
     out.rsEnHtml = html.indexOf("Aguilar Maria Co") >= 0;
+    // F4 v31.48 (Luis): la fecha en que se HIZO el pedido — web de la programación, ISIS sin programar de la base
+    out.recOk = byNp["LK 0053"].recep === "2026-09-15" && byNp["44593"].recep === "2026-09-01"
+      && html.indexOf("🛒 Pedido 15/9") >= 0 && html.indexOf("🛒 Pedido 1/9") >= 0 && html.indexOf("📅 Entrega 22/9") >= 0;
 
     // caso borde: si TODAS las NP están canceladas/facturadas, el pop-up lo dice y no rompe
     window.fetch = function (url) {
@@ -101,7 +104,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     return out;
   });
   const pass = r.sinCancelada && r.totalOk && r.hintCancel && r.hintFact && r.spOk &&
-    r.rsOk && r.rsEnHtml && r.todoCancelado && r.webEsta && r.webEnHtml && errs.length === 0;
+    r.rsOk && r.rsEnHtml && r.recOk && r.todoCancelado && r.webEsta && r.webEnHtml && errs.length === 0;
   console.log("cajped-canceladas:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();
