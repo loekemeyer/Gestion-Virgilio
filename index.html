@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.89">
+<link rel="stylesheet" href="gv-ui.css?v=31.90">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6527,7 +6527,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.89"></script>
+<script type="module" src="recepcion.js?v=31.90"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -8247,6 +8247,27 @@ function tdModulosAbiertos(st) {
     .map(function (m) { return { tipo: m.code || m.k, k: m.k, desc: m.desc }; });
 }
 /* Cierra cada tarea de módulo con el MISMO cierre que su botón (el tiempo hasta ahora queda registrado). */
+/* v31.90 (Luis, 16/10: "cuando termina el día el celular debería mandar el dato al server, no puede quedar
+   vivo en el celu") — Terminar Día con un armado abierto sube la ÚLTIMA foto (`GV_Armado_Avance`, en_curso)
+   y, sólo si el servidor contesta OK, borra la copia del celular (`vir_comp_<tanda>`). Al retomar, mañana,
+   `showCompletarWizard` no encuentra copia local y arranca de la del servidor: la misma para cualquier
+   celular, y la que ve un ajuste hecho desde el servidor (caso F73A / NP LK 0392). Sin señal la copia local
+   queda, como antes: no se pierde avance. El picking ya vivía en el servidor (PKC + `pkResumeServer`). */
+function tdSubirArmado(legajoStr) {
+  try {
+    const L = String(legajoStr || "").trim();
+    if (!L || esLegajoPrueba(L)) return;
+    const st = getLegajoState(L);
+    const T = (st && st.armado && st.armado.active) ? String(st.armado.value || "").trim().toUpperCase() : "";
+    if (!T) return;
+    const loc = _compRestore(T);
+    if (!loc || !loc.nps || !loc.nps.length) return;
+    const foto = _armAvFoto(loc); if (!foto) return;
+    _armAvPost(_armAvCuerpo(T, L, "en_curso", foto), 0, false).then(function (ok) {
+      if (ok) _compClearPersist(T);
+    }).catch(function () {});
+  } catch (_e) {}
+}
 function tdCerrarModulos(legajoStr) {
   const st = getLegajoState(legajoStr) || {};
   TD_MODULOS.forEach(function (m) {
@@ -8680,6 +8701,8 @@ async function confirmarTerminarDia() {
 
   // 1c) v31.01: tareas de módulo abiertas → su cierre de siempre, ANTES del FJ.
   tdCerrarModulos(legajoStr);
+  // 1d) v31.90 (Luis, 16/10): el armado abierto NO queda vivo en el celular — sube la foto y, con el OK, se borra la local.
+  tdSubirArmado(legajoStr);
 
   // 2) Reporte FJ "Fin de Jornada" con resumen del día como JSON en texto.
   //    client_id DETERMINÍSTICO por (legajo, día) -> si tocan Terminar Día
@@ -10875,7 +10898,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.89";
+const APP_VERSION = "v31.90";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -65262,7 +65285,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.89"></script>
+<script src="importacion.js?v=31.90"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -68713,15 +68736,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.89"></script>
-<script src="hotsale.js?v=31.89"></script>
-<script src="estadisticas.js?v=31.89"></script>
-<script src="ads.js?v=31.89"></script>
-<script src="plantel.js?v=31.89"></script>
+<script src="cobranzas.js?v=31.90"></script>
+<script src="hotsale.js?v=31.90"></script>
+<script src="estadisticas.js?v=31.90"></script>
+<script src="ads.js?v=31.90"></script>
+<script src="plantel.js?v=31.90"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.89"></script>
+<script src="analisis.js?v=31.90"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.89"></script>
+<script src="ayuda.js?v=31.90"></script>
 
 </body>
 </html>

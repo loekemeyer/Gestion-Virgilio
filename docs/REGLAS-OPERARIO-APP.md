@@ -208,6 +208,16 @@ la tarde que se seguía el lunes** (~65 h: D45B, D52C, D67F; F22A al 05/10) arra
 `tests/tarea-abierta-otro-dia.cjs`. → **Desde la v26.61 el armado SÍ viaja al servidor** (regla de abajo); leerlo para
 retomar en otro celular es la parte 2.
 
+## ⚠ REGLA (Luis, 2026-10-16, v31.90): al TERMINAR DÍA el armado abierto sube al servidor y NO queda en el celular
+
+**Luis:** *"cuando termina el día el celular debería mandar el dato al server, no puede quedar vivo en el celu"*.
+Hasta la v31.89 la foto ya viajaba a `GV_Armado_Avance`, pero el celular se quedaba su copia (`vir_comp_<tanda>`) y
+al retomar **ganaba la del celular** (`showCompletarWizard` lee primero `_compRestore`): un ajuste hecho desde el
+servidor (F73A, NP LK 0392: 5 artículos sacados) no le llegaba. Ahora `tdSubirArmado` (Terminar Día, después de
+`tdCerrarModulos`) sube la última foto `en_curso` y, **sólo con el OK del servidor**, borra la copia local; mañana
+se retoma de la del servidor. Sin señal la copia local queda (no se pierde avance). El picking ya estaba en el
+servidor (PKC + `pkResumeServer`, y la retomada después del freno siembra de todos). `tests/td-sube-armado.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-10-05, v26.83): en BAJAR DE RACKS, GUARDADO e INGRESO A RACKS, «Cerrar» MINIMIZA y «Anular» SALE
 
 **Luis:** *"si envía bajada de racks y cierra con el botón de cerrar de arriba, se debería considerar que sigue bajando
