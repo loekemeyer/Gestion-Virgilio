@@ -23,6 +23,8 @@ node() {
   return 0
 }
 
+echo "== mg-sin-gondola (v31.49: Guardar a góndola pregunta dónde si el código no tiene celda en el Mapa) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-sin-gondola.cjs
 echo "== tp-movs-filtrados (v31.38: el TP baja solo los movimientos de los codigos de la tanda, no la tabla entera) =="
 node tests/tp-movs-filtrados.cjs
 echo "== ins-alta-gp2 (v31.14: Insumos edita solo descripcion y cantidad; alta desde GP2 o a mano) =="
