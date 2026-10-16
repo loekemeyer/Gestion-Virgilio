@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.59">
+<link rel="stylesheet" href="gv-ui.css?v=31.60">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6477,7 +6477,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.59"></script>
+<script type="module" src="recepcion.js?v=31.60"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10822,7 +10822,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.59";
+const APP_VERSION = "v31.60";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -23614,7 +23614,12 @@ async function stkOpenCajasPedidasArt(codEnc) {
   const _sfx = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
   const _empFiltro = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : "";
   _stkPopShell("Cajas pedidas — " + escapeHtml(_codDisp) + (_empFiltro ? ' <span style="font-size:14px;font-weight:800;color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + ';">' + _empFiltro + '</span>' : ''), "stkPopBody");
-  const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando pedidos…</div>';
+  /* (Luis, 16/10/2026) — dos pestañas: «Hoy» (lo pendiente, como siempre) e «Histórico» (cada NP que pidió el
+     artículo: cuándo, cuánto pidió y cuánto se entregó, de Entregas_Virgilio). El Histórico se carga al tocarlo. */
+  const _cpShell = document.getElementById("stkPopBody") || null;
+  if (_cpShell) _cpShell.innerHTML = '<div class="stkpop-filters" style="justify-content:center;margin-bottom:12px"><button class="stkpop-fb on" id="stkCpTabHoy" style="font-size:clamp(14px,1vw,18px);padding:7px 18px" onclick="stkCajasPedTab(\'hoy\')">Hoy</button><button class="stkpop-fb" id="stkCpTabHist" style="font-size:clamp(14px,1vw,18px);padding:7px 18px" onclick="stkCajasPedTab(\'hist\')">Histórico</button></div><div id="stkCpHoy"></div><div id="stkCpHist" style="display:none"></div>';
+  _stkCpCtx = null;
+  const body = document.getElementById("stkCpHoy") || document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando pedidos…</div>';
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   let base = [];
   // v12.22 — se trae también `cliente`: es el fallback de Razón Social para las NP que NO
@@ -23631,6 +23636,7 @@ async function stkOpenCajasPedidasArt(codEnc) {
     (_eq || []).forEach(function (e) { if (_cn.indexOf(_stkNormCod(e.cod_real)) >= 0) _stkArtCands(String(e.cod_pedido || "")).forEach(function (c) { if (_cands0.indexOf(c) < 0) _cands0.push(c); }); });
   } catch (_e) {}
   const _codCands = _cands0.map(encodeURIComponent).join(",");   // v19.79: variantes de cero (problema 425)
+  _stkCpCtx = { cands: _cands0.slice(), emp: _empFiltro, codDisp: _codDisp };   // para la pestaña Histórico
   /* v19.65 (Thomas: "¿por qué ahí dice que pide 198 pero cuando entro veo solo tres cajas?
      algo está mal") — la fuente pasó de `gv_ppp_base_pedidos` (SOLO el espejo de ISIS) a
      `gv_demanda_pedidos`, que es ISIS + WEB. Es el MISMO agujero que tenía el generador de
@@ -23687,7 +23693,7 @@ async function stkOpenCajasPedidasArt(codEnc) {
   } catch (_e) {}
   const nps = npsAll.filter(function (np) { return !_facSet[np]; });
   const yaFact = npsAll.length - nps.length - _canN;
-  if (!nps.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Todo lo que pidió ' + escapeHtml(_codDisp) + (_empFiltro ? ' (' + _empFiltro + ')' : '') + ' ya está <b>facturado, entregado o cancelado</b> (' + yaFact + ' facturadas/entregadas' + (_canN ? ' + ' + _canN + ' canceladas' : '') + '). El recorrido está en Historial.</div>'; return; }
+  if (!nps.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Todo lo que pidió ' + escapeHtml(_codDisp) + (_empFiltro ? ' (' + _empFiltro + ')' : '') + ' ya está <b>facturado, entregado o cancelado</b> (' + yaFact + ' facturadas/entregadas' + (_canN ? ' + ' + _canN + ' canceladas' : '') + '). Lo entregado está en la pestaña Histórico.</div>'; return; }
   const npInfo = {};
   try {
     /* v19.65 — `gv_np_prog_info` en vez de la programación de ISIS sola: une las dos
@@ -23764,6 +23770,65 @@ async function stkOpenCajasPedidasArt(codEnc) {
   }).join("") + '</tbody>';
   h += '<tfoot><tr style="font-weight:800;border-top:2px solid #334155"><td colspan="2">TOTAL (' + nps.length + ' NP)</td><td class="num">' + totP + '</td><td></td><td></td></tr></tfoot></table></div>';
   if (body) body.innerHTML = h;
+}
+let _stkCpCtx = null;
+function stkCajasPedTab(t) {
+  const hoy = document.getElementById("stkCpHoy"), hist = document.getElementById("stkCpHist");
+  const bH = document.getElementById("stkCpTabHoy"), bX = document.getElementById("stkCpTabHist");
+  if (!hoy || !hist) return;
+  hoy.style.display = t === "hist" ? "none" : ""; hist.style.display = t === "hist" ? "" : "none";
+  if (bH) bH.classList.toggle("on", t !== "hist"); if (bX) bX.classList.toggle("on", t === "hist");
+  if (t === "hist" && !hist.dataset.ok) stkCajasPedHist();
+}
+/* Histórico de un artículo: una fila por NP armada (Entregas_Virgilio, sin tandas anuladas «-X»), con la fecha
+   del pedido, la de entrega, lo pedido y lo entregado. Mismo filtro de empresa que «Hoy» (código con L → LK). */
+async function stkCajasPedHist() {
+  const res = document.getElementById("stkCpHist"); if (!res) return;
+  if (!_stkCpCtx) { res.innerHTML = '<div class="stkpop-empty">Cargando…</div>'; setTimeout(stkCajasPedHist, 400); return; }
+  const ctx = _stkCpCtx, H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  res.innerHTML = '<div class="stkpop-empty">Cargando histórico…</div>';
+  let ent;
+  try { ent = await supaFetchAll(SUPABASE_URL + "/rest/v1/Entregas_Virgilio", "cod_art=in.(" + ctx.cands.map(encodeURIComponent).join(",") + ")&tanda=not.like.*-X&select=np,cod_art,tanda,cajas_pedidas,cajas_entregadas,fecha_salida&order=fecha_salida.desc,np.asc"); }
+  catch (e) { res.innerHTML = '<div class="stkpop-empty" style="color:#b91c1c">No se pudo leer el histórico: ' + escapeHtml(e && e.message ? e.message : String(e)) + '</div>'; return; }
+  const visto = {}, by = {};
+  (ent || []).forEach(function (x) {
+    const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (!np) return;
+    const art = String(x.cod_art || "").toUpperCase();
+    const emp = /[0-9E]L$/.test(art) ? "LK" : empresaDeNp(np);
+    if (ctx.emp && emp && emp !== ctx.emp) return;
+    const k = np + "|" + art + "|" + String(x.tanda || "").toUpperCase(); if (visto[k]) return; visto[k] = true;
+    const r = by[np] || (by[np] = { np: np, ped: 0, ent: 0, fecha: "", tandas: [] });
+    r.ped += Number(x.cajas_pedidas) || 0; r.ent += Number(x.cajas_entregadas) || 0;
+    const f = String(x.fecha_salida || "").slice(0, 10); if (f > r.fecha) r.fecha = f;
+    const t = String(x.tanda || "").trim().toUpperCase(); if (t && r.tandas.indexOf(t) < 0) r.tandas.push(t);
+  });
+  const nps = Object.keys(by);
+  if (!nps.length) { res.innerHTML = '<div class="stkpop-empty">Ninguna NP armada con ' + escapeHtml(ctx.codDisp) + (ctx.emp ? ' (' + ctx.emp + ')' : '') + '.</div>'; res.dataset.ok = "1"; return; }
+  // Razón social y fecha del pedido: programación viva (ISIS + web) y, si no está, Facturacion_NP.
+  const info = {};
+  for (let i = 0; i < nps.length; i += 150) {
+    const inl = nps.slice(i, i + 150).map(encodeURIComponent).join(",");
+    try {
+      const rr = await Promise.all([
+        fetch(SUPABASE_URL + "/rest/v1/gv_np_prog_info?np=in.(" + inl + ")&select=np,razon_social,fecha_recep&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+        supaFetchAllSafe(SUPABASE_FACTURACION_NP_ENDPOINT, "np=in.(" + inl + ")&select=np,razon_social&order=np.asc")
+      ]);
+      (rr[0] || []).forEach(function (x) { const np = String(x.np || "").trim(); const o = info[np] || (info[np] = {}); if (!o.rs && x.razon_social) o.rs = String(x.razon_social).trim(); if (!o.rec && x.fecha_recep) o.rec = String(x.fecha_recep).slice(0, 10); });
+      (rr[1] || []).forEach(function (x) { const np = String(x.np || "").trim(); const o = info[np] || (info[np] = {}); if (!o.rs && x.razon_social) o.rs = String(x.razon_social).trim(); });
+    } catch (_e) {}
+  }
+  const r1 = function (n) { return Math.round(n * 10) / 10; };
+  const rows = nps.map(function (np) { return by[np]; }).sort(function (a, b) { return a.fecha !== b.fecha ? (a.fecha < b.fecha ? 1 : -1) : String(a.np).localeCompare(String(b.np), undefined, { numeric: true }); });
+  let tP = 0, tE = 0;
+  let h = '<div class="mva-tblwrap"><table class="mva-tbl cp-tbl"><thead><tr><th>Pedido</th><th>Entrega</th><th>NP</th><th>Razón Social</th><th class="num">Pidió</th><th class="num">Entregó</th><th class="num">Faltó</th></tr></thead><tbody>';
+  rows.forEach(function (r) {
+    const i = info[r.np] || {}, falto = r1(Math.max(0, r.ped - r.ent));
+    tP += r.ped; tE += r.ent;
+    h += '<tr' + (falto > 0 ? ' style="background:#fef2f2"' : '') + '><td class="num">' + (i.rec ? escapeHtml(_stkFmtFechaNP(i.rec)) : '—') + '</td><td class="num">' + (r.fecha ? escapeHtml(_stkFmtFechaNP(r.fecha)) : '—') + '</td><td class="cp-np"><b>' + escapeHtml(r.np) + '</b> <small style="color:#64748b">' + escapeHtml(r.tandas.join(" · ")) + '</small></td><td class="cp-rs" title="' + escapeHtml(i.rs || "") + '">' + escapeHtml(i.rs || "—") + '</td><td class="num"><b>' + r1(r.ped) + '</b></td><td class="num"><b>' + r1(r.ent) + '</b></td><td class="num"' + (falto > 0 ? ' style="color:#b91c1c;font-weight:800"' : ' style="color:#94a3b8"') + '>' + (falto > 0 ? falto : '—') + '</td></tr>';
+  });
+  const tF = r1(Math.max(0, tP - tE));
+  h += '</tbody><tfoot><tr style="font-weight:800;border-top:2px solid #334155"><td colspan="4">TOTAL (' + rows.length + ' NP)</td><td class="num">' + r1(tP) + '</td><td class="num">' + r1(tE) + '</td><td class="num"' + (tF > 0 ? ' style="color:#b91c1c"' : '') + '>' + (tF > 0 ? tF : '—') + '</td></tr></tfoot></table></div>';
+  res.innerHTML = h; res.dataset.ok = "1";
 }
 /* v5.104 — Exportar "Cajas pedidas" a Excel (.xls vía tabla HTML, mismo patrón que
    el export de excedentes). Lee _stkPop.rows (guardado por stkOpenCajasPedidasArt). */
@@ -23949,6 +24014,9 @@ function _stkQuienChip(mv) {
   if (!leg) return "";
   // v9.42 — legajo 0/1 (pruebas/admin) NO es un operario: mostrar "admin", no el nombre de prueba
   // (ej. antes los CP de supervisor quedaban "TL · 0"). Los CP nuevos ya guardan el legajo real.
+  /* (Luis, 16/10/2026) — el supervisor se guarda como "sup:<mail>": se muestra "Admin", no el mail
+     (salía dos veces y partía la fila). El mail queda en el tooltip. */
+  if (/^sup:/i.test(leg)) return ' <span class="mva-qui" title="' + escapeHtml(leg.replace(/^sup:/i, "")) + '"><b>Admin</b></span>';
   if (esLegajoPrueba(leg)) return ' <span class="mva-qui" title="Movimiento de administración / sistema (sin legajo de operario)"><b>admin</b></span>';
   const nom = (typeof _empleadosNombres !== "undefined" && _empleadosNombres) ? (_empleadosNombres.get(leg) || "") : "";
   const sig = (typeof initialsFromName === "function" ? initialsFromName(nom, leg) : "") || nom || leg;
@@ -64691,7 +64759,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.59"></script>
+<script src="importacion.js?v=31.60"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -68013,15 +68081,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.59"></script>
-<script src="hotsale.js?v=31.59"></script>
-<script src="estadisticas.js?v=31.59"></script>
-<script src="ads.js?v=31.59"></script>
-<script src="plantel.js?v=31.59"></script>
+<script src="cobranzas.js?v=31.60"></script>
+<script src="hotsale.js?v=31.60"></script>
+<script src="estadisticas.js?v=31.60"></script>
+<script src="ads.js?v=31.60"></script>
+<script src="plantel.js?v=31.60"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.59"></script>
+<script src="analisis.js?v=31.60"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.59"></script>
+<script src="ayuda.js?v=31.60"></script>
 
 </body>
 </html>
