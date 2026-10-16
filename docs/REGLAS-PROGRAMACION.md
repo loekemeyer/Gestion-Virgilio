@@ -171,6 +171,7 @@ Cada línea de una NP que espera en la PPP (fecha de hoy en adelante o todavía 
 |---|---|---|
 | **historial** | cliente con **3 o más pedidos** en 12 meses: promedio del artículo **< 5 cj** → tope promedio × 5 · promedio **≥ 5 cj** → tope ×2 de su pedido más grande | pasa el tope → **contacta el bot** |
 | **em** | cliente con **menos de 3 pedidos**, o con historial pidiendo un artículo **que nunca compró** | peso del artículo en el pedido / peso en la **Est. Madre** (`proy_cajas_mes`, secundario → su principal, dual por empresa) **≥ ×5** y **≥ 10 cj** → **contacta el bot** |
+| **linea_nueva** (D4) | cliente con historial, **5+ artículos nuevos** en el pedido y alguno con desbalance E.M. | **un solo aviso** al bot por pedido |
 | **cajas_uxb** | cajas múltiplo del uxb (uxb > 1), el aviso de la página (`cajasHintHtml`), **y el cliente nunca pidió tanto** | **sólo el cartel** en la PPP |
 
 - **Historia** = la de los pedidos disruptivos (v26.20): pedidos web y, antes de la web de esa empresa, facturas ISIS
@@ -180,8 +181,12 @@ Cada línea de una NP que espera en la PPP (fecha de hoy en adelante o todavía 
 - **D1-D3 (Luis, 16/10, v31.94)**:
   - **D1** `cajas_uxb` sólo si el cliente **nunca pidió tanto** de ese artículo (su máximo < lo pedido). Bajó de 100 a ~39 NP en 6 semanas.
   - **D2** cliente con historial que pide un artículo que **nunca compró** → regla `em`, proporcional a su pedido.
-  - **D3** historial con promedio **≥ 5 cj** → anómalo si pide **más que ×2 de su pedido más grande** de ese artículo
-    (`anomalo_hist_max_factor` = 2).
+  - **D3 + D5 (v31.97)** historial con promedio **≥ 5 cj** → anómalo si la línea pasa **×2 del pedido TOTAL más grande
+    del cliente** en 12 meses (`anomalo_hist_max_factor` = 2). Medido 16/10 sobre 6 semanas: **0 líneas** (la regla casi
+    no puede dispararse: una sola línea tendría que doblar el pedido entero más grande).
+  - **D4 (v31.97)** cliente con historial que mete **5 o más artículos nuevos** en un pedido (`anomalo_linea_min_art`)
+    y alguno pasa el desbalance de la E.M. = **incorporación de línea**: un aviso `linea_nueva` por NP con la lista,
+    en vez de uno por artículo. Kohn (cód. 565) pasó de 24 avisos a 4 (uno por NP, un pedido).
 - **Pantalla**: `⚠ PEDIDOS ANÓMALOS: X` (X = NP del día) a la IZQUIERDA de la fila del día, afuera de la tabla
   (`_pgaAnomGutter`); en el celular, sin margen, queda adentro de la fila. Tocarlo abre NP · artículo · cajas · regla ·
   motivo · «Bot: a contactar» / «Sólo aviso». La NP lleva `⚠ anómalo` (`· bot` si contacta).
