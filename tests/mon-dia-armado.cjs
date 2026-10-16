@@ -32,6 +32,9 @@ ok(/_rdArm\(x\)/.test(src), "la celda del día no muestra el día de armado");
    del 28/09: lo que no entra se abrevia o baja de renglón, nunca se ensancha la columna. */
 ok(/small class="rd-arm/.test(src), "el día de armado tiene que ir en el <small> de la celda, no al lado");
 ok(/rd-arm\.tarde/.test(src), "falta el estilo del vencido");
+/* v31.51 (Luis, 16/10): también en el renglón del día de la tabla de tandas («MAR 20/10»). */
+ok(/small class="dia-arm/.test(src), "el renglón del día de la tabla de tandas no muestra el día de armado");
+ok(/dia-arm\.tarde/.test(src), "falta el estilo del vencido en el renglón del día de tandas");
 
 if (fallas.length) { console.log("mon-dia-armado: ✗ FAIL\n  - " + fallas.join("\n  - ")); process.exit(1); }
 
@@ -63,7 +66,11 @@ const T0 = Date.parse("2026-10-13T15:00:00-03:00");
   ];
   await p.route("**/rest/v1/**", (route) => {
     const u = decodeURIComponent(route.request().url());
-    const filas = u.includes("/rpc/gv_ppp_prog_arbol") ? ARBOL : [];
+    /* v31.51: la tabla de tandas sale de PPP_Web_Programacion; una tanda sin tocar por día */
+    const WEB = ARBOL.map((a) => ({ empresa: "LK", np: a.np.replace(/\D/g, ""), tanda: a.tanda,
+      fecha_entrega: a.fecha, razon_social: "Cliente " + a.tanda, zona: "Z", m3: a.m3 }));
+    const filas = u.includes("/rpc/gv_ppp_prog_arbol") ? ARBOL
+                : u.includes("/PPP_Web_Programacion") ? WEB : [];
     route.fulfill({ status: 200,
       headers: { "content-type": "application/json",
                  "content-range": "0-" + Math.max(0, filas.length - 1) + "/" + filas.length },
@@ -77,6 +84,11 @@ const T0 = Date.parse("2026-10-13T15:00:00-03:00");
      que además es lo que ve el que mira la pared. Una fila por día, en orden. */
   const r = await p.evaluate(() => ({
     dias: (document.getElementById("fcBox") || {}).innerHTML || "",
+    tandas: Array.from(document.querySelectorAll("tr.dia td")).map((td) => {
+      const sm = td.querySelector("small.dia-arm");
+      return { dia: td.firstChild.textContent.trim(), arm: sm ? sm.textContent.trim() : "",
+               tarde: !!(sm && sm.classList.contains("tarde")) };
+    }),
     filas: Array.from(document.querySelectorAll("#fcBox tbody tr")).map((tr) => {
       const td = tr.querySelector("td.rd-fe"), sm = td && td.querySelector("small.rd-arm");
       return { fe: td ? td.firstChild.textContent.trim() : "",
@@ -114,6 +126,14 @@ const T0 = Date.parse("2026-10-13T15:00:00-03:00");
   /* hoy (13/10): su armado era el jueves 8 — ya pasó, pero su NP sigue pendiente */
   ok(d13 && d13.arm === "(debió armarse Jue 08/10)",
      "el día de hoy dice «" + (d13 && d13.arm) + "»; se esperaba «(debió armarse Jue 08/10)»");
+
+  /* v31.51 (Luis, 16/10): el mismo dato en el renglón del día de la tabla de tandas */
+  const t14 = r.tandas.filter((x) => x.dia === "Mié 14/10")[0];
+  ok(t14 && t14.arm === "(debió armarse Vie 09/10)" && t14.tarde,
+     "el renglón «Mié 14/10» de la tabla de tandas no dice «(debió armarse Vie 09/10)» en rojo: " + JSON.stringify(r.tandas));
+  const t16 = r.tandas.filter((x) => x.dia === "Vie 16/10")[0];
+  ok(!t16 || (t16.arm === "(debe armarse Mié 14/10)" && !t16.tarde),
+     "el renglón «Vie 16/10» de la tabla de tandas: " + JSON.stringify(t16));
 
   /* la columna del día no se desbanda: el texto va en el <small>, que .rd td dibuja en bloque */
   const anchoFe = Math.max.apply(null, r.filas.map((x) => x.ancho));

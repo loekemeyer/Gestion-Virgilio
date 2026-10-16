@@ -145,6 +145,8 @@ table.rd{width:auto;margin:0 auto}
    cuando entraron cliente, zona y demora: el boceto de Damián encabeza la
    tabla con el día ("Miercoles 23/09") y la ventana son 2-3 días, así que cada
    bloque lleva el suyo. */
+tr.dia td small.dia-arm{font-size:.6em;font-weight:700;opacity:.75;letter-spacing:0;text-transform:none}
+tr.dia td small.dia-arm.tarde{color:#f87171;opacity:1}
 tr.dia td{background:#0e1830;color:#93c5fd;font-size:calc(1.9*var(--u));font-weight:900;
   letter-spacing:.07em;text-transform:uppercase;padding:.5vh .5vw;
   border-bottom:.2vh solid #1e293b}
@@ -1507,8 +1509,14 @@ function pintar(d) {
        armado), pero el rótulo del camión ya no se escribe. */
     if (v.fechaRaw !== diaEnCurso) {
       diaEnCurso = v.fechaRaw;
+      /* v31.51 (Luis, 16/10): el «debió armarse» también en el renglón del día de la tabla de
+         tandas, al lado de la fecha. Acá sólo quedan tandas SIN terminar, así que si la fecha
+         de armado ya pasó es atraso real: va en rojo (el verbo lo dice igual). */
+      var _arm = diaArmado(v.fechaRaw);
       filas.push('<tr class="dia"><td colspan="5">' +
-        esc(diaEtiqueta(v.fechaRaw) || "Sin fecha") + '</td></tr>');
+        esc(diaEtiqueta(v.fechaRaw) || "Sin fecha") +
+        (_arm ? ' <small class="dia-arm' + (_arm.vencido ? ' tarde' : '') + '">' + esc(_arm.txt) + '</small>' : '') +
+        '</td></tr>');
     }
     filas.push('<tr' + (enCurso ? ' class="curso"' : (salioT ? ' class="salio-sinfc"' : '')) + '>' +
       '<td class="t-tanda">' + esc(v.tanda) +
