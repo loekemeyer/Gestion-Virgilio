@@ -452,8 +452,12 @@ al entregar ni «cerrar el círculo» por empresa.**
   importados NO.
 - **Qué código va con qué componente lo dice `GP2.insumo_equivalencia`** (54 cargadas el 09/10; el resto lo asigna
   Thomas en GP2 → Stock General → Virgilio, D30). Un código sin equivalencia no se copia.
-- **D16 (Thomas): el celular del operario de Virgilio NO escribe en GP2.** Lo que pasa en GP2 (envío de bolsas a un inyector,
-  consumo) lo carga el admin dentro de GP2. `gv_insumo_envio_inyector` queda sin grant y sin llamador.
+- ~~D16 (Thomas): el celular del operario de Virgilio NO escribe en GP2.~~ **Reemplazada el 16/10 (Thomas, D1, v32.14):
+  el envío de bolsas a un inyector desde el celular SÍ escribe en GP2**, por `public.gv_insumo_envio_inyector` (anon,
+  SECURITY DEFINER): traduce el código por `GP2.insumo_equivalencia` (sector 14) y llama a `GP2.enviar_material_inyector`
+  (kg de la 57 → ubicación del inyector). Es lo ÚNICO que el celular escribe en GP2; Thomas aceptó el riesgo (con la clave
+  pública se pueden cargar envíos falsos). Antes: 0 `envio_inyector` en toda la historia, 96 bolsas sólo en Virgilio
+  (25/08–08/10). La recepción contra OC (`recibir_oc_virgilio`) sigue sin anon. `sql/gv_insumo_envio_inyector_v3214.sql`.
 - Lectura: `select * from public.gv_gp2_espejo_insumos(null, true);` (qué haría) · `select * from public."GV_GP2_Espejo_Log" order by id desc;`
 - Rollback: `select cron.unschedule('gv-gp2-espejo-insumos');` + `alter table public."Movimientos_Stock" disable trigger zz_gv_gp2_espejo_insumos;`
 - ⚠⚠ **v29.66 (Luis, 13/10): el depósito «<sector> en Virgilio» SE CREA SOLO si falta.** Sin eso la fila salía «sin depósito

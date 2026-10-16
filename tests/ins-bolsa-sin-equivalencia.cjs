@@ -14,7 +14,7 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(async () => {
     const out = {}, llamadas = [];
-    window.insGp2Rpc = async (name, args) => { llamadas.push({ name, args }); return { ok: true, virgilio_despues: 200 }; };
+    window.insGp2Rpc = async (name, args, schema) => { llamadas.push({ name, args, schema }); return { ok: true, virgilio_despues: 200 }; };
     // el bundle de GP2 trae el código REAL de Virgilio (v29.74: sale de insumo_equivalencia)
     const mv = { kg_x_bolsa: 25, materiales: [{ codigo_virgilio: "NY VIRGEN", codigo: "2475", inyectores: [{ proveedor: "Kollplast", bolsas_a_enviar: 4 }] }] };
     const gp2EI = { modo: "EI", inyector: "Kollplast", mv: mv };
@@ -22,7 +22,8 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
     const eba = { cod: "EBA", nombre: "EBA", qty: 1, unidad: "Bolsas", categoria: "plastico" };
 
     const a = await _insGp2Enviar(gp2EI, [ny], "104", "");
-    out.a = a.ok === true && llamadas.length === 1 && llamadas[0].name === "enviar_material_virgilio" &&
+    out.a = a.ok === true && llamadas.length === 1 && llamadas[0].name === "gv_insumo_envio_inyector" && llamadas[0].schema === "public" &&   // v32.14 (D1): el puente, no GP2 directo
+           
             llamadas[0].args.p_cod_virgilio === "NY VIRGEN" && llamadas[0].args.p_bolsas === 2 &&
             llamadas[0].args.p_inyector === "Kollplast";
 
