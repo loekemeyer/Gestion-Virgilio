@@ -165,6 +165,25 @@ puerta). Arriba del iframe de la Est. Madre (Stock y Compras) va la barra `#emBa
   vendido que no tiene fila en la planilla (599E / 599EZ en Costos LK) va **al fondo en naranja**, como está.
 - Una RPC vacía o con error no baja nada. `sql/gv_est_plantilla_v2736.sql`, `tests/est-madre-mes.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-16, v31.55): REMAP CON FECHA DE CORTE — la venta vieja del 936E es del 938E
+
+**Luis:** *"Los datos de estadística madre de 936E son en realidad del 938E (no preguntes). Quiero que se le pasen para
+todo lo que respecta al cálculo de proyección de ventas, compras, importaciones y demás. Y a partir de hoy, se trackean
+por separado"*.
+
+- `sales_item_remap` junta dos códigos **para siempre**; para «hasta tal día es del otro» está la tabla nueva
+  **`sales_item_remap_hasta`** (LK: `from_code`, `to_code`, `hasta`, `motivo`): lo facturado con `invoice_date < hasta`
+  cuenta como `to_code`. Fila: `936E → 938E, hasta 2026-10-16`.
+- Se aplica en **`ventas_proy_lineas.nitem`** (LK), la fuente de todo el motor: proyección (`_fn_proy_window`,
+  `fn_proyeccion_madre`, `fn_proyeccion_oc_virgilio`) → `proyeccion_madre` de Gestión → Stocks, OC, Importados,
+  `GP2.est_madre`; y los meses de la Est. Madre (`get_estadistica_madre_mensual`). **`sales_lines` no se toca**: la
+  factura sigue diciendo 936E, y las Estadísticas ISIS (manuales 29/31) siguen como ISIS.
+- Medido al aplicarlo: 57 líneas / 143 cajas (sep/25 → 15/10/26) pasaron al 938E. Proyección 938E = 11,67 cj/mes
+  (140 u); 936E = 0 hasta que venda con su código (el 938E nunca había vendido).
+- No lo cubre: el caché del portal (`estadistica_madre_cache.meses`, lee `sales_lines`) y los pedidos web
+  (`lk_pedidos_match`). Otro caso igual = un `insert` en `sales_item_remap_hasta`, no un deploy.
+- `sql/lk_remap_hasta_936E_938E_v3155.sql` (rollback en la cabecera).
+
 ## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
 
 > Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
