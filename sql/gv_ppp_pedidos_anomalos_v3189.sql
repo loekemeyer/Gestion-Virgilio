@@ -286,7 +286,7 @@ revoke all on function public.gv_ppp_anomalos_detectar() from public, anon, auth
 create or replace function public.gv_ppp_anomalos_lista(p_desde date default null)
 returns table (id bigint, empresa text, order_id bigint, np_idx integer, np_label text, cod_cliente text, razon_social text,
                fecha_entrega date, articulo text, cajas numeric, regla text, detalle text, contactar boolean,
-               estado text, contacto_nota text)
+               estado text, contacto_nota text, referencia numeric, limite numeric)
 language sql stable security definer
 set search_path to 'public', 'pg_temp'
 as $function$
@@ -294,7 +294,7 @@ as $function$
    lleva su cartel al día nuevo). Se ven pendientes y contactados: confirmado / corregido /
    descartado ya no son anomalías abiertas. */
 select g.id, g.empresa, g.order_id, g.np_idx, gv_ppp_web_np_label(p.empresa, p.np), p.cod_cliente, p.razon_social,
-       p.fecha_entrega, g.articulo, g.cajas, g.regla, g.detalle, g.contactar, g.estado, g.contacto_nota
+       p.fecha_entrega, g.articulo, g.cajas, g.regla, g.detalle, g.contactar, g.estado, g.contacto_nota, g.referencia, g.limite   -- v32.03 (drop + create: cambió el returns)
   from "GV_Pedido_Anomalo" g
   join "PPP_Web_Programacion" p on p.empresa = g.empresa and p.order_id = g.order_id and p.np_idx = g.np_idx
  where g.estado in ('pendiente','contactado')

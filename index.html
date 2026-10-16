@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=32.02">
+<link rel="stylesheet" href="gv-ui.css?v=32.03">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -4002,6 +4002,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
   font-size:11px; font-weight:900; border-radius:999px; padding:0 8px; margin-left:8px; vertical-align:1px;
   white-space:nowrap; cursor:pointer; }
 .pga-anom-tbl td{ white-space:normal; }
+.pga-it.anom{ background:#fee2e2; box-shadow:inset 0 0 0 1px #fca5a5; border-radius:6px; }
+.pga-it.anom .pga-it-cod, .pga-it.anom .pga-it-cj{ color:#b91c1c; font-weight:900; }
 .pga-anom-tbl td.t{ max-width:420px; }
 .pga-anom-acc{ font-weight:800; font-size:12px; white-space:nowrap; }
 .pga-anom-acc.bot{ color:#b91c1c; }
@@ -6528,7 +6530,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=32.02"></script>
+<script type="module" src="recepcion.js?v=32.03"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10899,7 +10901,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v32.02";
+const APP_VERSION = "v32.03";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -45158,12 +45160,38 @@ function _pgaAnomDiaChip(d) {
     ' con cantidades fuera de lo normal' + (bot ? ' · ' + bot + ' para que el bot contacte al cliente' : '') +
     '. Tocá para ver cuáles y por qué.">⚠ PEDIDOS ANÓMALOS: ' + nps.length + '</span>';
 }
+/* v32.03 (Luis, 16/10: «que me indique cuál es»): la pastilla dice QUÉ artículo, cuántas cajas y contra qué
+   se midió — «⚠ 599E 20 cj (tope 15)» — en vez de un «anómalo» genérico. Un artículo una vez (manda la regla
+   que contacta), hasta 2 y «+N»; el resto en el detalle. */
+const PGA_ANOM_PRIO = { historial: 0, em: 1, linea_nueva: 2, cajas_uxb: 3 };
+function _pgaAnomTxt(x) {
+  const cj = aprNum(Number(x.cajas) || 0, 0) + " cj";
+  if (x.regla === "linea_nueva") return "línea nueva " + aprNum(Number(x.referencia) || 0, 0) + " art.";
+  if (x.regla === "historial") return x.articulo + " " + cj + (x.limite != null ? " (tope " + aprNum(Number(x.limite), 0) + ")" : "");
+  if (x.regla === "em") return x.articulo + " " + cj + (x.referencia != null ? " (×" + aprNum(Number(x.referencia), 0) + " E.M.)" : "");
+  const u = Number(x.referencia) || 0;
+  return x.articulo + " " + cj + (u > 1 ? " (¿" + aprNum((Number(x.cajas) || 0) / u, 0) + " cj?)" : "");
+}
 function _pgaAnomNpChip(r) {
   const l = _pgaAnomDe(r.np);
   if (!l) return "";
   const bot = l.some(function (x) { return x.contactar; });
+  const vistos = {}, partes = [];
+  l.slice().sort(function (a, b) { return (a.regla in PGA_ANOM_PRIO ? PGA_ANOM_PRIO[a.regla] : 9) - (b.regla in PGA_ANOM_PRIO ? PGA_ANOM_PRIO[b.regla] : 9); })
+    .forEach(function (x) { const k = x.regla === "linea_nueva" ? "*" : x.articulo; if (vistos[k]) return; vistos[k] = 1; partes.push(_pgaAnomTxt(x)); });
+  const txt = partes.slice(0, 2).join(" · ") + (partes.length > 2 ? " +" + (partes.length - 2) : "");
   return '<span class="pga-anom-np" onclick="event.stopPropagation();pgaAnomAbrir(\'' + escapeHtml(r.np) + '\',\'' + escapeHtml(r.np) + '\')"' +
-    ' title="' + escapeHtml(l.map(function (x) { return x.detalle; }).join(" · ")) + '">⚠ anómalo' + (bot ? ' · bot' : '') + '</span>';
+    ' title="' + escapeHtml(l.map(function (x) { return x.detalle; }).join(" · ")) + '">⚠ ' + escapeHtml(txt) + (bot ? ' · bot' : '') + '</span>';
+}
+/* El renglón del artículo anómalo, adentro de la NP abierta: en rojo y con el motivo en el title. */
+function _pgaAnomItem(np, art) {
+  const l = _pgaAnomDe(np); if (!l) return null;
+  const a = String(art || "").trim().toUpperCase();
+  const m = l.filter(function (x) {
+    return String(x.articulo || "").toUpperCase() === a ||
+      (x.regla === "linea_nueva" && (" " + String(x.detalle || "") + ",").indexOf(" " + a + " ") >= 0);
+  });
+  return m.length ? m : null;
 }
 let _pgaAnomVer = null;
 function pgaAnomAbrir(nps, titulo) {
@@ -45771,7 +45799,9 @@ function _pgaItemsHtml(np) {
   const cel = c.map(function (it) {
     const uni = aprItemUni(it), uxb = Number(it.uxb) || 0, cajas = Number(it.cajas) || 0;
     cj += cajas; un += uni;
-    return '<div class="pga-it"><span class="pga-it-cod">' + escapeHtml(String(it.art || "—")) + '</span>' +
+    const an = _pgaAnomItem(np, it.art);   // v32.03: el renglón anómalo, marcado
+    return '<div class="pga-it' + (an ? ' anom" title="' + escapeHtml(an.map(function (x) { return x.detalle; }).join(" · ")) : '') + '">' +
+      '<span class="pga-it-cod">' + (an ? '⚠ ' : '') + escapeHtml(String(it.art || "—")) + '</span>' +
       '<span class="pga-it-cj">' + aprNum(cajas, 0) + ' cj</span>' +
       '<span class="pga-it-un">' + (uni ? aprNum(uni, 0) + " un" + (uxb ? " ×" + aprNum(uxb, 0) : "") : "—") + '</span></div>';
   }).join("");
@@ -65320,7 +65350,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=32.02"></script>
+<script src="importacion.js?v=32.03"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -68771,15 +68801,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=32.02"></script>
-<script src="hotsale.js?v=32.02"></script>
-<script src="estadisticas.js?v=32.02"></script>
-<script src="ads.js?v=32.02"></script>
-<script src="plantel.js?v=32.02"></script>
+<script src="cobranzas.js?v=32.03"></script>
+<script src="hotsale.js?v=32.03"></script>
+<script src="estadisticas.js?v=32.03"></script>
+<script src="ads.js?v=32.03"></script>
+<script src="plantel.js?v=32.03"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=32.02"></script>
+<script src="analisis.js?v=32.03"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=32.02"></script>
+<script src="ayuda.js?v=32.03"></script>
 
 </body>
 </html>

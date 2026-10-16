@@ -27,11 +27,11 @@ F.d1C = F.d1.replace(/-/g, "");
 const ANOM = [
   { id: 1, empresa: "lk", np_label: "LK 0364", razon_social: "Emotiti S.A.", articulo: "525E", cajas: 48, regla: "historial",
     detalle: "Pidió 48 cj de 525E; su promedio es 2,0 cj (3 pedidos con el artículo, 9 pedidos en 12 meses). Tope ×5 = 10,0 cj",
-    contactar: true, estado: "pendiente", contacto_nota: null },
+    contactar: true, estado: "pendiente", contacto_nota: null, referencia: 2, limite: 10 },
   { id: 2, empresa: "lk", np_label: "LK 0364", razon_social: "Emotiti S.A.", articulo: "525E", cajas: 48, regla: "cajas_uxb",
-    detalle: "Pidió 48 cj de 525E y la caja trae 24 u.: ¿quiso decir 2 cj (48 unidades)?", contactar: false, estado: "pendiente", contacto_nota: null },
+    detalle: "Pidió 48 cj de 525E y la caja trae 24 u.: ¿quiso decir 2 cj (48 unidades)?", contactar: false, estado: "pendiente", contacto_nota: null, referencia: 24, limite: null },
   { id: 3, empresa: "lk", np_label: "LK 0365", razon_social: "Bazar Uxb", articulo: "501", cajas: 12, regla: "cajas_uxb",
-    detalle: "Pidió 12 cj de 501 y la caja trae 12 u.: ¿quiso decir 1 cj (12 unidades)?", contactar: false, estado: "pendiente", contacto_nota: null }
+    detalle: "Pidió 12 cj de 501 y la caja trae 12 u.: ¿quiso decir 1 cj (12 unidades)?", contactar: false, estado: "pendiente", contacto_nota: null, referencia: 12, limite: null }
 ];
 
 async function correr(b, ancho, falla) {
@@ -112,6 +112,11 @@ async function correr(b, ancho, falla) {
     const n1 = fila("tr.pga-n", "LK 0364"), n2 = fila("tr.pga-n", "LK 0365");
     out.npBot = n1 && n1.querySelector(".pga-anom-np") ? n1.querySelector(".pga-anom-np").textContent.trim() : "";
     out.npAviso = n2 && n2.querySelector(".pga-anom-np") ? n2.querySelector(".pga-anom-np").textContent.trim() : "";
+    _pgaItems["LK 0364"] = [{ art: "501", cajas: 3, uxb: 12 }, { art: "525E", cajas: 48, uxb: 24 }];
+    pgaAbrirNp(F.d1C + "|F66A|LK 0364", "LK 0364");
+    await esperar(() => !!document.querySelector("#pppPreview .pga-it"));
+    const its = [...document.querySelectorAll("#pppPreview .pga-it")];
+    out.itMarcado = its.filter((x) => x.classList.contains("anom")).map((x) => x.textContent.trim());
     return out;
   }, { F: F, ANOM: ANOM, falla: !!falla });
   await p.close();
@@ -139,8 +144,9 @@ async function correr(b, ancho, falla) {
   ok(ancho.modalMotivo, "(d) el detalle no explica el motivo");
   ok(ancho.modalBot, "(d) el detalle no distingue «Bot: a contactar» de «Sólo aviso»");
   ok(ancho.diaNoAbrio, "(d) tocar el cartel abrió el día");
-  ok(ancho.npBot === "⚠ anómalo · bot", "(e) la NP a contactar dice: " + JSON.stringify(ancho.npBot));
-  ok(ancho.npAviso === "⚠ anómalo", "(e) la NP de sólo aviso dice: " + JSON.stringify(ancho.npAviso));
+  ok(ancho.npBot === "⚠ 525E 48 cj (tope 10) · bot", "(e) la NP a contactar dice: " + JSON.stringify(ancho.npBot));
+  ok(ancho.npAviso === "⚠ 501 12 cj (¿1 cj?)", "(e) la NP de sólo aviso dice: " + JSON.stringify(ancho.npAviso));
+  ok((ancho.itMarcado || []).length === 1 && /525E/.test(ancho.itMarcado[0]), "(e) adentro de la NP tenía que marcarse sólo el 525E: " + JSON.stringify(ancho.itMarcado));
   ok(cel.chipTxt === "⚠ PEDIDOS ANÓMALOS: 2", "(c) en el celular el cartel no está");
   ok(!cel.afuera && cel.chipAdentroVisible, "(c) en el celular el cartel tenía que quedar adentro de la fila y visible");
   ok(caido.tablaSigue && caido.chipTxt === "", "(f) con la lectura caída la tabla tenía que verse sin cartel");
