@@ -155,6 +155,12 @@ aprueba, esa gondola se marca como vacia."*
   dónde sacó, si levantó algo) el operario **marca en cuál(es) fue y no estaba**; al menos una, sin salteo. Sólo esas
   van al admin. Con una sola posición no se pregunta. El PKC sale antes de la pregunta (sin aviso) y se re-manda con
   las marcadas.
+- **v32.07 (Luis, 16/10)** — **D4 «no»**: el «No está» no reabre la góndola (la NP sale sin ese código y se completa
+  después). **Completar pedido**: si el código tiene excedente, avisa *«buscalo en excedente (P21 (6) · P22 (4)) y/o
+  góndola»*, **no elige el origen solo** y suma la opción **Excedente**, que pide la posición (botones; sin posición
+  registrada, la lista de la zona P). Sale de `excedente` **con ubicación** → la vista descuenta de ésa. Evento CP:
+  `NP|cod|qty|EXCEDENTE P22|lío`. Cubre el caso en que el admin todavía no dio por vacío un excedente que no estaba.
+  `tests/cp-excedente.cjs`.
 
 ## ⚠ REGLA: LAS TABLAS QUE VALEN — góndola, racks y empresa del artículo
 

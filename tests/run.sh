@@ -1310,6 +1310,8 @@ echo "== exc-noesta-admin (v31.85: «No está» del excedente → aviso en la la
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/exc-noesta-admin.cjs
 echo "== pk-excedente-faltante (v32.00: faltó en posición registrada → aviso; posición del excedente de lista P) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-excedente-faltante.cjs
+echo "== cp-excedente (v32.07: Completar pedido con excedente → excedente y/o góndola, de dónde y qué posición) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cp-excedente.cjs
 echo "== ppp-plantel (v29.46: PPP → Plantel de la semana, horas de picking/armado/fijas → personas; plantel.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-plantel.cjs
 echo "== monitor-ritmo (v29.47: Monitor → Ritmo de picking, estimado por dificultad vs real; plantel.js) =="
