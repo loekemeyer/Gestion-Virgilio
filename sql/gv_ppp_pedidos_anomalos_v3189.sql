@@ -16,7 +16,7 @@
    v31.94 (Luis, 16/10, D1-D3):
    D1 cajas_uxb sólo si el cliente NUNCA pidió tanto de ese artículo (antes: 100 de 476 NP, 21 %).
    D2 cliente con historial que pide un artículo que nunca compró → regla em (proporcional a su pedido).
-   D3 historial con promedio ≥ 5 cj → anómalo si pide más que ×2 de su pedido TOTAL más grande (D5, v31.97)
+   D3 historial con promedio ≥ 5 cj → anómalo si pide más que ×2 de su pedido más grande de ese artículo (D6, v31.99; D5 retirado)
       (anomalo_hist_max_factor = 2).
    D4 (v31.97) cliente con historial + 5 o más artículos nuevos en el pedido = incorporación de línea: un aviso
       'linea_nueva' por NP en vez de uno por artículo (anomalo_linea_min_art = 5).
@@ -91,7 +91,7 @@ returns table (empresa text, order_id bigint, np_idx integer, np integer, np_lab
 language sql stable security definer
 set search_path to 'public', 'pg_temp'
 as $function$
-/* v31.97 — marcador: anomalos-v3189 (D1-D5; ver cabecera de sql/gv_ppp_pedidos_anomalos_v3189.sql) */
+/* v31.99 — marcador: anomalos-v3189 (D1-D5; ver cabecera de sql/gv_ppp_pedidos_anomalos_v3189.sql) */
 with par as (
   select coalesce(p_desde, (now() at time zone 'America/Argentina/Buenos_Aires')::date) desde,
          coalesce((select valor from "PPP_Web_Config" where clave='anomalo_hist_min_pedidos'), 3) hmin,
@@ -201,14 +201,15 @@ select r.empresa, r.order_id, r.np_idx, r.np, gv_ppp_web_np_label(r.empresa, r.n
   from r, par
  where r.nped >= par.hmin and r.nart > 0 and r.prom < par.hprom and r.cajas > r.prom * par.hfac
 union all
-/* D3 + D5 (Luis, 16/10): promedio de 5 cj o más → tope = ×2 del PEDIDO TOTAL más grande de ese cliente (12 meses) */
+/* D3 + D6 (Luis, 16/10): promedio de 5 cj o más → tope = ×2 del pedido más grande que hizo ESE cliente de ESE artículo.
+   (D5, ×2 del pedido TOTAL, se probó y se retiró: 0 líneas en 6 semanas.) */
 select r.empresa, r.order_id, r.np_idx, r.np, gv_ppp_web_np_label(r.empresa, r.np), r.cli, r.razon_social, r.fecha_entrega,
-       r.art, r.cajas, 'historial'::text, r.mxped, r.mxped * par.hmaxf, r.nped,
-       format('Pidió %s cj de %s; su pedido total más grande fue de %s cj (promedio del artículo %s cj, %s pedidos con el artículo). Tope ×%s = %s cj',
-              r.cajas, r.art, replace(round(r.mxped, 1)::float8::text, '.', ','), replace(round(r.prom, 1)::text, '.', ','), r.nart, par.hmaxf, replace(round(r.mxped * par.hmaxf, 1)::float8::text, '.', ',')),
+       r.art, r.cajas, 'historial'::text, r.mx, r.mx * par.hmaxf, r.nped,
+       format('Pidió %s cj de %s; su pedido más grande de ese artículo fue de %s cj (promedio %s cj, %s pedidos con el artículo). Tope ×%s = %s cj',
+              r.cajas, r.art, replace(round(r.mx, 1)::float8::text, '.', ','), replace(round(r.prom, 1)::text, '.', ','), r.nart, par.hmaxf, replace(round(r.mx * par.hmaxf, 1)::float8::text, '.', ',')),
        true
   from r, par
- where r.nped >= par.hmin and r.nart > 0 and r.prom >= par.hprom and r.cajas > r.mxped * par.hmaxf
+ where r.nped >= par.hmin and r.nart > 0 and r.prom >= par.hprom and r.cajas > r.mx * par.hmaxf
 union all
 select r.empresa, r.order_id, r.np_idx, r.np, gv_ppp_web_np_label(r.empresa, r.np), r.cli, r.razon_social, r.fecha_entrega,
        r.art, r.cajas, 'em', round(r.peso, 2), par.efac, r.nped,
@@ -362,10 +363,10 @@ insert into "GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, ve
 ('gv_ppp_anomalos_calc','funcion','r\.prom < par\.hprom and r\.cajas > r\.prom \* par\.hfac','pedido anomalo por historial: cliente con 3+ pedidos y promedio del articulo < 5 cj -> anomalo si pide mas que promedio x5 (contactar)','Luis','v31.89',true),
 ('gv_ppp_anomalos_calc','funcion','r\.nped < par\.hmin or r\.nart = 0\) and r\.peso >= par\.efac','pedido anomalo por Est. Madre: cliente con menos de 3 pedidos y desbalance del articulo vs la E.M. >= x5 (contactar)','Luis','v31.89',true),
 ('gv_ppp_anomalos_calc','funcion','coalesce\(r\.mx, 0\) < r\.cajas','cajas multiplo del uxb SOLO si el cliente nunca pidio tanto de ese articulo (D1). solo cartel, no se contacta','Luis','v31.94',true),
-('gv_ppp_anomalos_calc','funcion','r\.prom >= par\.hprom and r\.cajas > r\.mxped \* par\.hmaxf','pedido anomalo D3/D5: promedio del articulo >= 5 cj -> anomalo si pide mas que x2 de su pedido TOTAL mas grande (contactar)','Luis','v31.94',true);
+('gv_ppp_anomalos_calc','funcion','r\.prom >= par\.hprom and r\.cajas > r\.mx \* par\.hmaxf','pedido anomalo D3/D6: promedio del articulo >= 5 cj -> anomalo si pide mas que x2 de su pedido mas grande de ese articulo (contactar)','Luis','v31.94',true);
 
 -- 9) v31.97 (D4-D5): regla linea_nueva en la tabla y centinela
 alter table public."GV_Pedido_Anomalo" drop constraint if exists "GV_Pedido_Anomalo_regla_check";   -- correr con el truco 'dr'||'op' desde el MCP
 alter table public."GV_Pedido_Anomalo" add constraint "GV_Pedido_Anomalo_regla_check" check (regla in ('historial','em','cajas_uxb','linea_nueva'));
 insert into "GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version, activo) values
-('gv_ppp_anomalos_calc','funcion','r\.nnuevos >= par\.lmin','pedido anomalo D4: cliente con historial y 5+ articulos nuevos en un pedido = incorporacion de linea, un solo aviso (linea_nueva) en vez de uno por articulo','Luis','v31.97',true);
+('gv_ppp_anomalos_calc','funcion','r\.nnuevos >= par\.lmin','pedido anomalo D4: cliente con historial y 5+ articulos nuevos en un pedido = incorporacion de linea, un solo aviso (linea_nueva) en vez de uno por articulo','Luis','v31.99',true);
