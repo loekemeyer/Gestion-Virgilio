@@ -4465,12 +4465,23 @@
     findInPool: findInPool,
     parseNum: parseNum,
     // Lookup directo por cod en LK products + loke_products (sin chef).
+    // 16/10/2026 (Luis, pedido 1630 Emotiti): primero los artículos ACTIVOS. El EAN da el código
+    // sin sufijo ("0525" → "525") y codVariants prueba "525" antes que "525E": como la caché trae
+    // también los inactivos, se quedaba con el 525 viejo (inactivo, UxB 1 = "no sé") y 48 unidades
+    // del Excel salían como 48 cajas. Un inactivo sólo se toma si no hay ningún activo que matchee.
     findProductByCodLK: function (cod) {
       var variants = codVariants(cod);
       if (!variants.length) return null;
-      var p = findInPool(allProductsCache || [], variants);
+      function activos(pool) {
+        return (pool || []).filter(function (x) { return x.active !== false; });
+      }
+      var p = findInPool(activos(allProductsCache), variants);
       if (p) return { product: p, isLoke: false };
-      var lp = findInPool(allLokeProductsCache || [], variants);
+      var lp = findInPool(activos(allLokeProductsCache), variants);
+      if (lp) return { product: lp, isLoke: true };
+      p = findInPool(allProductsCache || [], variants);
+      if (p) return { product: p, isLoke: false };
+      lp = findInPool(allLokeProductsCache || [], variants);
       if (lp) return { product: lp, isLoke: true };
       return null;
     },
