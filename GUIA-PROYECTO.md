@@ -1,3 +1,66 @@
+## Nota v31.36 (2026-10-16) — Análisis Productivo: rendimiento como desvío, tabla Esperado·Real·Dif, m³ pickeado y avisos que cuadran
+
+Tanda de cambios al **Análisis Productivo** (botón 📊 del supervisor, `analisis.js` + funciones
+`gv_analisis_lista` / `gv_analisis_tanda` en `sql/gv_analisis_productivo_v2964.sql`; lee de
+`GV_Picking_Tanda` / `GV_Picking_Paso`). El módulo es del **supervisor**: NO está en el repo
+Registro-Produccion-3.0 (que sólo tiene la botonera de operario).
+
+- **v31.23 — el «rendimiento» es ahora el DESVÍO del ritmo, no el índice crudo** (Thomas, 15/10).
+  `0 %` = fue al ritmo esperado; `+` más rápido, `−` más lento. `_anPct(x) = (índice − 1)` en puntos.
+  Antes el índice crudo mostraba «150 %» para un 50 % más rápido y confundía.
+- **v31.24 — tabla código por código con Esperado · Real · Dif** (`±s`, con color: **verde** a favor,
+  **rojo** en contra), ordenada por la diferencia más grande arriba, con **total** y la nota de que ese
+  total **no reconcilia** con el «real» de la fase (el «Real» por código va desde que confirmó el anterior,
+  incluye la caminata y no descuenta pausas; el de la fase sí resta pausas y huecos y suma la cola).
+  `_anDif(esp, real) = esperado − real`.
+- **v31.30 — se sacó la columna «Góndola» (sector/ubicación)** de esa tabla; el marcador **EXC**
+  (excedente) pasó al lado del código para no perderlo.
+- **v31.32 (D3) — dedup de tandas pickeadas por dos personas** (frenada por una, retomada por otra):
+  `gv_analisis_lista` usa `distinct on (tanda)` con `order by t.tanda, lineas desc, real_min asc, tp desc`,
+  y `gv_analisis_tanda` el mismo `order by … limit 1`. Se queda con el **pick real** (el de más líneas;
+  empate → menor `real_min` sano), no con la fila abandonada.
+- **v31.36 #2 — el m³ del Análisis (lista y detalle) sale de `vista_tanda_m3`** (m³ **pickeado** =
+  `COALESCE(ISIS, web, histórico) × fracción`), no de la suma cruda de `PPP_Web_Programacion` +
+  `GV_PPP_Programacion_Diaria` (que no tenía fracción ni fallback: inflaba o daba 0 en picking parcial).
+- **v31.36 #3 — el contador de avisos de la tarjeta (`alerta`) cuenta TIPOS presentes**, no eventos:
+  `paso.n = bool_or(relámpago) + bool_or(imposible)` (1 c/u) y `alerta = least(n_falto,1) + n_paso`
+  (relámpago / imposible / faltó, 1 por tipo). Medido: antes 8 de 22 tandas con aviso (36 %) no cuadraban
+  con el detalle; tras el fix, 22/22. **El badge NO cambió**: cuenta TANDAS con aviso (presencia), no avisos
+  por tanda. Aplicado sobre la definición VIVA con `replace()` (`sql/gv_analisis_avisos_m3_v3136.sql`).
+- **v31.36 #1 — el buscador del Análisis ya no pierde el foco al tipear**: re-renderiza sólo el cuerpo de
+  la lista, no toda la pantalla.
+
+⚠ La vista «Por camión» del Análisis (v31.34) se **revirtió** en v31.35 (Thomas: iba en Recepción Remitos,
+no en el Análisis, que queda **por tanda/pedido**); `gv_analisis_camion` se dropeó por no tener consumidores.
+
+`tests/` → `analisis-productivo` (verde).
+
+## Nota v31.35 (2026-10-16) — Recepción Remitos agrupada por camión (fletero), Carga Camión con fletero cerrado, fecha «hoy»
+
+Cadena de cambios de la **Recepción Remitos (RR)** y su carga. El fletero viaja en el **3er campo del CCN**
+(`NP|TANDA|FLETERO|ORDEN`). Esto SÍ está también en Registro-Produccion-3.0 (operario), traído con
+`tools/traer_de_gv.cjs`.
+
+- **v31.28 — Pendientes de Recepción (acordeón)** (`recepcion.js`): la tarjeta arranca **contraída**;
+  **Carga ISIS** y **Control Partes** se abren al tildar «Recibido». La **Foto NO se colapsa** a propósito
+  (habilita el tilde Recibido: sin foto no se puede recibir). Wrapper `.pcCollapse`, lo abre/cierra el
+  `sync()` de `pendRecibidoRow`, también al destildar.
+- **v31.29 — la fecha de carga dice «hoy HH:MM»** si la carga es del día; ayer o más viejo, la fecha
+  `DD/MM HH:MM`. El día se compara en hora de Buenos Aires (UTC-3). Sólo `crFmtCC`.
+- **v31.31 — el fletero de Carga Camión pasó de texto libre a un desplegable CERRADO** del maestro
+  **Camioneros** (limpiado de 22 variantes/basura de retira a **14 nombres** en la base) + «+ Nuevo
+  fletero…» a demanda, que **capitaliza y no duplica** (`ccCamioneroPick` / `ccCamioneroCap`, `ccRender`,
+  `ccFinish`). `ccUpsertCamionero` guardaba cada variante y ensuciaba el maestro.
+- **v31.33 — el FLETERO figura en RR**: `vista_control_remitos` (CTE `ccn_raw`) escanea el 3er campo del
+  CCN como `camionero` y toma el de la última carga (`max(...) filter rn_last = 1`) → `fletero`, expuesto en
+  `gv_vista_control_remitos.fletero`. Vistas recreadas con `security_invoker = true`
+  (`sql/vista_control_remitos_ciclo_v2595.sql`, `sql/gv_vista_control_remitos.sql`).
+- **v31.35 — RR agrupada POR CAMIÓN (fletero)** (`crRender`): un encabezado **«🚚 <fletero> · N pedidos»**
+  por grupo, los grupos con algún **VENCIDO primero**, **«Sin fletero» al final**. El fletero quedó en el
+  encabezado (ya no se repite por fila); cada fila muestra sólo la fecha de carga.
+
+`tests/` → `rr-sin-remitos-cierra`, `rr-volvio-ciclo`, `toggle-anular`, `pend-checklist` (verdes).
+
 ## Nota v31.03 (2026-10-15) — Avisos de sistema C2 / C4 / C5 también en POP-UP para Luis
 
 Luis pidió canalizar avisos de Telegram a pop-ups en la app. Primer tramo (B y C del inventario de 30 días
@@ -4187,7 +4250,7 @@ Pedido de Luis. Dos cosas:
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v18.02**
+> Última actualización: 2026-10-16 (jueves) · Versión app al documentar: **v31.36** · (las notas más nuevas están arriba de todo, con su fecha)
 >
 > Nota **v17.71 (2026-09-14, Thomas) — el camión lo define la ZONA, no el número de tanda.**
 > Corrección de la v17.62. Dueño, mirando la pantalla: *"la zona uno se entrega con zona dos, así
