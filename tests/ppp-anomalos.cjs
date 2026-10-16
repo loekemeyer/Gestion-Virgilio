@@ -134,7 +134,8 @@ async function correr(b, ancho, falla) {
   const fallas = [];
   const ok = (c, m) => { if (!c) fallas.push(m); };
   ok(ancho.tabla, "no se dibujó la Programación");
-  ok(ancho.chipTxt === "⚠ PEDIDOS ANÓMALOS: 2", "(a) el día tenía que decir «⚠ PEDIDOS ANÓMALOS: 2» y dice: " + JSON.stringify(ancho.chipTxt));
+  ok(ancho.chipTxt.indexOf("⚠ PEDIDOS ANÓMALOS: 2") === 0, "(a) el día tenía que decir «⚠ PEDIDOS ANÓMALOS: 2» y dice: " + JSON.stringify(ancho.chipTxt));
+  ok(ancho.chipTxt.indexOf("LK 0364 · 525E 48 cj (promedia 2 cj, tope 10)") > 0 && ancho.chipTxt.indexOf("LK 0365 · 501 12 cj (caja de 12 u.: ¿quiso 1 cj?)") > 0, "(a) el cartel del día tenía que decir cuál es y por qué: " + JSON.stringify(ancho.chipTxt));
   ok(ancho.d2SinChip, "(a) el día sin anomalías dibujó el cartel");
   ok(ancho.afuera, "(b) en pantalla ancha el cartel no salió afuera de la tabla (bloque a " + ancho.blkLeft + " px del borde)");
   ok(ancho.aLaIzquierda, "(b) el cartel de afuera no está a la izquierda de la tabla");
@@ -144,10 +145,10 @@ async function correr(b, ancho, falla) {
   ok(ancho.modalMotivo, "(d) el detalle no explica el motivo");
   ok(ancho.modalBot, "(d) el detalle no distingue «Bot: a contactar» de «Sólo aviso»");
   ok(ancho.diaNoAbrio, "(d) tocar el cartel abrió el día");
-  ok(ancho.npBot === "⚠ 525E 48 cj (tope 10) · bot", "(e) la NP a contactar dice: " + JSON.stringify(ancho.npBot));
-  ok(ancho.npAviso === "⚠ 501 12 cj (¿1 cj?)", "(e) la NP de sólo aviso dice: " + JSON.stringify(ancho.npAviso));
+  ok(ancho.npBot === "⚠ 525E 48 cj (promedia 2 cj, tope 10) · bot", "(e) la NP a contactar dice: " + JSON.stringify(ancho.npBot));
+  ok(ancho.npAviso === "⚠ 501 12 cj (caja de 12 u.: ¿quiso 1 cj?)", "(e) la NP de sólo aviso dice: " + JSON.stringify(ancho.npAviso));
   ok((ancho.itMarcado || []).length === 1 && /525E/.test(ancho.itMarcado[0]), "(e) adentro de la NP tenía que marcarse sólo el 525E: " + JSON.stringify(ancho.itMarcado));
-  ok(cel.chipTxt === "⚠ PEDIDOS ANÓMALOS: 2", "(c) en el celular el cartel no está");
+  ok(cel.chipTxt.indexOf("⚠ PEDIDOS ANÓMALOS: 2") === 0, "(c) en el celular el cartel no está");
   ok(!cel.afuera && cel.chipAdentroVisible, "(c) en el celular el cartel tenía que quedar adentro de la fila y visible");
   ok(caido.tablaSigue && caido.chipTxt === "", "(f) con la lectura caída la tabla tenía que verse sin cartel");
   for (const x of [ancho, cel, caido]) ok(!x.errs.length && !x.err, "error de JS: " + JSON.stringify(x.errs.concat(x.err || [])));

@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=32.05">
+<link rel="stylesheet" href="gv-ui.css?v=32.06">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -3997,7 +3997,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
   white-space:nowrap; cursor:pointer; }
 .pga-blk.anom-fuera tr.pga-d .pga-anom{ display:none; }
 .pga-anom.pga-anom-g{ position:absolute; right:calc(100% + 10px); transform:translateY(-50%); margin:0;
-  font-size:12px; padding:3px 10px; z-index:3; }
+  font-size:12px; padding:3px 10px; z-index:3; border-radius:10px; text-align:left; }
+.pga-anom-l{ display:block; font-size:11px; font-weight:700; letter-spacing:0; text-transform:none; opacity:.95; }
 .pga-anom-np{ display:inline-block; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5;
   font-size:11px; font-weight:900; border-radius:999px; padding:0 8px; margin-left:8px; vertical-align:1px;
   white-space:nowrap; cursor:pointer; }
@@ -6532,7 +6533,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=32.05"></script>
+<script type="module" src="recepcion.js?v=32.06"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10903,7 +10904,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v32.05";
+const APP_VERSION = "v32.06";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -45228,19 +45229,41 @@ function _pgaAnomDiaChip(d) {
   return '<span class="pga-anom" onclick="event.stopPropagation();pgaAnomAbrir(\'' + escapeHtml(nps.join("|")) + '\',\'' +
     escapeHtml(_pgaDiaTxt(d.key)) + '\')" title="' + nps.length + (nps.length === 1 ? ' pedido' : ' pedidos') +
     ' con cantidades fuera de lo normal' + (bot ? ' · ' + bot + ' para que el bot contacte al cliente' : '') +
-    '. Tocá para ver cuáles y por qué.">⚠ PEDIDOS ANÓMALOS: ' + nps.length + '</span>';
+    '. Tocá para ver el detalle.">⚠ PEDIDOS ANÓMALOS: ' + nps.length +
+    (function () {   // v32.06 (Luis: «dónde ves cuál es el anómalo… y por qué»): cuál y por qué, sin abrir el día
+      const ls = []; nps.forEach(function (np) { _pgaAnomLineas(np).forEach(function (t) { ls.push(t); }); });
+      return ls.slice(0, 3).map(function (t) { return '<span class="pga-anom-l">' + escapeHtml(t) + '</span>'; }).join("") +
+        (ls.length > 3 ? '<span class="pga-anom-l">+' + (ls.length - 3) + ' más</span>' : '');
+    })() + '</span>';
 }
 /* v32.03 (Luis, 16/10: «que me indique cuál es»): la pastilla dice QUÉ artículo, cuántas cajas y contra qué
    se midió — «⚠ 599E 20 cj (tope 15)» — en vez de un «anómalo» genérico. Un artículo una vez (manda la regla
    que contacta), hasta 2 y «+N»; el resto en el detalle. */
 const PGA_ANOM_PRIO = { historial: 0, em: 1, linea_nueva: 2, cajas_uxb: 3 };
+/* v32.06 (Luis: «y por qué»): el motivo en pocas palabras, el mismo en el cartel del día y en la NP. */
+function _pgaAnomPorQue(x) {
+  const ref = Number(x.referencia), lim = Number(x.limite);
+  if (x.regla === "historial") {
+    // promedio < 5 cj → tope = promedio × 5 · promedio ≥ 5 cj (D6) → tope = su pedido más grande × 2
+    const porProm = ref > 0 && Math.abs(lim - ref * 5) < 0.01;
+    return (porProm ? "promedia " + aprNum(ref, ref % 1 ? 1 : 0) + " cj" : "su máximo fue " + aprNum(ref, 0) + " cj") + ", tope " + aprNum(lim, 0);
+  }
+  if (x.regla === "em") return "es nuevo en su compra y pesa ×" + aprNum(ref, 0) + " lo de la Est. Madre";
+  if (x.regla === "linea_nueva") return aprNum(ref, 0) + " artículos que nunca compró";
+  return ref > 1 ? "caja de " + aprNum(ref, 0) + " u.: ¿quiso " + aprNum((Number(x.cajas) || 0) / ref, 0) + " cj?" : "múltiplo del uxb";
+}
 function _pgaAnomTxt(x) {
   const cj = aprNum(Number(x.cajas) || 0, 0) + " cj";
-  if (x.regla === "linea_nueva") return "línea nueva " + aprNum(Number(x.referencia) || 0, 0) + " art.";
-  if (x.regla === "historial") return x.articulo + " " + cj + (x.limite != null ? " (tope " + aprNum(Number(x.limite), 0) + ")" : "");
-  if (x.regla === "em") return x.articulo + " " + cj + (x.referencia != null ? " (×" + aprNum(Number(x.referencia), 0) + " E.M.)" : "");
-  const u = Number(x.referencia) || 0;
-  return x.articulo + " " + cj + (u > 1 ? " (¿" + aprNum((Number(x.cajas) || 0) / u, 0) + " cj?)" : "");
+  return (x.regla === "linea_nueva" ? "línea nueva" : x.articulo + " " + cj) + " (" + _pgaAnomPorQue(x) + ")";
+}
+/* Lo que se pide al cartel del día: una línea por artículo, ordenado igual que la pastilla. */
+function _pgaAnomLineas(np) {
+  const l = (_pgaAnomDe(np) || []).slice().sort(function (a, b) {
+    return (a.regla in PGA_ANOM_PRIO ? PGA_ANOM_PRIO[a.regla] : 9) - (b.regla in PGA_ANOM_PRIO ? PGA_ANOM_PRIO[b.regla] : 9); });
+  const vistos = {}, out = [];
+  l.forEach(function (x) { const k = x.regla === "linea_nueva" ? "*" : x.articulo; if (vistos[k]) return; vistos[k] = 1;
+    out.push(np + " · " + _pgaAnomTxt(x)); });
+  return out;
 }
 function _pgaAnomNpChip(r) {
   const l = _pgaAnomDe(r.np);
@@ -45323,6 +45346,11 @@ function _pgaAnomGutter() {
       g.style.top = (rt.top - rb.top + rt.height / 2) + "px";
       blk.appendChild(g);
     });
+    // v32.06: con el «por qué» el cartel es más ancho; si no entra a la izquierda, queda adentro de la fila
+    if ([...blk.querySelectorAll(".pga-anom-g")].some(function (g) { return g.getBoundingClientRect().left < 4; })) {
+      blk.querySelectorAll(".pga-anom-g").forEach(function (x) { x.remove(); });
+      blk.classList.remove("anom-fuera");
+    }
   });
 }
 /* Se re-ubica en cada redibujo y otra vez al terminar la animación del overlay (~400 ms): mientras
@@ -65420,7 +65448,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=32.05"></script>
+<script src="importacion.js?v=32.06"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -68871,15 +68899,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=32.05"></script>
-<script src="hotsale.js?v=32.05"></script>
-<script src="estadisticas.js?v=32.05"></script>
-<script src="ads.js?v=32.05"></script>
-<script src="plantel.js?v=32.05"></script>
+<script src="cobranzas.js?v=32.06"></script>
+<script src="hotsale.js?v=32.06"></script>
+<script src="estadisticas.js?v=32.06"></script>
+<script src="ads.js?v=32.06"></script>
+<script src="plantel.js?v=32.06"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=32.05"></script>
+<script src="analisis.js?v=32.06"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=32.05"></script>
+<script src="ayuda.js?v=32.06"></script>
 
 </body>
 </html>

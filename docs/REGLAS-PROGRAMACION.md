@@ -190,8 +190,10 @@ Cada línea de una NP que espera en la PPP (fecha de hoy en adelante o todavía 
 - **Pantalla**: `⚠ PEDIDOS ANÓMALOS: X` (X = NP del día) a la IZQUIERDA de la fila del día, afuera de la tabla
   (`_pgaAnomGutter`); en el celular, sin margen, queda adentro de la fila. Tocarlo abre NP · artículo · cajas · regla ·
   motivo · «Bot: a contactar» / «Sólo aviso». La NP dice **qué artículo** (v32.03, Luis: *«que me indique cuál es»*):
-  `⚠ 599E 20 cj (tope 15) · bot`, `⚠ 525E 48 cj (¿2 cj?)`, `⚠ línea nueva 15 art.`; hasta 2 y «+N». Abierta la NP, el renglón
-  del artículo anómalo va en rojo con el motivo en el title.
+  `⚠ 599E 20 cj (promedia 3 cj, tope 15) · bot`, `⚠ 525E 48 cj (caja de 24 u.: ¿quiso 2 cj?)`, `⚠ línea nueva (15 artículos
+  que nunca compró)`; hasta 2 y «+N». Abierta la NP, el renglón del artículo anómalo va en rojo con el motivo en el title.
+- **v32.06 (Luis: *«dónde ves cuál es el anómalo… y por qué»*)**: el cartel del DÍA lista, debajo del título, `NP · artículo
+  cajas (por qué)` hasta 3 renglones y «+N más». Afuera de la tabla sólo si entra; si se sale de la pantalla queda en la fila.
 - **Backend**: `GV_Pedido_Anomalo` (una fila por NP + artículo + regla, RLS sin policies) ← cron **167 `gv-ppp-anomalos`**
   (`8-59/10`, anti-solape) → `gv_ppp_anomalos_detectar()`. Lo pendiente que deja de dar (pedido corregido) pasa a
   `sin_efecto` solo. La PPP lee `gv_ppp_anomalos_lista` (supervisor).
