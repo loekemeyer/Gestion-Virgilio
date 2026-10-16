@@ -106,6 +106,13 @@ const DET = {
       .map((x) => x.textContent.trim() + (x.classList.contains("on") ? "*" : ""));
     out.modosHoy = modos().join("|");
 
+    // (m) v31.36: el buscador no pierde el foco al tipear (antes se recreaba el input en cada tecla)
+    const q0 = document.getElementById("anQ");
+    if (q0) { q0.focus(); window.anBuscar("F13"); }
+    out.buscadorFoco = !!q0 && document.activeElement === document.getElementById("anQ");
+    out.buscadorMismo = !!q0 && document.getElementById("anQ") === q0;   // el MISMO nodo, no uno nuevo
+    window.anBuscar("");
+
     // (b) lista
     const t = [...document.querySelectorAll("#anOv .an-t")];
     out.tarjetas = t.length;
@@ -227,6 +234,7 @@ const DET = {
   ok(/"p_dias":31\b/.test(r.racePide), "(k) cambiar a «Días anteriores» durante una carga no disparó su lectura: " + r.racePide);
   ok(r.raceModo === "Hoy|Días anteriores*", "(k) tras la carrera la barra quedó «" + r.raceModo + "» (esperaba ant activo)");
   ok(r.raceCods === "F13C", "(k) la carrera dejó la lista en «" + r.raceCods + "» (esperaba sólo F13C: ni falso vacío ni datos de hoy)");
+  ok(r.buscadorFoco && r.buscadorMismo, "(m) el buscador perdió el foco al tipear (foco=" + r.buscadorFoco + " mismoNodo=" + r.buscadorMismo + ")");
   ok(r.tarjetas === 2, "(b) tarjetas: " + r.tarjetas + " (esperaba 2)");
   ok(r.primera === "F77A", "(b) la primera tanda es " + r.primera);
   ok(r.alerta.indexOf("2") >= 0, "(b) F13C tendría que mostrar ⚠ 2, muestra «" + r.alerta + "»");

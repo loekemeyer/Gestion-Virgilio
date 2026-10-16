@@ -198,7 +198,13 @@ function _anHoyIso() {
   if (_an.lista && _an.lista.hasta) return String(_an.lista.hasta).slice(0, 10);
   return new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);   // UTC-3 fijo
 }
-function anBuscar(v) { _an.q = String(v || "").toUpperCase().trim(); _anRender(); }
+/* v31.36 — al tipear en el buscador se re-renderiza SÓLO el cuerpo de la lista, no todo el overlay:
+   antes el input se recreaba en cada tecla y perdía el foco (en el celular se cerraba el teclado). */
+function anBuscar(v) {
+  _an.q = String(v || "").toUpperCase().trim();
+  var w = document.querySelector("#anOv .an-body .an-wrap");
+  if (w && !_an.tanda) w.innerHTML = _anListaHtml(); else _anRender();
+}
 function anVolver() { _an.tanda = null; _an.det = null; _an.detErr = ""; _anRender(); }
 
 function _anCargar() {
