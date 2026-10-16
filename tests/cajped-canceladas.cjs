@@ -74,8 +74,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.webEsta = !!_web && _web.pidio === 80 && _web.origen === "web"
       && _web.tanda === "E17B" && _web.sinProg === false;
     out.webEnHtml = html.indexOf("LK 0053") >= 0 && html.indexOf(">WEB<") >= 0;
-    out.hintCancel = html.indexOf("1 NP canceladas (🚫 no va)") >= 0;
-    out.hintFact = html.indexOf("1 NP ya facturadas/entregadas") >= 0;
+    /* (Luis, 16/10/2026) — el párrafo «+N NP ya facturadas/entregadas · N canceladas — no se muestran; verlas
+       en Historial» se sacó (texto de relleno: el Historial ya lo tiene). Lo que se mide es que NO vuelva;
+       que las canceladas/facturadas quedan FUERA de la tabla lo mide sinCancelada. */
+    out.hintCancel = html.indexOf("canceladas") < 0;
+    out.hintFact = html.indexOf("ya facturadas") < 0 && html.indexOf("no se muestran") < 0;
     // el ⚠ "sin programar" ya no se dispara por una cancelada: sólo la 44593 queda marcada
     out.spNps = rows.filter(function (x) { return x.sinProg; }).map(function (x) { return x.np; }).join(",");
     out.spOk = out.spNps === "44593";
@@ -88,7 +91,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.rsEnHtml = html.indexOf("Aguilar Maria Co") >= 0;
     // F4 v31.48 (Luis): la fecha en que se HIZO el pedido — web de la programación, ISIS sin programar de la base
     out.recOk = byNp["LK 0053"].recep === "2026-09-15" && byNp["44593"].recep === "2026-09-01"
-      && html.indexOf("🛒 Pedido 15/9") >= 0 && html.indexOf("🛒 Pedido 1/9") >= 0 && html.indexOf("📅 Entrega 22/9") >= 0;
+      && html.indexOf(">Pedido 15/9") >= 0 && html.indexOf(">Pedido 1/9") >= 0 && html.indexOf(">Entrega 22/9") >= 0
+      && html.indexOf("🛒") < 0 && html.indexOf("📅") < 0;   // (Luis, 16/10) sin emojis al lado de Pedido / Entrega
 
     // caso borde: si TODAS las NP están canceladas/facturadas, el pop-up lo dice y no rompe
     window.fetch = function (url) {

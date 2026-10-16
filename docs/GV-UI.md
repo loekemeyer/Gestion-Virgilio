@@ -207,6 +207,33 @@ Compras (index.html): `.mva-tbl` (todas las tablas de los pop-ups `_stkPopShell`
 `.oc-tbl`, `.abast-tbl`, `.proyv-tab` / `.proyv-det`. **La grilla de Stocks** sólo cambió encabezado
 y letra: ya era `stk-tbl-fit`.
 
+#### Segunda pasada — pop-ups (Luis, 16/10/2026, mirándolo en un monitor de 1920 px)
+
+**Luis, textual:** *"Mejor pero se puede mejorar aun mas: 1) '936E · pedido PENDIENTE: 12 cajas en 1 NP(s)
+(+15 NP ya facturadas/entregadas — no se muestran; verlas en 🕓 Historial)' <- textos como ese no aportan
+nada, sacalo. 2) la tabla tiene que estar centrada en sí en el pop-up. 3) Mira todo el espacio
+desperdiciado en la pantalla. Que se agrande ajustándose a la pantalla (más grandes las fonts, más
+claridad visual). 4) Los emojis al lado de pedido y entrega están al pedo, no quiero tanto EMOJI AI en la
+página."*
+
+8. **Sin párrafos de resumen ni explicativos arriba de la tabla** que repitan lo que la tabla ya dice
+   (el total está en la fila TOTAL; lo descontado está en el Historial). Un aviso que **cambia una
+   decisión** (NP sin programar ⚠) queda, en **una línea corta**: `⚠ 1 NP sin programar en el PPP (6 cajas)`.
+   Si la vista no tiene fila de total, el total va en una línea de ≤ 40 caracteres (`12 cajas en 3 NP`).
+9. **La tabla va centrada** en el cuerpo del pop-up (`margin-left/right: auto` en el wrapper).
+10. **El pop-up escala con la pantalla.** La letra del dato es `clamp(14px, 1vw, 20px)` (14 en
+    celular y notebook, ~19 en 1920), el encabezado `clamp(14px, 0.9vw, 17px)`, el título
+    `clamp(16px, 1.2vw, 24px)`. La tarjeta mide lo que su contenido (`width: fit-content`) entre
+    `min(560px, 96vw)` y `min(clamp(760px, 62vw, 1240px), 96vw)`: no queda una tarjeta chica en el medio
+    de 1920 px, ni una tarjeta ancha con la tabla flotando. En celular la letra **nunca baja de 14**.
+11. **Sin emojis decorativos** en títulos, rótulos, encabezados, botones ni celdas (🛒 📅 🟡 📦 🧾 🕓 🔁 📍
+    👤 ⬇ …): texto plano — «Pedido 7/10», «Entrega 22/10», «Exportar a Excel». Queda un ícono sólo si
+    es un **estado que se lee de un golpe y no tiene palabra**: ⚠ de alerta, ✓ hecho, ✕ cerrar/descartar.
+
+Medido en «Cajas pedidas — 936E»: a 1920 px, dato de 14 → 19,2 px, encabezado 14 → 17 px, tarjeta de
+760 px con la tabla de 577 recostada a la izquierda → tarjeta de 758 px con la tabla de 728 centrada; a
+430 px, 14 px y sin scroll horizontal. Lo sostiene `tests/stk-tabla-ancho-contenido.cjs` (f–i).
+
 ---
 
 ## 6. Estados de la pantalla
@@ -267,6 +294,9 @@ y letra: ya era `stk-tbl-fit`.
 | Más de 2 radios distintos | `--gv-r-sm` y `--gv-r`, y la pastilla |
 | Tarjetas anidadas | tres bordes para un dato |
 | Emoji decorativo | se anuncia por su nombre Unicode, que casi nunca es lo que se quiso decir. **Si se saca y no se pierde información, se saca** |
+| Párrafo de resumen o de explicación arriba de una tabla | repite lo que la tabla ya dice (Luis 16/10: *"textos como ese no aportan nada, sacalo"*). Un aviso que cambia una decisión va en **una línea** (§5) |
+| Emoji en título, encabezado, botón o celda de un pop-up (🛒 📅 🟡 📦 🧾 🕓) | Luis 16/10: *"no quiero tanto EMOJI AI en la página"*. Texto plano; sólo ⚠ ✓ ✕ como estado (§5) |
+| Tabla estirada al 100 % o pop-up de ancho fijo chico en una pantalla grande | ríos blancos entre columnas / letra chica en el medio de 1920 px (§5, «Ancho según contenido») |
 | Un `font-size` o un hex nuevo en un módulo | para eso están los tokens |
 
 ---
