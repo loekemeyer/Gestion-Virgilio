@@ -58,6 +58,10 @@ const DET = {
   ],
   conteo: [], registro_por_paso: true, nota_paso: null
 };
+const CAMION = [
+  { fecha: "2026-10-15", camion: "GBA Oeste", tandas: 2, m3: 0.25, min_pick: 25.4, min_arm: 48.9, min_real: 74.3, min_esp: 89.4, rendimiento: 0.204, min_x_m3: 297.0 },
+  { fecha: "2026-10-15", camion: "Capital Sur", tandas: 4, m3: 2.565, min_pick: 139, min_arm: 348.4, min_real: 487.4, min_esp: 463.8, rendimiento: -0.048, min_x_m3: 190.0 }
+];
 
 (async () => {
   const b = await chromium.launch();
@@ -66,7 +70,7 @@ const DET = {
   await p.route("**/rest/v1/**", (r) => r.abort());
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
 
-  const r = await p.evaluate(async ({ LISTA, DET }) => {
+  const r = await p.evaluate(async ({ LISTA, DET, CAMION }) => {
     const espera = (ms) => new Promise((res) => setTimeout(res, ms));
     for (let i = 0; i < 60 && typeof window.openAnalisisProductivo !== "function"; i++) await espera(100);
     const out = { pedidos: [] };
@@ -78,6 +82,7 @@ const DET = {
       if (modo === "roto") return { data: null, error: { message: "canceling statement due to statement timeout" } };
       if (n === "gv_analisis_lista") return { data: LISTA, error: null };
       if (n === "gv_analisis_tanda") return { data: DET, error: null };
+      if (n === "gv_analisis_camion") return { data: CAMION, error: null };
       if (n === "gv_analisis_marcas") return { data: {}, error: null };
       if (n === "gv_analisis_badge") return badgeRoto ? { data: null, error: { message: "timeout" } }
                                                      : { data: { pendientes: 3, con_aviso: 5, anomalas: 1 }, error: null };
@@ -185,6 +190,14 @@ const DET = {
     out.racePide = out.pedidos.filter((x) => /^gv_analisis_lista:/.test(x)).pop() || "";
     out.raceCods = [...document.querySelectorAll("#anOv .an-t .cod")].map((x) => x.textContent).join(",");
     window.anModo("hoy"); await espera(80);
+    // (l) v31.34: vista «Por camión»
+    window.anVista("camion"); await espera(90);
+    out.camChip = [...document.querySelectorAll("#anOv .an-bar .gv-chip")].some((x) => /Por camión/.test(x.textContent));
+    out.camPidio = out.pedidos.filter((x) => /^gv_analisis_camion:/.test(x)).pop() || "";
+    out.camCols = [...document.querySelectorAll("#anOv th")].map((x) => x.innerHTML.replace(/<br>/g, " ").replace(/\s+/g, " ").trim());
+    out.camFilas = document.querySelectorAll("#anOv tbody tr").length;
+    out.camPrimera = (document.querySelector("#anOv tbody tr td") || {}).textContent || "";
+    window.anVista("tandas"); await espera(60);
     _an.tanda = "F13C"; _an.det = DET; _anRender(); await espera(40);
 
     // (f) el botón Cerrar no hereda el width:100% global
@@ -207,7 +220,7 @@ const DET = {
     out.opVisible8 = bop ? bop.style.display !== "none" : false;
     out.opLegajo = bop ? bop.getAttribute("data-legajo") : "";
     return out;
-  }, { LISTA, DET });
+  }, { LISTA, DET, CAMION });
 
   await b.close();
   const fallos = [];
@@ -227,6 +240,10 @@ const DET = {
   ok(/"p_dias":31\b/.test(r.racePide), "(k) cambiar a «Días anteriores» durante una carga no disparó su lectura: " + r.racePide);
   ok(r.raceModo === "Hoy|Días anteriores*", "(k) tras la carrera la barra quedó «" + r.raceModo + "» (esperaba ant activo)");
   ok(r.raceCods === "F13C", "(k) la carrera dejó la lista en «" + r.raceCods + "» (esperaba sólo F13C: ni falso vacío ni datos de hoy)");
+  ok(r.camChip, "(l) falta el chip «Por camión» en la barra");
+  ok(/"p_dias":1\b/.test(r.camPidio), "(l) «Por camión» no pidió gv_analisis_camion en el día: " + r.camPidio);
+  ok(r.camCols.join("|").indexOf("min-h por m³") >= 0, "(l) falta la columna «min-h por m³»: " + JSON.stringify(r.camCols));
+  ok(r.camFilas === 2 && /GBA Oeste/.test(r.camPrimera), "(l) tabla por camión: filas=" + r.camFilas + " primera=«" + r.camPrimera + "»");
   ok(r.tarjetas === 2, "(b) tarjetas: " + r.tarjetas + " (esperaba 2)");
   ok(r.primera === "F77A", "(b) la primera tanda es " + r.primera);
   ok(r.alerta.indexOf("2") >= 0, "(b) F13C tendría que mostrar ⚠ 2, muestra «" + r.alerta + "»");

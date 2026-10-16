@@ -33,7 +33,8 @@
    v30.21 (Luis): SÓLO esos dos botones, sin chips de período. */
 var _an = { modo: "hoy", dias: 30, q: "", lista: null, err: "", cargando: false, filtro: "todas",
             tanda: null, det: null, detErr: "", detCargando: false, legajo: null, marcas: {},
-            req: 0, detReq: 0 };   // tokens: descartan respuestas viejas que llegan tarde (ver _anCargar / anAbrir)
+            req: 0, detReq: 0,                 // tokens: descartan respuestas viejas que llegan tarde
+            vista: "tandas", cam: null, camErr: "", camCargando: false, camReq: 0 };   // v31.34: vista «Por camión»
 
 function _anEsc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -191,7 +192,10 @@ function openAnalisisProductivo(legajo) {
   _anRender(); _anCargar();
 }
 function anCerrar() { var ov = document.getElementById("anOv"); if (ov) ov.style.display = "none"; try { anLoadBadge(); } catch (_e) {} }
-function anModo(m) { _an.modo = m === "ant" ? "ant" : "hoy"; _an.tanda = null; _an.det = null; _anCargar(); }
+function anModo(m) {
+  _an.modo = m === "ant" ? "ant" : "hoy"; _an.tanda = null; _an.det = null;
+  if (_an.vista === "camion") _anCargarCamion(); else _anCargar();
+}
 /* Lo que se le pide al servidor: hoy = 1 día; anteriores = N días + el de hoy, que después se saca. */
 function _anPDias() { return _an.modo === "hoy" ? 1 : _an.dias + 1; }
 function _anHoyIso() {
@@ -200,6 +204,63 @@ function _anHoyIso() {
 }
 function anBuscar(v) { _an.q = String(v || "").toUpperCase().trim(); _anRender(); }
 function anVolver() { _an.tanda = null; _an.det = null; _an.detErr = ""; _anRender(); }
+
+/* v31.34 — vista «Por camión»: la operación se despacha por camión, no por tanda. Muestra, por
+   camión y día, las horas-hombre (picking + armado) reales vs esperadas y los minutos-hombre por m³
+   (lo que paga el viaje). El servidor ordena por min-h/m³ desc: el más caro, arriba. */
+function anVista(v) {
+  _an.vista = v === "camion" ? "camion" : "tandas";
+  _an.tanda = null; _an.det = null;
+  if (_an.vista === "camion") { if (!_an.cam) _anCargarCamion(); else _anRender(); }
+  else _anRender();
+}
+function _anCargarCamion() {
+  var tok = ++_an.camReq;
+  _an.camCargando = true; _an.camErr = ""; _an.cam = null; _anRender();
+  _anRpc("gv_analisis_camion", { p_dias: _anPDias(), p_legajo: _an.legajo }).then(function (r) {
+    if (tok !== _an.camReq) return;   // descarta respuestas viejas (mismo criterio que _anCargar)
+    if (r.error || !r.data) {
+      var m = String((r.error && r.error.message) || "sin respuesta");
+      _an.camErr = /ACCESO/.test(m)
+        ? "El Análisis Productivo es para el supervisor y los legajos habilitados."
+        : "No se pudo leer: " + m;
+    } else _an.cam = r.data;
+    _an.camCargando = false; _anRender();
+  });
+}
+function _anCamionHtml() {
+  if (_an.camErr) return '<div class="gv-err">' + _anEsc(_an.camErr) + '</div>';
+  if (_an.camCargando || !_an.cam) return '<div class="msg">Calculando…</div>';
+  var rows = _an.cam || [];
+  if (!rows.length) return '<div class="gv-msg">Sin camiones con picking o armado en el período.</div>';
+  var byDia = {}, orden = [];
+  rows.forEach(function (r) { var d = String(r.fecha); if (!byDia[d]) { byDia[d] = []; orden.push(d); } byDia[d].push(r); });
+  var rend = function (v) {
+    var n = Number(v); if (!isFinite(n)) return { txt: "—", col: "var(--gv-ink-2)" };
+    var d = Math.round(n * 100);
+    return { txt: (d > 0 ? "+" + d : d < 0 ? "−" + Math.abs(d) : "0") + " %", col: d >= 0 ? "var(--gv-ok)" : "var(--gv-error)" };
+  };
+  var h = '<div class="an-hd"><div class="cod">Por camión</div>' +
+          '<div class="sub">Horas-hombre (picking + armado) reales vs esperadas y minutos-hombre por m³. El más caro por m³, arriba.</div></div>';
+  orden.forEach(function (d) {
+    h += '<details open><summary>' + _anDia(d) + '<span class="n">' + byDia[d].length + '</span></summary>' +
+      '<div class="gv-tblwrap"><table class="gv-tbl"><thead><tr>' +
+      '<th>Camión</th><th>Tandas</th><th>m³</th><th>Horas</th><th>Esperado</th><th>Rend</th><th>min-h<br>por m³</th>' +
+      '</tr></thead><tbody>';
+    byDia[d].forEach(function (r) {
+      var rd = rend(r.rendimiento);
+      h += '<tr><td class="t"><b>' + _anEsc(r.camion) + '</b></td>' +
+        '<td>' + _anN(r.tandas, 0) + '</td>' +
+        '<td>' + _anN(r.m3, 3) + '</td>' +
+        '<td>' + _anMin(r.min_real) + '</td>' +
+        '<td>' + _anMin(r.min_esp) + '</td>' +
+        '<td style="color:' + rd.col + ';font-weight:700">' + rd.txt + '</td>' +
+        '<td><b>' + _anN(r.min_x_m3, 1) + '</b></td></tr>';
+    });
+    h += '</tbody></table></div></details>';
+  });
+  return h;
+}
 
 function _anCargar() {
   // Token de esta lectura: si el supervisor toca «Días anteriores» o «Actualizar» mientras una
@@ -269,13 +330,19 @@ function _anRender() {
   if (!_an.tanda) {
     var m = function (k, t, id) { return '<span id="' + id + '" class="gv-chip' + (_an.modo === k ? ' on' : '') + '" onclick="anModo(\'' + k + '\')">' + t + '</span>'; };
     var f = function (k, t) { return '<span class="gv-chip' + (_an.filtro === k ? ' on' : '') + '" onclick="anFiltro(\'' + k + '\')">' + t + '</span>'; };
+    var vb = function (k, t) { return '<span class="gv-chip' + (_an.vista === k ? ' on' : '') + '" onclick="anVista(\'' + k + '\')">' + t + '</span>'; };
     h += '<div class="an-bar">' + m("hoy", "Hoy", "anBtnHoy") + m("ant", "Días anteriores", "anBtnAnt") +
-         '<span class="an-sep"></span>' + f("todas", "Todas") + f("avisos", "Con avisos") + f("marcadas", "Marcadas") +
-         '<input id="anQ" placeholder="Buscar tanda" value="' + _anEsc(_an.q) + '" oninput="anBuscar(this.value)" style="width:128px">' +
-         '<button onclick="_anCargar()">Actualizar</button>' +
+         '<span class="an-sep"></span>' + vb("tandas", "Por tanda") + vb("camion", "🚚 Por camión") +
+         (_an.vista === "tandas"
+           ? '<span class="an-sep"></span>' + f("todas", "Todas") + f("avisos", "Con avisos") + f("marcadas", "Marcadas") +
+             '<input id="anQ" placeholder="Buscar tanda" value="' + _anEsc(_an.q) + '" oninput="anBuscar(this.value)" style="width:128px">' +
+             '<button onclick="_anCargar()">Actualizar</button>'
+           : '<button onclick="_anCargarCamion()">Actualizar</button>') +
          '</div>';
   }
-  h += '<div class="an-body"><div class="an-wrap">' + (_an.tanda ? _anDetalleHtml() : _anListaHtml()) + '</div></div>';
+  h += '<div class="an-body"><div class="an-wrap">' +
+       (_an.tanda ? _anDetalleHtml() : _an.vista === "camion" ? _anCamionHtml() : _anListaHtml()) +
+       '</div></div>';
   ov.innerHTML = h;
 }
 
