@@ -525,6 +525,22 @@ cuadro lo muestra en rojo para que el supervisor lo corrija a mano.
 ⚠ **Al agregar un evento de detalle como PKG hay que sumarlo a `COLA_AUTO` y a los `isUpsert` de
 `index.html`**, o la cola lo trata como una tarea del operario.
 
+### v31.49 (Luis, 16/10): lo mismo en **Guardar a góndola**
+
+*"cuando un operario guarda en gondola un codigo del que no hay posicion establecida, debería preguntar
+DONDE se está guardando"*.
+
+- El renglón de un código sin celda en `GV_Lugar_Item` muestra **«📍 ¿En qué góndola lo guardaste?»**.
+  Con cajas a góndola **no deja guardar** sin anotarla, y tiene que ser un lugar de `GV_Lugar` (como el
+  excedente). Vale para «✓ Guardé este código», «Ya estaba en góndola» y el confirmar de todo.
+- Emite el **mismo PKG** del picking: `COD|celda|GUARDADO|cajas` (dedup `pkg_<legajo>_G<día>_<cod>`).
+  Cae en el cuadro «Góndolas sin cargar en el Mapa»; `gv_gondola_sugerida_pendientes` toma las cajas del
+  propio evento cuando la tanda es `GUARDADO` (centinela `v31.49`). `sql/gv_gondola_sugerida_guardado_v3149.sql`.
+- El código **fuera de lista** ahora busca su celda y la muestra («📍 Va en G09»); antes no mostraba nada.
+- ⚠ Si el mapa de celdas **no cargó**, no se exige (lectura rota ≠ «no tiene lugar»).
+- Medido el 16/10 sobre 30 días: **4 guardados de 3 códigos** sin celda (55219, 55289, 865ED), 4.194 cajas.
+  Lo sostiene `tests/mg-sin-gondola.cjs`.
+
 ### D3 (Luis): en el Análisis Productivo se MARCAN los anómalos — y sólo en pantalla
 
 *"solo en pantalla, hace que sea mas claro el detalle, descripcion, analisis y que haya algo para
