@@ -135,6 +135,21 @@ aprueba, esa gondola se marca como vacia."*
 
 `sql/gv_excedente_noesta_v3185.sql` · `tests/exc-noesta-admin.cjs`.
 
+### v32.00 (Luis, 16/10): faltó en una posición REGISTRADA → aviso por posición · la posición se ELIGE de la zona P
+
+- **D5** — *"excedente con posición registrada que el operario no encuentra ahí … Deberia llegarle, simple y se ajusta de
+  ahi"*: «Sin stock» o «Faltan» en un paso de excedente con posición manda en el 8º campo `-P21;-P22` (todas las
+  posiciones del paso). Cada una es un pendiente en la landing («Excedente que no estaba», sist. = cajas de ESA
+  posición); ✓ la vacía con un ajuste **con ubicación**. Si el operario vuelve y confirma completo, el aviso se anula.
+- **D6** — *"que si o si tiene que poner la posicion y que se despliegue la lista de posiciones en el mapa para que no
+  puedan poner cualquier cosa"*: en el guardado (MG) y en el cartel del picking la posición del excedente es una **lista
+  desplegable con la zona P de `GV_Lugar` (P01–P40)**, obligatoria («— elegí —» no pasa). Sin la lista (no cargó
+  `GV_Lugar`) queda el input de antes, que igual valida contra el Mapa.
+- Al 16/10, desde el 01/08: 85 de 85 guardados a excedente con posición; 121 de 123 entradas sin posición fueron ajustes
+  por SQL de sesiones (conteo P 13/10, backfill), no del operario.
+
+`sql/gv_excedente_noesta_pos_v3200.sql` · `tests/pk-excedente-faltante.cjs`.
+
 ## ⚠ REGLA: LAS TABLAS QUE VALEN — góndola, racks y empresa del artículo
 
 **Luis, 2026-09-17:** *"fijate que estés usando las tablas actualizadas de `gv_` y escribí en
