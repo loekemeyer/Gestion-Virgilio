@@ -1,3 +1,9 @@
+## Nota v31.54 (2026-10-16) — Stock: el código liquidado en el picking se imputa al del pedido (tipo `liquidacion`)
+
+Nuevo `tipo='liquidacion'` en `Movimientos_Stock` (ref = tanda): terminado del código viejo −L y a_facturar del
+código del pedido +L, lo asienta `gv_stock_liquidacion_imputar()` en el cron 68. Pares en `GV_Pick_Liquidar`
+(hoy 574E → 574, igual que `PK_LIQUIDAR_EN`). Regla completa: `docs/REGLAS-PICKING-ARMADO.md` (v31.54).
+
 ## Nota v31.44 (2026-10-16) — Tabla `GV_NP_Remito_Estado`: el estado del remito de cada NP, referenciable
 
 Luis: *"quiero que quede un registro referenciable, una tabla o algo"*. No hay tabla madre de NP que cubra ISIS + web,

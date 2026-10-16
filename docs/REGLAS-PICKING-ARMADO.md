@@ -591,6 +591,17 @@ PKC del 574 con real > 0 desde el 14/10, su tanda tiene remito (CRN) y el saldo 
 depósitos. El alta dispara la liberación de la góndola F50. `select * from gv_liquidado_discontinuar(true);`
 simula. `sql/gv_liquidado_discontinuar_v3030.sql`, centinela v30.30 (la app salió en la v30.31).
 
+**v31.54 (Luis, 16/10, D1 · problema 850): el armado ya NO devuelve a góndola el código liquidado.** El armado
+cruza lo pickeado contra Entregas (que dice 574E), así que el `separado` del 574 iba a terminado: caja fantasma en
+góndola (F47A, F48N), el picking siguiente lo volvía a pedir (F97A) y el 574E quedaba corto en a_facturar.
+`gv_stock_liquidacion_imputar()` (cron 68, después de `reconciliar_pipeline_stock`) asienta por tanda armada un par
+`tipo='liquidacion'`, ref = tanda: **terminado del viejo −L, a_facturar del pedido +L**, con
+L = min(pickeado del viejo, entregado del pedido − pickeado del pedido). Idempotente (índice
+`mov_stock_liquidacion_dedup`). Los pares viven en **`GV_Pick_Liquidar`** y tienen que coincidir con
+`PK_LIQUIDAR_EN`: liquidar otro código = fila en los dos. `select * from gv_stock_liquidacion_imputar(true);` simula.
+`sql/gv_stock_liquidacion_v3154.sql` (rollback al pie), centinela v31.54. Al 16/10 el 574 quedó en −1 en terminado:
+se pickearon 3 cajas (F47A, F48N, F97A) contra 2 en F50 — lo resuelve el conteo físico, no el pipeline.
+
 ## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
 
 > Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
