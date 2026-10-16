@@ -16,3 +16,5 @@ select cron.alter_job(68,  schedule => '1-59/10 0,1,8-23 * * *');
 select cron.alter_job(81,  schedule => '*/2 0,1,8-23 * * *');
 select cron.alter_job(109, schedule => '5-55/10 0,1,8-23 * * *');
 -- El 25 (sync-fichadas-respuestas) queda las 24 h: watchdog_syncs_externos avisa si pasa 30 min sin correr.
+-- v31.40 (D7 de Thomas) — fichadas cada 5 min: el 97 % de las corridas cada 2 min no traía nada; 5 min < umbral 30 del watchdog.
+select cron.alter_job(25, schedule => '4-59/5 * * * *');

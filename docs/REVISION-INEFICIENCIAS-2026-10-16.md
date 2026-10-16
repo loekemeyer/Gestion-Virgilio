@@ -85,4 +85,8 @@ pantallas. Y en el front no pesan las funciones muertas (~30 KB): pesa la **form
 
 - **D3: NO se toca** `trg_gv_ppp_web_base_sin_l_chef`. Sigue activo pelando la L de Chef cuando el código no está en `precios_venta` de LK. No volver a proponer apagarlo salvo que lo pida el dueño.
 - **D5: el schema `gt` y el cron 126 (`gt.sync_pedidos_tn`) SÍ se usan.** No proponer sacarlos.
-- Abierto: D7 (cron 25 de fichadas de 2 a 5 min).
+- D7 aplicado en v31.40.
+
+## 8. v31.40 — D7
+
+- Cron 25 (fichadas) de cada 2 min a cada 5 min (`4-59/5`). Sigue 24 h, dentro de los 30 min del vigilante. Máximo por minuto en `gv_cron_colisiones`: 8 jobs.
