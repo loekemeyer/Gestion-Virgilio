@@ -220,7 +220,7 @@ select cron.alter_job(55, command := 'REFRESH MATERIALIZED VIEW CONCURRENTLY vis
 `sql/gv_refresh_stock_si_cambio_v2105.sql`, `tests/stock-refresh-si-cambio.cjs`, §3.mi.
 
 
-## ⚠⚠ REGLA (Luis, 2026-10-16, v31.64): Stocks EN VIVO — nada vuelve atrás, las pedidas sólo si cambió, realtime para el supervisor
+## ⚠⚠ REGLA (Luis, 2026-10-16, v31.65): Stocks EN VIVO — nada vuelve atrás, las pedidas sólo si cambió, realtime para el supervisor
 
 **Luis:** *"arregla el cron, dale"* · *"el tema es evitar que se llegue a timeout porque tenga que ver tablas
 completas, si se puede hacer que solo busque cambios, golazo"* · *"si la tabla se ve en realtime, aun mejor"*.

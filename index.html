@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.64">
+<link rel="stylesheet" href="gv-ui.css?v=31.65">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6477,7 +6477,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.64"></script>
+<script type="module" src="recepcion.js?v=31.65"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10822,7 +10822,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.64";
+const APP_VERSION = "v31.65";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17414,7 +17414,7 @@ async function openStockAdmin(soloConteo) {
        así la tabla se dibuja ya con el total (lo de siempre) y se redibuja cuando llega. Si la
        lectura falla o tarda, la pantalla queda como la v24.03 — no hay ningún await de por medio
        que la pueda colgar (regla v19.44). */
-    /* v31.64 (Luis, 16/10) — el neto viaja en la MISMA fila de stocks_carga_rapida (job
+    /* v31.65 (Luis, 16/10) — el neto viaja en la MISMA fila de stocks_carga_rapida (job
        gv_stock_pedidas_vivo, ≤ 30 s, y por realtime): si la carga ya lo trae, la lectura de la
        vista (≈ 0:01) sobra. Sin el dato (job caído o tabla vieja) se lee la vista como siempre. */
     var _pnFila = _stkPedNetoDeFilas(saldosRapido);
@@ -17485,7 +17485,7 @@ async function openStockAdmin(soloConteo) {
       (_stk.viewRows || []).forEach(function (r) {
         var vr = _vistaMap[_ocgNorm(r.cod)];
         if (vr) {
-          // v31.64 — con ped_vivo_en la fila trae las pedidas del job (≤ 30 s): la matview es MÁS vieja
+          // v31.65 — con ped_vivo_en la fila trae las pedidas del job (≤ 30 s): la matview es MÁS vieja
           if (r.ped_vivo_en == null) r.cajas_pedidas = vr.cajas_pedidas;
           r.proy_cajas_mes = vr.proy_cajas_mes;
           r.capacidad_gondola = vr.capacidad_gondola;
@@ -17499,7 +17499,7 @@ async function openStockAdmin(soloConteo) {
           if (vr.linea) r.linea = vr.linea;
         }
       });
-      // v31.64 — y el mapa de demanda sale de esas mismas filas vivas, no de la matview
+      // v31.65 — y el mapa de demanda sale de esas mismas filas vivas, no de la matview
       (_stk.viewRows || []).forEach(function (r) {
         if (r.ped_vivo_en == null) return;
         var k = _ocgNorm(r.cod); if (!k) return;
@@ -17567,14 +17567,14 @@ function stkSubscribeRealtime() {
             else delete _stk.dem[codN];
             if (Number(nw.proy_cajas_mes) > 0) _stk.proy[codN] = Number(nw.proy_cajas_mes);
             else delete _stk.proy[codN];
-            // v31.64 — el neto del tooltip viaja en la misma fila (job gv_stock_pedidas_vivo)
+            // v31.65 — el neto del tooltip viaja en la misma fila (job gv_stock_pedidas_vivo)
             if (nw.ped_vivo_en != null) {
               if (!_stk.pedNeto) _stk.pedNeto = {};
               var _pe = _stkPedNetoEntrada(nw);
               if (_pe) _stk.pedNeto[codN] = _pe; else delete _stk.pedNeto[codN];
             }
           }
-          // v31.64 — un job escribe varias filas juntas: un solo redibujo por ráfaga (como los movs)
+          // v31.65 — un job escribe varias filas juntas: un solo redibujo por ráfaga (como los movs)
           if (_stkMovsRenderT) clearTimeout(_stkMovsRenderT);
           _stkMovsRenderT = setTimeout(function () { _stkMovsRenderT = null; if (_stk) { try { updateStkBadge(); stkRender(); } catch (_e) {} } }, 600);
         })
@@ -27926,7 +27926,7 @@ async function stkFetchPedidasNeto() {
    y ahí la celda muestra el total de siempre.
    ⚠ Es GLOBAL a propósito: la usan la tabla y el Excel, que son dos funciones distintas. Con una
    copia en cada scope los dos números se desfasarían, que es el bug que esto viene a arreglar. */
-/* v31.64 (Luis, 16/10: "si la tabla se ve en realtime, aun mejor") — la entrada del neto armada
+/* v31.65 (Luis, 16/10: "si la tabla se ve en realtime, aun mejor") — la entrada del neto armada
    desde una fila de stocks_carga_rapida (columnas ped_*, las escribe gv_stock_pedidas_vivo). Mismo
    formato que stkFetchPedidasNeto. null = sin pedidas o sin dato vivo: la celda cae al total. */
 function _stkPedNetoEntrada(r) {
@@ -64814,7 +64814,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.64"></script>
+<script src="importacion.js?v=31.65"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -68136,15 +68136,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.64"></script>
-<script src="hotsale.js?v=31.64"></script>
-<script src="estadisticas.js?v=31.64"></script>
-<script src="ads.js?v=31.64"></script>
-<script src="plantel.js?v=31.64"></script>
+<script src="cobranzas.js?v=31.65"></script>
+<script src="hotsale.js?v=31.65"></script>
+<script src="estadisticas.js?v=31.65"></script>
+<script src="ads.js?v=31.65"></script>
+<script src="plantel.js?v=31.65"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.64"></script>
+<script src="analisis.js?v=31.65"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.64"></script>
+<script src="ayuda.js?v=31.65"></script>
 
 </body>
 </html>
