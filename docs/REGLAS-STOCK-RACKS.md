@@ -1262,5 +1262,9 @@ caso se encuentra con la consulta de arriba, a mano.
 `vista_uni_x_caja` (generador de OC) tomaban `max(uxb)` de `GV_UxB` juntando LK y CH: el 231/232/233 pasado a 12 en LK
 seguía en 24 por una fila CH absorbida del fallback. Ahora el orden es: empresa dueña (`GV_Articulo_Empresa_Cache`) >
 LK > curado > no absorbido > más reciente. Centinelas en `GV_Reglas_Centinela`. `sql/gv_uxb_empresa_duena_v3193.sql`.
-Siguen con `max` ciego (pendiente): `gv_ppp_web_valor_items`, `gv_clin_composicion`, `gv_cuarentena_pedido_composicion`,
-`isis_pedido_json`, `gv_isis_pedido_json`.
+**v31.96 (Luis, D4):** `gv_ppp_web_valor_items`, `gv_clin_composicion`, `gv_cuarentena_pedido_composicion` (empresa del
+pedido; L = LK), `isis_pedido_json` y `gv_isis_pedido_json` (empresa dueña) usan **`gv_uxb_de(cod, empresa)`**: misma regla,
+con la empresa del pedido primero. Un uxb nuevo en una función = `gv_uxb_de`, nunca `max(uxb)`. **D5:** `OC_Maximos`
+231/232/233 a 12 (backup `zz_backups."OC_Maximos_uxb_20261016"`).
+⚠ **Cambio de packaging (palos de amasar, 24 → 12, 16/10):** `order_items.uxb` guarda el uxb de cada línea; los pedidos
+pendientes mezclan cajas de 24 y de 12, y `PPP_Web_Base.cajas` / la demanda del generador las suman como si fueran iguales.
