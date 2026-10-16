@@ -52,6 +52,35 @@ recorrido**. Si algún día molesta, el arreglo NO es volver atrás: es que el f
 Lo sostiene `tests/pk-excedente-orden.cjs` y el candado invertido de `tests/pk-deposito-pkc.cjs`
 (`items.concat(excSteps)` tiene que estar, `excSteps.concat(items)` no). Problema 455.
 
+## ⚠ REGLA (Giuliana, 2026-10-16, v31.59): la zona P NO es fija — dónde está cada excedente lo dice `gv_excedente_posicion`
+
+**Giuliana, textual:** *"Entendé que P no es fijo. Cuando se acaba el stock de artículo X excedente en PX, deja de
+estar asignado el código X a PX"* · *"si hay excedente, que mande a pickear directamente al excedente (y que lo
+contemple para la ruta de picking)"*.
+
+> **El excedente de un código está en PX mientras tenga saldo ahí. No se carga en `GV_Lugar_Item`** (esa tabla es
+> la asignación fija de góndola): la posición sale del libro de stock, neta, en el momento.
+
+| quién | qué lee |
+|---|---|
+| picking (`pkFetchExcedente`, Gestión y Registro 3.0) | cajas de `vista_saldos_stock` + posiciones de `gv_excedente_posicion`, en **orden de recorrido** |
+| Mapa de góndolas (`pmapExcFetch`) | las celdas P con excedente hoy, con código y cajas; libre si no tiene |
+| pop-up 🧊 Excedente de Stocks | las posiciones de la vista (si no contesta, la cuenta vieja con los movimientos) |
+
+- **Cómo calcula la vista**: neto por (código, empresa, posición) de lo que entró y salió **con** ubicación; lo
+  que salió **sin** ubicación (el picking no anota de qué posición sacó) se descuenta de la posición que el picking
+  manda primero, la de **menor `orden`** de `GV_Lugar`. Lo que no se puede ubicar sale con `sector` NULL.
+  Mismo corte (`cutoff_ts`) y misma `clave` que `vista_saldos_stock`: **la suma da igual** (1.461 = 1.461 el 16/10).
+- **Lo que arregla**: `pkFetchExcedente` listaba **toda ubicación que alguna vez recibió cajas**, así que un código
+  que se movió de P22 a P18 seguía mandando al operario a P22 (caso 654, 13/10).
+- **El picking ya mandaba primero al excedente** (lo que hay en excedente sale de ahí y la góndola sólo el resto) y
+  ordena el paso por el `orden` de su posición (regla de Thomas de arriba). No cambió eso: cambió de dónde salen
+  las posiciones. Un paso por artículo; si el excedente está repartido, va a la posición del recorrido que llega
+  antes y la pantalla lista las demás.
+- Una lectura rota no borra nada: el Mapa conserva lo último leído y el picking cae a «sin posición» (al final).
+
+`sql/gv_excedente_posicion_v3159.sql` · `tests/pmap-excedente-p.cjs` · `tests/pk-excedente-vista.cjs`.
+
 ## ⚠ REGLA: LAS TABLAS QUE VALEN — góndola, racks y empresa del artículo
 
 **Luis, 2026-09-17:** *"fijate que estés usando las tablas actualizadas de `gv_` y escribí en

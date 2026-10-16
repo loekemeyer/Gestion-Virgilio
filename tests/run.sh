@@ -744,6 +744,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pk-excedente-vista (v14.93: pkFetchExcedente lee cajas de vista_saldos_stock, no suma movimientos truncados a 1000) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-excedente-vista.cjs
+echo "== pmap-excedente-p (v31.59: el Mapa muestra el excedente de cada P hoy, no fijo) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-excedente-p.cjs
 
 echo "== remito-np-web (v15.46: el remito impreso trae cliente y fecha también en las NP de la página) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/remito-np-web.cjs

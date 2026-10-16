@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.58">
+<link rel="stylesheet" href="gv-ui.css?v=31.59">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -3149,6 +3149,10 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
    vista". La celda normal queda callada (blanca) y las otras tres gritan: borde de
    2 px, fondo saturado y, en las dos que hay que revisar, una BARRA de color a la
    izquierda — el color solo no alcanza para el que ve la pantalla de lejos. */
+/* v31.59: celda de la zona P con excedente HOY (gv_excedente_posicion). No es asignación fija: se va sola al acabarse. */
+.pmap-exc{ border:2px solid #92400e; border-left-width:8px; background:#fff7ed; }
+.pmap-exc-chip{ display:block; font-size:12px; font-weight:800; color:#92400e; line-height:1.2; }
+.pmap-leg .pmap-exc{ background:#fff7ed; border:2px solid #92400e; border-left-width:9px; }
 .pmap-libre{ background:repeating-linear-gradient(135deg,#eef2f7,#eef2f7 6px,#e2e8f0 6px,#e2e8f0 12px); border:2px dashed #94a3b8; }
 .pmap-libre .pmap-cod{ color:#64748b; font-size:13px; font-weight:800; letter-spacing:.5px; }
 .pmap-smapa{ border:2px solid #f59e0b; border-left-width:8px; background:#fef3c7; }
@@ -6473,7 +6477,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.58"></script>
+<script type="module" src="recepcion.js?v=31.59"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10818,7 +10822,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.58";
+const APP_VERSION = "v31.59";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13899,7 +13903,10 @@ async function pkFetchExcedente(arts) {
     try {
       const res = await Promise.all([
         fetch(SUPABASE_URL + "/rest/v1/vista_saldos_stock?clave=in.(" + inList + ")&select=clave,cod_art,excedente&limit=1000", { headers: H, cache: "no-store", signal: _ctrl ? _ctrl.signal : undefined }),
-        fetch(SUPABASE_STOCK_ENDPOINT + "?deposito=eq.excedente&delta=gt.0&ubicacion=not.is.null&cod_art=in.(" + inList + ")&select=cod_art,ubicacion,ts&order=ts.desc&limit=1000", { headers: H, cache: "no-store", signal: _ctrl ? _ctrl.signal : undefined })
+        // v31.59 (Giuliana, 16/10): las posiciones salen de gv_excedente_posicion = el NETO de cada
+        // posición hoy, en orden de recorrido. Antes se listaban todas las ubicaciones que alguna vez
+        // recibieron cajas, así que un código que se movió de P22 a P18 seguía mandando a P22.
+        fetch(SUPABASE_URL + "/rest/v1/gv_excedente_posicion?clave=in.(" + inList + ")&sector=not.is.null&select=clave,sector,orden,cajas&order=orden.asc", { headers: H, cache: "no-store", signal: _ctrl ? _ctrl.signal : undefined })
       ]);
       rs = res[0]; ru = res[1];
     } finally { if (_to) clearTimeout(_to); }
@@ -13923,10 +13930,12 @@ async function pkFetchExcedente(arts) {
     if (ru && ru.ok) {
       const rows = await ru.json();
       (Array.isArray(rows) ? rows : []).forEach(function (mv) {
-        const k = String(mv.cod_art).toUpperCase();
+        const k = String(mv.clave).toUpperCase();
         if (!out[k]) return;
-        const u = pkUbicLimpia(mv.ubicacion);
-        if (u && out[k].ubics.indexOf(u) < 0) out[k].ubics.push(u);   // ubicaciones de las entradas, recientes primero
+        const u = pkUbicLimpia(mv.sector);
+        if (!u || out[k].ubics.indexOf(u) >= 0) return;
+        out[k].ubics.push(u);                                           // en orden de recorrido (orden asc)
+        (out[k].porUbic || (out[k].porUbic = {}))[u] = Number(mv.cajas) || 0;
       });
     }
     return out;
@@ -23486,14 +23495,19 @@ async function stkOpenExcedenteArt(codEnc) {
   _stkPopShell("Excedente — " + escapeHtml(_padCod(_codBex)), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (!body) return;
   const byU = {}; let sinU = 0;
-  _stk.movs.forEach(function (mv) {
+  // v31.59: las posiciones salen de gv_excedente_posicion (neto de cada posición HOY, la misma
+  // fuente que el picking y el Mapa). Si no contesta, se calcula como antes con los movimientos.
+  let _vp = null;
+  try { _vp = await supaFetchAll(SUPABASE_URL + "/rest/v1/gv_excedente_posicion", "select=clave,sector,cajas&clave=eq." + encodeURIComponent(String(cod).toUpperCase().trim())); } catch (_e) { _vp = null; }
+  if (_vp && _vp.length) _vp.forEach(function (r) { const u = String(r.sector || "").trim(); const d = Number(r.cajas) || 0; if (u) byU[u] = (byU[u] || 0) + d; else sinU += d; });
+  else _stk.movs.forEach(function (mv) {
     if (mv.deposito !== "excedente" || !_stkMovMatch(mv, codN, emp) || !_stkWin(mv, true)) return;
     const u = String(mv.ubicacion || "").trim(), d = Number(mv.delta) || 0;
     if (u) byU[u] = (byU[u] || 0) + d; else sinU += d;
   });
   const round1 = function (n) { return Math.round(n * 10) / 10; };
   let ubics = Object.keys(byU).filter(function (u) { return round1(byU[u]) > 0.05; });
-  if (ubics.length === 1) byU[ubics[0]] += sinU;   // única ubicación → absorbe las bajas sin ubicación (como el export)
+  if (ubics.length === 1 && !(_vp && _vp.length)) byU[ubics[0]] += sinU;   // única ubicación → absorbe las bajas sin ubicación (como el export)
   ubics = ubics.filter(function (u) { return round1(byU[u]) > 0.05; })
     .sort(function (a, b) { const ka = String(a).match(/^([A-Za-z]+)(\d+)/), kb = String(b).match(/^([A-Za-z]+)(\d+)/); if (ka && kb && ka[1].toUpperCase() !== kb[1].toUpperCase()) return ka[1] < kb[1] ? -1 : 1; if (ka && kb) return (+ka[2]) - (+kb[2]); return String(a).localeCompare(String(b)); });
   if (!ubics.length) { body.innerHTML = '<div class="stkpop-empty">No hay excedente de ' + escapeHtml(_padCod(_codBex)) + ' con ubicación' + (round1(sinU) > 0 ? ' (' + round1(sinU) + ' cajas sin ubicación cargada)' : '') + '.</div><div style="margin-top:10px;text-align:center"><button class="mva-clear" onclick="stkOpenMovsArt(\'' + encodeURIComponent(cod) + '\',\'excedente\',\'Excedente\',\'🔁\')">Ver movimientos</button></div>'; return; }
@@ -49532,6 +49546,7 @@ let _prkDes = null;   // v22.68 — desfase posiciones vs stock del depósito ra
 let _prkRev = [];     // v22.77 — «a contar»: lo que la planimetría vieja decía y el stock no respalda (GV_Rack_Revisar)
 let _prkSin = [];     // v22.77 — stock de racks sin posición (gv_rack_sin_ubicar), para ubicarlo a mano
 let _pmapAlerta = [];  // v22.82 — gv_mapa_stock_sin_lugar: hay stock y ningún lugar del Mapa lo tiene
+let _pmapExc = {};     // v31.59 — excedente HOY por posición (gv_excedente_posicion): sector → [{cod, clave, cajas}]
 let _pmapInsG = {};    // v31.05 — insumos ubicados en una celda de GÓNDOLA (gv_insumo_ubicacion): sector → [cod]
 
 function pmapSetStatus(msg, ok) {
@@ -49565,6 +49580,19 @@ async function openPlanimMapa() {
   prkFetch().then(function () { if (_pmapModo === "rack") pmapRender(); }).catch(function () {});
   pmapAlertaFetch().then(pmapAlertaRender).catch(function () {});
   pmapInsGFetch().then(function () { if (_pmapModo === "gondola") pmapRender(); }).catch(function () {});
+  pmapExcFetch().then(function () { if (_pmapModo === "gondola") pmapRender(); }).catch(function () {});
+}
+/* v31.59 (Giuliana, 16/10): la zona P NO es fija. Un código está en PX mientras tenga saldo de excedente ahí;
+   cuando se acaba, deja de figurar. Lo decide la vista gv_excedente_posicion (neto por posición); el front sólo
+   lo dibuja. Si la lectura falla, se conserva lo último leído: «no pude leer» no es «no hay excedente». */
+async function pmapExcFetch() {
+  let f;
+  try { f = await supaFetchAll(SUPABASE_URL + "/rest/v1/gv_excedente_posicion", "select=cod,clave,empresa,sector,cajas&sector=not.is.null&order=cajas.desc"); }
+  catch (_e) { return _pmapExc; }
+  const out = {};
+  (f || []).forEach(function (x) { const k = String(x.sector || "").toUpperCase(); if (k) (out[k] || (out[k] = [])).push(x); });
+  _pmapExc = out;
+  return _pmapExc;
 }
 /* v31.05 (Luis, 15/10): desde Tránsito un insumo se puede ubicar en una celda de góndola. La celda lo muestra
    abajo del artículo («+ insumo …»). Se lee de gv_insumo_ubicacion (ya resuelta contra el Mapa). */
@@ -49837,7 +49865,11 @@ function pmapLegRender(g) {
     item("pmap-libre", "leg-libre", "celda libre", n.libre) +
     item("pmap-smapa", "leg-smapa", "sin capacidad cargada", n.solo_mapa) +
     item("pmap-scap", "leg-scap", "capacidad sin el artículo en el mapa", n.solo_capacidad) +
-    (n.disc ? item("pmap-disc", "leg-disc", "código discontinuado: se libera", n.disc) : "");
+    (n.disc ? item("pmap-disc", "leg-disc", "código discontinuado: se libera", n.disc) : "") +
+    (function () {   // v31.59: celdas con excedente hoy (zona P)
+      const ne = Object.keys(celdas).filter(function (k) { return _pmapExc[k] && _pmapExc[k].length; }).length;
+      return ne ? item("pmap-exc", "leg-exc", "con excedente hoy", ne) : "";
+    })();
 }
 function pmapGondolaHtml(g) {
   const rows = (_pmap || []).filter(function (r) { return String(r.gondola || "").toUpperCase() === g; });
@@ -49926,8 +49958,21 @@ function pmapCellHtml(g, n, porCelda) {
     else cuerpo += '<span class="pmap-mas">+ insumo ' + escapeHtml(insG.join(", ")) + '</span>';
     tip += "\nInsumo: " + insG.join(", ");
   }
+  // v31.59: excedente que HOY está en esta posición (zona P). Se va solo cuando se acaba.
+  const exc = _pmapExc[sec.toUpperCase()];
+  let hitF = hit;
+  if (exc && exc.length) {
+    const lst = exc.map(function (e) { return _padCod(e.clave || e.cod) + " · " + pmapNum(e.cajas) + " caj"; });
+    const chips = exc.slice(0, 2).map(function (e) {
+      return '<span class="pmap-exc-chip">' + escapeHtml(_padCod(e.clave || e.cod)) + ' · ' + pmapNum(e.cajas) + '</span>';
+    }).join("") + (exc.length > 2 ? '<span class="pmap-mas">+' + (exc.length - 2) + ' más</span>' : "");
+    if (libre && !(insG && insG.length)) { cuerpo = chips; clsF = clsF.replace("pmap-libre", "") + " pmap-exc"; }
+    else cuerpo += chips;
+    tip += "\nExcedente hoy: " + lst.join(", ") + " (no es fijo: se va cuando se acaba)";
+    if (_pmapQ && exc.some(function (e) { return String(e.clave || e.cod).toUpperCase().indexOf(String(_pmapQ).toUpperCase()) >= 0; })) hitF = true;
+  }
   const click = ' onclick="pmapAbrirCelda(' + JSON.stringify(sec).replace(/"/g, "&quot;") + ')"';
-  return '<div class="pmap-cell ' + clsF + (hit ? " pmap-hit" : "") + '" title="' + escapeHtml(tip) + '"' + click + '>' +
+  return '<div class="pmap-cell ' + clsF + (hitF ? " pmap-hit" : "") + '" title="' + escapeHtml(tip) + '"' + click + '>' +
          '<span class="pmap-sec">' + escapeHtml(sec) + '</span>' + cuerpo + '</div>';
 }
 /* ═══════════════════════════════════════════════════════════════════
@@ -64646,7 +64691,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.58"></script>
+<script src="importacion.js?v=31.59"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67968,15 +68013,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.58"></script>
-<script src="hotsale.js?v=31.58"></script>
-<script src="estadisticas.js?v=31.58"></script>
-<script src="ads.js?v=31.58"></script>
-<script src="plantel.js?v=31.58"></script>
+<script src="cobranzas.js?v=31.59"></script>
+<script src="hotsale.js?v=31.59"></script>
+<script src="estadisticas.js?v=31.59"></script>
+<script src="ads.js?v=31.59"></script>
+<script src="plantel.js?v=31.59"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.58"></script>
+<script src="analisis.js?v=31.59"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.58"></script>
+<script src="ayuda.js?v=31.59"></script>
 
 </body>
 </html>
