@@ -588,7 +588,7 @@ Test: `tests/pk-liquidar-574.cjs`.
 **v30.30 (Luis, 14/10): el 574 queda DISCONTINUADO cuando se fue.** `gv_liquidado_discontinuar()` (cron
 160 `gv-liquidado-discontinuar`, 05:13 ART) da de alta el 574 en `Articulos_Discontinuados` cuando hay un
 PKC del 574 con real > 0 desde el 14/10, su tanda tiene remito (CRN) y el saldo del 574 es 0 en todos los
-depósitos. El alta dispara la liberación de la góndola F50. `select * from gv_liquidado_discontinuar(true);`
+depósitos. El alta dispara la liberación de góndola, que saca SÓLO el código 574 del mapa (hoy no figura en ninguna celda: F49 y F50 son del 574E y no se tocan). `select * from gv_liquidado_discontinuar(true);`
 simula. `sql/gv_liquidado_discontinuar_v3030.sql`, centinela v30.30 (la app salió en la v30.31).
 
 **v31.54 (Luis, 16/10, D1 · problema 850): el armado ya NO devuelve a góndola el código liquidado.** El armado
@@ -608,7 +608,7 @@ discontinuado."* `gv_liquidado_discontinuar()` ya no mira el remito ni exige sal
 cumplía nunca): recorre `GV_Pick_Liquidar` activo y, cuando (1) ningún depósito del viejo tiene saldo **> 0** (el
 negativo es conteo, no mercadería), y (2) cada tanda donde se pickeó el viejo está armada y **todas** sus NP con el
 código del pedido tienen `Facturacion_NP.facturado_at`, pasa la fila a `activo = false` y da de alta el viejo en
-`Articulos_Discontinuados` (libera F50 y lo saca de stock y OC). Cron 160 cada 10 min de 8 a 20 ART.
+`Articulos_Discontinuados` (lo saca de stock y OC; la liberación de góndola saca sólo el código 574 del mapa — F50 está asignada al **574E** y no se toca). Cron 160 cada 10 min de 8 a 20 ART.
 Al 16/10 espera a F97A (armado + factura) y a las NP de F47A (LK 0263, LK 0285) y F48N (LK 0297).
 `select * from gv_liquidado_discontinuar(true);` simula. `sql/gv_liquidado_discontinuar_v3156.sql`, centinela v31.56.
 
