@@ -80,3 +80,9 @@ pantallas. Y en el front no pesan las funciones muertas (~30 KB): pesa la **form
 - 34, 55, 68, 81 y 109 corren igual de 5:00 a 22:59 y paran de 23:00 a 4:59 (30 días medidos: 0 movimientos, 0 eventos, 0 facturas, 0 fichadas en esa franja).
 - El 25 (fichadas) queda las 24 h: `watchdog_syncs_externos` manda un Telegram si pasa 30 min sin correr. Achicarlo exige tocar el vigilante.
 - D3 (regla que pela la L en Chef): **sin decidir**. Se apagó por error menos de un minuto y se reactivó; no entró ningún renglón en ese lapso.
+
+## 7. Decidido por Thomas (16/10) — no revisitar
+
+- **D3: NO se toca** `trg_gv_ppp_web_base_sin_l_chef`. Sigue activo pelando la L de Chef cuando el código no está en `precios_venta` de LK. No volver a proponer apagarlo salvo que lo pida el dueño.
+- **D5: el schema `gt` y el cron 126 (`gt.sync_pedidos_tn`) SÍ se usan.** No proponer sacarlos.
+- Abierto: D7 (cron 25 de fichadas de 2 a 5 min).
