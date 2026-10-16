@@ -27,7 +27,7 @@ Private Const CELDA_DOLAR As String = "H3"
 Private Const ULTIMA_COL As Long = 16               ' A..P (solo Lista de Precios)
 Private Const SUPA_URL_HOJAS As String = "https://hrxfctzncixxqmpfhskv.supabase.co/rest/v1/rpc/planilla_hojas_cargar"
 Private Const TANDA_MAX As Long = 700000             ' caracteres por envio de las demas hojas
-Private Const HOJAS_FUERA As String = "|Renta Pond|"  ' no se suben (Thomas 16/10: no se usa hoy; 17 MB)
+Private Const HOJAS_FUERA As String = "|Renta Pond|Resumen Rent Pond|"  ' no se suben (Thomas 16/10: no se usan hoy)
 ' -----------------------------------------------------------------------------
 
 Private mTocada As Boolean
