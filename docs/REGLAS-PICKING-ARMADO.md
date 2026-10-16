@@ -631,6 +631,17 @@ en excedente que con sólo `terminado` quedaban varadas. La baja es la de la v31
 el código liquidado: los discontinuados que hoy siguen en el Mapa de góndolas no se tocan. Al 16/10: 636 = 5 góndola +
 9 excedente + 6 separadas; 635 = 11. `sql/gv_pick_liquidar_636_635_v3160.sql`, `tests/pk-liquidar-636.cjs`.
 
+**v31.66 (Luis, 16/10): en la página de Chef se ve el NACIONAL hasta que los pedidos lo comprometen entero; recién ahí
+aparece el importado.** *"en la pagina tienen que aparecer 636 y 635 (nacionales) y no el importado hasta que no se acabe
+el stock del nacional (… que haya suficientes pedidos que comprometan el total del stock)"*. `GV_Pick_Liquidar.web_switch`
+= true → `gv_pick_liquidar_web_ocultos()` entra en `lk_web_ocultos_feed()` (el feed de `GV_Web_Oculto`), y el sync de LK
+(`sync_web_ocultos_virgilio`, cada 5 min, también sobre `products` de Chef por el FDW) lo aplica:
+**libre = disponible del nacional (terminado + excedente + racks + racks_ch + a_guardar + para_envasar) − cajas pedidas
+sin pickear (`gv_stock_pedidas_neto.neto`) del nacional y del importado**. libre > 0 → se oculta el E; libre ≤ 0 → se
+oculta el nacional; par liquidado (`activo = false`) → el nacional queda oculto para siempre. Si la cuenta falla, queda el
+nacional. LK sólo reactiva lo que ocultó el feed. Al aplicarlo (16/10): 636 libre 14, 635 libre 9 → 636E y 635E ocultos.
+El 634E (no existe) se apagó a mano en `products` de Chef. `sql/gv_pick_liquidar_web_switch_v3166.sql`.
+
 ## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
 
 > Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
