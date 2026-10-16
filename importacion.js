@@ -17,7 +17,7 @@ function _impPad(c) { return typeof _padCod === "function" ? _padCod(c) : String
    pantalla siga andando si el fetch falla. */
 let _PROV_IMP_LISTA = ["Fujian", "Hugo Wong", "Becky", "Kangli", "Ownland", "Zhixin", "Frontier"];
 /* v11.17 — Un solo botón "Importación" en el panel: adentro, solapas para cambiar entre
-   📦 Pedidos (openPedidosImportacion) y 🏭 Proveedores (stkOpenProvImp). La llamada
+   Pedidos (openPedidosImportacion) y Proveedores (stkOpenProvImp). La llamada
    _impTabsHtml('ped') existía desde v10.42 pero la función nunca se definió (popup roto). */
 function _impTabsHtml(cur) {
   // v11.70 — `width:auto;margin:0` explícitos: el `button{width:100%;padding:16px;margin-top:14px}`
@@ -25,18 +25,18 @@ function _impTabsHtml(cur) {
   // v24.57 (Thomas) — UNA fila que se desliza al costado: en el celular eran 4 filas de solapas.
   const t = function (on) { return 'width:auto;margin:0;flex:0 0 auto;padding:5px 11px;border-radius:999px;border:1px solid ' + (on ? '#1d4ed8' : '#cbd5e1') + ';background:' + (on ? '#1d4ed8' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap'; };
   return '<div class="imp-tabs" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px">' +
-    '<button style="' + t(cur === 'ped') + '" onclick="openPedidosImportacion()">📦 Pedidos</button>' +
-    '<button style="' + t(cur === 'alta') + '" onclick="openImpAgregar()" title="Dar de alta un importado nuevo o modificar uno existente: código, medidas, unidades, FOB, MOQ, proveedor, tipo, INAL, góndola y el primer pedido a mano.">➕ Agregar / modificar</button>' +
-    '<button style="' + t(cur === 'curso') + '" onclick="openImpEnCurso()" title="Los pedidos YA HECHOS que vienen en camino: qué día embarcan y qué día llegan. No mira lo que hay que pedir.">🚢 En curso</button>' +
-    '<button style="' + t(cur === 'recop') + '" onclick="openImpRecibidoOp()" title="Lo que recibieron los operarios por Ingreso a racks (Importación): contra qué pedido se descontó, y para elegir el pedido cuando hay más de uno en viaje del mismo código.">📥 Recibido' + (_impIrN > 0 ? ' <span style="background:#dc2626;color:#fff;border-radius:999px;padding:0 6px;font-size:11px">' + _impIrN + '</span>' : '') + '</button>' +
-    '<button style="' + t(cur === 'ntl') + '" onclick="openImpNtl()" title="La cuenta corriente de NTL, el forwarder de Hong Kong: depósitos, giros a las fábricas, recuperos y comisiones.">💱 NTL</button>' +
-    '<button style="' + t(cur === 'provcc') + '" onclick="openImpProvCC()" title="Una cuenta por fábrica: cuánto le debemos por los pedidos en curso, cada giro, y la historia (hoja del Excel + extracto NTL).">📒 Cta. proveedor</button>' +
-    '<button style="' + t(cur === 'hist') + '" onclick="openImpHistRecep()" title="Los pedidos hechos y las recepciones: qué se pidió, cuándo, cuánto llegó y dónde se guardó.">📜 Historial</button>' +
-    '<button style="' + t(cur === 'disc') + '" onclick="openImpDisc()" title="Los importados dados de baja (Importados.activo = false): no salen en Pedidos ni en el PDF.">🚫 Discontinuos</button>' +
-    '<button style="' + t(cur === 'prov') + '" onclick="stkOpenProvImp()">🏭 Proveedores</button>' +
+    '<button style="' + t(cur === 'ped') + '" onclick="openPedidosImportacion()">Pedidos</button>' +
+    '<button style="' + t(cur === 'alta') + '" onclick="openImpAgregar()" title="Dar de alta un importado nuevo o modificar uno existente: código, medidas, unidades, FOB, MOQ, proveedor, tipo, INAL, góndola y el primer pedido a mano.">Agregar / modificar</button>' +
+    '<button style="' + t(cur === 'curso') + '" onclick="openImpEnCurso()" title="Los pedidos YA HECHOS que vienen en camino: qué día embarcan y qué día llegan. No mira lo que hay que pedir.">En curso</button>' +
+    '<button style="' + t(cur === 'recop') + '" onclick="openImpRecibidoOp()" title="Lo que recibieron los operarios por Ingreso a racks (Importación): contra qué pedido se descontó, y para elegir el pedido cuando hay más de uno en viaje del mismo código.">Recibido' + (_impIrN > 0 ? ' <span style="background:#dc2626;color:#fff;border-radius:999px;padding:0 6px;font-size:11px">' + _impIrN + '</span>' : '') + '</button>' +
+    '<button style="' + t(cur === 'ntl') + '" onclick="openImpNtl()" title="La cuenta corriente de NTL, el forwarder de Hong Kong: depósitos, giros a las fábricas, recuperos y comisiones.">NTL</button>' +
+    '<button style="' + t(cur === 'provcc') + '" onclick="openImpProvCC()" title="Una cuenta por fábrica: cuánto le debemos por los pedidos en curso, cada giro, y la historia (hoja del Excel + extracto NTL).">Cta. proveedor</button>' +
+    '<button style="' + t(cur === 'hist') + '" onclick="openImpHistRecep()" title="Los pedidos hechos y las recepciones: qué se pidió, cuándo, cuánto llegó y dónde se guardó.">Historial</button>' +
+    '<button style="' + t(cur === 'disc') + '" onclick="openImpDisc()" title="Los importados dados de baja (Importados.activo = false): no salen en Pedidos ni en el PDF.">Discontinuos</button>' +
+    '<button style="' + t(cur === 'prov') + '" onclick="stkOpenProvImp()">Proveedores</button>' +
     /* v30.06 (Elías, 13/10: «oculta el impo comex antiguo»): queda sólo el nuevo (impocomex/, sin build).
        openImpoComex() y la carpeta impo-comex/ siguen en el repo (los tests de paridad la usan); lo que se fue es la puerta. */
-    '<button style="' + t(false) + '" onclick="openImpoComex2()" title="Verificación de documentos de importación (IMPO COMEX). Sólo supervisores.">🛃 IMPO COMEX</button></div>';
+    '<button style="' + t(false) + '" onclick="openImpoComex2()" title="Verificación de documentos de importación (IMPO COMEX). Sólo supervisores.">IMPO COMEX</button></div>';
 }
 /* v23.19 (Elías, 28/09) — IMPO COMEX dentro de Gestión: la versión web vive en impo-comex/ (copia
    armada; el fuente está en el repo privado loekemeyer/Impo-Comex). Página completa, mismo origin:
@@ -54,7 +54,7 @@ function openImpoComex2() {
   document.head.appendChild(s);
 }
 async function stkOpenProvImp() {
-  _stkPopShell("🏭 Proveedor de importación", "stkPopBody", true);
+  _stkPopShell("Proveedor de importación", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = '<div class="stkpop-empty">Cargando…</div>';
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
@@ -76,7 +76,7 @@ function _provImpRender() {
   if (_stkPop.soloSin) rows = rows.filter(function (r) { return !r.proveedor; });
   if (q) rows = rows.filter(function (r) { return stkMatchBusq(q, r.cod, r.descripcion, false); });   // v21.43
   let h = _impTabsHtml('prov');
-  h += '<div class="stkpop-hint"><b>' + all.length + '</b> artículos importados (' + conProv + ' con proveedor). Tocá el desplegable para <b>corregir el proveedor chino</b> de cada uno (se guarda al instante en el maestro <code>Importados</code>, que alimenta la OC de importados). <small style="color:#94a3b8">García no está: reenvasa lo de insumos, no importa.</small></div>';
+  h += '<div class="stkpop-hint"><b>' + all.length + '</b> artículos · ' + conProv + ' con proveedor</div>';
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">';
   h += '<input id="provImpQ" placeholder="Buscar código o descripción…" value="' + escapeHtml(_stkPop.q || "") + '" oninput="provImpSearch(this.value)" style="flex:1;min-width:150px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">';
   h += '<button class="mva-clear" style="' + (_stkPop.soloSin ? 'background:#b45309;color:#fff;border-color:#b45309' : '') + '" onclick="provImpToggleSin()">' + (_stkPop.soloSin ? '✓ ' : '') + 'Solo sin proveedor</button>';
@@ -149,7 +149,7 @@ let _NTL_PROVEEDORES = { "Frontier": true, "Fujian": true, "Kangli": true, "Zhix
 function _esProvNtl(prov) { return !!_NTL_PROVEEDORES[String(prov || "").trim()]; }
 /* v23.89 (Luis) — las TASAS también salen de la base (Importados_Config → gv_imp_nac_config).
    Esto es el FALLBACK con los números de la v23.79/80/81: si el fetch falla la cuenta no cambia,
-   pero la fuente es la tabla y se edita desde el ⚙ del proveedor (pestaña Generales). */
+   pero la fuente es la tabla y se edita desde el del proveedor (pestaña Generales). */
 let _NAC_TASAS = { estad_pct: 0.03, estad_fob_desde: 6000, estad_fob_hasta: 10000, estad_fijo: 180,
                    iva_pct: 0.21, iva_adic_pct: 0.20, gcias_pct: 0.06, iibb_pct: 0.0017,
                    derechos_pct: 0.18, ntl_pct: 0.05, valor_m3: 110, flete_full: 2000,
@@ -415,10 +415,10 @@ function _pedImpBandaHtml(nac, totUsd, ext) {
   var _pie = function (txt) { return '<div style="opacity:.85">' + txt + '</div>'; };
   var der;
   var modoTxt = { consolidada: "Consolidada", full: "Contenedor", avion: "Avión" }[nac.modo] || nac.modo;
-  if (!(totUsd > 0)) der = chip("#f1f5f9", "#e2e8f0", "#475569", '🚢 Poné el pedido (columna <b>MC</b>) para ver el costo <b>puesto en Argentina</b>.');
+  if (!(totUsd > 0)) der = chip("#f1f5f9", "#e2e8f0", "#475569", 'Poné el pedido (columna <b>MC</b>) para ver el costo <b>puesto en Argentina</b>.');
   else if (nac.sinPeso) der = chip("#fef2f2", "#fecaca", "#991b1b", '✈️ <b>Avión:</b> cargá el <b>peso (TN)</b> arriba para calcular el flete FEDEX.');
   else der = chip("#eef2ff", "#c7d2fe", "#3730a3",
-    _big("🚢 +" + Math.round(nac.factor * 100) + "% · " + _usd0(nac.noRecup), "#b91c1c") + ' <span style="font-weight:800;color:#b91c1c">no recuperable</span>' +
+    _big("+" + Math.round(nac.factor * 100) + "% · " + _usd0(nac.noRecup), "#b91c1c") + ' <span style="font-weight:800;color:#b91c1c">no recuperable</span>' +
     _pie('puesto en Arg ' + _usd0(nac.landed) + ' · FOB ' + _usd0(totUsd) + ' · ' + modoTxt + (nac.ntl > 0 ? ' · NTL ' + _usd0(nac.ntl) : '') +
       (nac.recup > 0 ? ' · <span style="color:#047857;font-weight:700">' + _usd0(nac.recup) + ' recuperable</span>' : '')),
     _pedImpDesgDer(nac, totUsd, ext.m3), "der");
@@ -430,7 +430,7 @@ function _pedImpBandaHtml(nac, totUsd, ext) {
    "Fijate que no vivan en el front los datos, sino que modifiquen las tablas pertinentes".
    Hasta la v23.87 el importador de cada proveedor, quién factura por NTL, el % de derechos,
    las tasas de nacionalización y el mínimo estaban ESCRITOS ACÁ, y los meses objetivo eran
-   uno solo para todos (se editaban en OCs → ⚙ Configuraciones, que es otro módulo). Ahora:
+   uno solo para todos (se editaban en OCs → Configuraciones, que es otro módulo). Ahora:
      GV_Imp_Proveedor  (vista gv_imp_proveedor_cfg) → uno por proveedor, con lo que pisa
      Importados_Config (vista gv_imp_nac_config)    → los generales
    Los objetos de arriba (_PROV_IMP_LISTA, _IMPORTADOR_DE, _NTL_PROVEEDORES, _DERECHOS_PROV
@@ -534,7 +534,7 @@ function _derechosPedido(items, prov) {
 /* ══ v23.95 (Luis, 29/09) — MESES OBJETIVO por proveedor, en su encabezado ═══════════
    "el parámetro de meses objetivo ponelo configurable al lado del nombre de cada proveedor
    (menú desplegable con los números del 1 al 24 … que afecte a todos los códigos de ese
-   proveedor)". Es la MISMA columna que edita el ⚙ (GV_Imp_Proveedor.meses_objetivo): no hay
+   proveedor)". Es la MISMA columna que edita el (GV_Imp_Proveedor.meses_objetivo): no hay
    un segundo lugar donde guardarlo. Vacío en la tabla = hereda el general, y el select lo
    muestra como «gral N». */
 function _pedImpMesesSel(prov, provEnc) {
@@ -550,8 +550,8 @@ function _pedImpMesesSel(prov, provEnc) {
 /* v24.64 (Thomas) — los botones 📦 y 📥 de la tabla son íconos sin texto: antes de abrir
    piden confirmar en un pop-up que dice qué hacen. */
 const _PEDIMP_ACC = {
-  baches:  { t: "📦 Baches", d: "Ver y editar los pedidos en curso de este artículo: cada bache con sus unidades, su fecha de reingreso y sus llegadas (total o parcial).", b: "Abrir Baches", c: "#475569" },
-  recibir: { t: "📥 Recibir", d: "Registrar lo que LLEGÓ de este pedido: cuántas unidades, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Mueve el stock.", b: "Recibir", c: "#0f766e" }
+  baches:  { t: "Baches", d: "Ver y editar los pedidos en curso de este artículo: cada bache con sus unidades, su fecha de reingreso y sus llegadas (total o parcial).", b: "Abrir Baches", c: "#475569" },
+  recibir: { t: "Recibir", d: "Registrar lo que LLEGÓ de este pedido: cuántas unidades, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Mueve el stock.", b: "Recibir", c: "#0f766e" }
 };
 function _pedImpAccionConfirmar(tipo, codEnc, fn) {
   const a = _PEDIMP_ACC[tipo]; if (!a) { fn(); return; }
@@ -616,7 +616,7 @@ function pedImpProyAbrir(codEnc, proyCajas) {
    · entra estirando hasta el tope (12 por defecto)  → 🟡 se puede, fuera del target
    · ni con el tope                                  → 🔴 fuera de target
    El MOQ y el tope de meses salen de GV_Imp_Proveedor (default 1.000 u y 12 meses) y se
-   editan en el ⚙ del proveedor. ⚠ Acá NO se escribe ningún número. */
+   editan en el del proveedor. ⚠ Acá NO se escribe ningún número. */
 /* v24.55 (Thomas, 29/09: "o llego a por lo menos 80% del MOQ o no pido nada") — el MOQ deja de
    ser sólo aviso y MUEVE la cantidad:
      · lo calculado ya llega al 80 % del MOQ           → se pide eso (estado ok)
@@ -648,7 +648,7 @@ function _pedImpMoqCalc(it) {
 function _pedImpMoqChip(it) {
   const ov = (_stkPop && _stkPop.mcOverride) ? _stkPop.mcOverride[it.key || it.cod] : undefined;
   if (ov != null) return "";
-  if (_pedImpPrimerPedidoMc(it) != null) return ' <span style="font-size:10px;font-weight:800;color:#1e3a8a;background:#dbeafe;border-radius:999px;padding:1px 6px" title="Primer pedido cargado a mano en ➕ Agregar artículo. Se borra solo al cargar el primer pedido en curso.">1.er pedido</span>';
+  if (_pedImpPrimerPedidoMc(it) != null) return ' <span style="font-size:10px;font-weight:800;color:#1e3a8a;background:#dbeafe;border-radius:999px;padding:1px 6px" title="Primer pedido cargado a mano en Agregar artículo. Se borra solo al cargar el primer pedido en curso.">1.er pedido</span>';
   const m = _pedImpMoqCalc(it);
   if (m.estado === "ok") return "";
   const pisoTxt = Math.round(m.piso).toLocaleString("es-AR"), baseTxt = Math.round(m.mcBase).toLocaleString("es-AR");
@@ -700,7 +700,7 @@ function _impCfgRender() {
   };
   let h = '<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#0f766e;color:#fff">' +
-    '<div style="font-size:18px;font-weight:800">' + (prov ? '⚙ Configurar — ' + esc(prov) : '⚙ Parámetros generales de importación') + '</div>' +
+    '<div style="font-size:18px;font-weight:800">' + (prov ? 'Configurar — ' + esc(prov) : 'Parámetros generales de importación') + '</div>' +
     '<button onclick="pedImpCfgCerrar()" style="background:#fff;color:#0f766e;border:0;border-radius:8px;padding:6px 16px;font-size:14.5px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
     '<div style="padding:14px 16px">' +
     // v23.91 (Luis: "no entiendo por qué hay un general ahí y qué modifica esos") — los
@@ -727,7 +727,7 @@ function _impCfgRender() {
     h += '<div style="margin-top:12px"><label style="font-size:11px;font-weight:800;color:#475569">Nota</label>' +
       '<input id="impCfgNotas" value="' + esc(r.notas || "") + '" style="padding:6px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;width:100%"></div>';
     h += '<div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">' +
-      '<button onclick="pedImpCfgGuardar()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:9px 20px;font-weight:800;font-size:15px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar") + '</button>' +
+      '<button onclick="pedImpCfgGuardar()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:9px 20px;font-weight:800;font-size:15px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "Guardar") + '</button>' +
       (r.actualizado ? '<span style="font-size:11px;color:#94a3b8">último cambio ' + esc(String(r.actualizado).slice(0, 16).replace("T", " ")) + (r.actualizado_por ? " · " + esc(r.actualizado_por) : "") + '</span>' : '') +
       '</div>';
   } else if (P.tab === "cods") {
@@ -787,7 +787,7 @@ function _impCfgRender() {
     h += campo("impCfgGMoqP", "MOQ: mínimo a llegar (%)", _impCfgPctTxt(g.moq_pct != null ? g.moq_pct : 0.8), "", "si no se llega a este % del MOQ, no se pide");   // v24.56 (Thomas)
     h += campo("impCfgGAut", "Autorización de Impo (%)", _impCfgPctTxt(g.autoriz_impo_pct != null ? g.autoriz_impo_pct : 0.007), "", "sobre el FOB de lo que lleva INAL");   // v25.13 (Thomas)
     h += '</div>';
-    h += '<div style="margin-top:14px"><button onclick="pedImpCfgGuardarGral()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:9px 20px;font-weight:800;font-size:15px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar generales") + '</button></div>';
+    h += '<div style="margin-top:14px"><button onclick="pedImpCfgGuardarGral()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:9px 20px;font-weight:800;font-size:15px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "Guardar generales") + '</button></div>';
   }
   h += '</div></div>';
   ov.innerHTML = h;
@@ -859,7 +859,7 @@ function pedImpDesgPop(provEnc, lado) {
   const esDer = (lado === "der");
   if (!esDer) return;
   const cuerpo = _pedImpDesgDer(d.nac, d.totUsd, d.ext.m3);
-  const titulo = esDer ? ('🚢 Puesto en Argentina — ' + prov) : ('⏳ Cuándo llega al mínimo — ' + prov);
+  const titulo = esDer ? ('Puesto en Argentina — ' + prov) : ('Cuándo llega al mínimo — ' + prov);
   let ov = document.getElementById("impDesgOv");
   if (!ov) {
     ov = document.createElement("div"); ov.id = "impDesgOv";
@@ -906,7 +906,7 @@ async function pedImpStockDesglose(keyEnc, foco) {
   ];
   const depHtml = function () {
     const uxc = Number(it.uxc) || 0;
-    let h = '<div style="font-weight:800;font-size:15px;margin:2px 0 6px">📍 Dónde está</div>';
+    let h = '<div style="font-weight:800;font-size:15px;margin:2px 0 6px">Dónde está</div>';
     if (depRows === null) return h + '<div class="imp-dep-cargando" style="color:#64748b;margin-bottom:12px">Leyendo los depósitos…</div>';
     if (depRows === false) return h + '<div class="imp-dep-error" style="color:#b91c1c;margin-bottom:12px">No se pudo leer el stock por depósito.</div>';
     const sum = function (k) { return depRows.reduce(function (a, r) { return a + (Number(r[k]) || 0); }, 0); };
@@ -921,14 +921,14 @@ async function pedImpStockDesglose(keyEnc, foco) {
     const fcs = sum("fc_sin_salida");
     const gp2 = Number(it.stockGp2U) || 0;
     const comp = equiv ? equiv.map(function (e) { return escapeHtml(e.componente_codigo); }).join(' + ') : '';
-    filas += '<tr class="imp-dep-cerv" style="background:#fff7ed"><td style="text-align:left;padding:7px 10px">🏭 Cervantes (GP2)' + (comp ? ' · <b style="color:#b45309">' + comp + '</b>' : '') +
+    filas += '<tr class="imp-dep-cerv" style="background:#fff7ed"><td style="text-align:left;padding:7px 10px">Cervantes (GP2)' + (comp ? ' · <b style="color:#b45309">' + comp + '</b>' : '') +
       '</td><td class="num" ' + td + '>' + (uxc > 0 && gp2 ? f(gp2 / uxc) : '—') + '</td><td class="num" ' + td + '>' + f(gp2) + '</td></tr>';
     return h + '<table class="mva-tbl imp-stk-dep" style="width:auto;min-width:360px;font-size:16px;margin-bottom:6px"><thead><tr><th style="text-align:left;font-size:13px">Lugar</th><th class="num" style="font-size:13px">Cajas</th><th class="num" style="font-size:13px">u' + (uxc > 0 ? ' <small>(×' + f(uxc) + ')</small>' : '') + '</th></tr></thead><tbody>' + filas +
       '</tbody><tfoot><tr><th style="text-align:left;padding:7px 10px">Total Virgilio + Cervantes</th><th class="num" style="padding:7px 10px">' + (uxc > 0 ? f(totC + gp2 / uxc) : f(totC)) + '</th><th class="num" style="padding:7px 10px">' + (uxc > 0 ? f(totC * uxc + gp2) : '—') + '</th></tr></tfoot></table>' +
       (fcs ? '<div style="color:#475569;font-size:13px;margin-bottom:6px">Además ' + f(fcs) + ' caja(s) facturadas sin salir (FC s/Salida).</div>' : '') +
       (it.verComo ? '<div style="color:#7c3aed;font-size:13px;font-weight:700;margin-bottom:6px">Incluye ' + escapeHtml(it.verComo) + '.</div>' : '') +
       (!depRows.length && !gp2 ? '<div style="color:#64748b;font-size:13px;margin-bottom:6px">Sin stock en Virgilio ni en Cervantes.</div>' : '') +
-      '<div style="font-weight:800;font-size:15px;margin:12px 0 6px">🧮 Lo que cuenta para el pedido</div>';
+      '<div style="font-weight:800;font-size:15px;margin:12px 0 6px">Lo que cuenta para el pedido</div>';
   };
   const pintar = function (insDet, insErr) {
     if (insDet !== undefined) { insDetG = insDet; insErrG = !!insErr; } else { insDet = insDetG; insErr = insErrG; }
@@ -941,33 +941,33 @@ async function pedImpStockDesglose(keyEnc, foco) {
       h += '<table class="mva-tbl imp-stk-desg" style="width:100%;font-size:16px"><thead><tr><th style="text-align:left;font-size:13px">Qué cuenta</th><th class="num" style="font-size:13px">u</th><th style="text-align:left;font-size:13px">De dónde</th></tr></thead><tbody>';
       h += tr('Stock propio del artículo', f(it.stockPropioModulo), 'depósitos de Virgilio' + (it.uniPedidas > 0 ? ', ya descontadas ' + f(it.uniPedidas) + ' u de pedidos abiertos' : ''));
       if (insErr) h += tr('Depósito insumos', f(it.stockInsU), '<span style="color:#b91c1c">no se pudo leer el detalle</span>');
-      else if (insDet && insDet.length) insDet.forEach(function (d) { if (Number(d.saldo) || Number(d.uni)) h += tr('🧰 Insumo ' + escapeHtml(d.insumo), f(Number(d.uni) * _shIns), (_shIns !== 1 ? 'le toca el ' + Math.round(_shIns * 100) + ' % de ' + f(d.uni) + ' u · ' : '') + escapeHtml(f(d.saldo) + ' ' + (d.unidad || '') + (Number(d.factor) > 1 ? ' × ' + f(d.factor) : ''))); });
+      else if (insDet && insDet.length) insDet.forEach(function (d) { if (Number(d.saldo) || Number(d.uni)) h += tr('Insumo ' + escapeHtml(d.insumo), f(Number(d.uni) * _shIns), (_shIns !== 1 ? 'le toca el ' + Math.round(_shIns * 100) + ' % de ' + f(d.uni) + ' u · ' : '') + escapeHtml(f(d.saldo) + ' ' + (d.unidad || '') + (Number(d.factor) > 1 ? ' × ' + f(d.factor) : ''))); });
       else h += tr('Depósito insumos', f(it.stockInsU), '');
-      if (it.stockTermU > 0) h += tr('🧩 Productos ya armados', f(it.stockTermU), 'stock de los terminados que usan ' + (it.esInsumo ? 'este insumo' : 'esta parte') + ' (detalle abajo)');
+      if (it.stockTermU > 0) h += tr('Productos ya armados', f(it.stockTermU), 'stock de los terminados que usan ' + (it.esInsumo ? 'este insumo' : 'esta parte') + ' (detalle abajo)');
       if (it.stockGp2U > 0 || equiv) {
         const fac = equiv && equiv.length === 1 ? Number(equiv[0].factor) || 1 : 1;
         const comp = equiv ? equiv.map(function (e) { return escapeHtml(e.componente_codigo); }).join(' + ') : '';
-        h += tr('🏭 Cervantes (GP2)' + (comp ? ' · <b class="imp-gp2-cod" style="font-size:17px;color:#b45309">' + comp + '</b>' : ''), f(it.stockGp2U),
+        h += tr('Cervantes (GP2)' + (comp ? ' · <b class="imp-gp2-cod" style="font-size:17px;color:#b45309">' + comp + '</b>' : ''), f(it.stockGp2U),
           (comp ? 'stock de <b>' + comp + '</b> en Cervantes (sector, talleristas y PS)' : 'componente equivalente en GP2: sector, talleristas y PS') +
           (fac !== 1 && it.stockGp2U > 0 ? ' · le toca el <b>' + Math.round(fac * 100) + ' %</b> de ' + f(it.stockGp2U / fac) + ' u' : ''));
       }
       if (it.stockConvU > 0 || conv) {
         const cc = conv ? conv.map(function (e) { return escapeHtml(_impPad(e.cod_art) + ' ' + e.empresa); }).join(' + ') : '';
-        h += tr('🔁 Se convierte' + (cc ? ' · <b class="imp-conv-cod" style="font-size:17px;color:#7c3aed">' + cc + '</b>' : ''), f(it.stockConvU || 0),
+        h += tr('Se convierte' + (cc ? ' · <b class="imp-conv-cod" style="font-size:17px;color:#7c3aed">' + cc + '</b>' : ''), f(it.stockConvU || 0),
           'stock disponible en Virgilio de ' + (cc ? '<b>' + cc + '</b>' : 'otro código') + ', que se puede convertir en este');
       }
-      if (it.stockParteU > 0) h += tr('🔧 Parte ' + escapeHtml(it.stockParteCods || ''), f(it.stockParteU), 'el stock de la parte cuenta como stock de este artículo');
+      if (it.stockParteU > 0) h += tr('Parte ' + escapeHtml(it.stockParteCods || ''), f(it.stockParteU), 'el stock de la parte cuenta como stock de este artículo');
       /* v28.43 (Luis, 07/10): las piezas (GP2) y los insumos de este artículo los COMPARTE con otros
          (GV_Piezas_Reparto: 942E con 633E, 438E LK con CH…). Las filas de arriba muestran sólo su parte (los insumos, desde v28.97). */
       if (it.piezasShare != null && it.piezasShare !== 1)
-        h += '<tr class="imp-piezas-share"><td colspan="3" style="text-align:left;padding:8px 10px;font-size:14px;color:#7c2d12;background:#fff7ed">🔀 Piezas e insumos <b>compartidos</b>: a este artículo le toca el <b>' +
+        h += '<tr class="imp-piezas-share"><td colspan="3" style="text-align:left;padding:8px 10px;font-size:14px;color:#7c2d12;background:#fff7ed">Piezas e insumos <b>compartidos</b>: a este artículo le toca el <b>' +
           Math.round(it.piezasShare * 100) + ' %</b>, según la Estadística Madre del mes' + (it.piezasReparto ? ' (' + escapeHtml(it.piezasReparto) + ')' : '') + '.</td></tr>';
       h += '</tbody><tfoot><tr><th style="text-align:left;padding:8px 10px;font-size:16px">Total</th><th class="num" style="padding:8px 10px;font-size:18px">' + f(it.stockUni) + '</th><th></th></tr></tfoot></table>';
     }
     const det = it.parteDet || [];
     if (det.length) {
       let tp = 0, ts = 0;
-      h += '<div style="margin-top:12px;font-weight:800">' + (it.esInsumo ? '🧩 Productos armados con este insumo' : '🧩 Terminados que usan esta parte') + '</div>';
+      h += '<div style="margin-top:12px;font-weight:800">' + (it.esInsumo ? 'Productos armados con este insumo' : 'Terminados que usan esta parte') + '</div>';
       h += '<table class="mva-tbl" style="width:100%"><thead><tr><th style="text-align:left">Producto</th><th class="num">E.M. u/mes</th><th class="num">Stock u</th></tr></thead><tbody>';
       det.slice().sort(function (a, b) { return (Number(b.proy) || 0) - (Number(a.proy) || 0); }).forEach(function (d) {
         tp += Number(d.proy) || 0; ts += Number(d.stock_uni) || 0;
@@ -978,8 +978,8 @@ async function pedImpStockDesglose(keyEnc, foco) {
     }
     ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#0369a1;color:#fff">' +
-      '<div style="font-size:19px;font-weight:800">' + (foco === "proy" ? '📈 Estadística Madre — ' : '📦 Stock — ') + escapeHtml(codCanon(_impCodVista(it))) + (it.esInsumo ? ' · insumo' : '') +
-        (equiv ? ' <span class="imp-gp2-hdr" style="font-size:15px;font-weight:700;background:#fff;color:#b45309;border-radius:8px;padding:2px 8px;margin-left:6px">🏭 ' + equiv.map(function (e) { return escapeHtml(e.componente_codigo); }).join(' + ') + ' en Cervantes</span>' : '') + '</div>' +
+      '<div style="font-size:19px;font-weight:800">' + (foco === "proy" ? 'Estadística Madre — ' : 'Stock — ') + escapeHtml(codCanon(_impCodVista(it))) + (it.esInsumo ? ' · insumo' : '') +
+        (equiv ? ' <span class="imp-gp2-hdr" style="font-size:15px;font-weight:700;background:#fff;color:#b45309;border-radius:8px;padding:2px 8px;margin-left:6px">' + equiv.map(function (e) { return escapeHtml(e.componente_codigo); }).join(' + ') + ' en Cervantes</span>' : '') + '</div>' +
       '<button onclick="pedImpStockDesgCerrar()" style="width:auto;margin-top:0;background:#fff;color:#0369a1;border:0;border-radius:8px;padding:4px 11px;font-size:14px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
       '<div style="padding:10px 14px 14px">' + h + '</div></div>';
   };
@@ -1084,7 +1084,7 @@ async function pedImpCfgCodigo(codEnc, provEnc) {
   _impCfgRender();
 }
 async function openPedidosImportacion() {
-  _stkPopShell("📦 Pedidos Importación", "stkPopBody", true);
+  _stkPopShell("Pedidos Importación", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = '<div class="stkpop-empty">Calculando pedidos de importación…</div>';
   let data = { items: [], meses: 10 };
@@ -1333,19 +1333,19 @@ function _pedHechoPie() {
   el.innerHTML =
     '<div class="phc-tot">' + (t.n ? ('<b>' + t.n + '</b> artículo(s) · <b>' + _pedHechoFmt(t.uni) + '</b> u · <b>' + (Math.round(t.cajas * 100) / 100).toLocaleString("es-AR") + '</b> cajas · <b>' + (Math.round(t.mc * 100) / 100).toLocaleString("es-AR") + '</b> master cajas') : 'Cargá al menos un artículo con unidades.') + '</div>' +
     '<div style="display:flex;gap:8px"><button class="phc-btn" onclick="pedHechoCerrar()">Cancelar</button>' +
-    '<button class="phc-btn go" ' + (ok ? '' : 'disabled') + ' onclick="pedHechoGuardar()">' + (_pedHecho.guardando ? '⏳ Guardando…' : '✅ Guardar pedido') + '</button></div>';
+    '<button class="phc-btn go" ' + (ok ? '' : 'disabled') + ' onclick="pedHechoGuardar()">' + (_pedHecho.guardando ? 'Guardando…' : '✅ Guardar pedido') + '</button></div>';
 }
 function _pedHechoRender() {
   var ov = document.getElementById("pedHechoOv"); if (!ov || !_pedHecho) return;
   var st = _pedHecho;
   var opts = '<option value="">— Elegí —</option>' + st.provs.map(function (p) { return '<option value="' + escapeHtml(p) + '"' + (p === st.prov ? ' selected' : '') + '>' + escapeHtml(p) + '</option>'; }).join("");
   ov.innerHTML =
-    '<div class="phc-card"><div class="phc-head"><b>➕ Cargar pedido ya hecho</b><button class="phc-x" onclick="pedHechoCerrar()">Cerrar</button></div>' +
+    '<div class="phc-card"><div class="phc-head"><b>Cargar pedido ya hecho</b><button class="phc-x" onclick="pedHechoCerrar()">Cerrar</button></div>' +
     '<div class="phc-body">' +
       '<div class="phc-row">' +
-        '<div class="phc-f" style="flex:1 1 240px"><label>🏭 Proveedor</label><select onchange="pedHechoSetProv(this.value)">' + opts + '</select></div>' +
-        '<div class="phc-f" style="flex:1 1 160px"><label>📄 Pedido (PI)</label><input type="text" placeholder="PI B260601" value="' + escapeHtml(st.ref || "") + '" onchange="pedHechoSetRef(this.value)" title="Número de proforma. Agrupa estas líneas como UN pedido en la solapa 🚢 En curso."></div>' +
-        '<div class="phc-f" style="flex:0 0 auto"><label>🚢 Embarque</label>' + _pedImpFechaInputHtml(st.embarque, "pedHechoSetEmbarque(v)", 'title="Día que sale de China. Opcional." style="width:96px"') + '</div>' +
+        '<div class="phc-f" style="flex:1 1 240px"><label>Proveedor</label><select onchange="pedHechoSetProv(this.value)">' + opts + '</select></div>' +
+        '<div class="phc-f" style="flex:1 1 160px"><label>Pedido (PI)</label><input type="text" placeholder="PI B260601" value="' + escapeHtml(st.ref || "") + '" onchange="pedHechoSetRef(this.value)" title="Número de proforma. Agrupa estas líneas como UN pedido en la solapa En curso."></div>' +
+        '<div class="phc-f" style="flex:0 0 auto"><label>Embarque</label>' + _pedImpFechaInputHtml(st.embarque, "pedHechoSetEmbarque(v)", 'title="Día que sale de China. Opcional." style="width:96px"') + '</div>' +
         '<div class="phc-f" style="flex:0 0 auto"><label>🛬 Llegada</label>' + _pedImpFechaInputHtml(st.fecha, "pedHechoSetFecha(v)", 'title="Día que llega. Es el reingreso que ve la página LK." style="width:96px"') + '</div>' +
       '</div>' +
       '<div class="phc-tabs">' +
@@ -1402,7 +1402,7 @@ function _pedHechoRenderCuerpo(soloTabla) {
   if (soloTabla) { var t = document.getElementById("phTabla"); if (t) { t.innerHTML = tabla; return; } }
   el.innerHTML =
     '<div class="phc-hint">Tipeá las <b>unidades</b> de cada código que ya pediste. Las <b>cajas</b> y <b>master cajas</b> salen solas (⚠ = no entra justo en la caja).</div>' +
-    '<input class="phc-uni" style="width:100%;height:36px;text-align:left;margin-bottom:8px" placeholder="🔎 Filtrar por código o descripción" value="' + escapeHtml(st.q || "") + '" oninput="pedHechoBuscar(this.value)">' +
+    '<input class="phc-uni" style="width:100%;height:36px;text-align:left;margin-bottom:8px" placeholder="Filtrar por código o descripción" value="' + escapeHtml(st.q || "") + '" oninput="pedHechoBuscar(this.value)">' +
     '<div id="phTabla">' + tabla + '</div>';
 }
 function _pedHechoPreview() {
@@ -1523,7 +1523,7 @@ function _pedImpEnCaminoHtml(it, cls) {
   return u.toLocaleString("es-AR") + (f ? ' <span class="' + (cls || 'pedimp-camino-f') + '" style="color:#0369a1;font-weight:700" title="Llega (reingreso estimado)">' + f + '</span>' : ' <span style="color:#b45309;font-size:11px" title="Sin fecha de reingreso cargada">s/f</span>');
 }
 /* v24.74 (Thomas) — «FOB en viaje» = los u$s TOTALES de los pedidos en viaje, el mismo número
-   de 🚢 En curso (gv_importados_pedidos_curso, una fila por PI + proveedor). No es una estimación
+   de En curso (gv_importados_pedidos_curso, una fila por PI + proveedor). No es una estimación
    unidades × FOB de hoy. Se lee aparte y, si falla, no se muestra (no se inventa un 0). */
 var _pedImpViaje = { st: "", porProv: {}, nPorProv: {} };
 function _pedImpViajeCargar() {
@@ -1684,20 +1684,20 @@ function _pedImpRender() {
   const _chip = function (on) { return 'width:auto;margin:0;flex:0 0 auto;padding:5px 10px;border-radius:999px;border:1px solid ' + (on ? '#0f766e' : '#cbd5e1') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap'; };
   const _menuBtn = 'display:block;width:100%;margin:0;padding:8px 12px;border:0;border-radius:6px;background:#fff;color:#0f172a;font-size:13px;font-weight:700;text-align:left;cursor:pointer;white-space:nowrap';
   h += '<div class="pedimp-bar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">' +
-    '<input class="pedimp-q" type="text" enterkeyhint="search" autocomplete="off" placeholder="🔎 Código(s) o descripción" value="' + escapeHtml(_qRaw) + '" oninput="pedImpSetQ(this.value)" style="width:auto;margin:0;flex:1 1 170px;min-width:150px;max-width:360px;height:32px;border:1.5px solid ' + (_buscando ? '#0f766e' : '#cbd5e1') + ';border-radius:8px;padding:0 10px;font-size:13.5px;box-sizing:border-box;background:#fff">' +
+    '<input class="pedimp-q" type="text" enterkeyhint="search" autocomplete="off" placeholder="Código(s) o descripción" value="' + escapeHtml(_qRaw) + '" oninput="pedImpSetQ(this.value)" style="width:auto;margin:0;flex:1 1 170px;min-width:150px;max-width:360px;height:32px;border:1.5px solid ' + (_buscando ? '#0f766e' : '#cbd5e1') + ';border-radius:8px;padding:0 10px;font-size:13.5px;box-sizing:border-box;background:#fff">' +
     (_buscando ? '<button class="mva-clear" style="width:auto;margin:0" onclick="pedImpSetQ(\'\')" title="Limpiar la búsqueda">✕</button>' : '') +
     '<span style="display:inline-flex;flex:0 0 auto"><button style="' + _seg(soloPedir, true) + '" onclick="pedImpSetFiltro(true)" title="Sólo lo que hay que pedir">Solo Pedido</button><button style="' + _seg(!soloPedir, false) + '" onclick="pedImpSetFiltro(false)" title="Todos los artículos">Ver Todo</button></span>' +
-    '<label title="Fecha estimada de entrega que ven los clientes en el carrito del portal LK antes de confirmar. Vacía = no se muestra." style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:#1e3a8a;flex:0 0 auto">📅 ' +
+    '<label title="Fecha estimada de entrega que ven los clientes en el carrito del portal LK antes de confirmar. Vacía = no se muestra." style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:#1e3a8a;flex:0 0 auto">Entrega ' +
     _pedImpFechaInputHtml(_entrega, "pedImpSetEntregaGlobal(v)", 'style="width:80px;margin:0;height:30px;padding:0 6px;border:1px solid ' + (_entrega ? '#1d4ed8' : '#cbd5e1') + ';border-radius:8px;font-size:12.5px;background:#fff;box-sizing:border-box"') + '</label>' +
     '<details class="pedimp-mas" style="position:relative;flex:0 0 auto"><summary title="Más acciones" style="list-style:none;cursor:pointer;padding:3px 11px;border:1px solid #cbd5e1;border-radius:999px;background:#fff;font-size:15px;font-weight:900;color:#334155;user-select:none">⋯</summary>' +
       '<div style="position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.18);padding:4px;min-width:220px">' +
-      '<button style="' + _menuBtn + '" onclick="this.closest(\'details\').open=false;pedImpExportExcel()" title="Bajar a Excel lo que se está viendo">📥 Excel</button>' +
-      '<button style="' + _menuBtn + '" onclick="this.closest(\'details\').open=false;pedImpCargarPedidoHecho()" title="Registrar un pedido ya hecho por fuera (unidades en curso + fecha estimada de entrega)">➕ Cargar pedido ya hecho</button>' +
+      '<button style="' + _menuBtn + '" onclick="this.closest(\'details\').open=false;pedImpExportExcel()" title="Bajar a Excel lo que se está viendo">Excel</button>' +
+      '<button style="' + _menuBtn + '" onclick="this.closest(\'details\').open=false;pedImpCargarPedidoHecho()" title="Registrar un pedido ya hecho por fuera (unidades en curso + fecha estimada de entrega)">Cargar pedido ya hecho</button>' +
       '<details style="padding:4px 12px 6px"><summary style="cursor:pointer;font-size:13px;font-weight:700;color:#0f172a">ⓘ Cómo se usa</summary>' +
-        '<div class="stkpop-hint" style="margin:6px 0 0;white-space:normal;max-width:300px">Índice <b>' + (data.meses || 10) + ' meses</b>. El pedido va en <b>master cajas redondas</b>: tocá la celda <b>MC</b> para ajustarlo (<b>0</b> = no pedir). <b>Unidades = MC × uni/master</b>. 🧩 = parte · ✏️ en curso · 📥 llegó · 🖨 PDF para que el chino cotice (sin FOB). En pantalla angosta la tabla se desliza al costado.</div></details>' +
+        '<div class="stkpop-hint" style="margin:6px 0 0;white-space:normal;max-width:300px">Índice <b>' + (data.meses || 10) + ' meses</b>. El pedido va en <b>master cajas redondas</b>: tocá la celda <b>MC</b> para ajustarlo (<b>0</b> = no pedir). <b>Unidades = MC × uni/master</b>. = parte · ✏️ en curso · llegó · PDF para que el chino cotice (sin FOB). En pantalla angosta la tabla se desliza al costado.</div></details>' +
       '</div></details>' +
     // v24.76 (Luis) — reporte en PDF de los proveedores que se elijan, en el hueco de la derecha
-    '<button class="pedimp-rep-btn" onclick="pedImpRepAbrir()" title="PDF con la lógica del de Damián (pedido · sin pedir · discontinuos) de los proveedores que elijas" style="width:auto;margin:0 0 0 auto;flex:0 0 auto;padding:6px 14px;border:1px solid #1e3a8a;border-radius:8px;background:#1e3a8a;color:#fff;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap">🖨 IMPRIMIR PDF</button>' +
+    '<button class="pedimp-rep-btn" onclick="pedImpRepAbrir()" title="PDF con la lógica del de Damián (pedido · sin pedir · discontinuos) de los proveedores que elijas" style="width:auto;margin:0 0 0 auto;flex:0 0 auto;padding:6px 14px;border:1px solid #1e3a8a;border-radius:8px;background:#1e3a8a;color:#fff;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap">IMPRIMIR PDF</button>' +
     (_buscando ? '<span style="font-size:11.5px;color:#0f766e;font-weight:700;flex-basis:100%">' + items.length + ' ítem(s) · se busca en <b>todos</b> los proveedores, pidan o no</span>' : '') +
     '</div>';
   // Proveedores: UNA fila que se desliza; la alerta va como número (⚠N) con el detalle en el title.
@@ -1726,20 +1726,20 @@ function _pedImpRender() {
     (function () { const _src = provFiltro ? allItems.filter(function (it) { return (it.prov || "(sin proveedor)") === provFiltro; }) : allItems;
       _pedImpViajeCargar(); void _src;
       const _c = provFiltro ? _pedImpViajeUsd(provFiltro) : Object.keys(_pedImpViaje.porProv || {}).reduce(function (s, p) { return s + _pedImpViajeUsd(p); }, 0);
-      return _c > 0 ? '<span class="pedimp-camino-fob-tot" style="font-size:13px;font-weight:800;color:#0369a1;white-space:nowrap" title="u$s totales de los pedidos en viaje (los mismos de 🚢 En curso)">en viaje ' + _usd0(_c) + '</span>' : ''; })() +
+      return _c > 0 ? '<span class="pedimp-camino-fob-tot" style="font-size:13px;font-weight:800;color:#0369a1;white-space:nowrap" title="u$s totales de los pedidos en viaje (los mismos de En curso)">en viaje ' + _usd0(_c) + '</span>' : ''; })() +
     // v24.60 (Thomas) — consumo por mes de todo lo que se ve (proy × FOB), aunque hoy no pida nada
     (function () { const _src = provFiltro ? allItems.filter(function (it) { return (it.prov || "(sin proveedor)") === provFiltro; }) : allItems;
       const _c = _src.reduce(function (s, it) { return s + (it.proyUni > 0 && it.fobUni > 0 ? it.proyUni * it.fobUni : 0); }, 0);
       return _c > 0 ? '<span class="pedimp-consumo-tot" style="font-size:13px;font-weight:800;color:#b45309;white-space:nowrap" title="Consumo por mes: Estadística Madre u/mes × FOB, sumado sobre ' + (provFiltro ? escapeHtml(provFiltro) : 'todos los proveedores') + '">consumo ' + _usd0(_c) + '/mes</span>' : ''; })() +
     (_nSinFob || _nSinVol ? '<span style="font-size:11px;color:#b45309;font-weight:700">⚠ ' + [_nSinFob ? _nSinFob + ' sin FOB' : '', _nSinVol ? _nSinVol + ' sin volumen' : ''].filter(Boolean).join(' · ') + '</span>' : '') +
     '<span style="flex:1 1 0;min-width:0"></span>' +
-    '<label style="' + _lbl + '" title="Cómo viaja el pedido. El costo NO recuperable (derechos, flete, tasas, despachante' + (Object.keys(_NTL_PROVEEDORES).length ? ' y 5% NTL en los proveedores que facturan por NTL' : '') + ') queda pegado al costo del artículo. Cada proveedor se calcula como su propio embarque.">🚢 <select class="pedimp-modo" onchange="pedImpSetNacCfg(\'impo_nac_modo\',this.value)" style="width:auto;margin:0;height:28px;border:1px solid #c4b5fd;border-radius:7px;padding:0 4px;font-size:12.5px;font-weight:700;color:#6b21a8;background:#fff">' +
+    '<label style="' + _lbl + '" title="Cómo viaja el pedido. El costo NO recuperable (derechos, flete, tasas, despachante' + (Object.keys(_NTL_PROVEEDORES).length ? ' y 5% NTL en los proveedores que facturan por NTL' : '') + ') queda pegado al costo del artículo. Cada proveedor se calcula como su propio embarque."><select class="pedimp-modo" onchange="pedImpSetNacCfg(\'impo_nac_modo\',this.value)" style="width:auto;margin:0;height:28px;border:1px solid #c4b5fd;border-radius:7px;padding:0 4px;font-size:12.5px;font-weight:700;color:#6b21a8;background:#fff">' +
       [["consolidada", "Consolidada"], ["full", "Contenedor"], ["avion", "Avión"]].map(function (o) { return '<option value="' + o[0] + '"' + (_nac.modo === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' +
     (_nac.modo === "consolidada" ? '<label style="' + _lbl + '" title="Valor del m³ de flete, en u$s">m³ u$s <input type="number" inputmode="decimal" min="0" value="' + _nac.valorM3 + '" onchange="pedImpSetNacCfg(\'impo_nac_valor_m3\',this.value)" style="width:54px;' + _numIn + '"></label>' : '') +
     (_nac.modo === "avion" ? '<label style="' + _lbl + '" title="Peso total del embarque en toneladas (avión cobra por kg)">TN <input type="number" inputmode="decimal" min="0" value="' + (_nac.tn || "") + '" onchange="pedImpSetNacTn(this.value)" placeholder="0" style="width:50px;' + _numIn + '"></label>' : '') +
     // v24.58 (Thomas) — el mínimo del pedido (25k) se sacó: es una norma general, no un requisito.
     // v23.91 (Luis) — los parámetros generales se editan acá, no adentro del ⚙ de un proveedor
-    '<button class="mva-clear" style="width:auto;margin:0;padding:4px 9px;font-size:12px;background:#4338ca;color:#fff;border-color:#4338ca" onclick="pedImpCfgGralAbrir()" title="⚙ Generales: tasas, tope de estadística, valor del m³, mínimo y MOQ que valen para todos los proveedores que no tengan el suyo propio">⚙</button>' +
+    '<button class="mva-clear" style="width:auto;margin:0;padding:4px 9px;font-size:12px;background:#4338ca;color:#fff;border-color:#4338ca" onclick="pedImpCfgGralAbrir()" title="Generales: tasas, tope de estadística, valor del m³, mínimo y MOQ que valen para todos los proveedores que no tengan el suyo propio">⚙</button>' +
     '</div>';
   let algo = false;
   // v24.32 — la tarjeta se achica al ancho de la tabla más ancha que se dibuje
@@ -1770,8 +1770,8 @@ function _pedImpRender() {
     const _nBajo = arr.filter(function (it) { const m = _pedImpMesesStock(it); return m != null && m < _PEDIMP_MESES_ALERTA; }).length;
     h += '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#fff">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#f8fafc;border-bottom:1px solid #e2e8f0">' +
-      '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + _pedImpAlertaBadge(_nBajo) + _pedImpQuiebreBadge(arr.filter(function (it) { return _pedImpQuiebre(it); }).length) + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span class="pedimp-fob" style="color:#065f46;font-size:16px;font-weight:800;white-space:nowrap" title="FOB del pedido de este proveedor">FOB u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') +
-        (totCamUsd > 0 ? ' · <span class="pedimp-camino-fob" style="color:#0369a1;font-weight:800;white-space:nowrap" title="u$s totales de ' + nCam + ' pedido(s) en viaje de este proveedor (los mismos de 🚢 En curso)">en viaje FOB ' + _usd0(totCamUsd) + '</span>' : '') +
+      '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + _pedImpAlertaBadge(_nBajo) + _pedImpQuiebreBadge(arr.filter(function (it) { return _pedImpQuiebre(it); }).length) + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span class="pedimp-fob" style="color:#065f46;font-size:16px;font-weight:800;white-space:nowrap" title="FOB del pedido de este proveedor">FOB u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') +
+        (totCamUsd > 0 ? ' · <span class="pedimp-camino-fob" style="color:#0369a1;font-weight:800;white-space:nowrap" title="u$s totales de ' + nCam + ' pedido(s) en viaje de este proveedor (los mismos de En curso)">en viaje FOB ' + _usd0(totCamUsd) + '</span>' : '') +
         // v24.59 (Thomas) — el consumo por mes (proyección × FOB) vuelve acá, sin el mínimo
         (_burnN > 0 ? ' · <span class="pedimp-consumo" style="color:#b45309;font-weight:700" title="Consumo por mes: Estadística Madre u/mes × FOB de cada artículo">consumo ' + _usd0(_burnN) + '/mes</span>' : '') + '</div></div>' +
       '<div style="display:flex;gap:7px;flex:1 1 auto;min-width:0;max-width:100%;flex-wrap:wrap;align-items:center;justify-content:flex-end">' +   // v24.54 (Thomas): en el celular los botones se cortaban (no se veían los PDF): ahora bajan de línea
@@ -1779,9 +1779,9 @@ function _pedImpRender() {
       // TODOS los códigos de este proveedor (GV_Imp_Proveedor.meses_objetivo).
       _pedImpMesesSel(prov, provEnc) +
       // v23.89 (Luis) — los parámetros de ESTE proveedor se editan acá, no en el módulo de OCs
-      '<button class="mva-clear" style="background:#0f766e;color:#fff;border-color:#0f766e" onclick="pedImpCfgAbrir(\'' + provEnc + '\')" title="Derechos, comisión NTL, mínimo, MOQ y los códigos de este proveedor">⚙ Configurar</button>' +
-      '<button class="mva-clear" style="background:#1e6bd6;color:#fff;border-color:#1e6bd6" onclick="pedImpPdfProv(\'' + provEnc + '\')" title="PDF del pedido de este proveedor: Código, Master Cajas, Inner Cajas y Unidades (sin FOB)">🖨 PDF pedido</button>' +
-      '<button class="mva-clear" style="background:#7c2d12;color:#fff;border-color:#7c2d12" onclick="pedImpPdfDamian(\'' + provEnc + '\')" title="PDF interno para Damián: código, descripción, foto, stock, máximo, pedido en master cajas, FOB y m³, con los totales y cómo se compone el pedido">📄 PDF para Damián</button>' +
+      '<button class="mva-clear" style="background:#0f766e;color:#fff;border-color:#0f766e" onclick="pedImpCfgAbrir(\'' + provEnc + '\')" title="Derechos, comisión NTL, mínimo, MOQ y los códigos de este proveedor">Configurar</button>' +
+      '<button class="mva-clear" style="background:#1e6bd6;color:#fff;border-color:#1e6bd6" onclick="pedImpPdfProv(\'' + provEnc + '\')" title="PDF del pedido de este proveedor: Código, Master Cajas, Inner Cajas y Unidades (sin FOB)">PDF pedido</button>' +
+      '<button class="mva-clear" style="background:#7c2d12;color:#fff;border-color:#7c2d12" onclick="pedImpPdfDamian(\'' + provEnc + '\')" title="PDF interno para Damián: código, descripción, foto, stock, máximo, pedido en master cajas, FOB y m³, con los totales y cómo se compone el pedido">PDF para Damián</button>' +
       '</div>' +
       '</div>';
     // v22.37 — banda de proyección al mínimo + costo de nacionalización estimado.
@@ -1828,9 +1828,9 @@ function _pedImpRender() {
       const _hayCurso = _dets.some(function (d) { return Number(d.curso) > 0; });
       const _cervDen = _dets.map(function (d) { return _impCervDen.porImp[d.id]; }).filter(Boolean)[0];   // v25.37
       const actHtml = !_dets.length ? '' : '<div style="margin:1px 0"><span style="white-space:nowrap">' +
-          '<button class="stk-btn" style="padding:3px 8px;font-size:14px" title="📦 Baches: cada pedido en curso con su propia fecha de reingreso. Alta, edición y llegadas (total o parcial). El En curso y el Reingreso salen de acá (la fecha más cercana)." onclick="_pedImpAccionConfirmar(\'baches\',\'' + _codEncV + '\',function(){pedImpBachesDe(\'' + _detsEnc + '\',\'' + _codEncV + '\')})">📦</button>' +
+          '<button class="stk-btn" style="padding:3px 8px;font-size:14px" title="Baches: cada pedido en curso con su propia fecha de reingreso. Alta, edición y llegadas (total o parcial). El En curso y el Reingreso salen de acá (la fecha más cercana)." onclick="_pedImpAccionConfirmar(\'baches\',\'' + _codEncV + '\',function(){pedImpBachesDe(\'' + _detsEnc + '\',\'' + _codEncV + '\')})">📦</button>' +
           /* v25.66 (Luis, 01/10): el 📥 está SIEMPRE — sin pedido en viaje el pop-up avisa que no hay pedido registrado */
-          ' <button class="stk-btn" style="padding:3px 8px;font-size:14px;' + (_hayCurso ? 'background:#0f766e;color:#fff;border-color:#0f766e;' : 'background:#fff;color:#0f766e;border-color:#0f766e;') + 'font-weight:800" title="📥 RECIBIR: recibir lo que llegó de este código: cuánto, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Queda en el Historial de recepción.' + (_hayCurso ? '' : ' Este código NO tiene pedido en viaje: se puede recibir igual (queda como SIN PEDIDO).') + '" onclick="_pedImpAccionConfirmar(\'recibir\',\'' + _codEncV + '\',function(){impRecibirCodigo(\'' + _detsEnc + '\')})">📥</button>' + _impCervDenChip(_cervDen, true) + '</span></div>';
+          ' <button class="stk-btn" style="padding:3px 8px;font-size:14px;' + (_hayCurso ? 'background:#0f766e;color:#fff;border-color:#0f766e;' : 'background:#fff;color:#0f766e;border-color:#0f766e;') + 'font-weight:800" title="RECIBIR: recibir lo que llegó de este código: cuánto, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Queda en el Historial de recepción.' + (_hayCurso ? '' : ' Este código NO tiene pedido en viaje: se puede recibir igual (queda como SIN PEDIDO).') + '" onclick="_pedImpAccionConfirmar(\'recibir\',\'' + _codEncV + '\',function(){impRecibirCodigo(\'' + _detsEnc + '\')})">📥</button>' + _impCervDenChip(_cervDen, true) + '</span></div>';
       const _m3m = Number(it.m3Master) || 0;
       const _dimTip = it.m3Dims && it.m3Dims.l ? (it.m3Dims.l + '×' + it.m3Dims.a + '×' + it.m3Dims.h + ' cm') : '';
       // v14.97 — uni/master NO se edita desde la tabla (dueño: "al pedo editarlo desde ahí").
@@ -1867,7 +1867,7 @@ function _pedImpRender() {
     : ('No hay importados ' + (soloPedir ? 'para pedir (todo en o sobre el objetivo)' : 'cargados') + '.')) + '</div>';
   // v24.32 (Luis) — "OPTIMIZACIÓN DE ESPACIO": la tarjeta mide lo que mide la tabla. Sin esto
   // la tarjeta iba a 1760px, la tabla estiraba al 100% y todo el sobrante caía en Descripción.
-  try { const _card = body.closest ? body.closest(".stkpop-card") : null; if (_card) _card.style.maxWidth = _anchoMax > 0 ? ('min(' + (_anchoMax + 34) + 'px,98vw)') : ''; } catch (_e) {}
+  try { const _card = body.closest ? body.closest(".stkpop-card") : null; if (_card) _card.style.maxWidth = _anchoMax > 0 ? ('min(' + (_anchoMax + 34) + 'px,98vw,100%)') : ''; } catch (_e) {}
   _renderKeepFocus(body, h);   // v22.09 — el buscador re-renderiza en cada tecla: sin esto se pierde el foco
 }
 /* v10.38 — PDF del pedido de UN proveedor: Código · Master Cajas · Inner Cajas · Unidades (SIN FOB),
@@ -1958,7 +1958,7 @@ function _pedImpMoqPdf(it) {
   return '<span class="moq">↑ ' + Math.round(m.pct * 100) + '% MOQ<br>' + (Math.round(m.mesesNec * 10) / 10).toLocaleString("es-AR") + ' m</span>';
 }
 /* v25.13 (Thomas) — las HOJAS del PDF para Damián de UN proveedor (pedido · sin pedir · discontinuos).
-   La usa 📄 PDF para Damián (un proveedor) y 🖨 IMPRIMIR PDF con un solo proveedor tildado.
+   La usa PDF para Damián (un proveedor) y IMPRIMIR PDF con un solo proveedor tildado.
    opt.soloPed → sólo la hoja del pedido. Devuelve null si el proveedor no tiene ningún ítem,
    "" si con opt.soloPed no pide nada. Las hojas las arma _pedImpDamianPartes. */
 async function _pedImpDamianHojas(prov, opt) {
@@ -1973,7 +1973,7 @@ async function _pedImpDamianHojas(prov, opt) {
    - con VARIOS, una sola tabla por hoja («Pedido 02/oct», con el total general arriba) y cada
      proveedor en su renglón-rótulo (tr.prov) con SUS totales en las mismas columnas. Una sola
      tabla = las columnas alineadas entre proveedores y el ancho lo da el dato más ancho de todos.
-   ⚠ v26.39: 🖨 IMPRIMIR PDF ya no la llama con varios proveedores (va una por proveedor, ver
+   ⚠ v26.39: IMPRIMIR PDF ya no la llama con varios proveedores (va una por proveedor, ver
    pedImpRepImprimir); el modo de varios queda sin llamador.
    opt.soloPed → sólo la hoja del pedido. opt.discAll → los discontinuos ya leídos
    (_pedImpDamianDisc; null = no se pudieron leer). null si ningún proveedor tiene ítems. */
@@ -2161,7 +2161,7 @@ async function _pedImpCursoFob() {
 /* v26.39 (Luis, 02/10) — la HOJA RESUMEN del paquete: por proveedor, lo que tiene en curso (u$s), lo que
    se va a pedir (FOB u$s), el % de nacionalización de ESE pedido (no recuperable sobre FOB, la misma cuenta
    de la banda de la pantalla) y la urgencia (_pedImpUrgencia), ordenado del más urgente al menos.
-   En curso = los u$s de 🚢 En curso (gv_importados_pedidos_curso); si no se pudo leer, la suma de lo que
+   En curso = los u$s de En curso (gv_importados_pedidos_curso); si no se pudo leer, la suma de lo que
    viene en camino de sus artículos. Devuelve { html, orden } (orden = los proveedores por urgencia) o null. */
 async function _pedImpResumenHoja(provs, opt) {
   opt = opt || {};
@@ -2261,13 +2261,13 @@ function pedImpRepAbrir() {
   const chk = 'width:18px;height:18px;margin:0;flex:0 0 auto';
   ov.innerHTML = '<style>#impRepOv button{width:auto;margin-top:0}#impRepOv input{box-sizing:border-box}</style>' +
     '<div style="background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3);padding:14px 16px;max-width:360px;width:100%;max-height:90vh;overflow:auto">' +
-    '<div style="font-size:16px;font-weight:800;color:#1e3a8a;margin-bottom:8px;text-align:center">🖨 Reporte PDF</div>' +
+    '<div style="font-size:16px;font-weight:800;color:#1e3a8a;margin-bottom:8px;text-align:center">Reporte PDF</div>' +
     '<label style="' + lab + ';border-bottom:1px solid #e2e8f0;margin-bottom:4px"><input type="checkbox" id="impRepTodos" style="' + chk + '"' + (sel ? '' : ' checked') + ' onchange="Array.prototype.forEach.call(document.querySelectorAll(\'.imp-rep-prov\'),function(c){c.checked=this.checked}.bind(this))"> Todos</label>' +
     provs.map(function (p) { return '<label style="' + lab + '"><input type="checkbox" class="imp-rep-prov" value="' + escapeHtml(p) + '" style="' + chk + '"' + (!sel || sel === p ? ' checked' : '') + '> ' + escapeHtml(p) + '</label>'; }).join('') +
     '<label style="' + lab + ';border-top:1px solid #e2e8f0;margin-top:6px;padding-top:8px"><input type="checkbox" id="impRepSoloPed" style="' + chk + '"> Sólo lo que genera pedido</label>' +
     '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px">' +
     '<button onclick="document.getElementById(\'impRepOv\').remove()" style="padding:7px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:14px;font-weight:700;cursor:pointer">Cancelar</button>' +
-    '<button class="imp-rep-ok" onclick="pedImpRepImprimir()" style="padding:7px 14px;border:1px solid #1e3a8a;border-radius:8px;background:#1e3a8a;color:#fff;font-size:14px;font-weight:800;cursor:pointer">🖨 Imprimir</button>' +
+    '<button class="imp-rep-ok" onclick="pedImpRepImprimir()" style="padding:7px 14px;border:1px solid #1e3a8a;border-radius:8px;background:#1e3a8a;color:#fff;font-size:14px;font-weight:800;cursor:pointer">Imprimir</button>' +
     '</div></div>';
   ov.addEventListener("click", function (e) { if (e.target === ov) ov.remove(); });
   document.body.appendChild(ov);
@@ -2326,7 +2326,7 @@ function pedImpRepVista(html) {
     '<div class="imp-rep-vista" style="background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3);padding:10px;display:flex;flex-direction:column;gap:8px;max-height:94vh;width:min(840px,100%)">' +
     '<div style="display:flex;gap:8px;justify-content:center">' +
     '<button onclick="pedImpRepAbrir()" style="padding:7px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:14px;font-weight:700;cursor:pointer">← Volver</button>' +
-    '<button class="imp-rep-print" onclick="document.getElementById(\'impRepOv\').remove();_pedImpPrintConFotos(window._pedImpRepHtmlUlt)" style="padding:7px 14px;border:1px solid #1e3a8a;border-radius:8px;background:#1e3a8a;color:#fff;font-size:14px;font-weight:800;cursor:pointer">🖨 Imprimir</button>' +
+    '<button class="imp-rep-print" onclick="document.getElementById(\'impRepOv\').remove();_pedImpPrintConFotos(window._pedImpRepHtmlUlt)" style="padding:7px 14px;border:1px solid #1e3a8a;border-radius:8px;background:#1e3a8a;color:#fff;font-size:14px;font-weight:800;cursor:pointer">Imprimir</button>' +
     '<button onclick="document.getElementById(\'impRepOv\').remove()" style="padding:7px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:14px;font-weight:700;cursor:pointer">✕</button></div>' +
     '<iframe class="imp-rep-prev" style="flex:1 1 auto;width:100%;height:80vh;border:1px solid #cbd5e1;border-radius:6px;background:#fff"></iframe></div>';
   ov.querySelector("iframe.imp-rep-prev").srcdoc = html;
@@ -2439,7 +2439,7 @@ async function pedImpReload() {
 /* v25.37 (30/09) — «Denegado por Cervantes». Lo que se recibe con destino 🏭 Cervantes le aparece a Cervantes
    en Recepción de Insumos de GP2 con Sí / No. Si dice NO, el trigger gv_ingreso_virgilio_denegado vuelve a
    poner el pedido EN VIAJE (le resta lo llegado) y acá se marca con este chip: en la fila del código, en
-   📦 Baches, en 📥 RECIBIR y en el Historial [usuario: "en el mismo lugar que se cargaron las 3000 uni del
+   Baches, en RECIBIR y en el Historial [usuario: "en el mismo lugar que se cargaron las 3000 uni del
    rallador que vuelvan a aparecer con un cartelito de «Denegado por Cervantes»"]. Lectura propia con su propio
    catch: si falla, la pantalla anda igual, sin chips. */
 var _impCervDen = { porBache: {}, porImp: {}, st: "" };
@@ -2851,21 +2851,21 @@ function _impBachesRender() {
       "<td>" + f + "</td>" +
       '<td><span class="ibc-tag ' + (enc ? "en" : "ll") + '">' + (enc ? "en curso" : "llegado") + "</span>" + (enc ? _impCervDenChip(_impCervDen.porBache[r.id]) : "") + "</td>" +
       '<td style="white-space:nowrap">' +
-        (enc ? '<button class="ibc-b ok" title="Recibir lo que llegó: cuánto, empresa y a dónde va (queda en stock y en el historial)" onclick="impRecibirBache(' + r.id + ')">📥 Recibir</button>' +
+        (enc ? '<button class="ibc-b ok" title="Recibir lo que llegó: cuánto, empresa y a dónde va (queda en stock y en el historial)" onclick="impRecibirBache(' + r.id + ')">Recibir</button>' +
                '<button class="ibc-b ed" onclick="pedImpBacheEditar(' + r.id + ')" title="Editar unidades/fecha">✏️</button>' +
                '<button class="ibc-b rm" onclick="pedImpBacheBorrar(' + r.id + ')" title="Anular">🗑</button>' : "—") +
       "</td></tr>";
   }).join("");
   ov.innerHTML =
-    '<div class="ibc-card"><div class="ibc-head"><b>📦 Baches — ' + escapeHtml(codCanon(_impBaches.cod)) + (_impBaches.prov ? (" · " + escapeHtml(_impBaches.prov)) : "") + "</b>" +
+    '<div class="ibc-card"><div class="ibc-head"><b>Baches — ' + escapeHtml(codCanon(_impBaches.cod)) + (_impBaches.prov ? (" · " + escapeHtml(_impBaches.prov)) : "") + "</b>" +
       '<button class="ibc-x" onclick="pedImpBachesCerrar()">Cerrar</button></div>' +
     '<div class="ibc-body">' +
       (rows.length
-        ? '<table class="ibc-tbl"><thead><tr><th>Pedido</th><th class="num">Unidades</th><th class="num">Pendiente</th><th title="Día que embarca (sale de China). Se edita por pedido en la solapa 🚢 En curso.">Embarque</th><th>Reingreso</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>' + body + "</tbody></table>"
+        ? '<table class="ibc-tbl"><thead><tr><th>Pedido</th><th class="num">Unidades</th><th class="num">Pendiente</th><th title="Día que embarca (sale de China). Se edita por pedido en la solapa En curso.">Embarque</th><th>Reingreso</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>' + body + "</tbody></table>"
         : '<div class="ibc-empty">Sin baches todavía. Agregá el primero.</div>') +
     "</div>" +
     '<div class="ibc-foot"><div style="font-size:13px;color:#334155">En curso pendiente: <b>' + _impBachesFmt(totalPend) + '</b> u · el reingreso que ve la página es la fecha <b>más cercana</b></div>' +
-      '<button class="ibc-b add" onclick="pedImpBacheAdd()">➕ Agregar bache</button></div></div>';
+      '<button class="ibc-b add" onclick="pedImpBacheAdd()">Agregar bache</button></div></div>';
 }
 async function pedImpBacheAdd() {
   if (!_impBaches) return;
@@ -2875,7 +2875,7 @@ async function pedImpBacheAdd() {
   if (!(uni > 0)) { try { alert("Unidades inválidas."); } catch (_e) {} return; }
   // v15.85 — el bache va atado a un PEDIDO (el PI). Sin eso queda suelto en la solapa 🚢 En curso.
   var refPre = ""; try { (_impBaches.rows || []).some(function (x) { if (x.estado === "en_curso" && x.pedido_ref) { refPre = x.pedido_ref; return true; } return false; }); } catch (_e) {}
-  var rv; try { rv = prompt("Número de PI / referencia del pedido (agrupa las líneas en 🚢 En curso).\nVacío = queda suelto:", refPre); } catch (_e) { rv = null; }
+  var rv; try { rv = prompt("Número de PI / referencia del pedido (agrupa las líneas en En curso).\nVacío = queda suelto:", refPre); } catch (_e) { rv = null; }
   if (rv === null) return;
   var ref = String(rv).trim();
   var fv; try { fv = prompt("Fecha estimada de reingreso (dd/mm/aa).\nVacío = sin fecha:", ""); } catch (_e) { fv = null; }
@@ -2964,19 +2964,19 @@ function _impRecShell(titulo, inner) {
 }
 // Desde la tabla: un Importados.id puede tener varios baches en curso → se elige cuál llegó.
 async function impRecibirAbrir(importadoId, det) {
-  _impRecShell("📥 Recibir importación", '<div class="irc-muted">Cargando pedidos en curso…</div>');
+  _impRecShell("Recibir importación", '<div class="irc-muted">Cargando pedidos en curso…</div>');
   var rows;
   try { rows = (await _pedImpRpc("gv_importado_baches", { p_importado_id: importadoId })) || []; }
-  catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">No se pudieron leer los pedidos: ' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
+  catch (e) { _impRecShell("Recibir importación", '<div class="irc-conf">No se pudieron leer los pedidos: ' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
   var enc = rows.filter(function (r) { return r.estado === "en_curso" && Number(r.pendiente) > 0; });
   await _impCervDenCargar();   // v25.37
   if (!enc.length) return _impRecSinPedidoAviso([det || { id: importadoId, cod: (rows[0] && rows[0].cod_art) || "" }]);   // v25.66
   if (enc.length === 1) return impRecibirBache(enc[0].id);
   var h = '<div class="irc-sec"><h4>¿Qué pedido llegó?</h4>' + enc.map(function (r) {
-    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecibirBache(' + r.id + ')">📥 ' + escapeHtml(r.pedido_ref || ("bache " + r.id)) + '</button><span class="irc-muted">' +
+    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecibirBache(' + r.id + ')">' + escapeHtml(r.pedido_ref || ("bache " + r.id)) + '</button><span class="irc-muted">' +
       Number(r.pendiente).toLocaleString("es-AR") + ' u pendientes' + (r.fecha_reingreso ? ' · llega ' + escapeHtml(String(r.fecha_reingreso).slice(0, 10)) : '') + '</span>' + _impCervDenChip(_impCervDen.porBache[r.id]) + '</div>';
   }).join('') + '</div>';
-  _impRecShell("📥 Recibir importación", h);
+  _impRecShell("Recibir importación", h);
 }
 // v24.80 — el 📥 del código: junta los pedidos en viaje de TODOS sus artículos del maestro.
 function _impDetsDe(enc) { try { return JSON.parse(decodeURIComponent(enc)) || []; } catch (_e) { return []; } }
@@ -2984,12 +2984,12 @@ function _impDetLbl(d) { return escapeHtml(codCanon(d.cod || "")) + (d.marca ? '
 async function impRecibirCodigo(enc) {
   var dets = _impDetsDe(enc);
   if (dets.length === 1) return impRecibirAbrir(dets[0].id, dets[0]);
-  _impRecShell("📥 Recibir importación", '<div class="irc-muted">Cargando pedidos en curso…</div>');
+  _impRecShell("Recibir importación", '<div class="irc-muted">Cargando pedidos en curso…</div>');
   var enc2 = [];
   try {
     var res = await Promise.all(dets.map(function (d) { return _pedImpRpc("gv_importado_baches", { p_importado_id: d.id }); }));
     res.forEach(function (rows, k) { (rows || []).forEach(function (r) { if (r.estado === "en_curso" && Number(r.pendiente) > 0) enc2.push({ r: r, d: dets[k] }); }); });
-  } catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">No se pudieron leer los pedidos: ' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
+  } catch (e) { _impRecShell("Recibir importación", '<div class="irc-conf">No se pudieron leer los pedidos: ' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
   await _impCervDenCargar();   // v25.37
   if (!enc2.length) return _impRecSinPedidoAviso(dets);   // v25.66
   if (enc2.length === 1) return impRecibirBache(enc2[0].r.id);
@@ -3000,25 +3000,25 @@ async function impRecibirCodigo(enc) {
   } catch (_e) {}
   var h = '<div class="irc-sec"><h4>¿Qué llegó?</h4>' + enc2.map(function (x) {
     var r = x.r;
-    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecibirBache(' + r.id + ')">📥 ' + (x.ins ? escapeHtml(x.ins) + ' <span style="font-weight:600">(insumo)</span>' : _impDetLbl(x.d)) + '</button><span class="irc-muted">' +
+    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecibirBache(' + r.id + ')">' + (x.ins ? escapeHtml(x.ins) + ' <span style="font-weight:600">(insumo)</span>' : _impDetLbl(x.d)) + '</button><span class="irc-muted">' +
       escapeHtml(r.pedido_ref || ("bache " + r.id)) + ' · ' + Number(r.pendiente).toLocaleString("es-AR") + ' u pendientes' + (r.fecha_reingreso ? ' · llega ' + escapeHtml(_isoToDdMmAa(String(r.fecha_reingreso).slice(0, 10))) : '') + '</span>' + _impCervDenChip(_impCervDen.porBache[r.id]) + '</div>';
   }).join('') + '</div>';
-  _impRecShell("📥 Recibir importación", h);
+  _impRecShell("Recibir importación", h);
 }
 // v24.80 — el 📦 del código: con más de un artículo del maestro, se elige de cuál son los baches.
 function pedImpBachesDe(enc, codEnc) {
   var dets = _impDetsDe(enc);
   if (dets.length === 1) return pedImpBaches(dets[0].id, codEnc, encodeURIComponent(dets[0].prov || ""));
   var h = '<div class="irc-sec"><h4>¿Baches de cuál?</h4>' + dets.map(function (d) {
-    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecCerrar();pedImpBaches(' + d.id + ',\'' + encodeURIComponent(d.cod || "") + '\',\'' + encodeURIComponent(d.prov || "") + '\')">📦 ' + _impDetLbl(d) + '</button></div>';
+    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecCerrar();pedImpBaches(' + d.id + ',\'' + encodeURIComponent(d.cod || "") + '\',\'' + encodeURIComponent(d.prov || "") + '\')">' + _impDetLbl(d) + '</button></div>';
   }).join('') + '</div>';
-  _impRecShell("📦 Baches", h);
+  _impRecShell("Baches", h);
 }
 async function impRecibirBache(bacheId) {
-  _impRecShell("📥 Recibir importación", '<div class="irc-muted">Cargando lugares del Mapa…</div>');
+  _impRecShell("Recibir importación", '<div class="irc-muted">Cargando lugares del Mapa…</div>');
   var ctx;
   try { ctx = await _pedImpRpc("gv_imp_recibir_contexto", { p_bache_id: bacheId }); }
-  catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
+  catch (e) { _impRecShell("Recibir importación", '<div class="irc-conf">' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
   _impRecIniciar(ctx, "imprec-" + bacheId);
 }
 /* v25.66 (Luis, 01/10): «que de la posibilidad de recibir algo por más que no haya pedido … que el pop-up alerte».
@@ -3031,15 +3031,15 @@ function _impRecSinPedidoAlerta() {
 }
 function _impRecSinPedidoAviso(dets) {
   var h = _impRecSinPedidoAlerta() + '<div class="irc-sec"><h4>¿Recibir igual?</h4>' + (dets || []).map(function (d) {
-    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecibirSinPedido(' + Number(d.id) + ')">📥 Recibir sin pedido ' + _impDetLbl(d) + '</button></div>';
+    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecibirSinPedido(' + Number(d.id) + ')">Recibir sin pedido ' + _impDetLbl(d) + '</button></div>';
   }).join('') + '<div class="irc-row"><button class="irc-b sec" onclick="impRecCerrar()">Cancelar</button></div></div>';
-  _impRecShell("📥 Recibir importación", h);
+  _impRecShell("Recibir importación", h);
 }
 async function impRecibirSinPedido(importadoId) {
-  _impRecShell("📥 Recibir importación", '<div class="irc-muted">Cargando lugares del Mapa…</div>');
+  _impRecShell("Recibir importación", '<div class="irc-muted">Cargando lugares del Mapa…</div>');
   var ctx;
   try { ctx = await _pedImpRpc("gv_imp_recibir_contexto_sin_pedido", { p_importado_id: importadoId }); }
-  catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
+  catch (e) { _impRecShell("Recibir importación", '<div class="irc-conf">' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
   _impRecIniciar(ctx, "imprec-sp" + importadoId);
 }
 function _impRecIniciar(ctx, cidBase) {
@@ -3109,7 +3109,7 @@ function _impRecRender() {
     /* v25.26 (Luis, 30/09): «No aparece Cervantes» — estaba adentro de un menú que decía «Insumos», al lado del
        menú de LUGARES (posiciones de rack), que es el que se mira. Los destinos van a la vista, como botones. */
     var opts = Object.keys(_IMP_REC_DEST).filter(function (k) { return k !== "insumos" || (c.insumos_cods || []).length; })
-      .map(function (k) { return '<button type="button" class="irc-b irc-dest ' + (l.destino === k ? 'on' : 'sec') + '" data-dest="' + k + '" onclick="impRecLinea(' + i + ',\'destino\',\'' + k + '\')">' + (k === "cervantes" ? "🏭 " : "") + _IMP_REC_DEST[k] + '</button>'; }).join('');
+      .map(function (k) { return '<button type="button" class="irc-b irc-dest ' + (l.destino === k ? 'on' : 'sec') + '" data-dest="' + k + '" onclick="impRecLinea(' + i + ',\'destino\',\'' + k + '\')">' + (k === "cervantes" ? "" : "") + _IMP_REC_DEST[k] + '</button>'; }).join('');
     var lug = _impRecLugares(l);
     var lugHtml = '';
     if (l.destino === "gondola" && !lug.length) lugHtml = '<span class="irc-conf" style="margin:0">Este código no tiene celda de góndola en el Mapa' + (c.dual && _impRec.empresa ? ' para ' + _impRec.empresa : '') + '</span>';
@@ -3150,7 +3150,7 @@ function _impRecRender() {
     (tot.uni > 0 && tot.uni < pend
       /* v25.69 (Luis, D16): la casilla viene DESMARCADA (recepción parcial: lo que falta sigue pedido) y,
          marcada, dice sin vueltas que se cierra el PEDIDO TOTAL */
-      ? '<div class="irc-muted" style="margin-top:8px;font-size:14px">📦 Recepción <b>parcial</b>: siguen pedidas <b>' + (pend - tot.uni).toLocaleString("es-AR") + ' u</b> de ' + pend.toLocaleString("es-AR") + '.</div>' +
+      ? '<div class="irc-muted" style="margin-top:8px;font-size:14px">Recepción <b>parcial</b>: siguen pedidas <b>' + (pend - tot.uni).toLocaleString("es-AR") + ' u</b> de ' + pend.toLocaleString("es-AR") + '.</div>' +
         '<label class="irc-cerrar" style="display:flex;gap:8px;align-items:flex-start;margin-top:6px;font-size:13.5px;cursor:pointer;padding:6px 8px;border-radius:8px;border:1.5px solid ' + (_impRec.cerrar ? '#b91c1c;background:#fef2f2' : '#cbd5e1') + '"><input type="checkbox" style="width:18px;height:18px;margin:2px 0 0" ' + (_impRec.cerrar ? 'checked' : '') + ' onchange="impRecSet(\'cerrar\',this.checked)"><span>' +
         (_impRec.cerrar ? '<b style="color:#b91c1c">⛔ Se CIERRA EL PEDIDO COMPLETO.</b> Se da por recibido TODO el pedido: las ' + (pend - tot.uni).toLocaleString("es-AR") + ' u que faltan dejan de estar pedidas y quedan anotadas como faltante.'
                         : '<b>Cerrar el pedido completo</b> (marcalo sólo si no va a llegar nada más: las ' + (pend - tot.uni).toLocaleString("es-AR") + ' u que faltan dejan de estar pedidas).') + '</span></label>' : '') + '</div>';
@@ -3159,9 +3159,9 @@ function _impRecRender() {
   if (_impRec.sim && _impRec.sim.ok) h += '<div class="irc-ok">✓ Revisado: no hay conflictos de espacio. Tocá <b>Confirmar recepción</b> para grabarla.</div>';
   h += '<div style="margin-top:10px">' + (_impRec.sim && _impRec.sim.ok
       ? '<button class="irc-b pri" onclick="impRecGrabar()">✅ Confirmar recepción</button>'
-      : '<button class="irc-b pri" onclick="impRecRevisar()">🔎 Revisar espacio</button>') +
+      : '<button class="irc-b pri" onclick="impRecRevisar()">Revisar espacio</button>') +
     '<button class="irc-b sec" onclick="impRecCerrar()">Cancelar</button></div>';
-  _impRecShell("📥 Recibir importación", h);
+  _impRecShell("Recibir importación", h);
 }
 function _impRecConfHtml(cf, l, i) {
   var txt = String(cf.conflicto || ""), op = '';
@@ -3274,16 +3274,16 @@ async function impRecGrabar() {
   if (!r || !r.ok) { _impRec.sim = r; _impRec.err = "Apareció un conflicto de espacio mientras cargabas: resolvelo y confirmá de nuevo."; _impRecRender(); return; }
   _impRec.hecho = true;
   var dest = _impRec.lineas.map(function (l) { return l.cantidad + (_impRecU(l) ? " u" : " cj") + " → " + _IMP_REC_DEST[l.destino] + (l.sector ? " " + l.sector : ""); }).join(" · ");
-  _impRecShell("📥 Recepción grabada", '<div class="irc-ok">✓ Recibidas <b>' + Number(r.unidades).toLocaleString("es-AR") + ' u</b> (' + r.cajas + ' cajas). ' + escapeHtml(dest) + '</div>' +
+  _impRecShell("Recepción grabada", '<div class="irc-ok">✓ Recibidas <b>' + Number(r.unidades).toLocaleString("es-AR") + ' u</b> (' + r.cajas + ' cajas). ' + escapeHtml(dest) + '</div>' +
     '<div class="irc-muted" style="margin-top:8px">' + (r.repetida ? "(Ya estaba grabada: no se cargó dos veces.) " : "") +
     (r.sin_pedido ? "Quedó anotada como recepción SIN PEDIDO (no había pedido en viaje). " : r.estado === "llegado" ? "El pedido quedó RECIBIDO y ya no figura en viaje." + (Number(r.faltante) > 0 ? " Faltaron " + Number(r.faltante).toLocaleString("es-AR") + " u (anotadas)." : "") : "El pedido sigue en curso con lo que falta.") +
     (!r.sin_pedido && Number(r.sobra) > 0 ? ' Llegaron ' + Number(r.sobra).toLocaleString("es-AR") + ' u más de lo pedido: entraron al stock igual.' : '') + '</div>' +
-    (_impRec.lineas.some(function (l) { return l.destino === "cervantes"; }) ? '<div class="irc-ok" style="margin-top:8px">🏭 Lo que va a <b>Cervantes</b> no entró al stock de Virgilio: les aparece en <b>Recepción de Insumos → Importados</b> de GP2 para que digan <b>Sí</b> o <b>No</b>. Si dicen No, el pedido vuelve a estar en viaje con «Denegado por Cervantes».</div>' : '') +
+    (_impRec.lineas.some(function (l) { return l.destino === "cervantes"; }) ? '<div class="irc-ok" style="margin-top:8px">Lo que va a <b>Cervantes</b> no entró al stock de Virgilio: les aparece en <b>Recepción de Insumos → Importados</b> de GP2 para que digan <b>Sí</b> o <b>No</b>. Si dicen No, el pedido vuelve a estar en viaje con «Denegado por Cervantes».</div>' : '') +
     '<div style="margin-top:10px"><button class="irc-b pri" onclick="impRecCerrar()">Listo</button><button class="irc-b sec" onclick="impRecCerrar();openImpHistRecep()">Ver historial de recepción</button></div>');
 }
 /* v26.98 (Luis, 05/10) — Solapa ➕ Agregar artículo: alta de un importado nuevo (código, medidas de la MC y
    del inner, unidades por inner y por MC, FOB, descripción, MOQ, proveedor) y el PRIMER PEDIDO a mano, que se
-   guarda en Importados.pedido_manual (unidades): 📦 Pedidos lo toma como MC pedido mientras el código no tenga
+   guarda en Importados.pedido_manual (unidades): Pedidos lo toma como MC pedido mientras el código no tenga
    pedido en curso, y la base lo borra sola al cargar el primer bache (trigger gv_importados_bache_primer_pedido).
    v26.99 (Luis: "AGREGAR O MODIFICAR PRODUCTO … que impacte en todos los lugares pertinentes de stock … si
    necesitas que pida más data, que la pida") — la solapa también MODIFICA un importado existente, y pide además
@@ -3300,7 +3300,7 @@ function _impAltaNum(v) {
 }
 function _impAltaNuevo() { return { modo: "nuevo", id: null, v: { marca: "LK" }, orig: null, mcTocado: false, msg: "", msgTipo: "", guardando: false, ok: null, cargando: false }; }
 async function openImpAgregar() {
-  _stkPopShell("➕ Agregar o modificar producto importado", "stkPopBody", true);
+  _stkPopShell("Agregar o modificar producto importado", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;
   _stkPop = { kind: "impAlta" };
   if (!_impAlta) _impAlta = _impAltaNuevo();
@@ -3386,14 +3386,14 @@ function _impAltaRender() {
   if (A.ok) {
     const o = A.ok;
     h += '<div class="iaf"><div class="iaf-ok">✓ <b>' + escapeHtml(_impPad(o.cod)) + '</b> (' + escapeHtml(o.marca) + ') ' + (o.alta ? 'quedó dado de alta' : 'quedó modificado') + ' con ' + escapeHtml(o.prov) + '.' +
-      (o.mc > 0 ? ' Primer pedido: <b>' + fm(o.mc) + ' MC</b> (' + fm(o.uni) + ' u), figura en 📦 Pedidos.' : '') +
+      (o.mc > 0 ? ' Primer pedido: <b>' + fm(o.mc) + ' MC</b> (' + fm(o.uni) + ' u), figura en Pedidos.' : '') +
       '<div style="margin-top:4px;font-size:13px">Cargado en: ' + escapeHtml(o.hechos.join(" · ")) + '. Stocks lo muestra en hasta 2 min (lo que tarda en refrescarse).</div></div>' +
-      '<div class="iaf-bar"><button class="stk-btn" onclick="_impAlta=null;openPedidosImportacion()">📦 Ver en Pedidos</button>' +
-      '<button class="stk-btn" onclick="impAltaModo(\'nuevo\')">➕ Agregar otro</button><button class="stk-btn" onclick="impAltaModo(\'mod\')">✏️ Modificar otro</button></div></div>';
+      '<div class="iaf-bar"><button class="stk-btn" onclick="_impAlta=null;openPedidosImportacion()">Ver en Pedidos</button>' +
+      '<button class="stk-btn" onclick="impAltaModo(\'nuevo\')">Agregar otro</button><button class="stk-btn" onclick="impAltaModo(\'mod\')">✏️ Modificar otro</button></div></div>';
     body.innerHTML = h + _impAltaCss(); return;
   }
   h += '<div class="iaf" id="impAltaF">' +
-    '<div class="iaf-bar" style="margin-bottom:10px"><button ' + bt(!mod) + ' onclick="impAltaModo(\'nuevo\')">➕ Nuevo producto</button><button ' + bt(mod) + ' onclick="impAltaModo(\'mod\')">✏️ Modificar uno existente</button></div>';
+    '<div class="iaf-bar" style="margin-bottom:10px"><button ' + bt(!mod) + ' onclick="impAltaModo(\'nuevo\')">Nuevo producto</button><button ' + bt(mod) + ' onclick="impAltaModo(\'mod\')">✏️ Modificar uno existente</button></div>';
   if (mod && !A.id) {
     h += '<div class="iaf-g">' + (A.lista === null ? '<div class="iaf-err">No se pudo leer el maestro de importados. Probá de nuevo.</div>' :
       '<div>' + lbl("Buscá el producto (código o descripción)") + '<input id="impAltaBusq" list="impAltaLista" placeholder="438E · LK · Colador…" style="width:380px" onchange="impAltaElegir(this.value)">' +
@@ -3441,7 +3441,7 @@ function _impAltaRender() {
       '<div>' + lbl("Góndola") + '<b>' + (gonds ? escapeHtml(gonds) : 'sin lugar') + '</b><div class="iaf-s">se asigna y se edita en el Mapa' +
         (typeof openPlanimMapa === "function" ? ' · <a href="#" onclick="openPlanimMapa();return false">abrir el Mapa</a>' : '') + '</div></div>' +
     '</div>' +
-    '<div class="iaf-ped"><div class="iaf-pt">🧾 Primer pedido a mandar <small>(a mano: un artículo nuevo no tiene Estadística Madre)</small></div>' +
+    '<div class="iaf-ped"><div class="iaf-pt">Primer pedido a mandar <small>(a mano: un artículo nuevo no tiene Estadística Madre)</small></div>' +
       (enCurso > 0 ? '<div class="iaf-s">Ya tiene ' + fm(enCurso) + ' u en curso: el primer pedido a mano no se usa.</div>' : '') +
       '<div class="iaf-g" style="align-items:end">' +
         '<div>' + lbl("MC a pedir") + '<input data-k="mc" inputmode="numeric" value="' + (A.mcTocado ? val("mc") : String(c.sugMc || "")) + '" style="width:80px" oninput="_impAlta.mcTocado=true;_impAltaCambio(\'mc\')">' +
@@ -3449,9 +3449,9 @@ function _impAltaRender() {
         '<div class="iaf-n">' + lbl("Unidades") + '<b>' + fm(c.uni) + '</b>' + (c.moq > 0 && c.uni > 0 && c.uni < c.moq ? '<div class="iaf-s" style="color:#b45309">debajo del MOQ</div>' : '') + '</div>' +
         '<div class="iaf-n">' + lbl("FOB <small>u$s</small>") + '<b>' + (c.usd > 0 ? fm(c.usd, 2) : '—') + '</b></div>' +
         '<div class="iaf-n">' + lbl("m³") + '<b>' + (c.m3tot != null ? fm(c.m3tot, 2) : '—') + '</b></div>' +
-      '</div><div class="iaf-s">0 = no pedir todavía. Se puede cambiar en 📦 Pedidos (MC pedido); se borra solo al cargar el primer bache.</div></div>' +
+      '</div><div class="iaf-s">0 = no pedir todavía. Se puede cambiar en Pedidos (MC pedido); se borra solo al cargar el primer bache.</div></div>' +
     (A.msg ? '<div class="' + (A.msgTipo === "err" ? "iaf-err" : "iaf-ok") + '">' + escapeHtml(A.msg) + '</div>' : '') +
-    '<div class="iaf-bar"><button class="stk-btn" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8;font-weight:800"' + (A.guardando ? ' disabled' : '') + ' onclick="impAltaGuardar()">' + (A.guardando ? 'Guardando…' : (mod ? '💾 Guardar cambios' : '💾 Dar de alta')) + '</button></div>' +
+    '<div class="iaf-bar"><button class="stk-btn" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8;font-weight:800"' + (A.guardando ? ' disabled' : '') + ' onclick="impAltaGuardar()">' + (A.guardando ? 'Guardando…' : (mod ? 'Guardar cambios' : 'Dar de alta')) + '</button></div>' +
   '</div>';
   body.innerHTML = h + _impAltaCss();
 }
@@ -3525,7 +3525,7 @@ async function impAltaGuardar() {
    discontinuos de importados"). Son los de Importados.activo = false: la pantalla de Pedidos los
    saca con activo=eq.true, y acá se listan con su stock y en camino para que no se pierdan. */
 async function openImpDisc() {
-  _stkPopShell("🚫 Importados discontinuos", "stkPopBody", true);
+  _stkPopShell("Importados discontinuos", "stkPopBody", true);
   var body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = _impTabsHtml('disc') + '<div class="stkpop-empty">Cargando…</div>';
   _stkPop = { kind: "impDisc" };
@@ -3544,7 +3544,7 @@ async function openImpDisc() {
   if (!rows.length) { body.innerHTML = h + '<div class="stkpop-empty">No hay importados discontinuos.</div>'; return; }
   rows.sort(function (a, b) { return String(a.cod_art).localeCompare(String(b.cod_art), "es", { numeric: true }); });
   var n = function (v) { var x = Number(v) || 0; return x ? x.toLocaleString("es-AR", { maximumFractionDigits: 0 }) : '<span style="color:#94a3b8">0</span>'; };
-  h += '<div style="font-size:12px;color:#64748b;margin:0 0 6px;text-align:center">' + rows.length + ' códigos dados de baja · no salen en 📦 Pedidos ni en el PDF</div>' +
+  h += '<div style="font-size:12px;color:#64748b;margin:0 0 6px;text-align:center">' + rows.length + ' códigos dados de baja · no salen en Pedidos ni en el PDF</div>' +
     '<table class="mva-tbl" style="margin:0 auto;width:auto"><thead><tr><th>Código</th><th>Descripción</th><th>Emp.</th><th>Proveedor</th><th class="num">Stock<br><small>u</small></th><th class="num">En camino<br><small>u</small></th><th>Motivo</th></tr></thead><tbody>' +
     rows.map(function (r) {
       var c = String(r.cod_art || "").trim();
@@ -3554,7 +3554,7 @@ async function openImpDisc() {
   body.innerHTML = h;
 }
 /* v29.11 (Luis, 09/10: "que el operario no tenga que elegir el pedido para recepcionar. que eso se resuelva en el
-   modulo de importacion") — 📥 Recibido. Lo que los operarios cargan por Ingreso a racks → 📦 Importación ya movió
+   modulo de importacion") — Recibido. Lo que los operarios cargan por Ingreso a racks → Importación ya movió
    el stock; acá se ve contra qué pedido se descontó (gv_imp_imputar_ingreso_racks) y se cambia si hace falta.
    Con DOS o más pedidos en viaje del mismo código la base NO elige: queda «a elegir» y se resuelve acá
    (gv_imp_ir_asignar). Nada de esto mueve stock. Badge = renglones sin revisar (gv_imp_ir_avisos). */
@@ -3572,7 +3572,7 @@ async function impIrLoadBadge() {
   } catch (_e) { /* sin sesión de supervisor o sin red: el badge queda como estaba */ }
 }
 async function openImpRecibidoOp() {
-  _stkPopShell("📥 Recibido por operarios", "stkPopBody", true);
+  _stkPopShell("Recibido por operarios", "stkPopBody", true);
   var body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = _impTabsHtml('recop') + '<div class="stkpop-empty">Cargando…</div>';
   _stkPop = { kind: "impIr", rows: [], err: "", todos: false, sel: {} };
@@ -3611,7 +3611,7 @@ function _impIrRender() {
   if (!_stkPop || _stkPop.kind !== "impIr") return;
   var body = document.getElementById("stkPopBody"); if (!body) return;
   var h = _impTabsHtml('recop') +
-    '<div class="stkpop-hint">Lo que cargaron los operarios por <b>Ingreso a racks → 📦 Importación</b>. El stock ya entró. Si hay un solo pedido en viaje de ese código se descuenta solo; si hay <b>dos o más</b>, se elige acá. <b>↔</b> cambia el pedido contra el que se descontó. Lo cargado <b>antes del 09/10</b> (↺ revisar) no se descontó solo: elegí el pedido o marcá ✓ Visto si ya estaba descontado.</div>';
+    '';
   if (_stkPop.err) { body.innerHTML = h + '<div class="stkpop-empty">No se pudo leer lo recibido: ' + escapeHtml(_stkPop.err) + '</div>'; return; }
   var all = _stkPop.rows || [];
   var rows = _stkPop.todos ? all : all.filter(function (r) { return r.pendiente; });
@@ -3652,9 +3652,9 @@ function _impIrRender() {
 }
 /* Solapa 📜 Historial (v23.91, Luis: "debería pasar a ser Historial y mostrar recepción y
    pedidos"). Dos vistas del mismo circuito: lo que se PIDIÓ (baches, agrupados por pedido y
-   proveedor → gv_imp_pedidos_historial) y lo que se RECIBIÓ con 📥 RECIBIR. */
+   proveedor → gv_imp_pedidos_historial) y lo que se RECIBIÓ con RECIBIR. */
 async function openImpHistRecep() {
-  _stkPopShell("📜 Historial de importaciones", "stkPopBody", true);
+  _stkPopShell("Historial de importaciones", "stkPopBody", true);
   var body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = _impTabsHtml('hist') + '<div class="stkpop-empty">Cargando historial…</div>';
   _stkPop = { kind: "impHist", rows: [], peds: [], q: "", dias: 365, vista: "rec" };
@@ -3723,14 +3723,11 @@ function _impHistRender() {
   };
   var h = _impTabsHtml('hist') +
     '<div style="display:flex;gap:7px;margin:0 0 9px;flex-wrap:wrap">' +
-      sub("ped", "🚢 Pedidos", (_stkPop.peds || []).length) + sub("rec", "📥 Recepciones", (_stkPop.rows || []).length) + '</div>' +
-    '<div class="stkpop-hint">' + (esPed
-      ? 'Lo que se le <b>pidió</b> a cada fábrica: un renglón por pedido, con cuándo se cargó, cuándo embarca, cuándo reingresa y cuánto llegó. Un pedido sin PI se agrupa por el día en que se cargó.'
-      : 'Cada recepción hecha con <b>📥 RECIBIR</b>: cuándo, qué, cuánto, de qué empresa, dónde se guardó y quién la cargó. Lo marcado ⚠ se puso igual aunque el lugar tenía un conflicto de espacio.') + '</div>' +
+      sub("ped", "Pedidos", (_stkPop.peds || []).length) + sub("rec", "Recepciones", (_stkPop.rows || []).length) + '</div>' +
     '<input type="search" placeholder="Buscar código, proveedor, pedido o persona" value="' + escapeHtml(_stkPop.q || "") + '" oninput="impHistBuscar(this.value)" style="height:36px;border:1.5px solid #cbd5e1;border-radius:8px;padding:0 10px;font-size:14px;width:min(420px,100%);margin:0 0 10px">';
   if (esPed) { body.innerHTML = h + _impHistPedidosHtml(); return; }
   if (_stkPop.err) h += '<div class="stkpop-empty">No se pudo leer el historial: ' + escapeHtml(_stkPop.err) + '</div>';
-  else if (!rows.length) h += '<div class="stkpop-empty">' + (q ? 'Nada coincide con la búsqueda.' : 'Todavía no hay recepciones cargadas con 📥 RECIBIR.') + '</div>';
+  else if (!rows.length) h += '<div class="stkpop-empty">' + (q ? 'Nada coincide con la búsqueda.' : 'Todavía no hay recepciones cargadas con RECIBIR.') + '</div>';
   else {
     h += '<div class="mva-tblwrap" style="max-height:66vh;overflow-x:auto"><table class="mva-tbl" style="font-size:13px;width:auto;min-width:0;table-layout:auto"><thead><tr><th>Fecha</th><th>Código</th><th>Emp.</th><th>Proveedor · pedido</th><th class="num">Recibido</th><th>Dónde</th><th>Quién</th><th>Nota</th><th></th></tr></thead><tbody>' +
       rows.map(function (r) {
@@ -3779,18 +3776,18 @@ async function pedImpBacheBorrar(bacheId) {
 }
 /* v22.91 — 📒 CUENTA CORRIENTE POR PROVEEDOR (Thomas, 26/09: "debería estar la cta corriente de Hugo Wong,
    Becky Chen, Ownland" · sobre el formato: "la que creas mejor, entendible y analizable").
-   Hasta acá la plata se veía POR PEDIDO (💵 Plata de 🚢 En curso) y la cuenta de NTL POR EMPRESA (💱 NTL):
+   Hasta acá la plata se veía POR PEDIDO (Plata de En curso) y la cuenta de NTL POR EMPRESA (NTL):
    nadie juntaba, por fábrica, cuánto le debemos, cuánto le giramos y por dónde. Tres bloques por
    proveedor, cada uno de UNA fuente con su etiqueta, sin sumar cosas de fuentes distintas:
      · HOY   — los pedidos en curso con la planilla de deudas: FOB · girado · a girar por banco · falta.
      · LIBRO — el PI (nos factura) y cada giro (le giramos) en orden de fecha, saldo corrido = FOB − giros.
      · HISTORIA — la hoja del proveedor del Excel de Thomas tal cual (con SU saldo, no se rehace) y el
-       extracto de NTL de esa fábrica (girado / recuperado). Sólo lectura: los giros se cargan en 🚢 En
-       curso (💵 Giros) y el extracto en 💱 NTL.
+       extracto de NTL de esa fábrica (girado / recuperado). Sólo lectura: los giros se cargan en En
+       curso (Giros) y el extracto en NTL.
    Backend: gv_imp_prov_cc_resumen() y gv_imp_prov_cc_libro(p_proveedor) — sql/gv_imp_prov_cuenta_v2291.sql. */
 let _impProv = null;
 async function openImpProvCC() {
-  _stkPopShell("📒 Cuenta corriente por proveedor", "stkPopBody", true);
+  _stkPopShell("Cuenta corriente por proveedor", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = '<div class="stkpop-empty">Cargando las cuentas por proveedor…</div>';
   _stkPop = { kind: "impProv" };
@@ -3859,14 +3856,11 @@ function _impProvRender() {
   }
   const st = _impProv, res = st.resumen || [];
   let h = _impTabsHtml('provcc');
-  h += '<div class="stkpop-hint">Una cuenta por <b>fábrica china</b>, armada con lo que ya está cargado. <b>Hoy</b> = la planilla de deudas ' +
-       '(cuánto le debemos por los pedidos en curso y por dónde se paga) · <b>Libro</b> = el PI y cada giro, en orden, con el saldo corrido · ' +
-       '<b>Historia</b> = la hoja del proveedor del Excel (con su saldo tal cual) y lo que el extracto de NTL le giró. ' +
-       'Cada renglón dice de qué fuente sale; no se suman fuentes distintas. Los giros se cargan en 🚢 En curso → 💵 Giros.</div>';
+  /* (Luis, 16/10/2026 — docs/GV-UI.md §5) sin párrafo explicativo arriba de la tabla */
   if (st.err) h += '<div class="stkpop-empty" style="color:#b91c1c">No se pudo leer: ' + escapeHtml(st.err) + '</div>';
   if (!res.length) { body.innerHTML = h + '<div class="stkpop-empty">No hay proveedores con cuenta.</div>'; return; }
   // fichas de proveedor, en el orden del backend (más deuda primero)
-  h += '<div class="ipc-prov"><span class="ipc-sub" style="font-size:12px">🏭 Proveedor:</span>' +
+  h += '<div class="ipc-prov"><span class="ipc-sub" style="font-size:12px">Proveedor:</span>' +
     res.map(function (r) {
       const s = Number(r.saldo) || 0;
       return '<button class="' + (st.prov === r.prov ? 'on' : '') + '" onclick="impProvSet(\'' + _impCursoEnc(r.prov) + '\')" title="' +
@@ -3880,7 +3874,7 @@ function _impProvRender() {
   h += '<div class="ipc-h">' + escapeHtml(r.prov) + (emp ? ' <span class="ipc-chip pi">' + escapeHtml(emp) + '</span>' : '') +
        ' <span class="ipc-sub">' + (r.pedidos || 0) + ' pedido(s) en curso · ' + _impCursoNum(r.unidades || 0) + ' u · ' +
        (Number(r.m3) || 0).toLocaleString("es-AR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' m³</span>' +
-       '<button class="ipc-b" style="margin-left:auto" onclick="impProvExportExcel()">⬇ Excel</button></div>';
+       '<button class="ipc-b" style="margin-left:auto" onclick="impProvExportExcel()">Excel</button></div>';
   // ---- HOY ----
   const dEmb = _impCursoDias(r.prox_embarque);
   h += '<div class="ipc-kpi">' +
@@ -3898,7 +3892,7 @@ function _impProvRender() {
   pedidos.forEach(function (p) {
     if ((Number(p.fob) || 0) > 0 && !(Number(p.pagado) > 0)) avisos.push('<b>' + escapeHtml(p.carga) + '</b> no tiene ningún giro cargado: figura como deuda entera (u$s ' + _impProvUsd(p.fob, 0) + ').');
   });
-  if (r.fob_difiere) avisos.push('Hay un PI cuyo FOB cargado difiere del que calcula el motor (ver 💵 Plata en 🚢 En curso).');
+  if (r.fob_difiere) avisos.push('Hay un PI cuyo FOB cargado difiere del que calcula el motor (ver Plata en En curso).');
   if (!(r.hoja_movs > 0)) avisos.push('Sin hoja histórica en el Excel (sólo Ownland y Frontier vinieron con hoja): lo anterior a los pedidos en curso está sólo en el extracto de NTL.');
   if (r.papa_fecha && Math.abs((Number(r.papa_real) || 0) - saldo) > 1) avisos.push('La planilla "formato papá" del ' + _impProvFecha(r.papa_fecha) + ' dice deuda real <b>u$s ' + _impProvUsd(r.papa_real, 0) + '</b> y ésta dice <b>u$s ' + _impProvUsd(saldo, 0) + '</b>: a una de las dos le falta un giro o un FOB.');
   if (avisos.length) h += '<div class="ipc-aviso">⚠ ' + avisos.join('<br>⚠ ') + '</div>';
@@ -3940,7 +3934,7 @@ function _impProvRender() {
         }).join('') + '</tbody></table>';
     }
     if (ntl.length) {
-      h += '<div class="ipc-sub" style="margin-bottom:4px">Extracto de <b>NTL</b> (Hong Kong), sólo los renglones de esta fábrica: <b>Girado</b> = lo que NTL le transfirió · <b>Recuperado</b> = lo que volvió a NTL al nacionalizar. Es la cuenta de NTL, no la del proveedor: se mira entera en 💱 NTL.</div>' +
+      h += '<div class="ipc-sub" style="margin-bottom:4px">Extracto de <b>NTL</b> (Hong Kong), sólo los renglones de esta fábrica: <b>Girado</b> = lo que NTL le transfirió · <b>Recuperado</b> = lo que volvió a NTL al nacionalizar. Es la cuenta de NTL, no la del proveedor: se mira entera en NTL.</div>' +
         '<table class="ipc-tbl" id="ipcNtl"><thead><tr><th>Fecha</th><th>Descripción</th><th>Empresa</th><th class="num">Girado</th><th class="num">Recuperado</th><th>Detalle</th></tr></thead><tbody>' +
         ntl.map(function (x) {
           return '<tr><td>' + _impProvFecha(x.fecha) + '</td><td>' + escapeHtml(x.concepto || '') + '</td><td>' + escapeHtml(_impNtlEmpNom(x.empresa)) + '</td><td class="num">' + (x.pago != null ? _impProvUsd(x.pago) : '') + '</td><td class="num">' + (x.recupero != null ? _impProvUsd(x.recupero) : '') + '</td><td class="ipc-sub">' + escapeHtml(x.detalle || '') + '</td></tr>';
@@ -3990,7 +3984,7 @@ function impProvExportExcel() {
    TODAS las líneas del pedido de una (RPC gv_importado_pedido_fechas); la de llegada además
    re-sincroniza Importados.reingreso_est (es la que ve el portal LK). */
 async function openImpEnCurso() {
-  _stkPopShell("🚢 Pedidos de importación en curso", "stkPopBody", true);
+  _stkPopShell("Pedidos de importación en curso", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = '<div class="stkpop-empty">Cargando pedidos en curso…</div>';
   _stkPop = { kind: "impCurso", rows: [], abierto: "", lineas: {}, provFiltro: "", refFiltro: "", cc: {}, vistaPlata: false,
@@ -4047,7 +4041,7 @@ function _impCursoEstado(r) {
   if (dl != null && dl < 0) return '<span class="imcu-tag atras">⚠ llegada vencida hace ' + Math.abs(dl) + ' d</span>';
   if (de == null) return '<span class="imcu-tag falta">⚠ falta la fecha de embarque</span>';
   if (de > 0) return '<span class="imcu-tag espera">embarca en ' + de + ' d</span>';
-  return '<span class="imcu-tag viaje">🚢 embarcado hace ' + Math.abs(de) + ' d</span>';
+  return '<span class="imcu-tag viaje">embarcado hace ' + Math.abs(de) + ' d</span>';
 }
 function _impCursoFechaCell(r, campo) {
   const iso = (campo === "emb" ? r.fecha_embarque : r.fecha_llegada) || "";
@@ -4064,7 +4058,7 @@ function _impCursoFechaCell(r, campo) {
                   : '<div class="imcu-sub falta">sin cargar</div>');
 }
 /* v15.73 — filtros de la pantalla: fichas de PROVEEDOR y de PEDIDO (mismo criterio que la solapa
-   📦 Pedidos, dueño 11/09: "poneme los mismos botones… para que pueda ver solo un pedido, cuánta
+   Pedidos, dueño 11/09: "poneme los mismos botones… para que pueda ver solo un pedido, cuánta
    plata es y todo"). Los totales de arriba (unidades, u$s, m³) se recalculan con lo filtrado, así
    parado en un pedido el cartel verde dice exactamente cuánta plata es ESE pedido. */
 function impCursoSetProv(provEnc) {
@@ -4148,7 +4142,7 @@ function _impCursoRender() {
   }
   const rows = _stkPop.rows || [];
   let h = _impTabsHtml('curso');
-  h += '<div class="stkpop-hint">Lo que <b>ya está pedido y viene en camino</b>, un renglón por <b>pedido</b> (el PI del proveedor). Esta pantalla <b>no</b> mira lo que el módulo sugiere pedir: sólo los baches <code>en curso</code>. Tocá una fecha para corregirla — se guarda en <b>todas las líneas del pedido</b> de una, y la de <b>llegada</b> es la que la página LK muestra como "Reingreso Est". Tocá el <b>PI</b> para abrir el detalle por artículo. Las <b>fichas</b> de arriba filtran por <b>proveedor</b> o por <b>pedido</b>: parado en uno, los totales (unidades, <b>u$s</b>, m³) son los de ESE pedido.</div>';
+  /* (Luis, 16/10/2026 — docs/GV-UI.md §5) sin párrafo explicativo arriba de la tabla */ 
   if (_stkPop.err) h += '<div class="stkpop-empty" style="color:#b91c1c">No se pudo leer: ' + escapeHtml(_stkPop.err) + '</div>';
   if (!rows.length) { body.innerHTML = h + '<div class="stkpop-empty">No hay pedidos de importación en curso.</div>'; return; }
 
@@ -4160,7 +4154,7 @@ function _impCursoRender() {
   const provFiltro = (_stkPop.provFiltro && provs.indexOf(_stkPop.provFiltro) >= 0) ? _stkPop.provFiltro : "";
   _stkPop.provFiltro = provFiltro;
   if (provs.length > 1) {
-    h += '<div class="imcu-fila"><span class="imcu-lbl">🏭 Proveedor:</span>' +
+    h += '<div class="imcu-fila"><span class="imcu-lbl">Proveedor:</span>' +
       '<button style="' + _fb(!provFiltro) + '" onclick="impCursoSetProv(\'\')">Todos</button>' +
       provs.map(function (p) {
         const n = rows.filter(function (r) { return r.proveedor === p; }).length;
@@ -4172,7 +4166,7 @@ function _impCursoRender() {
   const refFiltro = (_stkPop.refFiltro && refsBase.some(function (r) { return r.pedido_ref === _stkPop.refFiltro; })) ? _stkPop.refFiltro : "";
   _stkPop.refFiltro = refFiltro;
   if (refsBase.length > 1) {
-    h += '<div class="imcu-fila"><span class="imcu-lbl">📄 Pedido:</span>' +
+    h += '<div class="imcu-fila"><span class="imcu-lbl">Pedido:</span>' +
       '<button style="' + _fb(!refFiltro) + '" onclick="impCursoSetRef(\'\')">Todos</button>' +
       refsBase.map(function (r) {
         return '<button style="' + _fb(refFiltro === r.pedido_ref) + '" onclick="impCursoSetRef(\'' + _impCursoEnc(r.pedido_ref) + '\')" title="' + escapeHtml(r.proveedor) + ' · ' + _impCursoNum(r.pendiente) + ' u · u$s ' + _impCursoNum(Math.round(Number(r.usd) || 0)) + '">' + escapeHtml(r.pedido_ref) + '</button>';
@@ -4182,11 +4176,11 @@ function _impCursoRender() {
   // (la cuenta corriente: las mismas columnas del Excel con el que Thomas lleva la deuda).
   const plata = !!_stkPop.vistaPlata;
   h += '<div class="imcu-fila"><span class="imcu-lbl">Ver:</span>' +
-    '<button style="' + _fb(!plata) + '" onclick="impCursoSetVista(false)">📦 Logística</button>' +
-    '<button style="' + _fb(plata) + '" onclick="impCursoSetVista(true)" title="Cuenta corriente: FOB, pagado, pendiente de giro directo y lo que falta">💵 Plata</button>' +
+    '<button style="' + _fb(!plata) + '" onclick="impCursoSetVista(false)">Logística</button>' +
+    '<button style="' + _fb(plata) + '" onclick="impCursoSetVista(true)" title="Cuenta corriente: FOB, pagado, pendiente de giro directo y lo que falta">Plata</button>' +
     '</div>';
   h += '<div class="imcu-fila">' +
-    '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="impCursoExportExcel()" title="Bajar a Excel lo que se está viendo, con el detalle por artículo de cada pedido">📥 Excel</button>' +
+    '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="impCursoExportExcel()" title="Bajar a Excel lo que se está viendo, con el detalle por artículo de cada pedido">Excel</button>' +
     ((provFiltro || refFiltro) ? '<button class="mva-clear" onclick="impCursoSetProv(\'\')" title="Sacar los filtros">✕ Ver todo</button>' : '') +
     '</div>';
 
@@ -4196,7 +4190,7 @@ function _impCursoRender() {
   const tUsd = vista.reduce(function (s, r) { return s + (Number(r.usd) || 0); }, 0);
   const tM3 = vista.reduce(function (s, r) { return s + (Number(r.m3) || 0); }, 0);
   const sinEmb = vista.filter(function (r) { return !r.fecha_embarque; }).length;
-  const foco = refFiltro ? ('📄 ' + refFiltro) : (provFiltro ? ('🏭 ' + provFiltro) : "");
+  const foco = refFiltro ? ('' + refFiltro) : (provFiltro ? ('' + provFiltro) : "");
   const kTit = refFiltro ? "Este pedido" : (provFiltro ? "Pedidos de " + provFiltro : "Pedidos en curso");
   if (plata) {
     // los mismos cuatro números del Excel, sobre lo filtrado
@@ -4212,7 +4206,7 @@ function _impCursoRender() {
       '<div style="background:#fff7ed;border:1px solid #fed7aa"><div class="k" style="color:#b45309">Pend. giro directo</div><div class="v" style="color:#92400e">u$s ' + _impCursoNum(Math.round(tGiro)) + '</div></div>' +
       '<div style="background:#fef2f2;border:1px solid #fecaca"><div class="k" style="color:#b91c1c">Falta</div><div class="v" style="color:#991b1b">u$s ' + _impCursoNum(Math.round(tFalta)) + '</div></div>' +
       '</div>';
-    h += '<div class="stkpop-hint">Cuenta corriente con los chinos, igual que el Excel: <b>Falta = FOB − Pagado − Pend. giro directo</b>. <b>A nombre de</b> es quién factura y cobra (<b>NTL</b>, el forwarder de Hong Kong, o el proveedor); sólo las que van a nombre del proveedor tienen giro directo. <b>💵</b> abre los giros de ese pedido para cargar uno nuevo. La plata que sale viaja pegada a una importación ya nacionalizada aunque financie el pedido siguiente — está explicado en <code>docs/IMPORTACIONES-PAGOS-ARGENTINA.md</code>.</div>';
+    h += '<div class="stkpop-hint"><b>Falta = FOB − Pagado − Pend. giro directo</b></div>';
     h += _impCursoTablaPlata(vista);
     body.innerHTML = h;
     return;
@@ -4223,10 +4217,10 @@ function _impCursoRender() {
     '<div style="background:#ecfdf5;border:1px solid #a7f3d0"><div class="k" style="color:#047857">' + (refFiltro ? "Plata de este pedido (FOB)" : "FOB en camino") + '</div><div class="v" style="color:#065f46">u$s ' + _impCursoNum(Math.round(tUsd)) + '</div></div>' +
     '<div style="background:#eff6ff;border:1px solid #bfdbfe"><div class="k" style="color:#1d4ed8">Volumen</div><div class="v" style="color:#1e3a8a">' + (Math.round(tM3 * 10) / 10).toLocaleString("es-AR") + ' m³</div></div>' +
     '</div>';
-  if (sinEmb) h += '<div style="margin-bottom:10px;padding:9px 13px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:12.5px;color:#92400e"><b>⚠ ' + sinEmb + ' pedido(s) sin fecha de embarque.</b> Cargala en la columna 🚢 (dd/mm/aa) y queda guardada en todas sus líneas.</div>';
+  if (sinEmb) h += '<div style="margin-bottom:10px;padding:9px 13px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:12.5px;color:#92400e"><b>⚠ ' + sinEmb + ' pedido(s) sin fecha de embarque.</b> Cargala en la columna (dd/mm/aa) y queda guardada en todas sus líneas.</div>';
   if (!vista.length) { body.innerHTML = h + '<div class="stkpop-empty">Nada con ese filtro.</div>'; return; }
   h += '<div class="mva-tblwrap wide"><table class="imcu-tbl">' +
-    '<thead><tr><th>Proveedor</th><th>Pedido (PI)</th><th class="num">Líneas</th><th class="num">Unidades</th><th class="num">u$s</th><th class="num">m³</th><th>🚢 Embarque</th><th>🛬 Llegada</th><th>Estado</th></tr></thead><tbody>';
+    '<thead><tr><th>Proveedor</th><th>Pedido (PI)</th><th class="num">Líneas</th><th class="num">Unidades</th><th class="num">u$s</th><th class="num">m³</th><th>Embarque</th><th>🛬 Llegada</th><th>Estado</th></tr></thead><tbody>';
   vista.forEach(function (r) {
     const key = _impCursoKey(r);
     const abierto = _stkPop.abierto === key;
@@ -4237,7 +4231,7 @@ function _impCursoRender() {
       // MISMO detalle que el PI (impCursoToggle), con el costo de nacionalización por artículo.
       '<td class="imcu-provtd" onclick="impCursoToggle(\'' + refEnc + '\',\'' + provEnc + '\')" title="Ver los artículos de este pedido con el costo de nacionalización de cada uno"><span class="imcu-prov">' + (abierto ? '▾ ' : '▸ ') + escapeHtml(r.proveedor) + '</span>' + (imp ? '<div class="imcu-imp">' + escapeHtml(imp) + '</div>' : '') + '</td>' +
       '<td><span class="imcu-pi" onclick="impCursoToggle(\'' + refEnc + '\',\'' + provEnc + '\')" title="Ver los artículos de este pedido">' + (abierto ? '▾ ' : '▸ ') + escapeHtml(r.pedido_ref) + '</span>' +
-        '<div class="imcu-sub"><span class="imcu-b" onclick="impCursoSetRef(\'' + refEnc + '\')" title="Ver SÓLO este pedido (y cuánta plata es)">🔎 solo éste</span> <span class="imcu-b" onclick="impPiEditar(\'' + refEnc + '\',\'' + provEnc + '\')" title="Corregir las cantidades de cada ítem y el número de PI. Pregunta quién corrige y queda registrado el día y la hora.">✏️ Editar PI</span></div></td>' +
+        '<div class="imcu-sub"><span class="imcu-b" onclick="impCursoSetRef(\'' + refEnc + '\')" title="Ver SÓLO este pedido (y cuánta plata es)">solo éste</span> <span class="imcu-b" onclick="impPiEditar(\'' + refEnc + '\',\'' + provEnc + '\')" title="Corregir las cantidades de cada ítem y el número de PI. Pregunta quién corrige y queda registrado el día y la hora.">✏️ Editar PI</span></div></td>' +
       '<td class="num">' + r.n_lineas + '</td>' +
       '<td class="num"><b>' + _impCursoNum(r.pendiente) + '</b></td>' +
       '<td class="num" style="color:#065f46;font-weight:700">' + (Number(r.usd) > 0 ? _impCursoNum(Math.round(r.usd)) : '—') + '</td>' +
@@ -4337,11 +4331,11 @@ function _impCursoMoneyInput(r, campo, val, extra) {
 function _impCursoTablaPlata(vista) {
   let h = '<div class="mva-tblwrap wide"><table class="imcu-tbl">' +
     '<thead><tr><th>Proveedor</th><th>Pedido (PI)</th><th title="Quién emite la factura y cobra: NTL o el proveedor">A nombre de</th>' +
-    '<th class="num">FOB</th><th class="num" title="Suma de los giros cargados. Tocá 💵 para verlos o agregar uno.">Pagado</th>' +
+    '<th class="num">FOB</th><th class="num" title="Suma de los giros cargados. Tocá para verlos o agregar uno.">Pagado</th>' +
     '<th class="num" title="Del saldo, lo que va girado derecho al proveedor (no por NTL)">Pend. giro directo</th>' +
     '<th class="num" title="FOB − Pagado − Pend. giro directo">Falta</th>' +
     '<th title="El anticipo/depósito. De acá sale la fecha de embarque (depósito + lead time del PI)">💰 Pago 30%</th>' +
-    '<th>🚢 Embarque</th><th title="Cuándo se recupera (las filas a nombre de NTL)">♻️ Recupero</th><th></th></tr></thead><tbody>';
+    '<th>Embarque</th><th title="Cuándo se recupera (las filas a nombre de NTL)">♻️ Recupero</th><th></th></tr></thead><tbody>';
   vista.forEach(function (r) {
     const c = _impCursoCc(r);
     const refEnc = _impCursoEnc(r.pedido_ref), provEnc = _impCursoEnc(r.proveedor);
@@ -4366,7 +4360,7 @@ function _impCursoTablaPlata(vista) {
         (c.dias_produccion != null ? '<div class="imcu-sub">+' + c.dias_produccion + ' d al embarque</div>' : '') + '</td>' +
       '<td>' + _impCursoFechaCell(r, "emb") + '</td>' +
       '<td>' + _pedImpFechaInputHtml(c.fecha_recup || "", "impCursoCcSet('" + enc + "','recup',v)", 'title="Fecha de recupero" style="width:82px;padding:5px 6px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:12.5px;background:#fff"') + '</td>' +
-      '<td><button class="imcu-b" style="background:#065f46;color:#fff" onclick="impCursoPagos(\'' + enc + '\')" title="Ver y cargar los giros de este pedido">💵 Giros</button></td>' +
+      '<td><button class="imcu-b" style="background:#065f46;color:#fff" onclick="impCursoPagos(\'' + enc + '\')" title="Ver y cargar los giros de este pedido">Giros</button></td>' +
       '</tr>';
   });
   return h + '</tbody></table></div>';
@@ -4433,7 +4427,7 @@ function _impPagosRender() {
       '<td><button class="imcu-b" style="background:#fee2e2;color:#b91c1c" onclick="impPagoBorrar(' + x.id + ')" title="Borrar este giro">🗑</button></td></tr>';
   }).join("");
   ov.innerHTML =
-    '<div class="ipg-card"><div class="ipg-head"><b>💵 Giros — ' + escapeHtml(_impPagos.ref) + ' · ' + escapeHtml(_impPagos.prov) + '</b>' +
+    '<div class="ipg-card"><div class="ipg-head"><b>Giros — ' + escapeHtml(_impPagos.ref) + ' · ' + escapeHtml(_impPagos.prov) + '</b>' +
       '<button class="ipg-x" onclick="impPagosCerrar()">Cerrar</button></div>' +
     '<div class="ipg-body">' +
       (rows.length
@@ -4442,7 +4436,7 @@ function _impPagosRender() {
     "</div>" +
     '<div class="ipg-foot"><div style="font-size:13px;color:#334155">FOB <b>u$s ' + _impCursoNum(Math.round(fob)) + '</b> · girado <b style="color:#065f46">u$s ' + _impCursoNum(Math.round(tot)) +
       '</b> · falta <b style="color:' + (Math.abs(falta) < 1 ? "#16a34a" : "#b45309") + '">u$s ' + _impCursoNum(Math.round(falta)) + '</b></div>' +
-      '<button class="imcu-b" style="background:#065f46;color:#fff;padding:8px 14px" onclick="impPagoAdd()">➕ Cargar giro</button></div></div>';
+      '<button class="imcu-b" style="background:#065f46;color:#fff;padding:8px 14px" onclick="impPagoAdd()">Cargar giro</button></div></div>';
 }
 async function impPagoAdd() {
   if (!_impPagos) return;
@@ -4485,7 +4479,7 @@ async function impPagoBorrar(pagoId) {
    sobre GV_Imp_NTL_Mov (importación fiel del Excel, saldo verificado fila por fila). */
 var _impNtl = null;
 async function openImpNtl() {
-  _stkPopShell("💱 Cuenta corriente NTL (Hong Kong)", "stkPopBody", true);
+  _stkPopShell("Cuenta corriente NTL (Hong Kong)", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = '<div class="stkpop-empty">Cargando la cuenta de NTL…</div>';
   _stkPop = { kind: "impNtl" };
@@ -4518,7 +4512,7 @@ function _impNtlEmpNom(e) {
   return e || "—";
 }
 function _impNtlClaseChip(c) {
-  const m = { ingreso: ["ing", "💵 ingreso"], recupero: ["rec", "♻️ recupero"], giro: ["gir", "🏭 giro"],
+  const m = { ingreso: ["ing", "ingreso"], recupero: ["rec", "♻️ recupero"], giro: ["gir", "giro"],
               comision: ["com", "comisión"], gasto_bancario: ["gas", "gasto banc."], devolucion: ["dev", "devolución"] };
   const x = m[c] || ["otr", c || "—"];
   return '<span class="intl-c ' + x[0] + '">' + x[1] + '</span>';
@@ -4546,7 +4540,7 @@ function _impNtlRender() {
   }
   const st = _impNtl;
   let h = _impTabsHtml('ntl');
-  h += '<div class="stkpop-hint">La cuenta del <b>forwarder de Hong Kong</b>, importada del Excel de Thomas (saldo verificado <b>fila por fila</b> contra el original). El circuito: entra <b>efectivo</b> (3% de comisión por subida) → NTL le <b>gira</b> a la fábrica el Advance 30% y el Balance 70% → cuando la carga se nacionaliza entra el <b>recupero</b> y NTL cobra su <b>5% s/FC</b>. <code>D</code> = depósitos todavía sin repartir entre Tierra Nativa y Chef.</div>';
+  /* (Luis, 16/10/2026 — docs/GV-UI.md §5) sin párrafo explicativo arriba de la tabla */ 
   if (st.err) h += '<div class="stkpop-empty" style="color:#b91c1c">No se pudo leer: ' + escapeHtml(st.err) + '</div>';
 
   const total = (st.resumen || []).reduce(function (a, r) { return a + (Number(r.saldo) || 0); }, 0);
@@ -4569,8 +4563,8 @@ function _impNtlRender() {
   // acumulados del circuito
   const suma = function (campo) { return (st.resumen || []).reduce(function (a, r) { return a + (Number(r[campo]) || 0); }, 0); };
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:#475569">' +
-    '<span style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:5px 10px">💵 Depositado <b>' + _impNtlNum(suma('ingresos')) + '</b></span>' +
-    '<span style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:5px 10px">🏭 Girado a fábricas <b>' + _impNtlNum(suma('girado_a_fabricas')) + '</b></span>' +
+    '<span style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:5px 10px">Depositado <b>' + _impNtlNum(suma('ingresos')) + '</b></span>' +
+    '<span style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:5px 10px">Girado a fábricas <b>' + _impNtlNum(suma('girado_a_fabricas')) + '</b></span>' +
     '<span style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:5px 10px">♻️ Recuperado <b>' + _impNtlNum(suma('recuperos')) + '</b></span>' +
     '<span style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:5px 10px">Comisiones + gastos <b>' + _impNtlNum(suma('comisiones') + suma('gastos_bancarios')) + '</b></span>' +
     '</div>';
@@ -4579,8 +4573,8 @@ function _impNtlRender() {
   // v15.91 — tres vistas de la misma cuenta
   const vista = st.vista || "extracto";
   h += '<div class="imcu-fila"><span class="imcu-lbl">Ver:</span>' +
-    '<button style="' + _fb(vista === 'extracto') + '" onclick="impNtlSetVista(\'extracto\')">📄 Extracto</button>' +
-    '<button style="' + _fb(vista === 'cargas') + '" onclick="impNtlSetVista(\'cargas\')" title="Las cargas del Excel con su saldo y el pedido que le calza">📦 Cargas</button>' +
+    '<button style="' + _fb(vista === 'extracto') + '" onclick="impNtlSetVista(\'extracto\')">Extracto</button>' +
+    '<button style="' + _fb(vista === 'cargas') + '" onclick="impNtlSetVista(\'cargas\')" title="Las cargas del Excel con su saldo y el pedido que le calza">Cargas</button>' +
     '<button style="' + _fb(vista === 'conc') + '" onclick="impNtlSetVista(\'conc\')" title="Los giros cargados contra el Excel: cuál aparece y cuál no">🔗 Conciliación</button>' +
     '</div>';
   h += _impNtlAliasHtml();
@@ -4596,7 +4590,7 @@ function _impNtlRender() {
   provs.sort();
   if (st.prov && provs.indexOf(st.prov) < 0) provs.unshift(st.prov);
   if (provs.length > 1) {
-    h += '<div class="imcu-fila"><span class="imcu-lbl">🏭 Proveedor:</span>' +
+    h += '<div class="imcu-fila"><span class="imcu-lbl">Proveedor:</span>' +
       '<button style="' + _fb(!st.prov) + '" onclick="impNtlSetProv(\'\')">Todos</button>' +
       provs.map(function (p) { return '<button style="' + _fb(st.prov === p) + '" onclick="impNtlSetProv(\'' + encodeURIComponent(p).replace(/'/g, "%27") + '\')">' + escapeHtml(p) + '</button>'; }).join('') +
       '</div>';
@@ -4621,8 +4615,8 @@ function _impNtlRender() {
   body.innerHTML = h;
 }
 /* v15.91 — La solapa 💱 NTL pasa a tener tres vistas:
-     📄 Extracto      · el movimiento a movimiento (lo de la v15.90)
-     📦 Cargas        · las cargas del Excel (CQ-9154, China 2…) con su saldo y el pedido que le calza
+     Extracto      · el movimiento a movimiento (lo de la v15.90)
+     Cargas        · las cargas del Excel (CQ-9154, China 2…) con su saldo y el pedido que le calza
      🔗 Conciliación  · cada giro cargado contra el Excel: cuál matchea y cuál no
    Las sugerencias NO se guardan: son para que Thomas confirme el mapa carga ↔ PI, que es lo único
    que falta para atar el extracto a los pedidos. */
@@ -4632,7 +4626,7 @@ function _impNtlChip(txt, tipo) { return '<span class="intl-c ' + tipo + '">' + 
 function _impNtlCargasHtml() {
   const rows = (_impNtl && _impNtl.cargas) || [];
   if (!rows.length) return '<div class="stkpop-empty">No hay cargas cargadas.</div>';
-  let h = '<div class="stkpop-hint">Las <b>cargas</b> del Excel de Thomas (las hojas por proveedor). <b>Girado</b> es lo que salió para esa carga y <b>FOB</b> lo que vale; saldo 0 = cerrada. El <b>pedido sugerido</b> es el que más se le parece por proveedor y monto — <b>es una sugerencia, no está guardada</b>: el mapa carga ↔ PI lo tiene que confirmar Thomas.</div>';
+  let h = '<div class="stkpop-hint" style="color:#b45309;font-weight:700">⚠ El pedido sugerido es una sugerencia: no está guardado</div>';
   h += '<div class="mva-tblwrap wide"><table class="intl-tbl"><thead><tr><th>Proveedor</th><th>Carga</th>' +
     '<th class="num">Girado</th><th class="num">FOB</th><th class="num">Saldo</th><th>Período</th>' +
     '<th>Pedido que le calza</th></tr></thead><tbody>';
@@ -4663,7 +4657,7 @@ function _impNtlConcHtml() {
   const rows = (_impNtl && _impNtl.conc) || [];
   if (!rows.length) return '<div class="stkpop-empty">No hay giros cargados para conciliar.</div>';
   const ok = rows.filter(function (r) { return r.match !== "SIN MATCH"; }).length;
-  let h = '<div class="stkpop-hint">Cada <b>giro</b> cargado en la cuenta corriente, buscado en el Excel de Thomas — en el extracto de NTL y en las hojas por proveedor. <b>' + ok + ' de ' + rows.length + '</b> aparecen. Los que dicen <b>SIN MATCH</b> no están en el Excel con ese monto: o el monto está mal, o el giro salió por un camino que no está en estas hojas.</div>';
+  let h = '<div class="stkpop-hint"><b>' + ok + ' de ' + rows.length + '</b> giros aparecen en el Excel</div>';
   h += '<div class="mva-tblwrap wide"><table class="intl-tbl"><thead><tr><th>Pedido</th><th>Proveedor</th>' +
     '<th>Fecha cargada</th><th class="num">u$s</th><th>Estado</th><th>Dónde aparece en el Excel</th></tr></thead><tbody>';
   rows.forEach(function (r) {
@@ -4716,8 +4710,8 @@ async function impAliasDefinir(aliasEnc) {
   await impNtlReload();
 }
 /* v15.94 — El mapa CARGA ↔ PEDIDO se carga desde la pantalla, no por chat.
-   · En 📦 Cargas: 🔗 Asignar elige a qué pedido corresponde esa carga (o la marca como "ninguno").
-   · En 💵 Giros: cada giro puede decir con qué carga se cursó ("a través de") y cuál cubre
+   · En Cargas: 🔗 Asignar elige a qué pedido corresponde esa carga (o la marca como "ninguno").
+   · En Giros: cada giro puede decir con qué carga se cursó ("a través de") y cuál cubre
      ("fue a"); si están vacías y el Excel de Thomas lo dice, aparece la sugerencia con un ✓ para
      aceptarla de una. Backend: GV_Imp_Carga_Pedido + GV_Imp_Pagos.carga_origen/carga_destino. */
 async function impCargaAsignar(provEnc, cargaEnc) {
@@ -4792,7 +4786,7 @@ function _impPagoCargasCell(x) {
   return '<button class="imcu-b" onclick="impPagoCargas(' + x.id + ')">+ cargas</button>';
 }
 /* v24.01 (Luis) — la nacionalización de ESTE pedido y su reparto por artículo.
-   El embarque es el PEDIDO (un proveedor = un embarque, igual que en 📦 Pedidos), así que el
+   El embarque es el PEDIDO (un proveedor = un embarque, igual que en Pedidos), así que el
    costo se calcula una vez con el FOB y los m³ del pedido y después se reparte entre sus líneas
    con `_impNacReparto`. La tasa de derechos sale del promedio ponderado por FOB de SUS artículos
    (`_derechosPedido`), no de una tasa suelta: cada código puede tener su partida arancelaria. */
@@ -4837,9 +4831,9 @@ function _impCursoLineasHtml(ls, r) {
     return '<span class="imcu-b" style="' + (crit === c ? 'background:#4c1d95;color:#fff;border-color:#4c1d95;' : '') + 'padding:3px 9px" onclick="impCursoNacCrit(\'' + c + '\')" title="' + escapeHtml(_impNacCritTxt(c).tip) + '">' + t + '</span>';
   };
   let h = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:8px 12px;margin:2px 0 8px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;font-size:12.5px;color:#4c1d95">' +
-    '<b>🛃 Nacionalización del embarque:</b> <b style="font-size:14px">u$s ' + _nacF(N.res.noRecup) + '</b>' +
+    '<b>Nacionalización del embarque:</b> <b style="font-size:14px">u$s ' + _nacF(N.res.noRecup) + '</b>' +
     '<span style="color:#6b21a8">= ' + fx + '% del FOB · ' + escapeHtml(N.modo) + '</span>' +
-    '<label style="display:flex;align-items:center;gap:5px;font-weight:700" title="Lo que cuesta cada m³ de flete marítimo. Se guarda en el proveedor (' + escapeHtml(N.prov) + ') y vale también para el módulo 📦 Pedidos: es la misma fuente.">u$s/m³ <input type="number" inputmode="decimal" min="0" step="1" value="' + N.valorM3 + '" onchange="impCursoSetNacM3(\'' + provEnc + '\',this.value)" style="width:66px;height:28px;border:1px solid #c4b5fd;border-radius:8px;padding:0 6px;font-size:13px;text-align:right"></label>' +
+    '<label style="display:flex;align-items:center;gap:5px;font-weight:700" title="Lo que cuesta cada m³ de flete marítimo. Se guarda en el proveedor (' + escapeHtml(N.prov) + ') y vale también para el módulo Pedidos: es la misma fuente.">u$s/m³ <input type="number" inputmode="decimal" min="0" step="1" value="' + N.valorM3 + '" onchange="impCursoSetNacM3(\'' + provEnc + '\',this.value)" style="width:66px;height:28px;border:1px solid #c4b5fd;border-radius:8px;padding:0 6px;font-size:13px;text-align:right"></label>' +
     '<span style="display:flex;align-items:center;gap:5px"><b>repartir:</b> ' + bt("mixto", "mixto") + bt("m3", "por m³") + bt("fob", "por FOB") + '</span>' +
     '<span style="color:#6b21a8;flex:1 1 100%;font-size:11.5px">' + escapeHtml(ct.tip) + '</span>' +
     '</div>';
@@ -4847,7 +4841,7 @@ function _impCursoLineasHtml(ls, r) {
   // la marca en dos líneas). El reparto natural de la tabla queda más apretado, que es la regla.
   h += '<table><thead><tr><th style="text-align:left">Código</th><th style="text-align:left">Descripción</th><th style="text-align:right">Unidades</th><th style="text-align:right">u$s</th><th style="text-align:right">m³</th>' +
     '<th style="text-align:right;white-space:nowrap" title="FOB por unidad = u$s ÷ unidades (el precio del artículo, antes de nacionalizar).">FOB<small style="display:block;font-weight:600;opacity:.75">u$s/u</small></th>' +
-    '<th style="text-align:right;white-space:nowrap" title="Costo de nacionalización de ESTE artículo: la parte que le toca del costo del embarque, repartida ' + escapeHtml(ct.lbl) + '. Abajo, por unidad.">🛃 Nac. u$s<small style="display:block;font-weight:600;opacity:.75">u$s/u</small></th>' +
+    '<th style="text-align:right;white-space:nowrap" title="Costo de nacionalización de ESTE artículo: la parte que le toca del costo del embarque, repartida ' + escapeHtml(ct.lbl) + '. Abajo, por unidad.">Nac. u$s<small style="display:block;font-weight:600;opacity:.75">u$s/u</small></th>' +
     '<th style="text-align:right;white-space:nowrap" title="Puesto en Argentina por unidad = FOB por unidad + la nacionalización que le toca. Es el costo real de la caja cuando llega al depósito.">Puesto<small style="display:block;font-weight:600;opacity:.75">u$s/u</small></th>' +
     '<th style="text-align:left">Llegada</th></tr></thead><tbody>';
   h += ls.map(function (l, i) {
@@ -5154,8 +5148,8 @@ function _impPiEdAgrOpciones() {
 }
 function _impPiEdAgrHtml() {
   const st = _impPiEd; if (!st) return "";
-  if (!st.agrAbierto) return '<div style="margin-top:8px"><button class="ipe-b" onclick="impPiEdAgrToggle()">➕ Agregar artículo a la PI</button></div>';
-  let h = '<div class="ipe-agr"><b>➕ Agregar artículo</b>';
+  if (!st.agrAbierto) return '<div style="margin-top:8px"><button class="ipe-b" onclick="impPiEdAgrToggle()">Agregar artículo a la PI</button></div>';
+  let h = '<div class="ipe-agr"><b>Agregar artículo</b>';
   if (!st.maestro) h += ' <span style="color:#64748b">Cargando el maestro…</span>';
   else if (!st.maestro.length) h += ' <span class="ipe-men">No se pudo leer el maestro de importados.</span>';
   else {
@@ -5203,7 +5197,7 @@ function _impPiEdTablaDiff(p) {
 function _impPiEdHistHtml() {
   const hs = (_impPiEd && _impPiEd.hist) || [];
   if (!hs.length) return '';
-  let h = '<details class="ipe-hist"><summary>📜 Ediciones anteriores (' + hs.length + ')</summary>' +
+  let h = '<details class="ipe-hist"><summary>Ediciones anteriores (' + hs.length + ')</summary>' +
     '<table class="ipe-tbl" style="margin-top:6px"><thead><tr><th>Día y hora</th><th>Quién</th><th>Qué</th><th>Antes</th><th>Después</th></tr></thead><tbody>';
   hs.forEach(function (x) {
     const que = x.campo === "pedido_ref" ? "N° de PI" : (escapeHtml(codCanon(x.cod_art || "")) + (x.marca ? ' <small style="color:#64748b">' + escapeHtml(x.marca) + '</small>' : ''));

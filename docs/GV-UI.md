@@ -234,6 +234,17 @@ Medido en «Cajas pedidas — 936E»: a 1920 px, dato de 14 → 19,2 px, encabez
 760 px con la tabla de 577 recostada a la izquierda → tarjeta de 758 px con la tabla de 728 centrada; a
 430 px, 14 px y sin scroll horizontal. Lo sostiene `tests/stk-tabla-ancho-contenido.cjs` (f–i).
 
+**Alcanza también a Pedidos Importación** (`importacion.js`, Luis 16/10, «D2 sí»): títulos, solapas, botones y celdas
+sin emojis (quedan ⚠ ✓ ✕ y los de estado ⛔ 🔴 🟡 del MOQ y la quiebra, más los botones que son sólo ícono 📦 📥 ✏️,
+que sacados pierden el rótulo), sin los párrafos de explicación arriba de las tablas (quedan, en una línea, los avisos
+que cambian una decisión y los conteos sin fila de total), tarjeta al ancho del contenido y solapas que escalan. **La
+tabla ancha `.mva-tbl.wide` queda con sus anchos fijos** (`<colgroup>` medido, `_anchoMax`, `tests/pedimp-ancho-tabla.cjs`
+y la regla v24.32 de `docs/REGLAS-IMPORTACION.md`): sólo cambió el encabezado (12 → 13 px, #334155, centrado); su letra
+de 15 px no escala, porque las columnas están medidas en px para ese tamaño.
+
+**Botones que son sólo ícono (📦 📥 ✏️ ⚙): QUEDAN — decisión cerrada** (Luis, 16/10/2026: *"esos dejalos"*). No se
+proponen pasar a texto ni se marcan como hallazgo en un pase de diseño.
+
 ---
 
 ## 6. Estados de la pantalla

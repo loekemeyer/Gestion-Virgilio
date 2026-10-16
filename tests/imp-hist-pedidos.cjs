@@ -42,9 +42,9 @@ const RECS = [
 
   const solapa = await p.evaluate(() => {
     const t = [...document.querySelectorAll("#stkPopBody button")].map(x => x.textContent.trim());
-    return { hist: t.some(x => /^📜 Historial$/.test(x)), viejo: t.some(x => /Historial recepción/.test(x)),
+    return { hist: t.some(x => /^Historial$/.test(x)), viejo: t.some(x => /Historial recepción/.test(x)),
              // ⚠ «📦 Pedidos» es la solapa del módulo: las sub-vistas son 🚢 y 📥
-             subs: t.filter(x => /^(🚢 Pedidos|📥 Recepciones)/.test(x)) };
+             subs: t.filter(x => /^(Pedidos|Recepciones) \d/.test(x)) };
   });
   if (!solapa.hist) fail("la solapa no se llama «📜 Historial»: " + JSON.stringify(solapa.subs));
   if (solapa.viejo) fail("quedó la solapa vieja «Historial recepción»");

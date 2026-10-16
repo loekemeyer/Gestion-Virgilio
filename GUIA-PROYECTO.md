@@ -1,6 +1,6 @@
-## Nota v31.62 (2026-10-16) — Stocks en vivo: el cron 57 no vuelve atrás, las pedidas sólo si cambió, realtime para el supervisor
+## Nota v31.64 (2026-10-16) — Stocks en vivo: el cron 57 no vuelve atrás, las pedidas sólo si cambió, realtime para el supervisor
 
-`stocks_carga_rapida` ahora la lee también `authenticated` (el realtime de la pantalla no le llegaba al supervisor logueado). `refresh_stocks_carga_rapida` no pisa con la matview los saldos de un código movido después del último refresco y escribe sólo las filas que cambian. `cajas_pedidas` + columnas `ped_*` (neto, pickeadas, en curso, familia) las escribe el job `gv-stock-pedidas-vivo` (cada 30 s, calcula sólo si `gv_stock_pedidas_sucio_seq` se movió; triggers `zz_gv_pedvivo*`). `gv_importados_stock_dep` lee las pedidas de `stocks_carga_rapida`. Regla completa: `docs/MODULO-STOCK-REFRESH.md` (v31.62).
+`stocks_carga_rapida` ahora la lee también `authenticated` (el realtime de la pantalla no le llegaba al supervisor logueado). `refresh_stocks_carga_rapida` no pisa con la matview los saldos de un código movido después del último refresco y escribe sólo las filas que cambian. `cajas_pedidas` + columnas `ped_*` (neto, pickeadas, en curso, familia) las escribe el job `gv-stock-pedidas-vivo` (cada 30 s, calcula sólo si `gv_stock_pedidas_sucio_seq` se movió; triggers `zz_gv_pedvivo*`). `gv_importados_stock_dep` lee las pedidas de `stocks_carga_rapida`. Regla completa: `docs/MODULO-STOCK-REFRESH.md` (v31.64).
 
 ## Nota v31.54 (2026-10-16) — Stock: el código liquidado en el picking se imputa al del pedido (tipo `liquidacion`)
 

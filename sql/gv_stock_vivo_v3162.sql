@@ -1,4 +1,4 @@
--- v31.62 (Luis, 16/10/2026) — STOCKS EN VIVO: que la pantalla no vuelva atrás y que las cajas
+-- v31.64 (Luis, 16/10/2026) — STOCKS EN VIVO: que la pantalla no vuelva atrás y que las cajas
 -- pedidas lleguen sin esperar la matview.
 --
 -- Luis: *"arregla el cron, dale"* · *"el tema es evitar que se llegue a timeout porque tenga que ver
@@ -177,7 +177,7 @@ CREATE OR REPLACE FUNCTION public.refresh_stocks_carga_rapida()
  LANGUAGE plpgsql
 AS $function$
 DECLARE v_conocidos text[];  -- v25.50-conocidos
-  v_ref timestamptz; v_movidos text[]; v_ped_vivo boolean;  -- v31.62-vivo
+  v_ref timestamptz; v_movidos text[]; v_ped_vivo boolean;  -- v31.64-vivo
 BEGIN
   v_conocidos := array(select distinct c from (
     select upper(regexp_replace(cod,'^0+(?=.)','')) c from public.vista_nombres_articulos
@@ -192,7 +192,7 @@ BEGIN
   -- zz_backups."GV_Backup_funcdef_20261016_stockvivo"): el cron 55 refresca la matview con
   -- CONCURRENTLY y encadena esta función.
 
-  -- v31.62 (Luis, 16/10) — NO VOLVER ATRÁS. El trigger actualizar_saldo_trigger deja los saldos
+  -- v31.64 (Luis, 16/10) — NO VOLVER ATRÁS. El trigger actualizar_saldo_trigger deja los saldos
   -- de cada movimiento al instante; la matview los tiene recién en su próximo refresco. Pisar con
   -- la matview un código que se movió DESPUÉS de su último refresco devolvía la pantalla al número
   -- viejo (936E 12 → 11 → 12). Esos códigos conservan lo del trigger; el resto se auto-cura como
@@ -205,7 +205,7 @@ BEGIN
     from public."GV_Stock_Pedidas_Estado" p where p.id = 1;
   v_ped_vivo := coalesce(v_ped_vivo, false);
 
-  -- v12.41: resincronizar las COLUMNAS DE SALDO desde la matview. v31.62: SÓLO las filas que
+  -- v12.41: resincronizar las COLUMNAS DE SALDO desde la matview. v31.64: SÓLO las filas que
   -- cambian (cada UPDATE es un evento de realtime para cada pantalla de Stocks abierta).
   UPDATE public.stocks_carga_rapida t
   SET terminado = n.terminado, excedente = n.excedente, separar_pedidos = n.separar_pedidos,
@@ -302,7 +302,7 @@ BEGIN
   -- codigo con L (026L) no matcheaba nada.
   -- La empresa SOLO desambigua donde hay dos filas con el mismo cod_base (los duales);
   -- en el resto sobra, y por eso el NOT EXISTS la deja pasar.
-  -- v31.62: en UNA sentencia y sólo donde cambia (antes: todo a 0 y de vuelta = dos eventos de
+  -- v31.64: en UNA sentencia y sólo donde cambia (antes: todo a 0 y de vuelta = dos eventos de
   -- realtime por fila). sum() en vez de "la fila que toque": medido 16/10, ningún código no dual
   -- tiene FC de las dos empresas, así que da lo mismo que antes.
   UPDATE public.stocks_carga_rapida t
@@ -338,7 +338,7 @@ create or replace view public.gv_importados_stock_dep with (security_invoker = t
            FROM vista_saldos_stock s
           GROUP BY (gv_cod_stock(s.cod_art)), (upper(COALESCE(s.empresa, 'Mixto'::text)))
         ), dem AS (
-         -- v31.62: de stocks_carga_rapida (job de pedidas, ≤ 30 s), no de la matview: el MISMO
+         -- v31.64: de stocks_carga_rapida (job de pedidas, ≤ 30 s), no de la matview: el MISMO
          -- número que Stocks. Misma clave (cod con sufijo de empresa en los duales).
          SELECT gv_cod_stock(p.cod) AS cod_norm,
                 CASE
@@ -366,8 +366,8 @@ create or replace view public.gv_importados_stock_dep with (security_invoker = t
 -- centinelas (patrón sacado del CÓDIGO) ─────────────────────────────────────────────────────
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version, activo) values
  ('refresh_stocks_carga_rapida', 'funcion', '= any\(v_movidos\)',
-  'No pisar con la matview los saldos de un codigo movido despues de su ultimo refresco: el trigger ya los dejo bien y pisarlos volvia la pantalla atras (936E 12->11->12).', 'Luis', 'v31.62', true),
+  'No pisar con la matview los saldos de un codigo movido despues de su ultimo refresco: el trigger ya los dejo bien y pisarlos volvia la pantalla atras (936E 12->11->12).', 'Luis', 'v31.64', true),
  ('refresh_stocks_carga_rapida', 'funcion', 'IS DISTINCT FROM',
-  'Escribir solo las filas que cambian: cada UPDATE es un evento de realtime para cada pantalla de Stocks abierta.', 'Luis', 'v31.62', true),
+  'Escribir solo las filas que cambian: cada UPDATE es un evento de realtime para cada pantalla de Stocks abierta.', 'Luis', 'v31.64', true),
  ('gv_stock_pedidas_vivo', 'funcion', 'gv_stock_pedidas_sucio_seq',
-  'Las cajas pedidas se recalculan SOLO si la secuencia se movio (triggers de pedidos/tandas), no cada vez: Luis "que solo busque cambios".', 'Luis', 'v31.62', true);
+  'Las cajas pedidas se recalculan SOLO si la secuencia se movio (triggers de pedidos/tandas), no cada vez: Luis "que solo busque cambios".', 'Luis', 'v31.64', true);

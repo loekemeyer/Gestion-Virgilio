@@ -46,7 +46,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   ok(get("A facturar")[1] === "2", "A facturar 2");
   ok(get("Racks")[1] === "6", "Racks suma racks + racks CH (6)");
   ok(!get("Excedente").length, "un depósito en 0 no se dibuja (salvo góndola)");
-  ok(/Cervantes/.test(get("🏭")[0] || "") && /GRJ99/.test(get("🏭")[0] || "") && get("🏭")[2] === "120", "fila Cervantes (GP2) con el componente y sus 120 u");
+  ok(/GRJ99/.test(get("Cervantes")[0] || "") && get("Cervantes")[2] === "120", "fila Cervantes (GP2) con el componente y sus 120 u");
   ok(r.total[1] === "31" && r.total[2] === "372", "total Virgilio + Cervantes: 21 + 10 cajas = 372 u");
   ok(r.fcs, "avisa lo facturado sin salir");
   ok(r.error, "lectura caída: lo dice, no muestra ceros");

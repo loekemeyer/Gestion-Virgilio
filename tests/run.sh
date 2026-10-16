@@ -23,7 +23,7 @@ node() {
   return 0
 }
 
-echo "== stock-vivo-v3162 (v31.62: Stocks en vivo — el cron 57 no vuelve atras, pedidas solo si cambio, realtime para el supervisor) =="
+echo "== stock-vivo-v3162 (v31.64: Stocks en vivo — el cron 57 no vuelve atras, pedidas solo si cambio, realtime para el supervisor) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stock-vivo-v3162.cjs
 echo "== mg-sin-gondola (v31.49: Guardar a góndola pregunta dónde si el código no tiene celda en el Mapa) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-sin-gondola.cjs

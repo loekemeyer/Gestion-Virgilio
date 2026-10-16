@@ -44,7 +44,7 @@ ctx.pedImpReload = () => {};
   try {
     await vm.runInContext("openImpRecibidoOp()", ctx);
     const h = html.v;
-    chk("pantalla: muestra la solapa 📥 Recibido con el badge", /📥 Recibido/.test(h) && /3<\/span>/.test(h));
+    chk("pantalla: muestra la solapa 📥 Recibido con el badge", />Recibido\b/.test(h) && /3<\/span>/.test(h));
     chk("pantalla: el renglón a elegir dice ⚠ elegir pedido", /⚠ elegir pedido/.test(h));
     chk("pantalla: ofrece los dos pedidos en viaje", /PI B260601-2/.test(h) && /PI X/.test(h));
     chk("pantalla: lo revisado no se ve por defecto", !/932E/.test(h));

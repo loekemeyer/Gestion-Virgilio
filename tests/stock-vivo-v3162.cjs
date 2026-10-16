@@ -1,4 +1,4 @@
-/* v31.62 (Luis, 16/10/2026) — STOCKS EN VIVO.
+/* v31.64 (Luis, 16/10/2026) — STOCKS EN VIVO.
    "arregla el cron, dale" · "si se puede hacer que solo busque cambios, golazo" · "si la tabla se ve
    en realtime, aun mejor".
 
