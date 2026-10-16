@@ -1255,3 +1255,12 @@ caso se encuentra con la consulta de arriba, a mano.
   góndola: racks 0, góndola **366 cajas** (sólo 809E; el 809 sigue con 9). Ajuste `conteo_809e_ch_20261013_*`;
   la celda AD05 / 809E se sacó del Mapa (backup `zz_backups."GV_Backup_LugarItem_809E_20261013"`).
 - **935E en AB09: 2 MC (24 cajas)**, no 5: ajuste −36 (`conteo_935e_ab09_20261013`).
+
+## ⚠⚠ REGLA (Luis, 2026-10-16, v31.93): el uxb lo manda la EMPRESA DUEÑA, nunca el más alto
+
+**Luis:** *"no hagas eso de que veas el más alto ignorando la empresa"*. `vista_uxb_articulo` (Est. Madre, Stocks) y
+`vista_uni_x_caja` (generador de OC) tomaban `max(uxb)` de `GV_UxB` juntando LK y CH: el 231/232/233 pasado a 12 en LK
+seguía en 24 por una fila CH absorbida del fallback. Ahora el orden es: empresa dueña (`GV_Articulo_Empresa_Cache`) >
+LK > curado > no absorbido > más reciente. Centinelas en `GV_Reglas_Centinela`. `sql/gv_uxb_empresa_duena_v3193.sql`.
+Siguen con `max` ciego (pendiente): `gv_ppp_web_valor_items`, `gv_clin_composicion`, `gv_cuarentena_pedido_composicion`,
+`isis_pedido_json`, `gv_isis_pedido_json`.
