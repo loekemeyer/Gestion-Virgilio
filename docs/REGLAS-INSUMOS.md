@@ -480,7 +480,14 @@ al entregar ni «cerrar el círculo» por empresa.**
 - **Relevamiento de flejes 15/10 (Luis)**: el Excel es la verdad. Lo que tenía stock y no figura → 0 (el código queda,
   se puede recibir); lo que figura y no estaba → se carga tal cual, con su lugar. Cruce por MEDIDA, no por la columna
   «Cod.» (6 renglones la contradecían). Ajustes `ref='RELEVAMIENTO FLEJES 15/10'`, posiciones en
-  `Insumos_Ubicaciones` (16 racks dados de alta), backups `zz_backups.*_flejes_20261015`. Total 15.534,05 Kg.
+  `Insumos_Ubicaciones` (16 racks dados de alta), backups `zz_backups.*_flejes_20261015`. Total 15.587,05 Kg (el renglón amarillo R1At era 60x2 = IB7 Fleje N° 59, 17+70 kg; N°69 a 0).
+- ⚠ **v31.23 (Luis, 16/10): los DISCONTINUOS de Virgilio sin pareja en Cervantes figuran igual en GP2.** Nazareno los
+  marcó en `GP2.virgilio_insumo_descartado` (motivo `discontinuo`). Cada uno con stock tiene un componente propio en
+  GP2 con código **`V·<cod de Virgilio>`**, `discontinuado = true`, `estado_compra = 'discontinuo'`, vinculado en
+  `insumo_equivalencia`: el espejo deja su stock en «<sector> en Virgilio». Flejes y EBA en kg; crudo y procesado con
+  `uni_x_cajon = 1` (GP2 muestra **cajones**, la descripción lo dice). Son 27; los importados (337P, CB01, H201Lever)
+  quedan afuera porque el espejo no copia importados. Sólo V·EBA entra en `v_nivel_stock` (ubicación 57) con consumo
+  y máximo 0: no genera OC.
 
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
 
