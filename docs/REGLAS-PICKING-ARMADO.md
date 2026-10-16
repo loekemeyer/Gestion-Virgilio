@@ -612,6 +612,17 @@ código del pedido tienen `Facturacion_NP.facturado_at`, pasa la fila a `activo 
 Al 16/10 espera a F97A (armado + factura) y a las NP de F47A (LK 0263, LK 0285) y F48N (LK 0297).
 `select * from gv_liquidado_discontinuar(true);` simula. `sql/gv_liquidado_discontinuar_v3156.sql`, centinela v31.56.
 
+**v31.64 (Luis, 16/10): el 574 se da de baja cuando queda SALDADO tras el armado, y su faltante se completa con 574E.**
+*"En armado van a ver que falta un 574 y se ajusta desde el operario en el armado. Con eso el stock queda en 0,
+saldado (y ahí sí, discontinualo). A ese pedido le va a faltar 574: que «Completar pedido» sepa que se completa con
+574E (por más que figure con código 574)."* (1) `gv_liquidado_discontinuar()` suma la vía **saldado**: todas las tandas
+donde se pickeó el viejo están armadas y el viejo está en **0 en todos los depósitos** (ni + ni −). La vía «último
+facturado» de la v31.56 sigue (la usan 636/635). (2) El armado ya deja el faltante sobre la línea **574E** del pedido
+(`faltMap` pela la E y el tope contra lo pickeado recorta el 574E); **`pkLiqPedidoDe`** en `cpLoadFaltantes` es la red:
+una fila de faltante con el código liquidado de la misma empresa se muestra, completa y descuenta como el código del
+pedido (574 LK → 574E; 636/635 CH → 636E/635E). Medido en transacción abortada: F97A armada con 13 de 14 → el 574 queda
+en 0 y se discontinúa. `sql/gv_liquidado_discontinuar_v3164.sql`, `tests/cp-liquidado-574.cjs`.
+
 **v31.60 (Luis, 16/10): 636E y 635E de Chef liquidan el 636 / 635 nacional.** *"entra pedido de 636E y el pedido entra
 como 636 sin la E, el nacional, … hasta liquidar el stock; una vez se termina, se discontinúan"*. Dos filas en
 `GV_Pick_Liquidar` (empresa CH) y en `PK_LIQUIDAR_EN` (M36 / M35). **La liquidación ahora cuenta el EXCEDENTE del
