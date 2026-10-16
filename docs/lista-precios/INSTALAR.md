@@ -52,6 +52,22 @@ La foto que hay hoy en la base (07/09) se armó distinto; comparar contra ella m
 2. Tiene que llegar al grupo el aviso con ese artículo, el antes y el después.
 3. Volver el precio como estaba → Guardar (llega el aviso inverso).
 
+## Actualizar a v32.09 (libro entero, 16/10)
+
+Desde v32.09 la macro sube **todas las hojas** al guardar (cualquier hoja tocada), no sólo la Lista de
+Precios. La base ya está lista (`sql/gp2_planilla_todas_hojas_v3209.sql`, aplicado el 16/10).
+
+1. Alt+F11 → abrir el módulo de la macro (en el Excel del server se llama **Módulo1**).
+2. **Anotar aparte la línea `Private Const LP_TOKEN ...`** (el token no está en el repo).
+3. Borrar todo el contenido del módulo y pegar `ListaPreciosSupabase.bas` **sin** la primera línea
+   (`Attribute VB_Name = ...`; si se pega, VBA da error).
+4. Volver a poner el token en `LP_TOKEN`.
+5. Salir del **Modo Diseño** (botón de la escuadra; si el título dice `[design]`, los eventos no corren).
+6. Guardar. La barra de estado tiene que decir `A Costos subido a Supabase: OK ... | OK N hojas en M envios`.
+
+Las hojas que no son la Lista de Precios **no mandan aviso a Telegram**. Lo subido sólo lo leen usuarios
+autorizados de GP2 (la clave pública ya no lo ve desde v32.09).
+
 ## Si algo falla
 
 - El Excel **se guarda igual**; sale un cartel con el error y se reintenta en el próximo guardado.
