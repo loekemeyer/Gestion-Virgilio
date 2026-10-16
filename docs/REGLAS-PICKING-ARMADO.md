@@ -612,6 +612,14 @@ código del pedido tienen `Facturacion_NP.facturado_at`, pasa la fila a `activo 
 Al 16/10 espera a F97A (armado + factura) y a las NP de F47A (LK 0263, LK 0285) y F48N (LK 0297).
 `select * from gv_liquidado_discontinuar(true);` simula. `sql/gv_liquidado_discontinuar_v3156.sql`, centinela v31.56.
 
+**v31.60 (Luis, 16/10): 636E y 635E de Chef liquidan el 636 / 635 nacional.** *"entra pedido de 636E y el pedido entra
+como 636 sin la E, el nacional, … hasta liquidar el stock; una vez se termina, se discontinúan"*. Dos filas en
+`GV_Pick_Liquidar` (empresa CH) y en `PK_LIQUIDAR_EN` (M36 / M35). **La liquidación ahora cuenta el EXCEDENTE del
+viejo** (terminado + excedente) y su paso ·EXC sale primero, con el aviso «van en lugar de 636E»: el 636 tenía 9 cajas
+en excedente que con sólo `terminado` quedaban varadas. La baja es la de la v31.56 (último facturado). Sólo se da de baja
+el código liquidado: los discontinuados que hoy siguen en el Mapa de góndolas no se tocan. Al 16/10: 636 = 5 góndola +
+9 excedente + 6 separadas; 635 = 11. `sql/gv_pick_liquidar_636_635_v3160.sql`, `tests/pk-liquidar-636.cjs`.
+
 ## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
 
 > Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
