@@ -180,9 +180,18 @@ por separado"*.
   factura sigue diciendo 936E, y las Estadísticas ISIS (manuales 29/31) siguen como ISIS.
 - Medido al aplicarlo: 57 líneas / 143 cajas (sep/25 → 15/10/26) pasaron al 938E. Proyección 938E = 11,67 cj/mes
   (140 u); 936E = 0 hasta que venda con su código (el 938E nunca había vendido).
-- No lo cubre: el caché del portal (`estadistica_madre_cache.meses`, lee `sales_lines`) y los pedidos web
-  (`lk_pedidos_match`). Otro caso igual = un `insert` en `sales_item_remap_hasta`, no un deploy.
-- `sql/lk_remap_hasta_936E_938E_v3155.sql` (rollback en la cabecera).
+- **Decidido por Luis (16/10), no volver a proponer**: el 936E **no lleva proyección provisoria**; arranca en 0 y crece
+  con su venta orgánica desde el 16/10 (forward-facing). Empaque de los dos: MC 144 u = 12 inner de 12 u
+  (`Importados_Volumen`); en `Importados.uni_x_caja` va el inner (12), que es la caja de Stocks.
+- **Pedidos (v31.58, Luis D3: *"fueron pedidos para el 936E pero deberían pesar para el 938E hasta hoy"*)**: mismo corte del
+  lado de Gestión, tabla **`GV_Cod_Remap_Hasta`** + `gv_cod_remap_hasta(cod, fecha)` (936EL → 938EL; la L se conserva).
+  La usan `gv_pedidos_mensuales_cod` (columna «pedidos» de la Proyección), `gv_isis_estad_pedidos` (Pedidos LK/CH de la
+  Est. Madre) y `gv_isis_estad_pedidos_disruptivos` (historia web y de facturas). **El pedido no se toca**: picking,
+  factura, PPP y Cuarentena siguen con el código pedido. Medido: 88 cajas pedidas (abr → 15/10) pasaron al 938E.
+  ⚠ **Un corte nuevo = una fila en LK (`sales_item_remap_hasta`) Y otra en Gestión (`GV_Cod_Remap_Hasta`)**, o ventas y
+  pedidos quedan en códigos distintos.
+- No lo cubre: el caché del portal (`estadistica_madre_cache.meses`, lee `sales_lines`). Otro caso igual = un `insert` en `sales_item_remap_hasta`, no un deploy.
+- `sql/lk_remap_hasta_936E_938E_v3155.sql`, `sql/gv_cod_remap_hasta_936E_938E_v3158.sql` (rollback en la cabecera).
 
 ## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
 
