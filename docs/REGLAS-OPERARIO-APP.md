@@ -15,6 +15,16 @@ y lo reemplace un botón que sea Login Operario que vincule a la página de RP3.
 - **Servidor**: `gv_tv_clave_validar` devuelve `{ok:false, error:'migrado'}` desde la misma hora, para el celular con el
   index viejo cacheado; el index nuevo, al recibir `migrado`, muestra el botón. RP3.0 valida con su propia función
   (`reg_prod_3_0_virgilio_operarios`): no la toca. Google (supervisores) sigue igual.
+- **v31.84 (Luis, 16/10): la sesión de operario abierta al corte se cierra sin perder nada.** Sin tareas abiertas: el
+  celular manda TODA la cola (aviso «Enviando N reporte(s)…» / «Sin señal…») y recién con la cola vacía cierra la
+  sesión. Con tareas abiertas (picking, armado, toggles, módulos): no se inventa ningún cierre ni FJ a las 0:01; un
+  aviso bloquea la botonera y sólo ofrece **Terminar Día** (el de siempre, que cierra con su dato y drena la cola).
+  `_gvCorteSesionOperario`. Supervisores con Google no se tocan.
+- **v31.84: monitor de GV sólo con Virgilio.** `gv_monitor_ingresos` comparaba contra Cervantes con el legajo crudo y
+  Cervantes lo graba con «c» (`c19`): el que entraba a GV y marcaba en Cervantes seguía en la TV. Se compara pelado
+  (`sql/gv_monitor_ingresos_cerv_c_v3184.sql`).
+- **v31.84: RP3.0 ordena «¿Quién sos?» por ingresos históricos** (días con eventos en GV + ingresos OK en RP3.0),
+  en el servidor (`sql/rp3_virgilio_operarios_ranking_v3184.sql`); el legajo 1 (de prueba) va al fondo (v31.86, D4).
 - `sql/gv_login_operario_rp3_v3178.sql`, `tests/login-operario-rp3.cjs`. Los tests del flujo viejo corren el corte al
   futuro con `window.GV_CLAVE_TV_CORTE_TS`.
 
@@ -197,6 +207,16 @@ la tarde que se seguía el lunes** (~65 h: D45B, D52C, D67F; F22A al 05/10) arra
 **otro celular** (o con el celular reseteado) arranca de cero; el picking no tiene ese problema.
 `tests/tarea-abierta-otro-dia.cjs`. → **Desde la v26.61 el armado SÍ viaja al servidor** (regla de abajo); leerlo para
 retomar en otro celular es la parte 2.
+
+## ⚠ REGLA (Luis, 2026-10-16, v31.90): al TERMINAR DÍA el armado abierto sube al servidor y NO queda en el celular
+
+**Luis:** *"cuando termina el día el celular debería mandar el dato al server, no puede quedar vivo en el celu"*.
+Hasta la v31.89 la foto ya viajaba a `GV_Armado_Avance`, pero el celular se quedaba su copia (`vir_comp_<tanda>`) y
+al retomar **ganaba la del celular** (`showCompletarWizard` lee primero `_compRestore`): un ajuste hecho desde el
+servidor (F73A, NP LK 0392: 5 artículos sacados) no le llegaba. Ahora `tdSubirArmado` (Terminar Día, después de
+`tdCerrarModulos`) sube la última foto `en_curso` y, **sólo con el OK del servidor**, borra la copia local; mañana
+se retoma de la del servidor. Sin señal la copia local queda (no se pierde avance). El picking ya estaba en el
+servidor (PKC + `pkResumeServer`, y la retomada después del freno siembra de todos). `tests/td-sube-armado.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-05, v26.83): en BAJAR DE RACKS, GUARDADO e INGRESO A RACKS, «Cerrar» MINIMIZA y «Anular» SALE
 

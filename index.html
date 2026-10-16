@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.83">
+<link rel="stylesheet" href="gv-ui.css?v=31.90">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -3988,6 +3988,24 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-mis{ display:inline-block; background:#ea580c; color:#fff; font-size:11px; font-weight:900;
   border-radius:999px; padding:1px 9px; margin-left:8px; vertical-align:1px; letter-spacing:.04em;
   white-space:nowrap; }
+/* v31.89 (Luis, 16/10) — PEDIDOS ANÓMALOS. El cartel del día va A LA IZQUIERDA de la fila, fuera de la
+   tabla, cuando hay lugar (`_pgaAnomGutter` lo saca del renglón y lo cuelga de `.pga-blk`); en el celular
+   no hay margen y queda adentro, al lado del día. El de la NP es la pastilla chica de la fila. */
+.pga-blk{ position:relative; }
+.pga-anom{ display:inline-block; background:#b91c1c; color:#fff; font-size:11px; font-weight:900;
+  border-radius:999px; padding:1px 9px; margin-left:8px; vertical-align:1px; letter-spacing:.04em;
+  white-space:nowrap; cursor:pointer; }
+.pga-blk.anom-fuera tr.pga-d .pga-anom{ display:none; }
+.pga-anom.pga-anom-g{ position:absolute; right:calc(100% + 10px); transform:translateY(-50%); margin:0;
+  font-size:12px; padding:3px 10px; z-index:3; }
+.pga-anom-np{ display:inline-block; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5;
+  font-size:11px; font-weight:900; border-radius:999px; padding:0 8px; margin-left:8px; vertical-align:1px;
+  white-space:nowrap; cursor:pointer; }
+.pga-anom-tbl td{ white-space:normal; }
+.pga-anom-tbl td.t{ max-width:420px; }
+.pga-anom-acc{ font-weight:800; font-size:12px; white-space:nowrap; }
+.pga-anom-acc.bot{ color:#b91c1c; }
+.pga-anom-acc.av{ color:#64748b; }
 /* el destino del expreso al lado de la zona: "Snaider · Misiones" */
 .pga-dest{ display:inline-block; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa;
   border-radius:6px; padding:0 7px; font-size:12.5px; font-weight:800; margin-left:8px;
@@ -6509,7 +6527,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.83"></script>
+<script type="module" src="recepcion.js?v=31.90"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -8229,6 +8247,27 @@ function tdModulosAbiertos(st) {
     .map(function (m) { return { tipo: m.code || m.k, k: m.k, desc: m.desc }; });
 }
 /* Cierra cada tarea de módulo con el MISMO cierre que su botón (el tiempo hasta ahora queda registrado). */
+/* v31.90 (Luis, 16/10: "cuando termina el día el celular debería mandar el dato al server, no puede quedar
+   vivo en el celu") — Terminar Día con un armado abierto sube la ÚLTIMA foto (`GV_Armado_Avance`, en_curso)
+   y, sólo si el servidor contesta OK, borra la copia del celular (`vir_comp_<tanda>`). Al retomar, mañana,
+   `showCompletarWizard` no encuentra copia local y arranca de la del servidor: la misma para cualquier
+   celular, y la que ve un ajuste hecho desde el servidor (caso F73A / NP LK 0392). Sin señal la copia local
+   queda, como antes: no se pierde avance. El picking ya vivía en el servidor (PKC + `pkResumeServer`). */
+function tdSubirArmado(legajoStr) {
+  try {
+    const L = String(legajoStr || "").trim();
+    if (!L || esLegajoPrueba(L)) return;
+    const st = getLegajoState(L);
+    const T = (st && st.armado && st.armado.active) ? String(st.armado.value || "").trim().toUpperCase() : "";
+    if (!T) return;
+    const loc = _compRestore(T);
+    if (!loc || !loc.nps || !loc.nps.length) return;
+    const foto = _armAvFoto(loc); if (!foto) return;
+    _armAvPost(_armAvCuerpo(T, L, "en_curso", foto), 0, false).then(function (ok) {
+      if (ok) _compClearPersist(T);
+    }).catch(function () {});
+  } catch (_e) {}
+}
 function tdCerrarModulos(legajoStr) {
   const st = getLegajoState(legajoStr) || {};
   TD_MODULOS.forEach(function (m) {
@@ -8662,6 +8701,8 @@ async function confirmarTerminarDia() {
 
   // 1c) v31.01: tareas de módulo abiertas → su cierre de siempre, ANTES del FJ.
   tdCerrarModulos(legajoStr);
+  // 1d) v31.90 (Luis, 16/10): el armado abierto NO queda vivo en el celular — sube la foto y, con el OK, se borra la local.
+  tdSubirArmado(legajoStr);
 
   // 2) Reporte FJ "Fin de Jornada" con resumen del día como JSON en texto.
   //    client_id DETERMINÍSTICO por (legajo, día) -> si tocan Terminar Día
@@ -10857,7 +10898,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.83";
+const APP_VERSION = "v31.90";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -14779,7 +14820,8 @@ window.pkExcPosVariasOk = pkExcPosVariasOk; window.pkExcPosSkip = pkExcPosSkip;
    Paso art·EXC sin ninguna posición (gv_excedente_posicion lo da con sector NULL: p. ej. un ajuste que
    entró sin ubicación): 1) ¿qué posición dice el cartel? 2) «Andá a P13 — ¿está?». Sí → se pickea ahí y el
    PKC lleva la posición en el 8º campo (trg_gv_exc_pick_pos → GV_Excedente_Ubic_Declarada: desde ahí la
-   vista ubica ese saldo en P13). No está → 0 del excedente (faltante, como «Sin stock»).
+   vista ubica ese saldo en P13). No está → 0 del excedente (faltante, como «Sin stock») y el PKC lleva «-P13»:
+   v31.89 (Luis) sale en la landing del admin junto a los conteos; ✓ da ese excedente por vacío.
    Sin botón para saltear (mismo criterio que D1). sql/gv_excedente_cartel_v3182.sql · tests/pk-excedente-cartel.cjs */
 function pkExcSinPos(it) {
   if (!it || !it.isExc || it.manualExc) return false;
@@ -14788,7 +14830,9 @@ function pkExcSinPos(it) {
 function pkExcCartelCampo(art) {
   if (!_pk || !_pk.excCartel) return "";
   const c = _pk.excCartel[String(art).toUpperCase()];
-  return (c && c.ok === true && c.u) ? String(c.u).replace(/[^A-Z0-9Ñ]/gi, "") : "";
+  if (!c || !c.u || c.ok == null) return "";
+  // v31.89: «No está» viaja como «-P13» → aviso al admin (gv_exc_noesta_pendientes)
+  return (c.ok === false ? "-" : "") + String(c.u).replace(/[^A-Z0-9Ñ]/gi, "");
 }
 function pkExcCartelCardHtml(it, c, nav) {
   const cod = escapeHtml(_padCod(codBase(it.art)));
@@ -45016,7 +45060,7 @@ function pgaNeed(force) {
     body: JSON.stringify({ p_desde: desde, p_hasta: hasta })
   }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(function (rows) { _pgaRows = rows || []; _pgaTs = Date.now(); _pgaErr = ""; _pgaBusy = false;
-      pgaDestDeFilas(_pgaRows); pgaFcCargar(_pgaRows); pppRenderProg(); })
+      pgaDestDeFilas(_pgaRows); pgaFcCargar(_pgaRows); pgaAnomCargar(desde); pppRenderProg(); })
     .catch(function (e) {
       _pgaBusy = false; _pgaErr = String((e && e.message) || e);
       if (!_pgaRows) _pgaRows = [];
@@ -45038,7 +45082,129 @@ function pgaFcCargar(rows) {
     .then(function (a) { _pgaFc = new Set((a || []).map(function (x) { return _pppNpNorm(x.np); })); pppRenderProg(); })
     .catch(function (e) { console.warn("[ppp] fc parseada:", e && e.message); });
 }
+/* ═══ v31.89 (Luis, 16/10/2026) — PEDIDOS ANÓMALOS ════════════════════════════════════
+   Caso testigo: LK 0364 pidió 48 cajas de 525E (uxb 24) y quería 2. El backend (cron 167,
+   `gv_ppp_anomalos_detectar`, sql/gv_ppp_pedidos_anomalos_v3189.sql) marca cada línea con su
+   regla: historial (cliente con 3+ pedidos, promedio < 5 cj → tope ×5) y Est. Madre (cliente con
+   menos de 3 pedidos, desbalance ×5) → los CONTACTA el bot de GestOpClientes; cajas múltiplo del
+   uxb (el mismo aviso que da la página) → sólo el cartel. Acá sólo se LEE (`gv_ppp_anomalos_lista`).
+   ⚠ Va en su propio fetch y con su propio catch: si falla, la Programación se ve igual, sin cartel. */
+let _pgaAnom = null, _pgaAnomBusy = false;
+function pgaAnomCargar(desde) {
+  if (_pgaAnomBusy) return;
+  _pgaAnomBusy = true;
+  aprRpc("gv_ppp_anomalos_lista", { p_desde: desde || null })
+    .then(function (rows) {
+      const m = new Map();
+      (rows || []).forEach(function (x) {
+        const k = String(x.np_label || "").trim(); if (!k) return;
+        if (!m.has(k)) m.set(k, []);
+        m.get(k).push(x);
+      });
+      _pgaAnom = m; _pgaAnomBusy = false; pppRenderProg();
+    })
+    .catch(function (e) { _pgaAnomBusy = false; console.warn("[ppp] anómalos:", e && e.message); });
+}
+function _pgaAnomDe(np) { return (_pgaAnom && _pgaAnom.get(String(np || "").trim())) || null; }
+function _pgaAnomNpsDia(d) {
+  const s = [];
+  for (const t of (d.tandasArr || [])) for (const r of (t.filas || [])) {
+    if (_pgaAnomDe(r.np) && s.indexOf(r.np) < 0) s.push(r.np);
+  }
+  return s;
+}
+const PGA_ANOM_REGLA = { historial: "Historial ×5", em: "Est. Madre", cajas_uxb: "Cajas = uxb" };
+function _pgaAnomDiaChip(d) {
+  const nps = _pgaAnomNpsDia(d);
+  if (!nps.length) return "";
+  const bot = nps.filter(function (np) { return _pgaAnomDe(np).some(function (x) { return x.contactar; }); }).length;
+  return '<span class="pga-anom" onclick="event.stopPropagation();pgaAnomAbrir(\'' + escapeHtml(nps.join("|")) + '\',\'' +
+    escapeHtml(_pgaDiaTxt(d.key)) + '\')" title="' + nps.length + (nps.length === 1 ? ' pedido' : ' pedidos') +
+    ' con cantidades fuera de lo normal' + (bot ? ' · ' + bot + ' para que el bot contacte al cliente' : '') +
+    '. Tocá para ver cuáles y por qué.">⚠ PEDIDOS ANÓMALOS: ' + nps.length + '</span>';
+}
+function _pgaAnomNpChip(r) {
+  const l = _pgaAnomDe(r.np);
+  if (!l) return "";
+  const bot = l.some(function (x) { return x.contactar; });
+  return '<span class="pga-anom-np" onclick="event.stopPropagation();pgaAnomAbrir(\'' + escapeHtml(r.np) + '\',\'' + escapeHtml(r.np) + '\')"' +
+    ' title="' + escapeHtml(l.map(function (x) { return x.detalle; }).join(" · ")) + '">⚠ anómalo' + (bot ? ' · bot' : '') + '</span>';
+}
+let _pgaAnomVer = null;
+function pgaAnomAbrir(nps, titulo) {
+  _pgaAnomVer = { titulo: String(titulo || ""), nps: String(nps || "").split("|").filter(Boolean) };
+  pgaAnomRender();
+}
+function pgaAnomCerrar() { _pgaAnomVer = null; pgaAnomRender(); }
+function pgaAnomRender() {
+  let ov = document.getElementById("pgaAnomModal");
+  if (!_pgaAnomVer) { if (ov) ov.hidden = true; return; }
+  if (!ov) { ov = document.createElement("div"); ov.id = "pgaAnomModal"; ov.className = "cuar-modal"; document.body.appendChild(ov); }
+  ov.hidden = false;
+  let filas = "";
+  for (const np of _pgaAnomVer.nps) {
+    const l = _pgaAnomDe(np) || [];
+    l.forEach(function (x, i) {
+      filas += '<tr>' +
+        (i === 0 ? '<td rowspan="' + l.length + '"><b>' + escapeHtml(np) + '</b><br>' + escapeHtml(x.razon_social || "—") + '</td>' : '') +
+        '<td><b>' + escapeHtml(x.articulo) + '</b></td><td>' + escapeHtml(String(Number(x.cajas))) + '</td>' +
+        '<td>' + escapeHtml(PGA_ANOM_REGLA[x.regla] || x.regla) + '</td>' +
+        '<td class="t">' + escapeHtml(x.detalle || "") + '</td>' +
+        '<td><span class="pga-anom-acc ' + (x.contactar ? 'bot' : 'av') + '">' +
+          (x.contactar ? (x.estado === "contactado" ? 'Bot: contactado' : 'Bot: a contactar') : 'Sólo aviso') + '</span>' +
+          (x.contacto_nota ? '<br><small>' + escapeHtml(x.contacto_nota) + '</small>' : '') + '</td>' +
+        '</tr>';
+    });
+  }
+  ov.innerHTML = '<div class="cuar-m-back" onclick="pgaAnomCerrar()"></div>' +
+    '<div class="cuar-m-card">' +
+      '<div class="cuar-m-head"><span>⚠ Pedidos anómalos · ' + escapeHtml(_pgaAnomVer.titulo) + '</span>' +
+        '<button class="cuar-m-x" onclick="pgaAnomCerrar()">✕</button></div>' +
+      '<div class="cuar-m-body">' +
+        (filas ? '<div class="gv-tblwrap fit"><table class="gv-tbl compact fit pga-anom-tbl"><thead><tr>' +
+            '<th>NP</th><th>Art.</th><th>Cj</th><th>Regla</th><th>Por qué</th><th>Acción</th></tr></thead><tbody>' +
+            filas + '</tbody></table></div>'
+          : '<p class="cuar-m-sub">Ya no hay anomalías abiertas en estos pedidos.</p>') +
+        '<p class="cuar-m-sub">Historial y Est. Madre los contacta el bot para confirmar con el cliente. ' +
+          'Cajas = uxb es el mismo aviso que ve el cliente en la página: sólo se avisa acá.</p>' +
+      '</div>' +
+      '<div class="cuar-m-foot"><button class="cuar-save" onclick="pgaAnomCerrar()">Cerrar</button></div>' +
+    '</div>';
+}
+/* El cartel del día, afuera de la tabla y a la izquierda de su fila (Luis lo dibujó ahí). Sólo si
+   el bloque centrado deja margen; si no (celular), queda el chip de adentro de la fila. */
+function _pgaAnomGutter() {
+  document.querySelectorAll(".pga-blk").forEach(function (blk) {
+    blk.querySelectorAll(".pga-anom-g").forEach(function (x) { x.remove(); });
+    blk.classList.remove("anom-fuera");
+    const chips = blk.querySelectorAll("tr.pga-d .pga-anom");
+    if (!chips.length) return;
+    const rb = blk.getBoundingClientRect();
+    if (rb.left < 200) return;
+    blk.classList.add("anom-fuera");
+    chips.forEach(function (ch) {
+      const tr = ch.closest("tr"); if (!tr) return;
+      const rt = tr.getBoundingClientRect();
+      const g = ch.cloneNode(true);
+      g.classList.add("pga-anom-g");
+      g.style.top = (rt.top - rb.top + rt.height / 2) + "px";
+      blk.appendChild(g);
+    });
+  });
+}
+/* Se re-ubica en cada redibujo y otra vez al terminar la animación del overlay (~400 ms): mientras
+   anima, el bloque no está en su lugar y la medida sale corrida o sin margen. */
+let _pgaAnomRsz = 0, _pgaAnomT = [];
+function _pgaAnomGutterPronto() {
+  _pgaAnomT.forEach(clearTimeout);
+  _pgaAnomGutter();   // en el mismo redibujo: la medida fuerza el layout y no hay un cuadro sin cartel
+  _pgaAnomT = [setTimeout(_pgaAnomGutter, 450), setTimeout(_pgaAnomGutter, 900)];
+}
+window.addEventListener("resize", function () { clearTimeout(_pgaAnomRsz); _pgaAnomRsz = setTimeout(_pgaAnomGutter, 150); });
+window.pgaAnomAbrir = pgaAnomAbrir; window.pgaAnomCerrar = pgaAnomCerrar;
+
 function pgaRecargar() { _pgaTs = 0; _pgaItems = {}; _patrTs = 0; _pgaDest = null; _pgaDestPide = new Set(); _pgaObs = null; _pgaObsPide = new Set();
+  _pgaAnom = null;
   pgaNeed(true); patrNeed(true); pppRenderProg(); }
 function pgaAbrirDia(k)   { _pgaOpenD[k] = !_pgaOpenD[k]; pppRenderProg(); }
 function pgaAbrirTanda(k) { _pgaOpenT[k] = !_pgaOpenT[k]; pppRenderProg(); }
@@ -45257,6 +45423,7 @@ function _pgaCuerpoHtml(dias, opts) {
         '" onclick="pgaAbrirDia(\'' + d.key + '\')"' +
         (esp ? ' title="Armado y parado a propósito, sin fecha de entrega: no consume cupo, no va en ningún camión y no cuenta como atrasado. Acá se mandan las tandas armadas sin fecha; para sacar una de acá, «📅 Cambiar de día» en la tanda."' : '') + '>' +
       '<td><span class="pga-chev">' + (ab ? "▾" : "▸") + '</span>' + _pgaDiaHtml(d.key) + _pgaMontoChip(_pgaValorDia(d)) +
+        _pgaAnomDiaChip(d) +   // v31.89 (Luis): PEDIDOS ANÓMALOS: X
         (d.mis ? '<span class="pga-mis" title="Este día lleva un pedido a una provincia marcada. El camión va al expreso en CABA, pero la mercadería termina en otra provincia: mirar que salga con el expreso que corresponde.">⚠ ' +
           escapeHtml(_pgaMisTxt(d.mis, d.misProv)) + '</span>' : '') +
         // v21.80 (Tomás González): cuántos comentarios lleva el día adentro. Se calcula acá, de
@@ -45336,7 +45503,7 @@ function _pgaCuerpoHtml(dias, opts) {
           '<td>' +
             '<div class="pga-nrow"><span class="pga-ninfo">' +
           '<span class="pga-chev">' + (nb ? "▾" : "▸") + '</span>' +
-            '<span class="pga-np">' + escapeHtml(r.np) + '</span>' + _npSrcChip(r.np) +
+            '<span class="pga-np">' + escapeHtml(r.np) + '</span>' + _npSrcChip(r.np) + _pgaAnomNpChip(r) +
             '<span class="pga-pill e-' + estVis + '"' +
               (_sal ? ' title="Ya salió en el camión (CCN). Antes de salir estaba: ' + PGA_EST_TXT[est] + '"' : '') +
               '>' + PGA_EST_TXT[estVis] + '</span>' +
@@ -47874,7 +48041,10 @@ function pppRenderProg() {
       pppMismoLugarNeed(); html += _pppMismoLugarNota();   // v28.34 (Luis, D6)
       html += '<div class="pn-wrap">' + (_pppPlanDay ? _pppPlanDiaHtml(programados, _pppPlanDay)
               : _pppArbolHtml(programados)) + '</div>';
-      _renderKeepFocus(box, html); return;
+      _renderKeepFocus(box, html);
+      // v31.89: el overlay abre con animación; al primer cuadro el bloque todavía no está en su lugar.
+      if (!_pppPlanDay) _pgaAnomGutterPronto();
+      return;
     }
   }
   // ===== Tab "A Programar" → (en modo editable) armar tandas y confirmar; en SOLO-LECTURA sólo lista =====
@@ -65115,7 +65285,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.83"></script>
+<script src="importacion.js?v=31.90"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65330,23 +65500,70 @@ function showSelector() {
    (contó 50, se pickearon 30 → 20). ✓ = ajusta la góndola (Movimientos_Stock 'ajuste', ref CONTEO PICKING,
    «Stock ajustado por conteo durante picking»); ✕ = rechaza. Los dos sacan la fila. Sin diferencias, no se dibuja. */
 let _cgRows = [];
+/* v31.89 (Luis, 16/10): EXCEDENTE QUE NO ESTABA. En el picking, el excedente sin posición registrada lleva al
+   operario a la posición del cartel; si dice «No está», sale acá, debajo de los conteos (misma lógica: el sistema
+   dice que hay y el operario no lo encuentra). ✓ = gv_exc_noesta_resolver(id, true): ajuste en 'excedente' por el
+   saldo SIN posición del código (ref EXCEDENTE NO ESTA) → queda vacío; ✕ = rechazado, no toca stock.
+   sql/gv_excedente_noesta_v3185.sql · tests/exc-noesta-admin.cjs */
+let _enRows = [], _enErr = false;
+async function enLoad() {
+  const sbx = window.sb;
+  let r;
+  try { r = await sbx.rpc("gv_exc_noesta_pendientes"); } catch (e) { r = { error: e }; }
+  _enErr = !!(r && r.error);
+  _enRows = (!_enErr && r && Array.isArray(r.data)) ? r.data : [];
+}
+async function enResolver(i, vaciar) {
+  const x = _enRows[i]; if (!x) return;
+  const caj = Math.round(Number(x.cajas_sin_pos) || 0);
+  const msg = vaciar
+    ? "Dar por vacío el excedente de " + x.cod + " (" + caj + " cajas sin posición)?\n(queda como «Excedente no encontrado»)"
+    : "Rechazar el aviso de " + x.cod + "? El stock no se toca.";
+  if (!confirm(msg)) return;
+  let r;
+  try { r = await window.sb.rpc("gv_exc_noesta_resolver", { p_id: x.id, p_vaciar: !!vaciar }); } catch (e) { r = { error: e }; }
+  if (r && r.error) { alert("No se pudo: " + (r.error.message || r.error) + "\nNo se tocó nada, probá de nuevo."); return; }
+  if (r && r.data && r.data.ok === false && r.data.motivo !== "ya_resuelto") { alert("No se pudo: " + r.data.motivo); return; }
+  await cgLoad();
+}
+window.enResolver = enResolver;
 async function cgLoad() {
   const box = document.getElementById("cgAside"); if (!box) return;
   const sbx = window.sb;
   if (!sbx || typeof sbx.rpc !== "function") { if (!cgLoad._re) { cgLoad._re = 1; setTimeout(cgLoad, 2500); } return; }
+  try { await enLoad(); } catch (_e) { _enErr = true; _enRows = []; }   // v31.89
   let r;
   try { r = await sbx.rpc("gv_conteo_picking_pendientes"); } catch (e) { r = { error: e }; }
   if (r && r.error) {
     box.style.display = "";
-    box.innerHTML = '<div class="cg-h">Conteos de góndola</div><div class="cg-l3">No se pudieron leer los conteos.</div>';
+    box.innerHTML = '<div class="cg-h">Conteos de góndola</div><div class="cg-l3">No se pudieron leer los conteos.</div>' + enHtml();
     return;
   }
   _cgRows = (r && r.data) || [];
   cgRender();
 }
+function enHtml() {
+  if (_enErr) return '<div class="cg-h" style="margin-top:8px">Excedente que no estaba</div><div class="cg-l3">No se pudieron leer.</div>';
+  if (!_enRows.length) return "";
+  const n = function (v) { return Math.round(Number(v) || 0).toLocaleString("es-AR"); };
+  return '<div class="cg-h" style="margin-top:8px">Excedente que no estaba (' + _enRows.length + ')</div>' +
+    _enRows.map(function (x, i) {
+      const f = x.ts ? new Date(x.ts) : null;
+      const cuando = f ? (String(f.getDate()).padStart(2, "0") + "/" + String(f.getMonth() + 1).padStart(2, "0") + " " + String(f.getHours()).padStart(2, "0") + ":" + String(f.getMinutes()).padStart(2, "0")) : "";
+      return '<div class="cg-it">' +
+        '<div class="cg-l1">' + escapeHtml(_padCod(x.cod || "")) + ' · ' + escapeHtml(x.sector || "—") + '</div>' +
+        '<div class="cg-l2">No estaba · sist. <b>' + n(x.cajas_sin_pos) + '</b> cj sin posición</div>' +
+        '<div class="cg-l3">' + escapeHtml(x.nombre || ("leg. " + (x.legajo || "?"))) + ' · ' + cuando + (x.tanda ? " · " + escapeHtml(x.tanda) : "") + '</div>' +
+        '<div class="cg-btns"><button class="cg-ok" title="Dar el excedente por vacío" onclick="enResolver(' + i + ',true)">✓</button>' +
+        '<button class="cg-no" title="Rechazar (no toca el stock)" onclick="enResolver(' + i + ',false)">✕</button></div>' +
+        '</div>';
+    }).join("");
+}
 function cgRender() {
   const box = document.getElementById("cgAside"); if (!box) return;
-  if (!_cgRows.length) { box.style.display = "none"; box.innerHTML = ""; return; }
+  const en = enHtml();   // v31.89
+  if (!_cgRows.length && !en) { box.style.display = "none"; box.innerHTML = ""; return; }
+  if (!_cgRows.length) { box.style.display = ""; box.innerHTML = en; return; }
   const n = function (v) { return Math.round(Number(v) || 0).toLocaleString("es-AR"); };
   box.style.display = "";
   box.innerHTML = '<div class="cg-h">Conteos de góndola en picking (' + _cgRows.length + ')</div>' +
@@ -65362,7 +65579,7 @@ function cgRender() {
         '<div class="cg-btns"><button class="cg-ok" title="Ajustar la góndola a lo contado" onclick="cgResolver(' + i + ',true)">✓</button>' +
         '<button class="cg-no" title="Rechazar el conteo (no toca el stock)" onclick="cgResolver(' + i + ',false)">✕</button></div>' +
         '</div>';
-    }).join("");
+    }).join("") + en;
 }
 async function cgResolver(i, ajustar) {
   const x = _cgRows[i]; if (!x) return;
@@ -65375,7 +65592,7 @@ async function cgResolver(i, ajustar) {
   try { r = await window.sb.rpc("gv_conteo_picking_resolver", { p_cid: x.client_id, p_ajustar: !!ajustar }); } catch (e) { r = { error: e }; }
   if (r && r.error) { alert("No se pudo: " + (r.error.message || r.error) + "\nNo se tocó nada, probá de nuevo."); return; }
   if (r && r.data && r.data.ok === false && r.data.motivo !== "ya_resuelto") { alert("No se pudo: " + r.data.motivo); return; }
-  cgLoad();
+  await cgLoad();
 }
 window.cgLoad = cgLoad; window.cgResolver = cgResolver;   // los onclick del cuadro viven en el global
 
@@ -65839,7 +66056,8 @@ function _plantaDiaHoy() {
 }
 function _routeAfterAuth() {
   try { gvRegistrarIngreso(__identity, window.__gvLoginMetodo || "sesion_guardada"); window.__gvLoginMetodo = null; } catch (_e) {}
-  if (__identity && __identity.soloCervantes) { window.location.href = "https://rp.loeke-erp.com/"; return; }   // v27.71 · v31.46: RP2 retirado, Cervantes es RP3 (Luis, 16/10)
+  if (__identity && __identity.soloCervantes) { window.location.href = "https://rp.loeke-erp.com/"; return; }
+  if (__identity && __identity.type === "operario" && _gvClaveTvApagada()) { try { _gvCorteSesionOperario(); } catch (_e) {} }   // v31.84   // v27.71 · v31.46: RP2 retirado, Cervantes es RP3 (Luis, 16/10)
   if (window.__pendingMonitorParam || __plantChosen) { _renderIdentity(); return; }
   if (__identity && __identity.type === "operario" && _plantaDiaHoy() === "virgilio") {
     __plantChosen = true;
@@ -66189,9 +66407,67 @@ function _gvAplicarCorteClaveTv() {
   const row = $("legajoLoginRow"), btn = $("loginOperarioRp");
   if (row) row.style.display = off ? "none" : "";
   if (btn) btn.style.display = off ? "" : "none";
+  if (off) { try { _gvCorteSesionOperario(); } catch (_e) {} }
   return off;
 }
+/* v31.84 (Luis, 16/10: «si por algún motivo hay alguna abierta a esa hora, que cuando se cierre queden registrados
+   todos los datos»): pasado el corte, la sesión de OPERARIO abierta en Gestión se cierra, pero primero:
+   · con tareas abiertas (picking, armado, toggles, módulos) → sólo «Terminar Día», que las cierra con su dato y
+     drena la cola como siempre (no se inventa ningún cierre ni una FJ a las 0:01);
+   · sin tareas abiertas → manda TODO lo que el celular tiene en cola y recién ahí cierra la sesión.
+   Supervisores (Google) no se tocan. La cola no depende de la sesión: si se corta la red sigue saliendo sola. */
+let _gvCorteDrenando = false;
+function _gvCorteOverlay(html, boton) {
+  let ov = $("gvCorteOverlay");
+  if (!ov) {
+    ov = document.createElement("div");
+    ov.id = "gvCorteOverlay";
+    ov.setAttribute("role", "dialog");
+    ov.style.cssText = "position:fixed;inset:0;z-index:99990;background:rgba(15,23,42,.78);display:flex;align-items:center;justify-content:center;padding:16px;";
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="background:#fff;border-radius:12px;max-width:380px;width:100%;padding:18px 16px;text-align:center;font-size:15px;line-height:1.4;color:#0f172a;">' +
+    html + (boton ? '<button id="gvCorteBtn" class="primary-btn" style="margin-top:14px;width:100%;">' + boton + '</button>' : "") + '</div>';
+  ov.style.display = "flex";
+  return ov;
+}
+function _gvCorteSesionOperario() {
+  if (_gvCorteDrenando) return;
+  if (!(__identity && __identity.type === "operario")) return;
+  const tdAbierto = $("terminarDiaModal");
+  if (tdAbierto && tdAbierto.classList.contains("show")) return;   // está terminando el día
+  const leg = String((__identity.emp && __identity.emp.legajo) || (typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim();
+  let pend = null;
+  try { pend = leg ? getPendingsForLegajo(leg) : null; } catch (_e) { pend = null; }
+  const abiertas = pend ? [].concat(pend.sobreviven || [], pend.seCierran || [], pend.modulos || []) : [];
+  if (abiertas.length) {
+    const ov = _gvCorteOverlay('<b>El registro de operario ahora es en RP3.0.</b><br><br>Tenés tareas abiertas: ' +
+      abiertas.map(function (a) { return escapeHtml(a.desc || a.tipo); }).join(", ") +
+      '.<br>Tocá <b>Terminar Día</b> para que quede todo registrado.', "Terminar Día");
+    const bt = $("gvCorteBtn");
+    if (bt) bt.onclick = function () { ov.style.display = "none"; try { if (legajoInput && !legajoInput.value) legajoInput.value = leg; terminarDia(); } catch (_e) {} };
+    return;
+  }
+  _gvCorteDrenando = true;
+  (async function () {
+    try {
+      while (readQueue().length) {
+        const sinRed = (typeof navigator !== "undefined" && navigator.onLine === false);
+        _gvCorteOverlay('<b>El registro de operario ahora es en RP3.0.</b><br><br>' + (sinRed
+          ? 'Sin señal: quedan <b>' + readQueue().length + '</b> reporte(s) por enviar. Dejá la app abierta cerca del wifi.'
+          : 'Enviando <b>' + readQueue().length + '</b> reporte(s) pendiente(s)…'));
+        try { await flushQueue(); } catch (_e) {}
+        if (readQueue().length) await new Promise(function (r) { setTimeout(r, 3000); });
+      }
+      const ov = $("gvCorteOverlay"); if (ov) ov.style.display = "none";
+      try { window.__gvLoginMetodo = null; } catch (_e) {}
+      __identity = null;
+      if (typeof window.endDaySignOut === "function") await window.endDaySignOut();
+    } finally { _gvCorteDrenando = false; }
+  })();
+}
 window.gvIrRp3 = function () { location.href = RP3_URL; };
+window.gvAplicarCorteClaveTv = function () { return _gvAplicarCorteClaveTv(); };
 document.addEventListener("DOMContentLoaded", _gvAplicarCorteClaveTv);
 if (document.readyState !== "loading") _gvAplicarCorteClaveTv();
 setInterval(_gvAplicarCorteClaveTv, 30000);
@@ -68460,15 +68736,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.83"></script>
-<script src="hotsale.js?v=31.83"></script>
-<script src="estadisticas.js?v=31.83"></script>
-<script src="ads.js?v=31.83"></script>
-<script src="plantel.js?v=31.83"></script>
+<script src="cobranzas.js?v=31.90"></script>
+<script src="hotsale.js?v=31.90"></script>
+<script src="estadisticas.js?v=31.90"></script>
+<script src="ads.js?v=31.90"></script>
+<script src="plantel.js?v=31.90"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.83"></script>
+<script src="analisis.js?v=31.90"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.83"></script>
+<script src="ayuda.js?v=31.90"></script>
 
 </body>
 </html>

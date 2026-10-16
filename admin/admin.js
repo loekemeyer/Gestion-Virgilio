@@ -1413,6 +1413,15 @@ function _pinAccesoSet(hasta, solicitante) {
 }
 
 async function _pinAccesoAbrir() {
+  // Si ya hay un código pedido y sin usar, se va directo a escribirlo: pedir otro invalidaría el que ya llegó.
+  var rv = await sb.rpc("admin_pin_codigo_vigente");
+  var vig = rv && !rv.error && rv.data && rv.data.vigente ? rv.data : null;
+  if (vig) {
+    var codYa = window.prompt("Ya hay un código pedido" + (vig.solicitante ? " por " + vig.solicitante : "") +
+      " (vence en " + vig.vence_en_min + " min). Pedíselo a Thomy y escribilo acá.\n\nDejalo vacío para pedir uno nuevo:", "");
+    if (codYa === null) return false;
+    if (String(codYa).trim()) return await _pinAccesoValidar(codYa);
+  }
   var nombre = window.prompt(
     "Para ver PINes hace falta un código que le llega a Thomy por WhatsApp junto con tu nombre.\n\nTu nombre y apellido:", "");
   if (nombre === null) return false;
@@ -1424,8 +1433,13 @@ async function _pinAccesoAbrir() {
       max_5_por_hora: "Máximo 5 códigos por hora", sin_aprobador: "Falta el teléfono del aprobador" }[e1.error] || e1.error, "warning");
     if (e1.error !== "espera_1_min") return false;
   }
-  var cod = window.prompt("Pedile a Thomy el código que le llegó (vence en 10 minutos):", "");
+  var cod = window.prompt("Pedile a Thomy el código que le llegó (vence en 10 minutos).\n" +
+    "Si cerrás esta ventana, al tocar «Ver» de nuevo te lo vuelve a pedir:", "");
   if (cod === null) return false;
+  return await _pinAccesoValidar(cod);
+}
+
+async function _pinAccesoValidar(cod) {
   var r2 = await sb.rpc("admin_pin_validar_codigo", { p_codigo: String(cod).trim() });
   if (r2.error) { toast("No se pudo validar: " + r2.error.message, "error"); return false; }
   var e2 = r2.data || {};

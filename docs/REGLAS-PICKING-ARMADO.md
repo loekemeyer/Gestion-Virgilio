@@ -683,6 +683,20 @@ oculta el nacional; par liquidado (`activo = false`) → el nacional queda ocult
 nacional. LK sólo reactiva lo que ocultó el feed. Al aplicarlo (16/10): 636 libre 14, 635 libre 9 → 636E y 635E ocultos.
 El 634E (no existe) se apagó a mano en `products` de Chef. `sql/gv_pick_liquidar_web_switch_v3166.sql`.
 
+## REGLA (Luis, 2026-10-16, v31.87): SACAR ARTÍCULOS de una NP ya pickeada — `GV_NP_Art_Quitado`
+
+**Luis:** *"Anticipate a que puede que los mande desde memoria y el sistema lo tenga que ajustar. No voy a
+interrumpir operación en depo por eso."* Caso NP LK 0392 (Carrefour, F73A): 521, 575, 500, 229 y 594 (95 cj).
+
+1. Sacar el artículo del pedido de origen (LK: `orders.sheets_payload.items` — de ahí lee `v_pedidos_web_np`;
+   con `set_config('lk.recodificando','1',true)` para no re-evaluar stock — y `order_items` + `orders.total`).
+   Sólo borrar `PPP_Web_Base` NO alcanza: el Edge Function la reescribe desde el pedido.
+2. Borrar las líneas de `PPP_Web_Base` y corregir `lineas` / `cajas` / `m3` de `PPP_Web_Programacion`.
+3. Stock: `separar_pedidos −` y `a_guardar +`, tipo `desarme`, `ref` = tanda, descripción con `(tanda XXXX)`.
+4. Fila en **`GV_NP_Art_Quitado`** (np, cod_art): el trigger `aa_gv_np_art_quitado` descarta ese renglón al
+   entrar a `Entregas_Virgilio` aunque el armado lo mande desde la memoria del celular. Sin fila no hay remito,
+   factura ni reconciliación de stock por él. `sql/gv_np_art_quitado_v3187.sql`.
+
 ## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
 
 > Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
