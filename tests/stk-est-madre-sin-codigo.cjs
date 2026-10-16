@@ -77,6 +77,10 @@ const STOCKS = [
     const abs = path.join(RAIZ, rel);
     if (!abs.startsWith(RAIZ) || !fs.existsSync(abs) || fs.statSync(abs).isDirectory()) { res.writeHead(404); return res.end("no"); }
     res.writeHead(200, { "Content-Type": MIME[path.extname(abs)] || "application/octet-stream" });
+    // Las librerias de CDN se sirven desde tests/vendor (otra version que la del CDN): el
+    // `integrity` (SRI) del HTML no coincidiria y el navegador no las cargaria. Solo en el test.
+    if (path.extname(abs) === ".html")
+      return res.end(fs.readFileSync(abs, "utf8").replace(/\s+integrity="[^"]*"/g, ""));
     fs.createReadStream(abs).pipe(res);
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));

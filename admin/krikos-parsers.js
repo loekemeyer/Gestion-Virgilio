@@ -29,6 +29,9 @@
   // ============================================================================
   function parseNum(s) {
     if (s == null) return 0;
+    // Celda numerica de Excel: ya es el valor. Pasarla a texto y releerla
+    // convierte 743.061 (precio con 3 decimales) en 743061 (pedido 1569).
+    if (typeof s === "number") return isFinite(s) ? s : 0;
     var t = String(s).trim();
     if (!t) return 0;
     t = t.replace(/[^0-9.,\-]/g, "");

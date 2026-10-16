@@ -314,6 +314,42 @@
     }
   }
 
+  // 14/10/2026 (Luis, cliente 4142 Poy Ignacio): `sucursal_entrega` tiene que ser la ETIQUETA del
+  // padrón de direcciones del cliente (customer_delivery_addresses.label), que es la llave con la que
+  // Gestión Virgilio cruza el pedido contra la dirección (Excel ISIS col H, destino del expreso). Antes
+  // se armaba "razón social — encabezado de la columna" («Poy Ignacio — ROJAS»), que no es ninguna
+  // dirección. Se elige la dirección del cliente que comparte palabras con el encabezado de la columna
+  // y la dirección de la hoja de facturación; si tiene una sola, ésa. Empate o nada → "" (no se
+  // adivina) y el que llama deja el texto viejo.
+  async function resolvePadronLabel(customerId, branchHeader, delivery) {
+    if (!customerId) return "";
+    try {
+      var r = await window.sb
+        .from("customer_delivery_addresses")
+        .select("slot,label,direccion_entrega,localidad")
+        .eq("customer_id", customerId);
+      if (r.error || !r.data) return "";
+      var dirs = r.data.filter(function (d) { return String(d.label || "").trim(); });
+      if (!dirs.length) return "";
+      if (dirs.length === 1) return String(dirs[0].label).trim();
+      var qset = {};
+      _sucTokens(String(branchHeader || "") + " " + String(delivery || "")).forEach(function (t) { qset[t] = 1; });
+      var best = null, bestSc = 0, empate = false;
+      dirs.forEach(function (d) {
+        var seen = {}, sc = 0;
+        _sucTokens([d.label, d.direccion_entrega, d.localidad].join(" ")).forEach(function (t) {
+          if (qset[t] && !seen[t]) { seen[t] = 1; sc++; }
+        });
+        if (sc > bestSc) { bestSc = sc; best = d; empate = false; }
+        else if (sc > 0 && sc === bestSc && String(d.label).trim() !== String(best.label).trim()) empate = true;
+      });
+      return best && !empate ? String(best.label).trim() : "";
+    } catch (e) {
+      console.warn("xkr resolvePadronLabel:", e);
+      return "";
+    }
+  }
+
   // ----- Helpers -----
   function el(html) {
     var d = document.createElement("div");
@@ -376,6 +412,7 @@
     uxb: [
       /\buxb\b/, /\bu\s*x\s*b\b/, /\bu\/b\b/, /\buxc\b/,
       /unidades?\s*x\s*bulto/, /unidades?\s*por\s*bulto/, /unid\s*caja/,
+      /unid\w*\s*(x|por)\s*(caja|bulto)/, /\bu(n|nid)?\s*x\s*(bulto|caja)\b/,
     ],
     qtyBoxes: [
       /\bbultos\b/, /\bcajas\b/, /\bbult\b/,
@@ -396,7 +433,7 @@
 
   // Headers a EXCLUIR de branchCols (cols numericas que no son sucursales:
   // bonificaciones, impuestos, totales, pendientes, etc.)
-  var BRANCH_EXCLUDE = /\b(bonif|dto|descuento|imp\w*|iva|rec\w*|retorno|sub.?total|total|pendiente|stock|saldo|venta|vta|precio|margen|markup|ganancia|costo)\b/i;
+  var BRANCH_EXCLUDE = /\b(bonif|dto|descuento|imp\w*|iva|rec\w*|retorno|sub.?total|total|pendiente|stock|saldo|venta|vta|precio|margen|markup|ganancia|costo|neto|monto|valor|bruto|importe|peso|m3|vol\w*)\b/i;
 
   function matchCol(headerNorm, patterns) {
     for (var i = 0; i < patterns.length; i++) {
@@ -515,8 +552,14 @@
       if (numericCount / total < 0.6) return;
       if (Object.keys(distinctVals).length < 2) return; // sin variabilidad → no es branch
       if (nonZero === 0) return;
+      // Una cantidad pedida por sucursal es entera; con decimales es plata o m3.
+      var allInt = Object.keys(distinctVals).every(function (k) { return Number(k) % 1 === 0; });
+      if (!allInt) return;
       branchCols.push(c.idx);
     });
+    // Una sola columna "sucursal" con una columna de Cajas/Cantidad reconocida:
+    // es otra columna numerica (Neto, U x Bulto...), no una sucursal. Manda la cantidad.
+    if (branchCols.length === 1 && (roles.qtyBoxes != null || roles.qtyUnits != null)) branchCols = [];
 
     return {
       eanCols: eanCols,
@@ -715,6 +758,7 @@
       items: [],
       submitting: false,
       submitted: false,
+      subidos: {}, // "hoja:sucursal" -> nro de pedido ya subido
       orderId: null,
       // Observaciones del pedido (Tomás Gonzalez, 29/09/2026). Viven en el
       // state porque renderResult() rehace la card entera en cada cambio de
@@ -1218,6 +1262,9 @@
         branchSel.addEventListener("change", async function () {
           var prevLocked = state.customerLockedAuto;
           state.activeBranchCol = parseInt(branchSel.value, 10);
+          var yaSubido = state.subidos[state.activeSheetIdx + ":" + state.activeBranchCol];
+          state.submitted = !!yaSubido;
+          state.orderId = yaSubido || null;
           // Si la nueva sucursal está mapeada → auto-resolver cliente.
           // Si no → liberar lock; si veníamos de auto, limpiar el cliente
           // (la elección anterior pertenecía a otra razón social).
@@ -1249,7 +1296,7 @@
         var caInp = tr.querySelector(".xkr-cajas-input");
         var inclChk = tr.querySelector(".xkr-incl");
         if (caInp) {
-          caInp.addEventListener("input", function () {
+          caInp.addEventListener("change", function () {
             state.items[i].cajas = Math.max(0, parseInt(caInp.value, 10) || 0);
             // Re-render solo totales y subtotal — full re-render por simplicidad
             renderResult();
@@ -1302,6 +1349,7 @@
       state.submitting = false;
       state.submitted = false;
       state.orderId = null;
+      state.subidos = {};
       state.observaciones = "";
       renderInitial();
     }
@@ -1325,6 +1373,16 @@
           missing.length + " item(s) sin match en LK no se enviarán. ¿Continuar?",
         );
         if (!ok) return;
+      }
+      var ceros = state.items.filter(function (it) {
+        return it.included && it.found && !((it.cajas || 0) > 0);
+      });
+      if (ceros.length) {
+        var ok0 = window.confirm(
+          ceros.length + " item(s) quedan en 0 cajas (menos de media caja) y NO se enviarán: " +
+            ceros.map(function (it) { return it.codLk || "?"; }).join(", ") + ". ¿Continuar?",
+        );
+        if (!ok0) return;
       }
       var mismatchUxb = state.items.filter(function (it) {
         return it.included && it.found && it.cajasMismatch;
@@ -1394,9 +1452,10 @@
         // Si la branch tiene mapping conocido, usar la dirección oficial del .doc
         // como dirección de entrega real. Si no, dejar el label del header.
         var deliveryDireccion = state.activeDelivery || branchLabel || "";
-        var sucursalEntrega = branchLabel
-          ? (state.customer.business_name || "") + " — " + branchLabel
-          : (state.customer.business_name || "");
+        var sucursalEntrega = (await resolvePadronLabel(state.customer.id, branchLabel, state.activeDelivery)) ||
+          (branchLabel
+            ? (state.customer.business_name || "") + " — " + branchLabel
+            : (state.customer.business_name || ""));
 
         var obsValue = String(state.observaciones || "").trim();
         var sheetsPayload = {
@@ -1471,6 +1530,7 @@
 
         state.submitted = true;
         state.orderId = orderId;
+        state.subidos[state.activeSheetIdx + ":" + state.activeBranchCol] = orderId;
         window.toast && window.toast("Pedido " + orderId + " subido", "success");
         if (btn) {
           btn.textContent = "Pedido " + orderId + " subido";
@@ -1685,6 +1745,7 @@
     resolveBranchAuto: resolveBranchAuto,
     resolveBranchCustomer: resolveBranchCustomer,
     loadCustomerByCuit: loadCustomerByCuit,
+    resolvePadronLabel: resolvePadronLabel,
     sendToSheetsWithRetry: sendToSheetsWithRetry,
     sendToEntregas: sendToEntregas,
   };
