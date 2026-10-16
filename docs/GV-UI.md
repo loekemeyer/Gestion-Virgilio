@@ -242,6 +242,9 @@ tabla ancha `.mva-tbl.wide` queda con sus anchos fijos** (`<colgroup>` medido, `
 y la regla v24.32 de `docs/REGLAS-IMPORTACION.md`): sólo cambió el encabezado (12 → 13 px, #334155, centrado); su letra
 de 15 px no escala, porque las columnas están medidas en px para ese tamaño.
 
+**Botones que son sólo ícono (📦 📥 ✏️ ⚙): QUEDAN — decisión cerrada** (Luis, 16/10/2026: *"esos dejalos"*). No se
+proponen pasar a texto ni se marcan como hallazgo en un pase de diseño.
+
 ---
 
 ## 6. Estados de la pantalla
