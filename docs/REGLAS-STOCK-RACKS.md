@@ -102,6 +102,23 @@ gondolas se vacian para liberarlas en el mapa"* · *"tanto en GV como en RP3.0"*
 
 `sql/gv_excedente_pick_pos_v3180.sql` · `tests/pk-excedente-posicion.cjs` · centinela de `gv_excedente_posicion`.
 
+## ⚠ REGLA (Luis, 2026-10-16, v31.82): excedente SIN posición registrada → el operario dice el cartel y confirma al llegar
+
+**Luis, textual:** *"Todos los articulos que tienen excedentes ya deberían tener registrada la gondola donde esta el
+excedente. Si hay alguno que tiene excedente y no esta registrado, que le pida al operario marcar en qué gondola esta el
+excedente (en que gondola dice el cartel que esta y que, cuando llegue ahi, confirme si esta o no)"*.
+
+- **Cuándo**: paso `art·EXC` sin ninguna posición (la vista lo da con `sector` NULL; nace de un ajuste que entró sin
+  ubicación: 120 en 60 días al 16/10, aunque ese día no había ningún código así). El marcado a mano no pregunta.
+- **Cómo**: 1) «¿Dónde está el excedente del X?» → posición del cartel (formato P13, se valida); 2) «¿Está el excedente
+  en P13?» → **Sí** pickea ahí; **No está** = 0 del excedente (faltante, igual que «Sin stock»); «Me equivoqué de
+  posición» vuelve al paso 1. Sin botón para saltear (D1).
+- **Qué viaja**: con «Sí», el PKC lleva un **8º campo** con la posición (`…|LK||P13`). `trg_gv_exc_pick_pos` la guarda en
+  `GV_Excedente_Ubic_Declarada` (una por código, la última) y `gv_excedente_posicion` ubica ahí el saldo que no tenía
+  posición. Stock y vista siguen sumando igual (1.440 = 1.440 el 16/10).
+
+`sql/gv_excedente_cartel_v3182.sql` · `tests/pk-excedente-cartel.cjs` · centinela de `gv_excedente_posicion`.
+
 ## ⚠ REGLA: LAS TABLAS QUE VALEN — góndola, racks y empresa del artículo
 
 **Luis, 2026-09-17:** *"fijate que estés usando las tablas actualizadas de `gv_` y escribí en

@@ -1302,6 +1302,8 @@ echo "== pk-gondola-sugerida (v29.69: el código sin góndola → se le pregunta
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-gondola-sugerida.cjs
 echo "== pk-excedente-posicion (v31.80: excedente en 2+ posiciones → se le pregunta de cuál sacó) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-excedente-posicion.cjs
+echo "== pk-excedente-cartel (v31.82: excedente sin posición → posición del cartel y confirmación al llegar) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-excedente-cartel.cjs
 echo "== ppp-plantel (v29.46: PPP → Plantel de la semana, horas de picking/armado/fijas → personas; plantel.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-plantel.cjs
 echo "== monitor-ritmo (v29.47: Monitor → Ritmo de picking, estimado por dificultad vs real; plantel.js) =="
