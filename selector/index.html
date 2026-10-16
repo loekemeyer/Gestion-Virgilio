@@ -64,7 +64,7 @@
       <p class="card-desc">Picking · Armado · Carga de camión · Recepción</p>
       <span class="card-go">→</span>
     </a>
-    <a class="card cer" id="cardCer" href="../cervantes/" onclick="recordar('cervantes')">
+    <a class="card cer" id="cardCer" href="https://rp.loeke-erp.com/" onclick="recordar('cervantes')">
       <span class="badge">Última vez</span>
       <p class="card-name">Cervantes</p>
       <p class="card-desc">Registro de producción · Matrices · Cajas</p>
@@ -79,7 +79,8 @@
 
   <script>
     /* Las dos apps viven en este mismo repo: Virgilio en la raíz (../) y Cervantes
-       en ../cervantes/. El selector solo linkea a esas subcarpetas. */
+       en ../cervantes/. El selector solo linkea a esas subcarpetas.
+       v31.46 (Luis, 16/10): RP2 retirado, Cervantes va directo a Registro Producción 3.0 (rp.loeke-erp.com). */
     var LS_KEY = "appprod_ultima_planta";
 
     function recordar(planta){ try { localStorage.setItem(LS_KEY, planta); } catch(e){} }
