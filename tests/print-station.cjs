@@ -22,6 +22,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // ---- stubs: red y render de remitos (no imprimimos de verdad) ----
     let talRows = [];                       // respuesta del endpoint de TAL
     let imprRows = [];                      // v31.77: respuesta del endpoint de IMPR (reimpresión)
+    const acuses = [];                      // v31.78: eventos IMPRK (acuse de la reimpresión)
     const impresionPosts = [];              // lo que se marca en Impresion_NP
     window.fetch = function (url, opts) {
       const u = String(url);
@@ -29,6 +30,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
         try { JSON.parse(opts.body).forEach(function (r0) { impresionPosts.push(r0.np); }); } catch (_e) {}
         return Promise.resolve({ ok: true, status: 201 });
       }
+      if (opts && opts.method === "POST" && opts.body && opts.body.indexOf('"IMPRK"') >= 0) { acuses.push(JSON.parse(opts.body)); return Promise.resolve({ ok: true, status: 201 }); }
       if (u.indexOf("opcion=eq.IMPR") >= 0) return Promise.resolve({ ok: true, json: function () { return Promise.resolve(imprRows); } });
       if (u.indexOf("opcion=eq.TAL") >= 0) return Promise.resolve({ ok: true, json: function () { return Promise.resolve(talRows); } });
       return Promise.resolve({ ok: true, json: function () { return Promise.resolve([]); } });
@@ -106,6 +108,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.impr_cursor = String(_ps.lastSeenImpr) === "2026-01-01T14:05:00-03:00";
     await psPoll(true); await espera(50);
     out.impr_unaVez = printed.length === 1;
+    // v31.78: deja acuse IMPRK con OK y la impresora; si el helper no imprime, acuse NO con el motivo
+    out.impr_acuseOk = acuses.length === 1 && acuses[0].texto === "r1|armado|98010|OK" && /HP/.test(acuses[0].descripcion) && acuses[0].legajo === "0";
+    window.__resp = { ok: false, impreso: [], errores: [], motivo: "sin regla para armado" };
+    imprRows = [{ id: "r2", texto: "armado|98010", ts_cliente: "2026-01-01T14:10:00-03:00" }];
+    await psPoll(true); await espera(50);
+    out.impr_acuseNo = acuses.length === 2 && acuses[1].texto === "r2|armado|98010|NO" && /sin regla/.test(acuses[1].descripcion);
+    window.__resp = { ok: true, impreso: ["HP"], errores: [] };
     imprRows = [];
 
     // ---- switch por dispositivo ----
@@ -121,7 +130,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     r.poll_imprimeNuevo && r.poll_marcaNuevo && r.poll_sinResumenMarca && r.poll_lastSeenAvanza &&
     r.poll_marcaImpresionNP && r.poll_dedup &&
     r.fallo_noMarca && r.fallo_log && r.sinHelper_noImprime && r.sinHelper_cursorAhora &&
-    r.impr_reimprime && r.impr_cursor && r.impr_unaVez &&
+    r.impr_reimprime && r.impr_cursor && r.impr_unaVez && r.impr_acuseOk && r.impr_acuseNo &&
     r.auto_on && r.auto_off && errs.length === 0;
   console.log("print-station:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);

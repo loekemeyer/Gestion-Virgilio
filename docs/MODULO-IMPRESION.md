@@ -56,6 +56,16 @@ armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`
   insert into public."Registros_Produccion_Virgilio" (legajo, opcion, texto, descripcion, ts_cliente, client_id, gv_app)
   values ('0','IMPR','armado|LK 0438','Reimprimir nota de armado', now(), 'impr-'||gen_random_uuid(), 'gestion');
   ```
+  **Acuse (v31.78, Luis D4)**: cada `IMPR` deja un evento **`IMPRK`** (legajo `0`), `texto = '<id IMPR>|armado|<NP>|OK'` o
+  `'…|NO'`, `descripcion` = impresora(s) o el motivo. Se ve con:
+  ```sql
+  select r.texto pedido, k.texto acuse, k.descripcion, k.ts_cliente
+    from public."Registros_Produccion_Virgilio" r
+    left join public."Registros_Produccion_Virgilio" k on k.opcion = 'IMPRK' and split_part(k.texto,'|',1) = r.id::text
+   where r.opcion = 'IMPR' order by r.ts_cliente desc;
+  ```
+  Sin fila `IMPRK` = ninguna PC con helper la tomó (o la tomó una con versión vieja). D3 (Luis): si el helper no contesta,
+  la reimpresión NO queda en la Cola; el acuse dice `NO` y el motivo.
   `tests/print-station.cjs` (bloque impr_*).
 
 - **El FUENTE del helper vive en `tools/helper-impresion/`** (v26.29): C# WinForms, un `.exe` sin instalar ni admin
