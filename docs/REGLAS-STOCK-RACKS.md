@@ -64,7 +64,7 @@ leer la que no es da respuestas que suenan bien y están mal.
 | Qué artículo va en qué sector de **góndola**, y de qué empresa es el sector | **`GV_Lugar` + `GV_Lugar_Item`** → vista **`gv_lugar_articulo`** (y `gv_planimetria_celda`) | `Planimetria` ⚠ ver abajo |
 | Qué hay cargado en cada **rack** | **`Movimientos_Stock`** (racks, `ubicacion` = sector) — `Racks_Planimetria` es una **VISTA** desde la v22.77 | **`Ubicaciones_Articulos`** · `Racks_Planimetria_legacy` |
 | **Capacidad** de cada celda de góndola (cajas que entran) | **`GV_Lugar_Item.cajas_max`** — `Capacidad_Sector` es una **VISTA** sobre ella desde la v22.75 | `Capacidad_Sector_legacy` (la tabla vieja, sin escritura, sólo para rollback) |
-| De qué **empresa** es un artículo (el dato de la columna LK/CH) | **`gv_empresa_de_articulo(cod)`** y su caché `GV_Articulo_Empresa_Cache` | `gv_articulo_empresa` (la vista rota) |
+| De qué **empresa** es un artículo (el dato de la columna LK/CH) | **`gv_empresa_de_articulo(cod)`** y su caché `GV_Articulo_Empresa_Cache`; el front lo lee por `vista_marca_articulo` (v31.48: es la caché pelada) | `gv_articulo_empresa` (la vista rota) · `OC_Maximos.linea` y `Articulos_Cajas.Marca` (ya no deciden la marca) |
 
 **Medido el 17/09**, que es lo que decide cuál está viva:
 

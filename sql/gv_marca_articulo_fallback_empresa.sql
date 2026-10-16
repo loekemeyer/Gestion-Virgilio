@@ -38,3 +38,18 @@ UNION ALL
    FROM "GV_Articulo_Empresa_Cache" c
   WHERE (c.empresa = ANY (ARRAY['LK'::text, 'CH'::text]))
     AND NOT EXISTS (SELECT 1 FROM base b WHERE b.cod = c.cod_canon);
+
+-- ═══ v31.48 (Luis, 16/10): FUENTE ÚNICA. La vista ya no mira OC_Maximos.linea ni Articulos_Cajas.Marca:
+-- es la empresa del código (GV_Articulo_Empresa_Cache, la que llena gv_refrescar_articulo_empresa cada 15 min).
+-- Medido antes: 125 códigos tenían marca SÓLO en las tablas viejas; 1 solo con saldo (007, en insumos "Mixto").
+-- Cambian: 702EN LK→CH (planimetría vieja), 724 CH→LK (lista), 838E CH→LK (góndola); los 4 duales quedan sin marca
+-- (el panel los muestra con sufijo "437E LK"). El impreso de OC (ocLoadLineas) también lee esta vista.
+create or replace view public.vista_marca_articulo with (security_invoker = true) as
+ SELECT c.cod_canon AS cod, c.empresa AS marca, c.fuente
+   FROM "GV_Articulo_Empresa_Cache" c
+  WHERE c.empresa = ANY (ARRAY['LK'::text, 'CH'::text]);
+
+-- D1 (Luis, 16/10): el 936E tenía la descripción del 938E en OC_Maximos y Articulos_Cajas.
+-- Backup: zz_backups.oc_maximos_936e_20261016 / zz_backups.articulos_cajas_936e_20261016.
+update public."OC_Maximos" set descripcion='Cuchara Calada Nylon Mgo Madera' where norm_cod(cod)='936E';
+update public."Articulos_Cajas" set "Descripcion"='Cuchara Calada Nylon Mgo Madera' where norm_cod("Cod_Art")='936E';
