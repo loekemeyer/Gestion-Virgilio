@@ -13,7 +13,7 @@
    3. cajas_uxb  — el mismo chequeo que muestra la página al cargar (cajasHintHtml): cajas múltiplo
                    del uxb (uxb > 1). SÓLO CARTEL en la PPP, no se contacta.
 
-   v31.93 (Luis, 16/10, D1-D3):
+   v31.94 (Luis, 16/10, D1-D3):
    D1 cajas_uxb sólo si el cliente NUNCA pidió tanto de ese artículo (antes: 100 de 476 NP, 21 %).
    D2 cliente con historial que pide un artículo que nunca compró → regla em (proporcional a su pedido).
    D3 historial con promedio ≥ 5 cj → anómalo si pide más que ×2 de su pedido más grande de ese artículo
@@ -341,5 +341,5 @@ select cron.schedule('gv-ppp-anomalos', '8-59/10 * * * *',
 insert into "GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version, activo) values
 ('gv_ppp_anomalos_calc','funcion','r\.prom < par\.hprom and r\.cajas > r\.prom \* par\.hfac','pedido anomalo por historial: cliente con 3+ pedidos y promedio del articulo < 5 cj -> anomalo si pide mas que promedio x5 (contactar)','Luis','v31.89',true),
 ('gv_ppp_anomalos_calc','funcion','r\.nped < par\.hmin or r\.nart = 0\) and r\.peso >= par\.efac','pedido anomalo por Est. Madre: cliente con menos de 3 pedidos y desbalance del articulo vs la E.M. >= x5 (contactar)','Luis','v31.89',true),
-('gv_ppp_anomalos_calc','funcion','coalesce\(r\.mx, 0\) < r\.cajas','cajas multiplo del uxb SOLO si el cliente nunca pidio tanto de ese articulo (D1). solo cartel, no se contacta','Luis','v31.93',true),
-('gv_ppp_anomalos_calc','funcion','r\.prom >= par\.hprom and r\.cajas > r\.mx \* par\.hmaxf','pedido anomalo D3: promedio del articulo >= 5 cj -> anomalo si pide mas que x2 de su pedido mas grande de ese articulo (contactar)','Luis','v31.93',true);
+('gv_ppp_anomalos_calc','funcion','coalesce\(r\.mx, 0\) < r\.cajas','cajas multiplo del uxb SOLO si el cliente nunca pidio tanto de ese articulo (D1). solo cartel, no se contacta','Luis','v31.94',true),
+('gv_ppp_anomalos_calc','funcion','r\.prom >= par\.hprom and r\.cajas > r\.mx \* par\.hmaxf','pedido anomalo D3: promedio del articulo >= 5 cj -> anomalo si pide mas que x2 de su pedido mas grande de ese articulo (contactar)','Luis','v31.94',true);
