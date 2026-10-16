@@ -11,7 +11,7 @@ ok(/o\.stockUni \+= \(r\.stock_total_neto != null\)/.test(idx), "a) el stock usa
 ok(/stockGp2U: Math\.round\(o\.stockGp2\)/.test(idx), "a) el ítem lleva stockGp2U");
 ok(/o\.stockUni - o\.stockIns - o\.stockGp2/.test(idx), "a) el stock propio no cuenta dos veces lo de GP2");
 ok(!/Math\.max\(0, Number\(it\.stockUni\)/.test(imp), "b) ninguna cuenta de importación pone piso en 0 al stock");
-ok(/🏭 Cervantes \(GP2\)/.test(imp) && /it\.stockGp2U > 0\) stockTxt/.test(imp), "c) desglose y celda muestran el stock de GP2");
+ok(/'Cervantes \(GP2\)/.test(imp) && /it\.stockGp2U > 0\) stockTxt/.test(imp), "c) desglose y celda muestran el stock de GP2");
 const sql = R("sql/gv_importados_equiv_gp2_v2561.sql");
 // v28.43 (Luis, 07/10): GRJ31 y la parte 323ES van 100 % al 838E (se retiran el 20/80 de la v25.61 y el pool de la v26.99)
 const sql42 = fs.readFileSync(path.join(__dirname, "..", "sql", "gv_piezas_reparto_em_v2843.sql"), "utf8");

@@ -21894,7 +21894,7 @@ var STK_POP_CSS =
      de 14 px quedaban chicas en el medio. --sp-fs es la letra del dato (14 px en celular y notebook, ~19 px en
      1920); encabezados y título acompañan. La tarjeta mide lo que su contenido (fit-content) entre un piso y un
      techo que también escalan. Las anchas (.wide, Importación) y .mid (Proyección) siguen con su ancho. */
-  ".stkpop-card{--sp-fs:clamp(14px,1vw,20px);--sp-fs-th:clamp(14px,0.9vw,17px);background:#f8fafc;width:fit-content;min-width:min(560px,96vw);max-width:min(clamp(760px,62vw,1240px),96vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}" +
+  ".stkpop-card{--sp-fs:clamp(14px,1vw,20px);--sp-fs-th:clamp(14px,0.9vw,17px);background:#f8fafc;width:fit-content;min-width:min(560px,100%);max-width:min(clamp(760px,62vw,1240px),96vw,100%);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}" +
   ".stkpop-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e3a8a,#1e40af);color:#fff;}" +
   ".stkpop-title{font-size:clamp(16px,1.2vw,24px);font-weight:800;}" +
   ".stkpop-body .mva-clear{font-size:var(--sp-fs-th,13px);}.stkpop-body .mva-daterow{font-size:var(--sp-fs-th,13px);}" +
@@ -21991,7 +21991,7 @@ var STK_POP_CSS =
   ".mva-tbl.wide th.num,.mva-tbl.wide td.num{width:auto;}" +   // manda el <colgroup>, no el 15% genérico
   ".mva-tbl.wide th,.mva-tbl.wide td{vertical-align:middle;overflow:hidden;}" +
   ".mva-tbl.wide thead th{text-overflow:ellipsis;}" +   // solo header y Descripción cortan con «…»
-  ".mva-tbl.wide thead th{white-space:normal;line-height:1.25;font-size:12px;}" +   // 'E.M. u/mes' entra en 2 renglones
+  ".mva-tbl.wide thead th{white-space:normal;line-height:1.25;font-size:13px;color:#334155;}" +   // 'E.M. u/mes' entra en 2 renglones
   // v23.91 (Luis): la PROYECCIÓN se toca en su propia celda (el código dejó de ser un link)
   ".mva-tbl.wide td.pedimp-proy{cursor:pointer;background:#faf5ff;color:#6d28d9;}" +
   ".mva-tbl.wide td.pedimp-proy:hover{background:#f3e8ff;}" +
@@ -22011,7 +22011,8 @@ var STK_POP_CSS =
   // v14.98 — la tabla mide 1366px (colgroup) + padding: con 1340px SIEMPRE había barra horizontal
   // aunque sobrara pantalla (dueño: "hay espacio, no pongas barras de scroll"). Ahora el popup
   // usa el ancho disponible; el scroll horizontal queda sólo para pantallas angostas.
-  ".stkpop-card.wide{width:auto;min-width:0;max-width:min(1760px,98vw);}" +
+  ".stkpop-card.wide{width:fit-content;min-width:min(560px,100%);max-width:min(1760px,98vw,100%);}" +   // (Luis 16/10, D2) también Importación: la tarjeta mide lo que su contenido
+  ".stkpop-card .imp-tabs button{font-size:var(--sp-fs-th,13px)!important;}" +
   ".stkpop-card.mid{width:auto;min-width:0;max-width:min(clamp(880px,60vw,1200px),96vw);}" +   // v18.32/34 — Estadística Madre: dos columnas sin scroll
   ".mva-tbl .mva-pos{color:#15803d;}.mva-tbl .mva-neg{color:#b91c1c;}" +
   // v6.68 — celda MOVIMIENTO como flex: slot fijo para el toggle (vacío en guardado) →
