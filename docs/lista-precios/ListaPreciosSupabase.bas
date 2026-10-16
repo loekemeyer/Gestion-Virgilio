@@ -27,6 +27,7 @@ Private Const CELDA_DOLAR As String = "H3"
 Private Const ULTIMA_COL As Long = 16               ' A..P (solo Lista de Precios)
 Private Const SUPA_URL_HOJAS As String = "https://hrxfctzncixxqmpfhskv.supabase.co/rest/v1/rpc/planilla_hojas_cargar"
 Private Const TANDA_MAX As Long = 700000             ' caracteres por envio de las demas hojas
+Private Const HOJAS_FUERA As String = "|Renta Pond|"  ' no se suben (Thomas 16/10: no se usa hoy; 17 MB)
 ' -----------------------------------------------------------------------------
 
 Private mTocada As Boolean
@@ -119,7 +120,7 @@ Private Function SubirOtrasHojas(ByVal snap As String) As String
     If mUltimo Is Nothing Then Set mUltimo = CreateObject("Scripting.Dictionary")
 
     For Each ws In ThisWorkbook.Worksheets
-        If ws.Name <> HOJA Then
+        If ws.Name <> HOJA And InStr(HOJAS_FUERA, "|" & ws.Name & "|") = 0 Then
             k = HojaFilas(ws, filas)
             If k > 0 Then j = "[" & Join(filas, ",") & "]" Else j = "[]"
             nom = ws.Name
