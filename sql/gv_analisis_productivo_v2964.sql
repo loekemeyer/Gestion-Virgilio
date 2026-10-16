@@ -124,10 +124,11 @@ begin
     raise exception 'ACCESO: el Analisis Productivo es para el supervisor y los legajos habilitados';
   end if;
   with p as (
-    select t.tanda, t.legajo, t.tp, t.tamano, t.real_min, t.indice, t.grado, t.nivel, t.lineas, t.cajas
+    select distinct on (t.tanda) t.tanda, t.legajo, t.tp, t.tamano, t.real_min, t.indice, t.grado, t.nivel, t.lineas, t.cajas
       from public."GV_Picking_Tanda" t
      where (t.tp at time zone 'America/Argentina/Buenos_Aires')::date between v_desde and v_hoy
        and not public.es_legajo_test(t.legajo)
+     order by t.tanda, t.lineas desc nulls last, t.real_min asc nulls last, t.tp desc   -- D3 (a): 1 fila por tanda = el pick real (más líneas; empate -> real_min sano, descarta la fila abandonada)
   ), a as (
     select t.tanda, t.legajo, t.tp, t.tamano, t.real_min, t.indice, t.grado, t.nivel, t.nps
       from public."GV_Armado_Tanda" t
@@ -241,9 +242,9 @@ begin
   select jsonb_object_agg(e.clave, e.valor) into c from public."GV_Picking_Esquema" e;
 
   select * into v_pk from public."GV_Picking_Tanda" t
-   where t.tanda = v_t and not public.es_legajo_test(t.legajo) order by t.tp desc limit 1;
+   where t.tanda = v_t and not public.es_legajo_test(t.legajo) order by t.lineas desc nulls last, t.real_min asc nulls last, t.tp desc limit 1;
   select * into v_ar from public."GV_Armado_Tanda" t
-   where t.tanda = v_t and not public.es_legajo_test(t.legajo) order by t.tp desc limit 1;
+   where t.tanda = v_t and not public.es_legajo_test(t.legajo) order by t.lineas desc nulls last, t.real_min asc nulls last, t.tp desc limit 1;
 
   with w as (
     select public.gv_ppp_web_np_label(x.empresa, x.np, x.np_idx) np, x.razon_social rs, coalesce(x.m3, 0) m3,
