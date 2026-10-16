@@ -4465,23 +4465,35 @@
     findInPool: findInPool,
     parseNum: parseNum,
     // Lookup directo por cod en LK products + loke_products (sin chef).
-    // 16/10/2026 (Luis, pedido 1630 Emotiti): primero los artículos ACTIVOS. El EAN da el código
-    // sin sufijo ("0525" → "525") y codVariants prueba "525" antes que "525E": como la caché trae
-    // también los inactivos, se quedaba con el 525 viejo (inactivo, UxB 1 = "no sé") y 48 unidades
-    // del Excel salían como 48 cajas. Un inactivo sólo se toma si no hay ningún activo que matchee.
+    // 16/10/2026 (Luis, pedido 1630 Emotiti): el EAN da el código sin sufijo ("0525" → "525") y
+    // codVariants prueba "525" antes que "525E". Como la caché trae también los inactivos, se quedaba
+    // con el 525 viejo (inactivo, UxB 1 = "no sé") y 48 unidades del Excel salían como 48 cajas.
+    // Regla: si lo que matchea está inactivo, se pasa a la variante ACTIVA sólo si es el MISMO
+    // artículo (descripción equivalente). El número con otro sufijo puede ser otro producto
+    // (LK 323 ≠ 323E, 514 ≠ 514E; Chef 838 ≠ 838E): ahí queda el inactivo, que sale a la vista.
     findProductByCodLK: function (cod) {
       var variants = codVariants(cod);
       if (!variants.length) return null;
-      function activos(pool) {
-        return (pool || []).filter(function (x) { return x.active !== false; });
+      function tokens(s) {
+        return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .split(/[^a-z0-9]+/).filter(function (t) { return t.length > 2; });
       }
-      var p = findInPool(activos(allProductsCache), variants);
+      function mismoArticulo(a, b) {
+        var ta = tokens(a.description), tb = tokens(b.description);
+        if (!ta.length || !tb.length) return false;
+        var inter = ta.filter(function (t) { return tb.indexOf(t) >= 0; }).length;
+        var union = ta.length + tb.length - inter;
+        return union > 0 && inter / union >= 0.6;
+      }
+      function resolver(pool) {
+        var p = findInPool(pool || [], variants);
+        if (!p || p.active !== false) return p;
+        var act = findInPool((pool || []).filter(function (x) { return x.active !== false; }), variants);
+        return act && mismoArticulo(p, act) ? act : p;
+      }
+      var p = resolver(allProductsCache);
       if (p) return { product: p, isLoke: false };
-      var lp = findInPool(activos(allLokeProductsCache), variants);
-      if (lp) return { product: lp, isLoke: true };
-      p = findInPool(allProductsCache || [], variants);
-      if (p) return { product: p, isLoke: false };
-      lp = findInPool(allLokeProductsCache || [], variants);
+      var lp = resolver(allLokeProductsCache);
       if (lp) return { product: lp, isLoke: true };
       return null;
     },
