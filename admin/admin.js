@@ -184,10 +184,24 @@ window.hasLiveAdminSession = hasLiveAdminSession;
 // ---- 2FA por email (solo PPP admin) ----
 var EMAIL_OTP_RECIPIENT_DISPLAY = "loekemeyer.n8n@gmail.com";
 
-async function ensureEmailOtp() {
-  // sessionStorage por tab: si ya verificó esta sesión de browser, no pide de nuevo
+// 16/10 (Elías, problema 859): la marca guarda el session_id del token, no un "1". Antes quedaba
+// en la pestaña para siempre: cerrar sesión y volver a entrar no pedía el código.
+async function _otpSesionId() {
   try {
-    if (sessionStorage.getItem("admin_2fa_ok") === "1") return true;
+    var s = await sb.auth.getSession();
+    var tok = s && s.data && s.data.session ? s.data.session.access_token : "";
+    var p = tok.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(p)).session_id || "";
+  } catch (e) {
+    return "";
+  }
+}
+
+async function ensureEmailOtp() {
+  // sessionStorage por tab, atado a la sesión de login: otra sesión vuelve a pedir el código
+  try {
+    var sid = await _otpSesionId();
+    if (sid && sessionStorage.getItem("admin_2fa_ok") === sid) return true;
   } catch (e) {}
   return await emailOtpFlow();
 }
@@ -352,7 +366,8 @@ async function emailOtpFlow() {
         return;
       }
       try {
-        sessionStorage.setItem("admin_2fa_ok", "1");
+        var sidOk = await _otpSesionId();
+        if (sidOk) sessionStorage.setItem("admin_2fa_ok", sidOk);
       } catch (e) {}
       _otpHide("emailOtpOverlay");
       resolve(true);
