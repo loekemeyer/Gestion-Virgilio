@@ -59,3 +59,30 @@ create or replace view public.gv_web_cotiza_cliente as
 
 revoke all on public.gv_web_cotiza_precio, public.gv_web_cotiza_cliente from anon, authenticated, public;
 grant select on public.gv_web_cotiza_precio, public.gv_web_cotiza_cliente to lk_ppp_reader, ch_ppp_reader;
+
+-- ── D14 (Luis 16/10/2026): la UxB sale de gv_uxb_de(cod, empresa) (v31.94), no del max ciego ──
+-- Migraciones `gv_web_cotiza_precio_uxb_de` + `gv_web_cotiza_uxb_definer`.
+-- ⚠ gv_uxb_de es security invoker: por FDW da «permission denied for table GV_Articulo_Empresa_Cache»
+--   (estuvo ~1 min asi). Por eso la vista llama al envoltorio definer gv_web_cotiza_uxb.
+-- Precio de super sin UxB propia (40 filas): la vista lo deja en null y la pagina usa la UxB de la
+-- lista de su empresa para ese codigo, si no 1 (= gv_ppp_web_valor_items). Verificado 16/10 sobre 331
+-- pedidos: 0 diferencias.
+create or replace function public.gv_web_cotiza_uxb(p_cod text, p_empresa text)
+returns numeric language sql stable security definer set search_path to 'public'
+as $$ select public.gv_uxb_de(p_cod, p_empresa) $$;
+revoke all on function public.gv_web_cotiza_uxb(text, text) from anon, authenticated, public;
+grant execute on function public.gv_web_cotiza_uxb(text, text) to lk_ppp_reader, ch_ppp_reader;
+
+create or replace view public.gv_web_cotiza_precio as
+  select 'lk'::text as lista, public.canon_cod(pv.cod) as cod, pv.precio_unit,
+         coalesce(public.gv_web_cotiza_uxb(public.canon_cod(pv.cod), 'lk'), 1)::int as uxb
+    from public.precios_venta pv
+  union all
+  select 'chef', public.canon_cod(pc.cod), pc.precio_unit,
+         coalesce(public.gv_web_cotiza_uxb(public.canon_cod(pc.cod), 'chef'), 1)::int
+    from public.precios_venta_chef pc
+  union all
+  select ps.super_key, ps.nc, ps.precio_unit, ps.uxb::int
+    from public.gv_web_cotiza_precio_super() ps;
+revoke all on public.gv_web_cotiza_precio from anon, authenticated, public;
+grant select on public.gv_web_cotiza_precio to lk_ppp_reader, ch_ppp_reader;
