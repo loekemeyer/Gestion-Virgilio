@@ -193,6 +193,8 @@ Cada línea de una NP que espera en la PPP (fecha de hoy en adelante o todavía 
 - **Backend**: `GV_Pedido_Anomalo` (una fila por NP + artículo + regla, RLS sin policies) ← cron **167 `gv-ppp-anomalos`**
   (`8-59/10`, anti-solape) → `gv_ppp_anomalos_detectar()`. Lo pendiente que deja de dar (pedido corregido) pasa a
   `sin_efecto` solo. La PPP lee `gv_ppp_anomalos_lista` (supervisor).
+- **D7 (Luis, 16/10): UNA sola consulta por PEDIDO** con todas sus líneas (línea nueva + artículos juntos): nunca un
+  mensaje por artículo ni dos por el mismo pedido. Gestión ya lo entrega así: Kohn = 1 renglón con 9 líneas.
 - **Bot** (GestOpClientes, Pablo): `gv_pedido_anomalo_bot_pendientes()` (un renglón por pedido, sólo `contactar`) y
   `gv_pedido_anomalo_bot_marcar(ids, 'contactado'|'confirmado'|'corregido'|'descartado', nota)`. Manda por `wa_outbox`
   de LK: la llave `wa_envio_automatico` decide (vasectomía). Hasta que el bot lo lea, el pedido sólo se ve en la PPP.
