@@ -483,11 +483,17 @@ al entregar ni «cerrar el círculo» por empresa.**
   `Insumos_Ubicaciones` (16 racks dados de alta), backups `zz_backups.*_flejes_20261015`. Total 15.587,05 Kg (el renglón amarillo R1At era 60x2 = IB7 Fleje N° 59, 17+70 kg; N°69 a 0).
 - ⚠ **v31.23 (Luis, 16/10): los DISCONTINUOS de Virgilio sin pareja en Cervantes figuran igual en GP2.** Nazareno los
   marcó en `GP2.virgilio_insumo_descartado` (motivo `discontinuo`). Cada uno con stock tiene un componente propio en
-  GP2 con código **`V·<cod de Virgilio>`**, `discontinuado = true`, `estado_compra = 'discontinuo'`, vinculado en
+  GP2 con código **`V·<cod de Virgilio>`** (⚠ desde el 16/10 son **`DiscV001…DiscV027`**, ver abajo), `discontinuado = true`, `estado_compra = 'discontinuo'`, vinculado en
   `insumo_equivalencia`: el espejo deja su stock en «<sector> en Virgilio». Flejes y EBA en kg; crudo y procesado con
   `uni_x_cajon = 1` (GP2 muestra **cajones**, la descripción lo dice). Son 27; los importados (337P, CB01, H201Lever)
   quedan afuera porque el espejo no copia importados. Sólo V·EBA entra en `v_nivel_stock` (ubicación 57) con consumo
   y máximo 0: no genera OC.
+- ⚠⚠ **16/10 (Luis): DiscVnnn es la regla.** Confirmar discontinuo un insumo con stock (Stock General de GP2 →
+  Virgilio, botón «Discontinuo» o «sin pareja») crea solo el componente **`DiscV` + 3 dígitos** con la **descripción de
+  GV** (`Insumos.nombre`), vinculado: GP2 ve el stock en vivo. Reactivar lo desvincula y lo deja en 0; renombrar en GV
+  actualiza la descripción (`zz_gv_insumo_discv_desc_sync`). Importados no (el espejo no los copia). El espejo es
+  **GV → GP2**: un ajuste en GP2 sobre «… en Virgilio» lo pisa el próximo espejo. Detalle:
+  `db/migracion_virgilio_discv_20261016.sql` de Gestion-Productiva-2.0 (CONOCIMIENTO §4ky).
 
 ## ⚠ REGLA (Thomas, 2026-10-09, v29.35, D43 · D44): LO VÁLIDO ES GP2 — Recibir insumos muestra el catálogo de GP2
 
