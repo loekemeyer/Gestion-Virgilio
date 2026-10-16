@@ -6,7 +6,9 @@
      (b) después del corte: el código desaparece, aparece «Login Operario» y loginConClaveTv() no llama al servidor;
      (c) el botón lleva a https://rp.loeke-erp.com/;
      (d) la pantalla abierta antes del corte cambia sola (re-chequeo) y un «migrado» del servidor también la cambia;
-     (e) el corte por defecto es 2026-10-17 00:01 (-03) y el servidor también corta (sql).
+     (e) el corte por defecto es 2026-10-17 00:01 (-03) y el servidor también corta (sql);
+     (f) v31.84: la sesión de operario abierta al corte manda la cola y recién ahí se cierra;
+     (g) v31.84: con una tarea abierta no se inventa nada: pide «Terminar Día».
    Sale 1 si falla. */
 const path = require("path");
 const fs = require("fs");
@@ -64,6 +66,54 @@ const URL_IDX = "file://" + path.join(__dirname, "..", "index.html");
   await D.p.evaluate(() => { window.GV_CLAVE_TV_CORTE_TS = Date.now() - 1; });
   await D.p.waitForFunction(() => getComputedStyle(document.getElementById("loginOperarioRp")).display !== "none", null, { timeout: 35000 }).catch(() => {});
   ok(await vis(D.p, "loginOperarioRp") && !(await vis(D.p, "tvClaveInput")), "(d) la pantalla abierta cambia sola al pasar el corte");
+
+  // (f) sesión de operario abierta al corte, sin tareas: manda la cola y RECIÉN AHÍ cierra la sesión
+  async function operario(abiertas) {
+    const p = await b.newPage({ viewport: { width: 400, height: 800 } });
+    const st = { srvOk: false, recibidos: [] };
+    await p.addInitScript(() => { window.GV_CLAVE_TV_CORTE_TS = 8e15; });
+    await p.route("**/rest/v1/**", (r) => {
+      const u = r.request().url();
+      if (/Registros_Produccion_Virgilio/.test(u) && r.request().method() === "POST") {
+        if (!st.srvOk) return r.fulfill({ status: 503, body: "" });
+        try { st.recibidos.push(JSON.parse(r.request().postData() || "{}").client_id); } catch (_e) {}
+        return r.fulfill({ status: 201, body: "" });
+      }
+      return r.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    });
+    await p.goto(URL_IDX, { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(300);
+    await p.evaluate((abiertas) => {
+      localStorage.removeItem("legajo_queue_virgilio_v1");
+      window.tvElegirOperario({ legajo: "104", nombre: "J. Colombia" });
+      if (abiertas) { const s = getLegajoState("104") || {}; s.toggles = Object.assign({}, s.toggles, { CR: new Date().toISOString() }); setLegajoState("104", s); }
+      _enqueueReportRaw({ id: "corte-t1", legajo: "104", opcion: "CR", descripcion: "prueba", texto: "", ts: Date.now() });
+    }, abiertas);
+    await p.waitForTimeout(500);
+    return { p, st };
+  }
+  const F = await operario(false);
+  const colaAntes = await F.p.evaluate(() => readQueue().length);
+  await F.p.evaluate(() => { window.GV_CLAVE_TV_CORTE_TS = 0; window.gvAplicarCorteClaveTv(); });
+  await F.p.waitForTimeout(800);
+  const mientras = await F.p.evaluate(() => ({ ses: !!localStorage.getItem("vir_legajo_auth"), ov: (document.getElementById("gvCorteOverlay") || {}).textContent || "" }));
+  ok(colaAntes === 1 && mientras.ses && /pendiente|señal/.test(mientras.ov), "(f) con la cola sin salir, la sesión NO se cierra y avisa: " + mientras.ov.slice(0, 60));
+  F.st.srvOk = true;
+  await F.p.waitForFunction(() => !localStorage.getItem("vir_legajo_auth"), null, { timeout: 15000 }).catch(() => {});
+  const despues = await F.p.evaluate(() => ({ ses: !!localStorage.getItem("vir_legajo_auth"), cola: readQueue().length }));
+  ok(F.st.recibidos.indexOf("corte-t1") >= 0 && despues.cola === 0 && !despues.ses, "(f) mandó lo pendiente y después cerró la sesión");
+  ok(await vis(F.p, "loginOperarioRp"), "(f) queda en el ingreso con «Login Operario»");
+
+  // (g) con una tarea abierta: no inventa cierres, pide Terminar Día y la sesión sigue
+  const G = await operario(true);
+  G.st.srvOk = true;
+  await G.p.evaluate(() => { window.GV_CLAVE_TV_CORTE_TS = 0; window.gvAplicarCorteClaveTv(); });
+  await G.p.waitForTimeout(800);
+  const g = await G.p.evaluate(() => ({ ses: !!localStorage.getItem("vir_legajo_auth"), ov: (document.getElementById("gvCorteOverlay") || {}).textContent || "", tog: Object.keys((getLegajoState("104") || {}).toggles || {}) }));
+  ok(g.ses && /Terminar Día/.test(g.ov) && g.tog.indexOf("CR") >= 0, "(g) tarea abierta → pide Terminar Día, no cierra nada solo");
+  await G.p.click("#gvCorteBtn");
+  const tdVis = await G.p.evaluate(() => document.getElementById("terminarDiaModal").classList.contains("show"));
+  ok(tdVis, "(g) el botón abre el Terminar Día de siempre");
 
   // (e) fechas
   const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "latin1");

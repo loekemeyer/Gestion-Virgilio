@@ -15,6 +15,16 @@ y lo reemplace un botón que sea Login Operario que vincule a la página de RP3.
 - **Servidor**: `gv_tv_clave_validar` devuelve `{ok:false, error:'migrado'}` desde la misma hora, para el celular con el
   index viejo cacheado; el index nuevo, al recibir `migrado`, muestra el botón. RP3.0 valida con su propia función
   (`reg_prod_3_0_virgilio_operarios`): no la toca. Google (supervisores) sigue igual.
+- **v31.84 (Luis, 16/10): la sesión de operario abierta al corte se cierra sin perder nada.** Sin tareas abiertas: el
+  celular manda TODA la cola (aviso «Enviando N reporte(s)…» / «Sin señal…») y recién con la cola vacía cierra la
+  sesión. Con tareas abiertas (picking, armado, toggles, módulos): no se inventa ningún cierre ni FJ a las 0:01; un
+  aviso bloquea la botonera y sólo ofrece **Terminar Día** (el de siempre, que cierra con su dato y drena la cola).
+  `_gvCorteSesionOperario`. Supervisores con Google no se tocan.
+- **v31.84: monitor de GV sólo con Virgilio.** `gv_monitor_ingresos` comparaba contra Cervantes con el legajo crudo y
+  Cervantes lo graba con «c» (`c19`): el que entraba a GV y marcaba en Cervantes seguía en la TV. Se compara pelado
+  (`sql/gv_monitor_ingresos_cerv_c_v3184.sql`).
+- **v31.84: RP3.0 ordena «¿Quién sos?» por ingresos históricos** (días con eventos en GV + ingresos OK en RP3.0),
+  en el servidor (`sql/rp3_virgilio_operarios_ranking_v3184.sql`).
 - `sql/gv_login_operario_rp3_v3178.sql`, `tests/login-operario-rp3.cjs`. Los tests del flujo viejo corren el corte al
   futuro con `window.GV_CLAVE_TV_CORTE_TS`.
 

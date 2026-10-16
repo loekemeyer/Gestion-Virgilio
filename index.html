@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.83">
+<link rel="stylesheet" href="gv-ui.css?v=31.84">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6509,7 +6509,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.83"></script>
+<script type="module" src="recepcion.js?v=31.84"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10857,7 +10857,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.83";
+const APP_VERSION = "v31.84";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -65115,7 +65115,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.83"></script>
+<script src="importacion.js?v=31.84"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65839,7 +65839,8 @@ function _plantaDiaHoy() {
 }
 function _routeAfterAuth() {
   try { gvRegistrarIngreso(__identity, window.__gvLoginMetodo || "sesion_guardada"); window.__gvLoginMetodo = null; } catch (_e) {}
-  if (__identity && __identity.soloCervantes) { window.location.href = "https://rp.loeke-erp.com/"; return; }   // v27.71 · v31.46: RP2 retirado, Cervantes es RP3 (Luis, 16/10)
+  if (__identity && __identity.soloCervantes) { window.location.href = "https://rp.loeke-erp.com/"; return; }
+  if (__identity && __identity.type === "operario" && _gvClaveTvApagada()) { try { _gvCorteSesionOperario(); } catch (_e) {} }   // v31.84   // v27.71 · v31.46: RP2 retirado, Cervantes es RP3 (Luis, 16/10)
   if (window.__pendingMonitorParam || __plantChosen) { _renderIdentity(); return; }
   if (__identity && __identity.type === "operario" && _plantaDiaHoy() === "virgilio") {
     __plantChosen = true;
@@ -66189,9 +66190,67 @@ function _gvAplicarCorteClaveTv() {
   const row = $("legajoLoginRow"), btn = $("loginOperarioRp");
   if (row) row.style.display = off ? "none" : "";
   if (btn) btn.style.display = off ? "" : "none";
+  if (off) { try { _gvCorteSesionOperario(); } catch (_e) {} }
   return off;
 }
+/* v31.84 (Luis, 16/10: «si por algún motivo hay alguna abierta a esa hora, que cuando se cierre queden registrados
+   todos los datos»): pasado el corte, la sesión de OPERARIO abierta en Gestión se cierra, pero primero:
+   · con tareas abiertas (picking, armado, toggles, módulos) → sólo «Terminar Día», que las cierra con su dato y
+     drena la cola como siempre (no se inventa ningún cierre ni una FJ a las 0:01);
+   · sin tareas abiertas → manda TODO lo que el celular tiene en cola y recién ahí cierra la sesión.
+   Supervisores (Google) no se tocan. La cola no depende de la sesión: si se corta la red sigue saliendo sola. */
+let _gvCorteDrenando = false;
+function _gvCorteOverlay(html, boton) {
+  let ov = $("gvCorteOverlay");
+  if (!ov) {
+    ov = document.createElement("div");
+    ov.id = "gvCorteOverlay";
+    ov.setAttribute("role", "dialog");
+    ov.style.cssText = "position:fixed;inset:0;z-index:99990;background:rgba(15,23,42,.78);display:flex;align-items:center;justify-content:center;padding:16px;";
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="background:#fff;border-radius:12px;max-width:380px;width:100%;padding:18px 16px;text-align:center;font-size:15px;line-height:1.4;color:#0f172a;">' +
+    html + (boton ? '<button id="gvCorteBtn" class="primary-btn" style="margin-top:14px;width:100%;">' + boton + '</button>' : "") + '</div>';
+  ov.style.display = "flex";
+  return ov;
+}
+function _gvCorteSesionOperario() {
+  if (_gvCorteDrenando) return;
+  if (!(__identity && __identity.type === "operario")) return;
+  const tdAbierto = $("terminarDiaModal");
+  if (tdAbierto && tdAbierto.classList.contains("show")) return;   // está terminando el día
+  const leg = String((__identity.emp && __identity.emp.legajo) || (typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim();
+  let pend = null;
+  try { pend = leg ? getPendingsForLegajo(leg) : null; } catch (_e) { pend = null; }
+  const abiertas = pend ? [].concat(pend.sobreviven || [], pend.seCierran || [], pend.modulos || []) : [];
+  if (abiertas.length) {
+    const ov = _gvCorteOverlay('<b>El registro de operario ahora es en RP3.0.</b><br><br>Tenés tareas abiertas: ' +
+      abiertas.map(function (a) { return escapeHtml(a.desc || a.tipo); }).join(", ") +
+      '.<br>Tocá <b>Terminar Día</b> para que quede todo registrado.', "Terminar Día");
+    const bt = $("gvCorteBtn");
+    if (bt) bt.onclick = function () { ov.style.display = "none"; try { if (legajoInput && !legajoInput.value) legajoInput.value = leg; terminarDia(); } catch (_e) {} };
+    return;
+  }
+  _gvCorteDrenando = true;
+  (async function () {
+    try {
+      while (readQueue().length) {
+        const sinRed = (typeof navigator !== "undefined" && navigator.onLine === false);
+        _gvCorteOverlay('<b>El registro de operario ahora es en RP3.0.</b><br><br>' + (sinRed
+          ? 'Sin señal: quedan <b>' + readQueue().length + '</b> reporte(s) por enviar. Dejá la app abierta cerca del wifi.'
+          : 'Enviando <b>' + readQueue().length + '</b> reporte(s) pendiente(s)…'));
+        try { await flushQueue(); } catch (_e) {}
+        if (readQueue().length) await new Promise(function (r) { setTimeout(r, 3000); });
+      }
+      const ov = $("gvCorteOverlay"); if (ov) ov.style.display = "none";
+      try { window.__gvLoginMetodo = null; } catch (_e) {}
+      __identity = null;
+      if (typeof window.endDaySignOut === "function") await window.endDaySignOut();
+    } finally { _gvCorteDrenando = false; }
+  })();
+}
 window.gvIrRp3 = function () { location.href = RP3_URL; };
+window.gvAplicarCorteClaveTv = function () { return _gvAplicarCorteClaveTv(); };
 document.addEventListener("DOMContentLoaded", _gvAplicarCorteClaveTv);
 if (document.readyState !== "loading") _gvAplicarCorteClaveTv();
 setInterval(_gvAplicarCorteClaveTv, 30000);
@@ -68460,15 +68519,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.83"></script>
-<script src="hotsale.js?v=31.83"></script>
-<script src="estadisticas.js?v=31.83"></script>
-<script src="ads.js?v=31.83"></script>
-<script src="plantel.js?v=31.83"></script>
+<script src="cobranzas.js?v=31.84"></script>
+<script src="hotsale.js?v=31.84"></script>
+<script src="estadisticas.js?v=31.84"></script>
+<script src="ads.js?v=31.84"></script>
+<script src="plantel.js?v=31.84"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.83"></script>
+<script src="analisis.js?v=31.84"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.83"></script>
+<script src="ayuda.js?v=31.84"></script>
 
 </body>
 </html>
