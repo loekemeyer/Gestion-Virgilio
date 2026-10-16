@@ -24,7 +24,7 @@ y lo reemplace un botón que sea Login Operario que vincule a la página de RP3.
   Cervantes lo graba con «c» (`c19`): el que entraba a GV y marcaba en Cervantes seguía en la TV. Se compara pelado
   (`sql/gv_monitor_ingresos_cerv_c_v3184.sql`).
 - **v31.84: RP3.0 ordena «¿Quién sos?» por ingresos históricos** (días con eventos en GV + ingresos OK en RP3.0),
-  en el servidor (`sql/rp3_virgilio_operarios_ranking_v3184.sql`).
+  en el servidor (`sql/rp3_virgilio_operarios_ranking_v3184.sql`); el legajo 1 (de prueba) va al fondo (v31.86, D4).
 - `sql/gv_login_operario_rp3_v3178.sql`, `tests/login-operario-rp3.cjs`. Los tests del flujo viejo corren el corte al
   futuro con `window.GV_CLAVE_TV_CORTE_TS`.
 
