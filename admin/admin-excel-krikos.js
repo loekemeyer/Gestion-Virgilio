@@ -1432,7 +1432,8 @@
       }).join("");
       return '<div class="xkr-rev ' + (ok ? "ok" : "bad") + '">' +
         '<div class="xkr-rev-head"><b>' + (ok ? "Pedido OK" : "Pedido para revisar con el cliente") + "</b>" +
-        (r.condicion_segun_precios ? '<span class="lab">Condición según precios: ' + escapeHtml(r.condicion_segun_precios) + "</span>" : "") +
+        (r.condicion_segun_precios ? '<span class="lab">Según precios: ' + escapeHtml(r.condicion_segun_precios) +
+          (r.iva_segun_precios ? " · " + escapeHtml(r.iva_segun_precios) : "") + "</span>" : "") +
         (r.condicion_escrita_en_excel ? '<span class="lab">En el Excel: ' + escapeHtml(r.condicion_escrita_en_excel) + "</span>" : "") +
         (stale ? '<span class="xkr-rev-stale">Cambiaste el pedido: volvé a revisar</span>' : "") +
         "</div>" +
