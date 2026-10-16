@@ -150,6 +150,12 @@ aprueba, esa gondola se marca como vacia."*
 
 `sql/gv_excedente_noesta_pos_v3200.sql` · `tests/pk-excedente-faltante.cjs`.
 
+- **v32.04 (Luis, 16/10)** — **D7**: la lista queda **sólo zona P** (los racks O no entran). **D8** *"preguntale al operario
+  por cual paso que faltaba"*: con el excedente en 2+ posiciones, después de «Sin stock» / «Faltan» (y de la pregunta de
+  dónde sacó, si levantó algo) el operario **marca en cuál(es) fue y no estaba**; al menos una, sin salteo. Sólo esas
+  van al admin. Con una sola posición no se pregunta. El PKC sale antes de la pregunta (sin aviso) y se re-manda con
+  las marcadas.
+
 ## ⚠ REGLA: LAS TABLAS QUE VALEN — góndola, racks y empresa del artículo
 
 **Luis, 2026-09-17:** *"fijate que estés usando las tablas actualizadas de `gv_` y escribí en
