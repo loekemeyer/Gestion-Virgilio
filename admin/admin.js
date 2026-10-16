@@ -97,12 +97,8 @@ async function checkAuth() {
     return false;
   }
   var userId = result.data.session.user.id;
-  var adminCheck = await sb
-    .from("admins")
-    .select("auth_user_id")
-    .eq("auth_user_id", userId)
-    .maybeSingle();
-  if (adminCheck.error || !adminCheck.data) {
+  var soy = await _soyAdmin(userId);
+  if (!soy.admin) {
     // Usuario válido pero no es admin. Cerramos sesión y mostramos el form
     // otra vez para que pueda probar con otro CUIT sin quedar atrapado.
     try { await sb.auth.signOut({ scope: "local" }); } catch (e) {}
@@ -197,12 +193,33 @@ async function _otpSesionId() {
   }
 }
 
-async function ensureEmailOtp() {
-  // sessionStorage por tab, atado a la sesión de login: otra sesión vuelve a pedir el código
+// D75 (Elías, 16/10/2026, problema 859): ¿soy admin y esta sesión ya pasó el código? Lo contesta la base
+// (soy_admin), que es quien va a exigirlo: después del corte la tabla admins sólo se puede leer con el código
+// pasado, así que leerla antes del código daría «Acceso denegado». Si la RPC no contesta, se lee admins como antes.
+var _dosfaServidor = null; // true / false según la base · null = la base no contestó
+async function _soyAdmin(userId) {
   try {
-    var sid = await _otpSesionId();
-    if (sid && sessionStorage.getItem("admin_2fa_ok") === sid) return true;
+    var r = await sb.rpc("soy_admin");
+    if (!r.error && r.data && typeof r.data.admin === "boolean") {
+      _dosfaServidor = r.data.dosfa === true;
+      return r.data;
+    }
   } catch (e) {}
+  _dosfaServidor = null;
+  var a = await sb.from("admins").select("auth_user_id").eq("auth_user_id", userId).maybeSingle();
+  return { admin: !a.error && !!a.data, dosfa: null };
+}
+
+async function ensureEmailOtp() {
+  // D75: manda la base. Una sesión que ya pasó el código no lo vuelve a pedir (ni en otra pestaña).
+  if (_dosfaServidor === true) return true;
+  // Sólo si la base no contestó: la marca de la pestaña, atada a la sesión de login (problema 859).
+  if (_dosfaServidor === null) {
+    try {
+      var sid = await _otpSesionId();
+      if (sid && sessionStorage.getItem("admin_2fa_ok") === sid) return true;
+    } catch (e) {}
+  }
   return await emailOtpFlow();
 }
 
@@ -369,6 +386,9 @@ async function emailOtpFlow() {
         var sidOk = await _otpSesionId();
         if (sidOk) sessionStorage.setItem("admin_2fa_ok", sidOk);
       } catch (e) {}
+      // D75: token nuevo de la MISMA sesión. Después del corte el rol lk_admin sale recién con el código pasado.
+      try { await sb.auth.refreshSession(); } catch (e) {}
+      _dosfaServidor = true;
       _otpHide("emailOtpOverlay");
       resolve(true);
     }
