@@ -90,7 +90,7 @@ gondolas se vacian para liberarlas en el mapa"* · *"tanto en GV como en RP3.0"*
 - **Cuándo**: paso `art·EXC` confirmado con más de 0 cajas y el excedente del código en **2 o más** posiciones
   (`porUbic` de `pkFetchExcedente`). Con una sola posición, con 0 cajas o con el excedente marcado a mano no pregunta.
 - **Cómo**: un botón por posición (todo de ahí) o «Saqué de más de una» con cantidades que tienen que sumar lo pickeado.
-  Se puede saltear («No sé»): queda como antes, descontado de la primera del recorrido.
+  **No se puede saltear** (Luis, D1 «no», 16/10, v31.81): sin la posición el Mapa no libera la P vacía.
 - **Qué viaja**: el PKC sale ANTES de preguntar (igual que la pregunta de góndola v29.69) y la respuesta lo re-manda
   (mismo id, upsert) con un **7º campo** `P18:3;P22:2`. Los campos 5 y 6 van aunque estén vacíos para no correr la posición.
 - **Base**: `trg_gv_exc_pick_pos` (PKC) guarda `GV_Excedente_Pick_Pos (tanda, cod, posiciones)`; `gv_excedente_posicion`
