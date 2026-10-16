@@ -1,3 +1,17 @@
+## Nota v31.44 (2026-10-16) — Tabla `GV_NP_Remito_Estado`: el estado del remito de cada NP, referenciable
+
+Luis: *"quiero que quede un registro referenciable, una tabla o algo"*. No hay tabla madre de NP que cubra ISIS + web,
+así que el estado va en una tabla propia con la NP como clave (misma normalización que `gv_remitos_controlados`).
+
+- `select * from public."GV_NP_Remito_Estado" order by actualizado_at desc;`
+- `estado`: `en_camion` (último evento CCN) · `controlado` (último CRN = «Terminé» de Recepción Remitos) · `volvio` (último FSS = «↩ s/salida»).
+- Columnas: tanda, cargado_at/fletero/vuelta (último CCN), controlado_at/controlado_legajo (PRIMER CRN), volvio_at/volvio_legajo (último FSS), veces_*.
+- **Derivada** de `Registros_Produccion_Virgilio`: trigger `trg_gv_np_remito_estado` (alta/cambio) y `_baja` llaman a
+  `gv_np_remito_estado_recalc(np)`, que recalcula la NP desde cero (idempotente). Un error del trigger sólo deja warning: nunca frena al operario.
+- Carga inicial (16/10): 1.329 NP — 869 controladas (= las 869 de `gv_remitos_controlados`), 460 en camión, 0 volvió (las 25 con FSS se recargaron después).
+- Sin anon; RLS con lectura para `authenticated`. `sql/gv_np_remito_estado.sql`.
+- La tilde de «Controlado» sigue sin escribirse hasta «Terminé»: la tabla refleja lo confirmado, no lo tildado en el celular.
+
 ## Nota v31.36 (2026-10-16) — Análisis Productivo: rendimiento como desvío, tabla Esperado·Real·Dif, m³ pickeado y avisos que cuadran
 
 Tanda de cambios al **Análisis Productivo** (botón 📊 del supervisor, `analisis.js` + funciones
