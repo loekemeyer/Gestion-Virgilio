@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.37">
+<link rel="stylesheet" href="gv-ui.css?v=31.38">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6473,7 +6473,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.37"></script>
+<script type="module" src="recepcion.js?v=31.38"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10818,7 +10818,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.37";
+const APP_VERSION = "v31.38";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16911,7 +16911,21 @@ try { window.addEventListener("online", function () { try { bajaRacksFlushPend()
 
 /* ===== STOCK — módulo admin (v4.06): saldos + movimientos por artículo,
    cargar stock inicial y marcar el "corte" (desconsiderar lo anterior). ===== */
-async function stockFetchMovs() {
+async function stockFetchMovs(cods) {
+  /* v31.38 — con `cods` (lista de códigos exactos) trae sólo los movimientos de esos códigos.
+     El saldo de un código depende sólo de sus propios movimientos, así que da lo mismo que
+     bajar la tabla entera: el TP del operario bajaba 86.572 filas (25 MB) para mirar 20 códigos. */
+  if (Array.isArray(cods)) {
+    const lista = Array.from(new Set(cods.map(function (c) { return String(c == null ? "" : c).trim(); }).filter(Boolean)));
+    const out = [];
+    for (let i = 0; i < lista.length; i += 100) {
+      const inq = lista.slice(i, i + 100).map(function (c) { return '"' + c.replace(/"/g, "") + '"'; }).join(",");
+      const rows = await supaFetchAll(SUPABASE_STOCK_ENDPOINT, "cod_art=in.(" + encodeURIComponent(inq) + ")&select=*&order=ts.desc,id.desc");
+      for (const r of rows) out.push(r);
+    }
+    out.sort(function (a, b) { return String(b.ts).localeCompare(String(a.ts)); });
+    return out;
+  }
   // ⚠ PostgREST corta en 1000 filas (db-max-rows) AUNQUE se pida limit=20000. Con miles de
   // movimientos, un fetch simple deja la app viendo sólo los ~1000 más recientes → el saldo
   // event-sourced sale MAL: pierde el inicial y el picking viejo pero conserva el armado
@@ -33176,7 +33190,13 @@ async function stockBajaPicking(tanda, legajo) {
     // de ESTA tanda: son justamente los que se están validando.
     let sal = {}, salOk = false;
     try {
-      const movs = (await stockFetchMovs()).filter(function (mv) {
+      // v31.38 — sólo la familia de los códigos de esta tanda (pelado + sufijos LK/CH/LOKE, como codBase).
+      const _codsTanda = [];
+      Object.keys(byArt).concat(Object.keys(espByArt)).forEach(function (a) {
+        const bk = codBase(a); if (!bk) return;
+        _codsTanda.push(bk, bk + " LK", bk + " CH", bk + " LOKE");
+      });
+      const movs = (await stockFetchMovs(_codsTanda)).filter(function (mv) {
         return !(mv.tipo === "picking" && String(mv.ref || "").split("|")[0].trim().toUpperCase() === t);
       });
       if (movs && movs.length) { sal = stockComputeSaldos(movs, await stockGetCutoff()); salOk = true; }
@@ -64538,7 +64558,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.37"></script>
+<script src="importacion.js?v=31.38"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67859,15 +67879,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.37"></script>
-<script src="hotsale.js?v=31.37"></script>
-<script src="estadisticas.js?v=31.37"></script>
-<script src="ads.js?v=31.37"></script>
-<script src="plantel.js?v=31.37"></script>
+<script src="cobranzas.js?v=31.38"></script>
+<script src="hotsale.js?v=31.38"></script>
+<script src="estadisticas.js?v=31.38"></script>
+<script src="ads.js?v=31.38"></script>
+<script src="plantel.js?v=31.38"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.37"></script>
+<script src="analisis.js?v=31.38"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.37"></script>
+<script src="ayuda.js?v=31.38"></script>
 
 </body>
 </html>

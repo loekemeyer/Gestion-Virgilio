@@ -23,6 +23,8 @@ node() {
   return 0
 }
 
+echo "== tp-movs-filtrados (v31.38: el TP baja solo los movimientos de los codigos de la tanda, no la tabla entera) =="
+node tests/tp-movs-filtrados.cjs
 echo "== ins-alta-gp2 (v31.14: Insumos edita solo descripcion y cantidad; alta desde GP2 o a mano) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-alta-gp2.cjs
 echo "== popup-avisos-luis (v31.05: avisos C2/C4/C5 en pop-up para Luis + aviso de Windows minimizada) =="

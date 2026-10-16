@@ -69,3 +69,8 @@ pantallas. Y en el front no pesan las funciones muertas (~30 KB): pesa la **form
 | N3 | trigger `trg_gv_ppp_web_base_sin_l_chef` le saca la L a líneas de Chef | sin log: no se sabe cuántas peló | choca con la regla de la L (21/09); decide el dueño |
 | N4 | dos vocabularios de empresa (`lk/chef` y `LK/CH`) | 75 + 25 tablas, 36 funciones traducen | unificar rompe todo y el bot por FDW: **no se toca** |
 | N5 | tablas sin lector en este repo (`pe_eventos`, `pe_resultados`, `Flejes_KG_Desp_x_Uni`, …) | 6 tablas | falta grepear `produccion-virgilio` |
+
+## 5. Aplicado después (v31.38, D2 de Thomas)
+
+- F1 resuelto: el TP pide sólo los movimientos de la familia de códigos de la tanda (`stockFetchMovs(cods)`), no la tabla entera. Medido como anon: 2 códigos = 2.604 filas en 5 ms, contra 86.572 filas / 25,2 MB. Test: `tests/tp-movs-filtrados.cjs`.
+- Auditoría: registrados «Facturación: la lista de NP ya facturadas cortaba en 1.000 filas» (corregido, 26b5986) y «Cron 112 gv_gp2_espejo_sync falla el 3,9 %» (abierto).
