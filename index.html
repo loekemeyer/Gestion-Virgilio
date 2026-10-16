@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.76">
+<link rel="stylesheet" href="gv-ui.css?v=31.77">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6498,7 +6498,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.76"></script>
+<script type="module" src="recepcion.js?v=31.77"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10843,7 +10843,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.76";
+const APP_VERSION = "v31.77";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -60649,7 +60649,8 @@ setInterval(gvHelperVigilar, 60000);
 var PS_POLL_MS = 12000;
 var PS_AUTO_KEY = "ps_auto_virgilio";
 var PS_LASTSEEN_KEY = "ps_lastseen_virgilio";
-var PS_LASTSEEN_FAC_KEY = "ps_lastseen_fac_virgilio";   // v26.32 — último facturado_at visto por la estación
+var PS_LASTSEEN_FAC_KEY = "ps_lastseen_fac_virgilio";
+var PS_LASTSEEN_IMPR_KEY = "ps_lastseen_impr_virgilio";   // v31.77 — última reimpresión (IMPR) vista por la estación   // v26.32 — último facturado_at visto por la estación
 var _ps = null;
 function psPrintedKey(){ return "ps_printed_virgilio_" + cpTodayAR(); }
 function psGetPrinted(){ try { return new Set(JSON.parse(localStorage.getItem(psPrintedKey()) || "[]")); } catch (_e) { return new Set(); } }
@@ -60750,6 +60751,27 @@ async function psPoll(force){
           });
         }
       } catch (_e3) {}
+      // v31.77 (Luis, 16/10: "mandá a imprimir de vuelta la nota de armado") — REIMPRESIÓN desde la base:
+      // un evento IMPR (texto = "armado|<NP>") hace que la PC del helper vuelva a sacar la nota de armado de esa
+      // NP con su ÚLTIMO TAL. La marca de impreso vive en el localStorage de esa PC, así que sin esto no había
+      // forma de reimprimir de lejos. Cursor propio persistido; la primera vez mira 6 h atrás (la PC puede
+      // tardar en recargar la versión nueva). Una vez por evento (clave IMPR|id).
+      try {
+        let desdeR = _ps.lastSeenImpr || ""; if (!desdeR) { try { desdeR = localStorage.getItem(PS_LASTSEEN_IMPR_KEY) || ""; } catch (_e) {} }
+        if (!desdeR) desdeR = new Date(Date.now() - 6 * 3600000).toISOString();
+        const evr = await fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.IMPR&ts_cliente=gt." + encodeURIComponent(desdeR) + "&select=id,texto,ts_cliente&order=ts_cliente.asc&limit=20", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; });
+        for (const ev of (evr || [])) {
+          _psSetLastImpr(String(ev.ts_cliente));
+          const pr = String(ev.texto || "").split("|"); const tipoR = String(pr[0] || "").trim().toLowerCase(); const npR = String(pr[1] || "").trim();
+          const kR = "IMPR|" + ev.id;
+          if (tipoR !== "armado" || !npR || psGetPrinted().has(kR)) continue;
+          psMarkPrinted(kR);
+          const tl = await fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&texto=like." + encodeURIComponent(npR + "|") + "*&select=texto,legajo,ts_cliente&order=ts_cliente.desc&limit=1", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; });
+          if (!tl || !tl.length) continue;
+          const pt = String(tl[0].texto || "").split("|");
+          await psPrintBatch([{ np: npR, tanda: String(pt[2] || "").trim().toUpperCase(), resumen: pt[3] || "", armadorLeg: String(tl[0].legajo || "") }]);
+        }
+      } catch (_e5) {}
       // v26.32 — FACTURADO: lo imprime la PC del HELPER, no la que factura (Luis, 02/10: "el excel de
       // facturación no se va a bajar en la pc que corre el helper"). Lee Facturacion_NP.facturado_at (lo
       // pone la base al tildar o al bajar el Excel, en cualquier PC). Sólo lo de HOY: una PC que estuvo
@@ -60780,6 +60802,7 @@ async function psPoll(force){
   } catch (_e){ _ps.lastErr = "sin conexión con Supabase"; }
   _psUpdatePollInfo();
 }
+function _psSetLastImpr(ts){ _psEnsure(); _ps.lastSeenImpr = ts; try { localStorage.setItem(PS_LASTSEEN_IMPR_KEY, ts); } catch (_e) {} }
 function _psSetLastFac(ts){ _psEnsure(); _ps.lastSeenFac = ts; try { localStorage.setItem(PS_LASTSEEN_FAC_KEY, ts); } catch (_e) {} }
 /* v26.66 — sin helper que conteste, la estación "ve" todo hasta ahora sin imprimirlo: queda en la Cola. */
 function _psCorrerCursores(){
@@ -60787,7 +60810,7 @@ function _psCorrerCursores(){
   const ahora = new Date().toISOString();
   _ps.lastSeen = ahora; _ps.lastSeenTp = ahora; _ps.lastSeenImpt = ahora;
   try { localStorage.setItem(PS_LASTSEEN_KEY, ahora); } catch (_e) {}
-  _psSetLastFac(ahora);
+  _psSetLastFac(ahora); _psSetLastImpr(ahora);
 }
 /* v26.30 — la hoja de la señal de prueba: sólo el texto, grande y centrado. */
 function _psHojaPrueba(txt){
@@ -64855,7 +64878,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.76"></script>
+<script src="importacion.js?v=31.77"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -68177,15 +68200,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.76"></script>
-<script src="hotsale.js?v=31.76"></script>
-<script src="estadisticas.js?v=31.76"></script>
-<script src="ads.js?v=31.76"></script>
-<script src="plantel.js?v=31.76"></script>
+<script src="cobranzas.js?v=31.77"></script>
+<script src="hotsale.js?v=31.77"></script>
+<script src="estadisticas.js?v=31.77"></script>
+<script src="ads.js?v=31.77"></script>
+<script src="plantel.js?v=31.77"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.76"></script>
+<script src="analisis.js?v=31.77"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.76"></script>
+<script src="ayuda.js?v=31.77"></script>
 
 </body>
 </html>

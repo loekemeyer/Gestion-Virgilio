@@ -21,6 +21,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
     // ---- stubs: red y render de remitos (no imprimimos de verdad) ----
     let talRows = [];                       // respuesta del endpoint de TAL
+    let imprRows = [];                      // v31.77: respuesta del endpoint de IMPR (reimpresión)
     const impresionPosts = [];              // lo que se marca en Impresion_NP
     window.fetch = function (url, opts) {
       const u = String(url);
@@ -28,6 +29,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
         try { JSON.parse(opts.body).forEach(function (r0) { impresionPosts.push(r0.np); }); } catch (_e) {}
         return Promise.resolve({ ok: true, status: 201 });
       }
+      if (u.indexOf("opcion=eq.IMPR") >= 0) return Promise.resolve({ ok: true, json: function () { return Promise.resolve(imprRows); } });
       if (u.indexOf("opcion=eq.TAL") >= 0) return Promise.resolve({ ok: true, json: function () { return Promise.resolve(talRows); } });
       return Promise.resolve({ ok: true, json: function () { return Promise.resolve([]); } });
     };
@@ -95,6 +97,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.sinHelper_cursorAhora = String(_ps.lastSeen) > "2026-01-02";
     helperOn = true;
 
+    // ---- v31.77: IMPR reimprime la nota de armado de una NP YA impresa, con su último TAL, una sola vez ----
+    printed.length = 0;
+    talRows = [{ texto: "98010|3|D12B|C=3X5|L2", ts_cliente: "2026-01-01T14:00:00-03:00", legajo: "8" }];
+    imprRows = [{ id: "r1", texto: "armado|98010", ts_cliente: "2026-01-01T14:05:00-03:00" }];
+    await psPoll(true); await espera(50);
+    out.impr_reimprime = printed.length === 1 && printed[0] === "REMITO-98010" && !out.usoCuadro;
+    out.impr_cursor = String(_ps.lastSeenImpr) === "2026-01-01T14:05:00-03:00";
+    await psPoll(true); await espera(50);
+    out.impr_unaVez = printed.length === 1;
+    imprRows = [];
+
     // ---- switch por dispositivo ----
     psSetAuto(true);
     await new Promise(function (res) { setTimeout(res, 150); });   // psStart es async (seed) antes de armar el timer
@@ -108,6 +121,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     r.poll_imprimeNuevo && r.poll_marcaNuevo && r.poll_sinResumenMarca && r.poll_lastSeenAvanza &&
     r.poll_marcaImpresionNP && r.poll_dedup &&
     r.fallo_noMarca && r.fallo_log && r.sinHelper_noImprime && r.sinHelper_cursorAhora &&
+    r.impr_reimprime && r.impr_cursor && r.impr_unaVez &&
     r.auto_on && r.auto_off && errs.length === 0;
   console.log("print-station:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);

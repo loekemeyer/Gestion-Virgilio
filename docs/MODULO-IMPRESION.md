@@ -47,6 +47,17 @@ armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`
   delete from public."Registros_Produccion_Virgilio" where opcion = 'IMPT';                        -- después de imprimir
   ```
 
+- **REIMPRIMIR una nota de armado desde la base: evento `IMPR`** (v31.77, Luis 16/10: *"mandá a imprimir de vuelta la nota
+  de armado"*). La marca de impreso de la estación vive en el `localStorage` de la PC del helper, así que el TAL ya impreso
+  no vuelve a salir. `opcion = 'IMPR'`, `texto = 'armado|<NP>'` → la estación (mismo sondeo de 12 s, sólo con el helper
+  contestando) toma el **último TAL** de esa NP y la saca por `psPrintBatch` → helper. Una vez por evento (`IMPR|id`), cursor
+  propio `ps_lastseen_impr_virgilio` (la primera vez mira 6 h atrás). Legajo `0`: no entra en reportes. Lo escribe la sesión:
+  ```sql
+  insert into public."Registros_Produccion_Virgilio" (legajo, opcion, texto, descripcion, ts_cliente, client_id, gv_app)
+  values ('0','IMPR','armado|LK 0438','Reimprimir nota de armado', now(), 'impr-'||gen_random_uuid(), 'gestion');
+  ```
+  `tests/print-station.cjs` (bloque impr_*).
+
 - **El FUENTE del helper vive en `tools/helper-impresion/`** (v26.29): C# WinForms, un `.exe` sin instalar ni admin
   (`TcpListener` en loopback), v1.0.0. `compilar.bat` lo compila con el `csc.exe` de .NET Framework 4 que trae
   Windows; `README.md` es el de desarrollo y `LEEME.txt` el de quien lo instala. **No se versionan**: `SumatraPDF.exe`
