@@ -81,6 +81,27 @@ contemple para la ruta de picking)"*.
 
 `sql/gv_excedente_posicion_v3159.sql` · `tests/pmap-excedente-p.cjs` · `tests/pk-excedente-vista.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-16, v31.80): excedente en 2+ posiciones → el picking PREGUNTA de cuál sacó
+
+**Luis, textual:** *"cuando un operario tiene que pickear un articulo que esta en excedente y esta en mas de una
+gondola en excedente, que le pregunte al operario de donde lo sacó. esto es con el fin de identificar cuando las
+gondolas se vacian para liberarlas en el mapa"* · *"tanto en GV como en RP3.0"*.
+
+- **Cuándo**: paso `art·EXC` confirmado con más de 0 cajas y el excedente del código en **2 o más** posiciones
+  (`porUbic` de `pkFetchExcedente`). Con una sola posición, con 0 cajas o con el excedente marcado a mano no pregunta.
+- **Cómo**: un botón por posición (todo de ahí) o «Saqué de más de una» con cantidades que tienen que sumar lo pickeado.
+  Se puede saltear («No sé»): queda como antes, descontado de la primera del recorrido.
+- **Qué viaja**: el PKC sale ANTES de preguntar (igual que la pregunta de góndola v29.69) y la respuesta lo re-manda
+  (mismo id, upsert) con un **7º campo** `P18:3;P22:2`. Los campos 5 y 6 van aunque estén vacíos para no correr la posición.
+- **Base**: `trg_gv_exc_pick_pos` (PKC) guarda `GV_Excedente_Pick_Pos (tanda, cod, posiciones)`; `gv_excedente_posicion`
+  reparte la salida `picking` sin ubicación de esa tanda entre las posiciones declaradas (hasta lo que salió; el resto,
+  como siempre). **No toca `Movimientos_Stock` ni `reconciliar_stock_articulo_rt`**: el saldo por código es el mismo,
+  cambia sólo en qué posición vive → la P que se vació deja de figurar y el Mapa la muestra libre.
+- Probado el 16/10 en transacción abortada: 066 (P21 72 · P22 52 · P23 56 · P24 48), PKC con `P22:52` → P22 desaparece;
+  antes se hubiera descontado de P21.
+
+`sql/gv_excedente_pick_pos_v3180.sql` · `tests/pk-excedente-posicion.cjs` · centinela de `gv_excedente_posicion`.
+
 ## ⚠ REGLA: LAS TABLAS QUE VALEN — góndola, racks y empresa del artículo
 
 **Luis, 2026-09-17:** *"fijate que estés usando las tablas actualizadas de `gv_` y escribí en

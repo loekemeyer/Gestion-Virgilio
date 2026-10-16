@@ -62,7 +62,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       && uv.indexOf("cod_art=in.(") < 0;
     out.posicionesNetasEnOrden = um.indexOf("clave=in.(502,066,315,546)") >= 0 && um.indexOf("sector=not.is.null") >= 0 && um.indexOf("order=orden.asc") >= 0;
     out.noLeeEntradasViejas = !urls.some(u => u.indexOf("Movimientos_Stock") >= 0 && u.indexOf("deposito=eq.excedente") >= 0);
-    out.cajasPorUbic = !!m["066"] && m["066"].porUbic && m["066"].porUbic["P03"] === 80 && m["066"].porUbic["AD02"] === 56;
+    // v31.80 — P3 y P03 son la MISMA posición: sus cajas se suman (80 + 1), no gana la primera.
+    out.cajasPorUbic = !!m["066"] && m["066"].porUbic && m["066"].porUbic["P03"] === 81 && m["066"].porUbic["AD02"] === 56;
     vistaFalla = true;
     const m2 = await pkFetchExcedente(["502", "066"]);
     out.vistaFalla_vacio = JSON.stringify(m2) === "{}";
