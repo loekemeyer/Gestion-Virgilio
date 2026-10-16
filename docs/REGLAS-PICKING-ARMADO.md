@@ -606,6 +606,11 @@ el picking (corrArt, PK_LIQUIDAR_EN) factura el código pedido. Por eso ya no ex
 - `PK_LIQUIDAR_EN` queda vacío **a propósito**; `PK_LIQ_PARES` sólo lo usa Completar pedido (v31.64).
 - Corregido el 16/10 (backup `zz_backups."GV_Backup_NPSust_*_20261016"`): **CH 0063** (F48M, armada) 809E→809 en NP y
   Entregas · **LK 0438** (F97A) 574: 1 + 574E: 14 · **LK 0347** (F48Q) 338: 1 → 941E: 2.
+- ⚠ **LK 0438 (F97A) REVERTIDO el 16/10 (Luis)**: el armado tenía las **15 cajas de 574E** (líos O, P1, P2 = 5+5+5) y la caja
+  de 574 volvió a la góndola **F50** (conviven 574E y 574; `GV_Lugar_Item` F50/574). Se borró el cambio 13, la NP volvió a
+  574E: 15, Entregas 15/15/0, TAL `O=574EX5`, PKC 574E 15 y el PKC 574 a `PKCX` (sus movimientos en 0). La última caja de 574
+  la lleva **LK 0449 (Pezzini, F45E)** vía `gv_np_cambiar_codigo` (cambio 18). Cuando F45E se arme y el 574 quede en 0,
+  `gv_liquidado_discontinuar` lo da de baja y la góndola F50 lo suelta sola. Backup `zz_backups."GV_Backup_574_*_20261016"`.
 - Ya facturadas con el código cambiado (quedan como están): LK 0285, LK 0263 (F47A) y LK 0297 (F48N), 1 caja de 574
   cada tanda facturada como 574E; LK 0291, LK 0307, LK 0327 (panel: se pickeó 945E/941E y se facturó 332/338).
 - `select * from gv_web_np_liquidar(true);` simula. `sql/gv_np_sustituto_v3162.sql` (los marcadores de la base dicen `v31.62-…`: llave, no cambiar), `tests/pk-liquidar-574.cjs`,
