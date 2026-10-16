@@ -90,3 +90,5 @@ LK no lo puede ver. Pero los que CAMBIAN esas bases sí pueden avisarle a LK, as
 - **precios de LK**: nadie pokea — `products`/`loke_products`/`item_precios` YA reconstruyen por su trigger
   (`tg_item_precio_*`), así que para LK la cache siempre fue event-driven.
 `sql/gv_web_ocultos_poke_20261006_LK.sql` (RPC + gate + el trigger de Chef para copiar y pegar, con rollback).
+
+> **Horario (v31.39, 16/10):** los jobs 34, 55, 68, 81 y 109 corren sólo de 5:00 a 22:59 BsAs (`0,1,8-23` en UTC). No hay actividad de 23:00 a 4:59. El 25 queda 24 h por `watchdog_syncs_externos` (umbral 30 min).

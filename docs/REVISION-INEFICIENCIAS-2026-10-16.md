@@ -74,3 +74,9 @@ pantallas. Y en el front no pesan las funciones muertas (~30 KB): pesa la **form
 
 - F1 resuelto: el TP pide sólo los movimientos de la familia de códigos de la tanda (`stockFetchMovs(cods)`), no la tabla entera. Medido como anon: 2 códigos = 2.604 filas en 5 ms, contra 86.572 filas / 25,2 MB. Test: `tests/tp-movs-filtrados.cjs`.
 - Auditoría: registrados «Facturación: la lista de NP ya facturadas cortaba en 1.000 filas» (corregido, 26b5986) y «Cron 112 gv_gp2_espejo_sync falla el 3,9 %» (abierto).
+
+## 6. v31.39 — D6: crons en horario
+
+- 34, 55, 68, 81 y 109 corren igual de 5:00 a 22:59 y paran de 23:00 a 4:59 (30 días medidos: 0 movimientos, 0 eventos, 0 facturas, 0 fichadas en esa franja).
+- El 25 (fichadas) queda las 24 h: `watchdog_syncs_externos` manda un Telegram si pasa 30 min sin correr. Achicarlo exige tocar el vigilante.
+- D3 (regla que pela la L en Chef): **sin decidir**. Se apagó por error menos de un minuto y se reactivó; no entró ningún renglón en ese lapso.
