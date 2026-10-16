@@ -1362,14 +1362,129 @@ document
 var allClientes = [];
 var allAddresses = [];
 
+// ---- PIN DEL CLIENTE: se ve sólo con el código que le llega a Thomy por WhatsApp (D55, Elías 16/10/2026) ----
+// La lista de clientes ya no guarda el PIN en memoria (queda c._tienePin). La ficha, «Reparar Auth» y «Verificar
+// PINes» se lo piden al servidor (admin_ver_pin / admin_pines_verificar), que sólo lo da si en ESTA sesión de login se
+// validó un código: admin_pin_pedir_codigo manda a Thomy desde dónde y quién lo pide (plantilla notif_thomy_admin) y
+// admin_pin_validar_codigo abre el acceso por 2 h o hasta cerrar sesión, lo que pase primero. Cada PIN visto queda
+// anotado en admin_pin_vistas. SQL: sql/admin_pin_codigo_20261016.sql
+var _pinAcceso = null; // { hasta: ms, solicitante }
+var _pinAccesoTimer = null;
+
+function _pinAccesoAviso() {
+  var el = document.getElementById("pinAccesoAviso");
+  var min = _pinAcceso ? Math.max(0, Math.ceil((_pinAcceso.hasta - Date.now()) / 60000)) : 0;
+  if (!min) {
+    _pinAcceso = null;
+    if (el) el.remove();
+    if (_pinAccesoTimer) { clearInterval(_pinAccesoTimer); _pinAccesoTimer = null; }
+    return;
+  }
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "pinAccesoAviso";
+    el.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:9999;max-width:300px;padding:8px 12px;" +
+      "border-radius:8px;background:#fff8ec;border:1px solid #f0d29c;font-size:13px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.12)";
+    document.body.appendChild(el);
+  }
+  el.textContent = "PIN visibles: quedan " + Math.floor(min / 60) + ":" + String(min % 60).padStart(2, "0") +
+    " o hasta cerrar sesión" + (_pinAcceso.solicitante ? " · " + _pinAcceso.solicitante : "");
+  if (!_pinAccesoTimer) _pinAccesoTimer = setInterval(_pinAccesoAviso, 30000);
+}
+
+function _pinAccesoSet(hasta, solicitante) {
+  _pinAcceso = { hasta: new Date(hasta).getTime(), solicitante: solicitante || (_pinAcceso && _pinAcceso.solicitante) || "" };
+  _pinAccesoAviso();
+}
+
+async function _pinAccesoAbrir() {
+  var nombre = window.prompt(
+    "Para ver PINes hace falta un código que le llega a Thomy por WhatsApp junto con tu nombre.\n\nTu nombre y apellido:", "");
+  if (nombre === null) return false;
+  var r1 = await sb.rpc("admin_pin_pedir_codigo", { p_nombre: String(nombre).trim() });
+  if (r1.error) { toast("No se pudo pedir el código: " + r1.error.message, "error"); return false; }
+  var e1 = r1.data || {};
+  if (!e1.ok) {
+    toast({ nombre: "Escribí tu nombre (de 3 a 60 letras)", espera_1_min: "Ya pediste un código hace menos de 1 minuto: usá ése",
+      max_5_por_hora: "Máximo 5 códigos por hora", sin_aprobador: "Falta el teléfono del aprobador" }[e1.error] || e1.error, "warning");
+    if (e1.error !== "espera_1_min") return false;
+  }
+  var cod = window.prompt("Pedile a Thomy el código que le llegó (vence en 10 minutos):", "");
+  if (cod === null) return false;
+  var r2 = await sb.rpc("admin_pin_validar_codigo", { p_codigo: String(cod).trim() });
+  if (r2.error) { toast("No se pudo validar: " + r2.error.message, "error"); return false; }
+  var e2 = r2.data || {};
+  if (!e2.ok) {
+    toast({ codigo: "Código incorrecto o vencido", bloqueado_1h: "Demasiados intentos: bloqueado 1 hora",
+      sin_sesion: "Volvé a iniciar sesión" }[e2.error] || e2.error, "error");
+    return false;
+  }
+  _pinAccesoSet(e2.hasta, e2.solicitante);
+  toast("Podés ver PINes por 2 horas o hasta cerrar sesión", "success");
+  return true;
+}
+
+// { customer_id: pin } de esos clientes. Sin acceso en esta sesión, lo pide (nombre → código). null = no lo abrió.
+async function pinObtener(ids, motivo) {
+  var out = {}, pidio = false;
+  ids = (ids || []).filter(Boolean);
+  for (var i = 0; i < ids.length; ) {
+    var r = await sb.rpc("admin_ver_pin", { p_customer_ids: ids.slice(i, i + 200), p_motivo: motivo });
+    if (r.error) throw new Error(r.error.message);
+    if (r.data && r.data.error === "sin_acceso" && !pidio) {
+      pidio = true;
+      if (!(await _pinAccesoAbrir())) return null;
+      continue;
+    }
+    if (!r.data || !r.data.ok) throw new Error((r.data && r.data.error) || "sin respuesta");
+    _pinAccesoSet(r.data.hasta);
+    (r.data.pines || []).forEach(function (x) { out[x.customer_id] = x.pin; });
+    i += 200;
+  }
+  return out;
+}
+
+// Estado del PIN guardado contra el login, sin traer el PIN: ok | distinto | sin_hash | sin_pin_o_usuario.
+async function pinEstados(lista, alAvanzar) {
+  var out = {};
+  for (var i = 0; i < lista.length; i += 50) {
+    var r = await sb.rpc("admin_pines_verificar", { p_customer_ids: lista.slice(i, i + 50).map(function (c) { return c.id; }) });
+    if (r.error) throw new Error(r.error.message);
+    (r.data || []).forEach(function (x) { out[x.customer_id] = x.estado; });
+    if (alAvanzar) alAvanzar(Math.min(i + 50, lista.length));
+  }
+  return out;
+}
+
+window.verPinCliente = async function (ev, id, btn) {
+  if (ev) ev.stopPropagation();
+  btn.disabled = true;
+  try {
+    var m = await pinObtener([id], "ficha");
+    if (!m) return;
+    var val = btn.parentNode;
+    val.textContent = m[id] || "-";
+    if (m[id]) val.setAttribute("data-copiable", String(m[id]));
+  } catch (e) {
+    toast("No se pudo ver el PIN: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+  }
+};
+
 async function loadClientes() {
   var grid = document.getElementById("clientesList");
   grid.innerHTML =
     '<div class="loading-row"><span class="spinner"></span>Cargando clientes...</div>';
   try {
     allClientes = await sbSelectAll(TABLE_CUSTOMERS, "order=cod_cliente.asc");
+    // D55: el PIN no queda en memoria; la ficha lo pide con código (pinObtener).
+    allClientes.forEach(function (c) { c._tienePin = c.pin != null && c.pin !== ""; delete c.pin; });
     allAddresses = await sbSelectAll(TABLE_ADDRESSES, "order=slot.asc");
     renderClientes(allClientes, allAddresses);
+    sb.rpc("admin_pin_acceso").then(function (r) {
+      if (r && r.data && r.data.activo) _pinAccesoSet(r.data.hasta, r.data.solicitante);
+    }, function () {});
   } catch (err) {
     grid.innerHTML =
       '<div class="empty-state"><p>Error al cargar clientes</p><small>' +
@@ -1425,10 +1540,11 @@ function renderClientes(clientes, addresses) {
         '<div class="cc-detail-item"><div class="label">Dto. Vol</div><div class="val">' +
         (c.dto_vol != null ? (c.dto_vol * 100).toFixed(0) + "%" : "-") +
         "</div></div>" +
-        '<div class="cc-detail-item"><div class="label">PIN</div><div class="val"' +
-        (c.pin ? ' data-copiable="' + String(c.pin).replace(/"/g, "") + '"' : "") +
-        ">" +
-        (c.pin || "-") +
+        '<div class="cc-detail-item"><div class="label">PIN</div><div class="val">' +
+        (c._tienePin
+          ? '<button type="button" class="btn-ghost" style="padding:2px 8px;font-size:12px" onclick="verPinCliente(event,\'' +
+            c.id + "',this)\">•••• Ver</button>"
+          : "-") +
         "</div></div></div>" +
         '<div class="suc-section-header"><h4 style="font-size:14px;font-weight:700">Sucursales</h4>' +
         '<button class="btn-primary" style="padding:7px 14px;font-size:13px" onclick="openAddSucModal(\'' +
@@ -1754,29 +1870,6 @@ async function _createAuthWithRetry(cuit, pin, sincronizar) {
   return null;
 }
 
-// Verifica si el PIN guardado puede abrir la sesión del cliente.
-// Devuelve "ok", "fail" o "rate".
-async function _repairTestPin(cuit, pin) {
-  var tmpClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-  var email = cleanCuit(cuit) + "@cuit.loekemeyer";
-  try {
-    var res = await tmpClient.auth.signInWithPassword({ email: email, password: String(pin) });
-    if (res.error) {
-      var msg = (res.error.message || "").toLowerCase();
-      if (msg.indexOf("rate") !== -1 || msg.indexOf("too many") !== -1 || res.error.status === 429) return "rate";
-      return "fail";
-    }
-    try { await tmpClient.auth.signOut({ scope: "local" }); } catch (_) {}
-    return "ok";
-  } catch (e) {
-    var m = (e && e.message ? e.message : "").toLowerCase();
-    if (m.indexOf("rate") !== -1 || m.indexOf("too many") !== -1) return "rate";
-    return "fail";
-  }
-}
-
 // El login es UNO por CUIT (<cuit>@cuit.loekemeyer). Si OTRO código con el mismo CUIT ya
 // tiene login, «reparar» a éste le pisa la clave a ese otro cliente (la Edge Function
 // sincroniza la cuenta que ya existe) y después falla con "duplicate key" al vincularla.
@@ -1801,7 +1894,7 @@ document
     try {
       // Fase 1: clientes sin auth_user_id
       var sinAuthTodos = allClientes.filter(function (c) {
-        return !c.auth_user_id && c.cuit && c.pin;
+        return !c.auth_user_id && c.cuit && c._tienePin;
       });
       // CUIT que ya entra con OTRO código: no se toca (ver _repairCuitConLoginDeOtro).
       var cuitDeOtro = [];
@@ -1820,7 +1913,7 @@ document
 
       // Fase 2: clientes CON auth_user_id — detectar PINes rotos
       var conAuthTodos = allClientes.filter(function (c) {
-        return c.auth_user_id && c.cuit && c.pin && cleanCuit(c.cuit).length >= 10;
+        return c.auth_user_id && c.cuit && c._tienePin && cleanCuit(c.cuit).length >= 10;
       });
       // 02/10 (Tomás Gonzalez, problema 679): probar el PIN entrando con CADA cliente son
       // ~1.237 ingresos: tarda cerca de una hora y choca con el límite de ingresos por IP de
@@ -1834,7 +1927,7 @@ document
           "\n\n" +
           "¿Revisar también el PIN de clientes que YA tienen login?\n" +
           "· Escribí sus códigos separados por coma (ej: 3924)\n" +
-          "· * = los " + conAuthTodos.length + " (tarda mucho y puede chocar con el límite de ingresos)\n" +
+          "· * = los " + conAuthTodos.length + " (lo compara el servidor: unos 4 s cada 50)\n" +
           "· Vacío = ninguno",
         "",
       );
@@ -1849,21 +1942,13 @@ document
           return codsElegidos.indexOf(String(c.cod_cliente)) >= 0;
         });
       }
-      var pinRotos = [];
-      for (var k = 0; k < conAuth.length; k++) {
-        btn.textContent = "Verificando PINes " + (k + 1) + "/" + conAuth.length + "...";
-        var estado = await _repairTestPin(conAuth[k].cuit, conAuth[k].pin);
-        if (estado === "fail") {
-          pinRotos.push(conAuth[k]);
-        } else if (estado === "rate") {
-          // si pega rate limit en el test, esperar y reintentar una vez
-          await _repairDelay(3000);
-          estado = await _repairTestPin(conAuth[k].cuit, conAuth[k].pin);
-          if (estado === "fail") pinRotos.push(conAuth[k]);
-        }
-        // pausa corta entre verificaciones (120ms como en Verificar PINes)
-        if (k < conAuth.length - 1) await _repairDelay(120);
-      }
+      // D55: el servidor compara el PIN guardado con el login sin devolverlo (antes: un ingreso por cliente).
+      var estados = await pinEstados(conAuth, function (n) {
+        btn.textContent = "Verificando PINes " + n + "/" + conAuth.length + "...";
+      });
+      var pinRotos = conAuth.filter(function (c) {
+        return estados[c.id] === "distinto" || estados[c.id] === "sin_hash";
+      });
 
       var totalArreglar = sinAuth.length + pinRotos.length;
       if (!totalArreglar) {
@@ -1879,13 +1964,16 @@ document
         errores = 0;
       var lista = sinAuth.concat(pinRotos);
       var total = lista.length;
+      var pines = await pinObtener(lista.map(function (c) { return c.id; }), "reparar");
+      if (!pines) return;
 
       for (var i = 0; i < total; i++) {
         var c = lista[i];
         var esSinAuth = !c.auth_user_id;
         btn.textContent = "Reparando " + (i + 1) + "/" + total + "...";
         try {
-          var authId = await _createAuthWithRetry(c.cuit, String(c.pin), true);   // «Reparar» (admin): sincroniza el PIN
+          if (!pines[c.id]) throw new Error("sin PIN guardado");
+          var authId = await _createAuthWithRetry(c.cuit, String(pines[c.id]), true);   // «Reparar» (admin): sincroniza el PIN
           if (authId) {
             if (esSinAuth) {
               await sbUpdate(TABLE_CUSTOMERS, c.id, "id", {
@@ -1924,8 +2012,8 @@ document
   });
 
 // ---- VERIFICAR PINES (sweep de desincronizaciones auth.users <-> customers.pin) ----
-// Intenta signInWithPassword por cada cliente y lista los que el PIN guardado no abre.
-// Es solo lectura: no modifica ninguna tabla. El fix (update auth.users) lo ejecuta
+// El servidor compara el PIN guardado de cada cliente con su login (admin_pines_verificar, D55) y
+// lista los que no coinciden. Es solo lectura: no modifica ninguna tabla. El fix (update auth.users) lo ejecuta
 // el admin a mano via SQL Editor con el SQL que copia cada fila.
 var verifyPinsInProgress = false;
 
@@ -1940,33 +2028,6 @@ function buildPinFixSql(email, pin) {
     safeEmail +
     "';"
   );
-}
-
-async function tryLoginWithStoredPin(tmpClient, email, pin) {
-  try {
-    var res = await tmpClient.auth.signInWithPassword({
-      email: email,
-      password: String(pin),
-    });
-    if (res.error) {
-      var msg = (res.error.message || "").toLowerCase();
-      if (
-        msg.indexOf("rate") !== -1 ||
-        msg.indexOf("too many") !== -1 ||
-        res.error.status === 429
-      )
-        return "rate";
-      return "fail";
-    }
-    try {
-      await tmpClient.auth.signOut({ scope: "local" });
-    } catch (_) {}
-    return "ok";
-  } catch (e) {
-    var m = (e && e.message ? e.message : "").toLowerCase();
-    if (m.indexOf("rate") !== -1 || m.indexOf("too many") !== -1) return "rate";
-    return "fail";
-  }
 }
 
 document
@@ -1987,7 +2048,7 @@ document
 
     if (
       !window.confirm(
-        "Esto va a intentar hacer login con el PIN guardado de cada cliente (~1–2 min). Es solo lectura, no modifica datos. ¿Continuar?",
+        "El servidor compara el PIN guardado de cada cliente con su login (~1–2 min). Es solo lectura, no modifica datos. ¿Continuar?",
       )
     ) {
       return;
@@ -2011,7 +2072,7 @@ document
 
     var candidatos = allClientes.filter(function (c) {
       return (
-        c.auth_user_id && c.pin && c.cuit && cleanCuit(c.cuit).length >= 10
+        c.auth_user_id && c._tienePin && c.cuit && cleanCuit(c.cuit).length >= 10
       );
     });
     var total = candidatos.length;
@@ -2025,24 +2086,10 @@ document
       return;
     }
 
-    var tmpClient = window.supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-        },
-      },
-    );
-
     var okCount = 0,
       rateCount = 0,
       done = 0;
     var broken = [];
-    var CONCURRENCY = 3;
-    var idx = 0;
 
     function updateSummary() {
       var pct = total ? Math.round((done * 100) / total) : 0;
@@ -2059,9 +2106,9 @@ document
         (rateCount ? ", " + rateCount + " rate-limit" : "");
     }
 
-    function renderBroken(c) {
+    function renderBroken(c, pin) {
       var email = cleanCuit(c.cuit) + "@cuit.loekemeyer";
-      var sql = buildPinFixSql(email, c.pin);
+      var sql = pin ? buildPinFixSql(email, pin) : "";
       var row = document.createElement("div");
       row.style.cssText =
         "display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:#fff8ec;border:1px solid #f0d29c;border-radius:8px";
@@ -2072,12 +2119,13 @@ document
         "</strong> — CUIT " +
         c.cuit +
         " — PIN guardado: <code>" +
-        c.pin +
+        (pin || "sin código: no se ve") +
         "</code>";
       var copyBtn = document.createElement("button");
       copyBtn.className = "btn-ghost";
       copyBtn.type = "button";
       copyBtn.textContent = "Copiar SQL";
+      copyBtn.disabled = !pin;
       copyBtn.addEventListener("click", function () {
         (navigator.clipboard && navigator.clipboard.writeText
           ? navigator.clipboard.writeText(sql)
@@ -2095,36 +2143,23 @@ document
       listEl.appendChild(row);
     }
 
-    async function worker() {
-      while (idx < total) {
-        var myIdx = idx++;
-        var c = candidatos[myIdx];
-        var email = cleanCuit(c.cuit) + "@cuit.loekemeyer";
-        var result = await tryLoginWithStoredPin(tmpClient, email, c.pin);
-        if (result === "rate") {
-          await new Promise(function (r) {
-            setTimeout(r, 2500);
-          });
-          result = await tryLoginWithStoredPin(tmpClient, email, c.pin);
-          if (result === "rate") rateCount++;
-        }
-        if (result === "ok") okCount++;
-        else if (result === "fail") {
-          broken.push(c);
-          renderBroken(c);
-        }
-        done++;
-        updateSummary();
-        await new Promise(function (r) {
-          setTimeout(r, 120);
-        });
-      }
-    }
-
     try {
-      var workers = [];
-      for (var w = 0; w < CONCURRENCY; w++) workers.push(worker());
-      await Promise.all(workers);
+      // D55: lo compara el servidor (admin_pines_verificar) sin devolver el PIN; el PIN se pide
+      // con código sólo para los desincronizados, que necesitan el SQL de arreglo.
+      var estados = await pinEstados(candidatos, function (n) {
+        done = n;
+        updateSummary();
+      });
+      candidatos.forEach(function (c) {
+        if (estados[c.id] === "ok") okCount++;
+        else if (estados[c.id] === "distinto" || estados[c.id] === "sin_hash") broken.push(c);
+      });
+      done = total;
+      updateSummary();
+      if (broken.length) {
+        var pinesRotos = await pinObtener(broken.map(function (c) { return c.id; }), "verificar");
+        broken.forEach(function (c) { renderBroken(c, pinesRotos ? pinesRotos[c.id] : null); });
+      }
       summaryEl.textContent =
         "Terminado: " +
         done +
