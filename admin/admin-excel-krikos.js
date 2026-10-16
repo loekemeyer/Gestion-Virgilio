@@ -77,6 +77,15 @@
     ".xkr-obs{display:flex;flex-direction:column;gap:4px;padding:10px 0 0;font-size:12px}",
     ".xkr-obs .lab{color:var(--text3,#888);font-weight:600}",
     ".xkr-obs textarea{width:100%;box-sizing:border-box;min-height:48px;padding:6px 8px;border:1px solid var(--border,#ddd);border-radius:6px;font-family:inherit;font-size:13px;resize:vertical}",
+    ".xkr-rev{margin-top:10px;padding:10px 12px;border:1px solid var(--border,#ddd);border-radius:8px;font-size:13px}",
+    ".xkr-rev.ok{border-color:#1e7a31;background:#f1faf3}",
+    ".xkr-rev.bad{border-color:#c0392b;background:#fff6f5}",
+    ".xkr-rev-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}",
+    ".xkr-rev-head b{font-size:14px}",
+    ".xkr-rev ul{margin:8px 0 0;padding-left:18px}",
+    ".xkr-rev li{margin:2px 0}",
+    ".xkr-rev-msg{margin-top:8px;white-space:pre-wrap;background:#fff;border:1px dashed var(--border,#ccc);border-radius:6px;padding:8px}",
+    ".xkr-rev-stale{color:#b8780f;font-weight:600}",
     ".xkr-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--border,#eee);padding-top:10px}",
     ".xkr-btn{font-size:12px;padding:7px 14px;border-radius:6px;border:1px solid var(--border,#ddd);background:#fff;cursor:pointer;color:var(--text2,#222);font-family:inherit}",
     ".xkr-btn:hover{background:var(--bg2,#fafafa)}",
@@ -102,6 +111,10 @@
     "https://kwkclwhmoygunqmlegrg.functions.supabase.co/sheets-proxy";
   var SHEETS_ENTREGAS_URL =
     "https://kwkclwhmoygunqmlegrg.functions.supabase.co/sheets-entregas-proxy";
+  // Revision del pedido por el agente (Luis, 16/10/2026): un pedido por Excel no se
+  // sube si no esta perfectamente cargado. Edge Function con API key de Anthropic.
+  var REVISION_URL =
+    "https://kwkclwhmoygunqmlegrg.functions.supabase.co/revisar-pedido-excel";
 
   var CARD_COUNT = 4;
   var cardInstances = [];
@@ -759,6 +772,9 @@
       submitting: false,
       submitted: false,
       subidos: {}, // "hoja:sucursal" -> nro de pedido ya subido
+      // Revision del agente: { key, estado, resumen, problemas[], mensaje_cliente, ... }
+      revision: null,
+      revisando: false,
       orderId: null,
       // Observaciones del pedido (Tomás Gonzalez, 29/09/2026). Viven en el
       // state porque renderResult() rehace la card entera en cada cambio de
@@ -1193,11 +1209,17 @@
               '<textarea class="xkr-obs-input" maxlength="500" placeholder="Opcional: van al pedido (Gestión / depósito)"' +
               (state.submitted ? " disabled" : "") + ">" + escapeHtml(state.observaciones || "") + "</textarea></label>"
             : "") +
+          (state.items.length > 0 && state.customer ? revisionHtml() : "") +
           '<div class="xkr-actions">' +
           '<button class="xkr-btn danger" id="xkrReset">Descartar</button>' +
+          (state.items.length > 0 && state.customer && !state.submitted
+            ? '<button class="xkr-btn" id="xkrRevisar"' + (state.revisando ? " disabled" : "") + ">" +
+              (state.revisando ? "Revisando…" : revisionVigente() ? "Volver a revisar" : "Revisar pedido") + "</button>"
+            : "") +
           (state.items.length > 0
             ? '<button class="xkr-btn primary" id="xkrSubmit"' +
-              (state.submitted ? " disabled" : "") + ">" +
+              (state.submitted || !revisionOk() ? " disabled" : "") +
+              (!state.submitted && !revisionOk() ? ' title="Se sube recién cuando la revisión da OK"' : "") + ">" +
               (state.submitted ? "Pedido " + (state.orderId || "") + " subido" : "Subir como pedido") +
               "</button>"
             : "") +
@@ -1283,6 +1305,17 @@
       if (resetBtn) resetBtn.addEventListener("click", resetState);
       var submitBtn = card.querySelector("#xkrSubmit");
       if (submitBtn) submitBtn.addEventListener("click", submitOrder);
+      var revBtn = card.querySelector("#xkrRevisar");
+      if (revBtn) revBtn.addEventListener("click", runRevision);
+      var copyBtn = card.querySelector("#xkrRevCopy");
+      if (copyBtn) copyBtn.addEventListener("click", function () {
+        var t = (state.revision && state.revision.mensaje_cliente) || "";
+        try {
+          navigator.clipboard.writeText(t).then(function () {
+            window.toast && window.toast("Mensaje copiado", "success");
+          });
+        } catch (_e) {}
+      });
       var obsInp = card.querySelector(".xkr-obs-input");
       if (obsInp) {
         obsInp.addEventListener("input", function () {
@@ -1350,12 +1383,131 @@
       state.submitted = false;
       state.orderId = null;
       state.subidos = {};
+      state.revision = null;
+      state.revisando = false;
       state.observaciones = "";
       renderInitial();
     }
 
+    // ---- Revision del agente --------------------------------------------
+    // Lo que define el pedido: si cambia (cliente, hoja, sucursal, renglones,
+    // cajas, precio), la revision anterior deja de valer.
+    function revKey() {
+      return JSON.stringify([
+        state.customer && state.customer.id,
+        state.activeSheetIdx,
+        state.activeBranchCol,
+        (state.items || []).filter(function (it) { return it.included; }).map(function (it) {
+          return [it.codLk, it.cajas, it.unitPrice, it.uxb];
+        }),
+      ]);
+    }
+    function revisionVigente() {
+      return !!(state.revision && state.revision.key === revKey());
+    }
+    function revisionOk() {
+      return revisionVigente() && state.revision.estado === "OK";
+    }
+    function textoExcel() {
+      var sh = state.sheets[state.activeSheetIdx];
+      var aoa = (sh && sh.aoa) || [];
+      return aoa.slice(0, 400).map(function (r) {
+        return (r || []).map(function (c) { return c == null ? "" : String(c); }).join("\t").replace(/\t+$/, "");
+      }).filter(Boolean).join("\n");
+    }
+    function revisionHtml() {
+      var r = state.revision;
+      if (!r) {
+        return '<div class="xkr-rev"><span class="lab">Revisión del pedido:</span> pendiente. ' +
+          "Se sube recién cuando la revisión da OK.</div>";
+      }
+      if (r.error) {
+        return '<div class="xkr-rev bad"><b>No se pudo revisar:</b> ' + escapeHtml(r.error) + "</div>";
+      }
+      var stale = !revisionVigente();
+      var ok = r.estado === "OK";
+      var probs = (r.problemas || []).map(function (p) {
+        return "<li>" + (p.fila ? "Fila " + p.fila + " · " : "") + (p.codigo ? "<b>" + escapeHtml(p.codigo) + "</b> · " : "") +
+          escapeHtml(p.detalle || "") + "</li>";
+      }).join("");
+      return '<div class="xkr-rev ' + (ok ? "ok" : "bad") + '">' +
+        '<div class="xkr-rev-head"><b>' + (ok ? "Pedido OK" : "Pedido para revisar con el cliente") + "</b>" +
+        (r.condicion_segun_precios ? '<span class="lab">Condición según precios: ' + escapeHtml(r.condicion_segun_precios) + "</span>" : "") +
+        (r.condicion_escrita_en_excel ? '<span class="lab">En el Excel: ' + escapeHtml(r.condicion_escrita_en_excel) + "</span>" : "") +
+        (stale ? '<span class="xkr-rev-stale">Cambiaste el pedido: volvé a revisar</span>' : "") +
+        "</div>" +
+        (r.resumen ? "<div>" + escapeHtml(r.resumen) + "</div>" : "") +
+        (probs ? "<ul>" + probs + "</ul>" : "") +
+        (r.mensaje_cliente
+          ? '<div class="xkr-rev-msg">' + escapeHtml(r.mensaje_cliente) + "</div>" +
+            '<button class="xkr-btn" id="xkrRevCopy" style="margin-top:6px">Copiar mensaje para el cliente</button>'
+          : "") +
+        "</div>";
+    }
+    async function runRevision() {
+      if (state.revisando || !state.customer) return;
+      var sheet = state.sheets[state.activeSheetIdx];
+      var cols = sheet && sheet.cols;
+      var hdr = sheet && sheet.headerIdx >= 0 ? sheet.headerIdx : 0;
+      var tienePrecio = !!(cols && cols.priceCol != null);
+      var items = state.items.filter(function (it) { return it.included; }).map(function (it) {
+        var codEx = (it.codCandidates || []).filter(function (c) { return c != null && String(c).trim(); })[0];
+        return {
+          fila: hdr + 2 + it.rowIdx,
+          cod_excel: String(codEx != null ? codEx : it.ean || "").trim(),
+          desc_excel: it.rawDesc || "",
+          cod_lk: it.found ? it.codLk : null,
+          cajas: Number(it.cajas) || 0,
+          uxb_excel: cols && cols.uxbCol != null ? Number(it.uxb) || 0 : 0,
+          precio_excel: tienePrecio ? Number(it.unitPrice) || 0 : 0,
+        };
+      });
+      if (!items.length) {
+        window.toast && window.toast("No hay renglones incluidos para revisar", "warning");
+        return;
+      }
+      var key = revKey();
+      state.revisando = true;
+      renderResult();
+      try {
+        var ses = await window.sb.auth.getSession();
+        var token = ses && ses.data && ses.data.session && ses.data.session.access_token;
+        if (!token) throw new Error("Sesión expirada. Recargá la página.");
+        var resp = await fetch(REVISION_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+            apikey: window.SUPABASE_ANON_KEY || "",
+          },
+          body: JSON.stringify({
+            cod_cliente: String(state.customer.cod_cliente || ""),
+            cliente: state.customer.business_name || "",
+            sucursal: state.activeDelivery || "",
+            tiene_precio: tienePrecio,
+            items: items,
+            texto_excel: textoExcel(),
+          }),
+        });
+        var data = await resp.json().catch(function () { return {}; });
+        if (!resp.ok || !data.ok) throw new Error(data.error || "Error " + resp.status);
+        data.key = key;
+        state.revision = data;
+      } catch (e) {
+        console.error("xkr revision:", e);
+        state.revision = { key: key, error: String((e && e.message) || e) };
+      } finally {
+        state.revisando = false;
+        renderResult();
+      }
+    }
+
     async function submitOrder() {
       if (state.submitting || state.submitted) return;
+      if (!revisionOk()) {
+        window.toast && window.toast("Primero revisá el pedido: se sube sólo si la revisión da OK", "warning");
+        return;
+      }
       if (!state.customer) {
         window.toast && window.toast("Falta cliente", "warning");
         return;

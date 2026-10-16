@@ -254,8 +254,7 @@
 /* observaciones */
 .sc-obs {
   display: grid;
-  grid-template-columns: 160px minmax(0, 1fr);
-  gap: 8px 12px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 /* resumen */

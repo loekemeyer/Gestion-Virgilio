@@ -54,7 +54,6 @@ var sc = {
   lines: [], // { p: product, cajas: int }
   pick: null, // producto elegido en el renglon de carga
   obs: "",
-  oc: "",
   review: false,
   submitting: false,
   lastOrder: null,
@@ -708,12 +707,8 @@ function scRenderObs() {
   el.innerHTML =
     scStepHead(5, "Observaciones <small>(opcional)</small>", false) +
     '<div class="sc-obs">' +
-    '<label class="sc-lbl">Nº OC<input type="text" id="scOc" class="field-input" maxlength="40" value="' + scEsc(sc.oc) + '"' + (off ? " disabled" : "") + " /></label>" +
     '<label class="sc-lbl sc-obs-txt">Observaciones<textarea id="scObs" class="field-input" rows="2" maxlength="500"' + (off ? " disabled" : "") + ">" + scEsc(sc.obs) + "</textarea></label>" +
     "</div>";
-  document.getElementById("scOc").addEventListener("input", function () {
-    sc.oc = this.value;
-  });
   document.getElementById("scObs").addEventListener("input", function () {
     sc.obs = this.value;
   });
@@ -755,7 +750,6 @@ function scAbrirRevision() {
     "<dt>Sucursal</dt><dd>" + scEsc(a.label || a.direccion_entrega || "") + " <span class=\"sc-tag\">" + scEsc(a.zona_expreso) + "</span></dd>" +
     (scEsRetira() ? "<dt>Retira</dt><dd>" + scDdMm(sc.retiroFecha) + " · " + scEsc(sc.retiroFranja) + "</dd>" : "") +
     "<dt>Pago</dt><dd>" + scEsc(SC_CFG.pago.text) + "</dd>" +
-    (sc.oc.trim() ? "<dt>OC</dt><dd>" + scEsc(sc.oc.trim()) + "</dd>" : "") +
     (sc.obs.trim() ? "<dt>Obs.</dt><dd>" + scEsc(sc.obs.trim()) + "</dd>" : "") +
     "</dl>" +
     '<table class="sc-table"><thead><tr><th>Cód</th><th>Artículo</th><th>UxB</th><th>' + unidad + "</th><th>Subtotal</th></tr></thead><tbody>" +
@@ -1002,7 +996,6 @@ function scReset() {
   sc.lines = [];
   sc.pick = null;
   sc.obs = "";
-  sc.oc = "";
   scRenderAll();
   var i = document.getElementById("scCustInput");
   if (i) i.focus();
@@ -1059,7 +1052,6 @@ async function scEnviar() {
       observaciones: observaciones,
       retiro_fecha: scEsRetira() ? sc.retiroFecha : null,
       retiro_franja: scEsRetira() ? sc.retiroFranja : null,
-      numero_oc: sc.oc.trim() || null,
       is_promo: false,
       is_chef: SC_CFG.isChef,
       tipo_documento: "pedido",
