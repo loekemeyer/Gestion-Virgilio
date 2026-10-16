@@ -96,8 +96,10 @@ Preferencias del dueño (Elías, 28/09/2026). El porqué y la historia de cada p
 **BD**
 - **Nunca INSERT / UPDATE / DELETE sin un "sí" EN ESE MOMENTO**, mostrando antes el SQL exacto y sus efectos en
   cadena. "Espera" anula la autorización. Después de escribir: **SELECT de verificación**.
-- **Excepciones automáticas**: crear y cerrar tareas de Planify y las 4 escrituras del semáforo (abajo). Auditoría:
-  toda escritura con confirmación.
+- **Excepciones automáticas**: crear y cerrar tareas de Planify, las 4 escrituras del semáforo (abajo) y **toda la
+  auditoría** (`registrar_problema` / `cerrar_problema` / `agregar_commit`). ⚠⚠ **Luis, 16/10: *"No quiero que
+  preguntes mas. Quiero que siempre se registre automaticamente sin preguntar en auditoria"*** — se registra al
+  detectar, se cierra al pushear el fix y se avisa el TÍTULO; no se muestra el SQL antes ni se pide «sí».
 - ⚠⚠ **EL PEDIDO ES LA AUTORIZACIÓN** (Luis, 04/10): lo que el dueño pidió —funciones, columnas, centinelas, el
   refresco que lo hace efectivo— se aplica en el mismo pedido, sin un segundo «sí». El «sí» previo queda para lo que
   **NO** pidió: corrección de datos que Claude detecta solo, borrados, reversiones.
@@ -294,6 +296,9 @@ Regla corta: **si ya estaba pusheado y andaba mal, se audita.** Si es trabajo nu
 | Tabla derivada desincronizada de su madre | Ajuste de estilo o texto |
 
 ### Cuando
+
+⚠⚠ **AUTOMÁTICO, SIN PREGUNTAR** (Luis, 16/10/2026): cada paso de abajo se ejecuta solo, sin mostrar el SQL ni
+pedir «sí»; después, el SELECT de verificación y el TÍTULO en el chat.
 
 1. **Al detectar el problema** (antes de tocar nada): `registrar_problema` devuelve el id.
 2. **Al pushear el fix**: `cerrar_problema` con el sha del commit.

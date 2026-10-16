@@ -588,7 +588,7 @@ Test: `tests/pk-liquidar-574.cjs`.
 **v30.30 (Luis, 14/10): el 574 queda DISCONTINUADO cuando se fue.** `gv_liquidado_discontinuar()` (cron
 160 `gv-liquidado-discontinuar`, 05:13 ART) da de alta el 574 en `Articulos_Discontinuados` cuando hay un
 PKC del 574 con real > 0 desde el 14/10, su tanda tiene remito (CRN) y el saldo del 574 es 0 en todos los
-depósitos. El alta dispara la liberación de la góndola F50. `select * from gv_liquidado_discontinuar(true);`
+depósitos. El alta dispara la liberación de góndola, que saca SÓLO el código 574 del mapa (hoy no figura en ninguna celda: F49 y F50 son del 574E y no se tocan). `select * from gv_liquidado_discontinuar(true);`
 simula. `sql/gv_liquidado_discontinuar_v3030.sql`, centinela v30.30 (la app salió en la v30.31).
 
 **v31.54 (Luis, 16/10, D1 · problema 850): el armado ya NO devuelve a góndola el código liquidado.** El armado
@@ -608,7 +608,7 @@ discontinuado."* `gv_liquidado_discontinuar()` ya no mira el remito ni exige sal
 cumplía nunca): recorre `GV_Pick_Liquidar` activo y, cuando (1) ningún depósito del viejo tiene saldo **> 0** (el
 negativo es conteo, no mercadería), y (2) cada tanda donde se pickeó el viejo está armada y **todas** sus NP con el
 código del pedido tienen `Facturacion_NP.facturado_at`, pasa la fila a `activo = false` y da de alta el viejo en
-`Articulos_Discontinuados` (libera F50 y lo saca de stock y OC). Cron 160 cada 10 min de 8 a 20 ART.
+`Articulos_Discontinuados` (lo saca de stock y OC; la liberación de góndola saca sólo el código 574 del mapa — F50 está asignada al **574E** y no se toca). Cron 160 cada 10 min de 8 a 20 ART.
 Al 16/10 espera a F97A (armado + factura) y a las NP de F47A (LK 0263, LK 0285) y F48N (LK 0297).
 `select * from gv_liquidado_discontinuar(true);` simula. `sql/gv_liquidado_discontinuar_v3156.sql`, centinela v31.56.
 
@@ -630,6 +630,17 @@ viejo** (terminado + excedente) y su paso ·EXC sale primero, con el aviso «van
 en excedente que con sólo `terminado` quedaban varadas. La baja es la de la v31.56 (último facturado). Sólo se da de baja
 el código liquidado: los discontinuados que hoy siguen en el Mapa de góndolas no se tocan. Al 16/10: 636 = 5 góndola +
 9 excedente + 6 separadas; 635 = 11. `sql/gv_pick_liquidar_636_635_v3160.sql`, `tests/pk-liquidar-636.cjs`.
+
+**v31.66 (Luis, 16/10): en la página de Chef se ve el NACIONAL hasta que los pedidos lo comprometen entero; recién ahí
+aparece el importado.** *"en la pagina tienen que aparecer 636 y 635 (nacionales) y no el importado hasta que no se acabe
+el stock del nacional (… que haya suficientes pedidos que comprometan el total del stock)"*. `GV_Pick_Liquidar.web_switch`
+= true → `gv_pick_liquidar_web_ocultos()` entra en `lk_web_ocultos_feed()` (el feed de `GV_Web_Oculto`), y el sync de LK
+(`sync_web_ocultos_virgilio`, cada 5 min, también sobre `products` de Chef por el FDW) lo aplica:
+**libre = disponible del nacional (terminado + excedente + racks + racks_ch + a_guardar + para_envasar) − cajas pedidas
+sin pickear (`gv_stock_pedidas_neto.neto`) del nacional y del importado**. libre > 0 → se oculta el E; libre ≤ 0 → se
+oculta el nacional; par liquidado (`activo = false`) → el nacional queda oculto para siempre. Si la cuenta falla, queda el
+nacional. LK sólo reactiva lo que ocultó el feed. Al aplicarlo (16/10): 636 libre 14, 635 libre 9 → 636E y 635E ocultos.
+El 634E (no existe) se apagó a mano en `products` de Chef. `sql/gv_pick_liquidar_web_switch_v3166.sql`.
 
 ## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
 
