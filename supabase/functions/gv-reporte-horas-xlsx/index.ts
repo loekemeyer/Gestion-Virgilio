@@ -277,40 +277,54 @@ function construirPdf(filas: any[], fecha: string, tandas: Record<string, DetOp>
     const hdr2 = [["Nombre"], ["Tarea"], ["Tanda"], ["m³"], ["Min", "trab"], ["Ritmo", "m³/h"]];
     const body2 = lin.map((l) => [l.nombre, l.tarea, l.tanda, l.m3, l.mi, l.rit]);
     const w2 = anchos(hdr2, body2);
-    x0 = (pageW - w2.reduce((a, b) => a + b, 0)) / 2;
-    const hH2 = 34;
-    const cab = () => {
-      titulo("Detalle por tanda — picking y armado", yy + 14);
-      yy += 24;
-      let x = x0;
-      hdr2.forEach((l, i) => { celda(x, yy, w2[i], hH2, l, true, HSZ); x += w2[i]; });
-      yy += hH2;
-    };
+    const tw = w2.reduce((a, b) => a + b, 0);
+    const hH2 = 34, CG = 20;
+    // v-col: el detalle va en COLUMNAS lado a lado (Luis 16/10: "no tiene sentido esa 2da hoja si hay lugar
+    // para las 2 columnas"). Se llena una columna hasta el pie y sigue en la de al lado; recién sin columnas, hoja nueva.
+    const ncol = Math.max(1, Math.floor((pageW - 40 + CG) / (tw + CG)));
+    const grupos: [number, number][] = [];
+    for (let i = 0; i < lin.length;) { let j = i; while (j < lin.length && lin[j].nombre === lin[i].nombre) j++; grupos.push([i, j]); i = j; }
     yy += 16;
     if (yy + 24 + hH2 + rH * 3 > pageH - 30) { doc.addPage(); yy = 20; }
-    cab();
-    // grupos para unir la celda de Nombre y la de Tarea (sin celdas vacías)
-    let i = 0;
-    while (i < lin.length) {
-      let j = i;
-      while (j < lin.length && lin[j].nombre === lin[i].nombre) j++;
-      const n = j - i;
-      if (yy + n * rH > pageH - 30) { doc.addPage(); yy = 20; cab(); }
-      celda(x0, yy, w2[0], n * rH, [lin[i].nombre], true, FSZ);
-      let a = i;
-      while (a < j) {
-        let b2 = a;
-        while (b2 < j && lin[b2].tarea === lin[a].tarea) b2++;
-        celda(x0 + w2[0], yy + (a - i) * rH, w2[1], (b2 - a) * rH, [lin[a].tarea], false, FSZ);
-        a = b2;
+    // pasada 1: ubicar cada grupo (página, columna, y) sin dibujar
+    type P = { pg: number; col: number; y: number; g: [number, number] };
+    const pos: P[] = []; const colsPg: number[] = [0]; const top0 = yy;
+    let pg = 0, col = 0, cy = top0 + 24 + hH2;
+    for (const g of grupos) {
+      const h = (g[1] - g[0]) * rH;
+      if (cy + h > pageH - 30 && cy > (pg === 0 ? top0 : 20) + 24 + hH2) {
+        if (col + 1 < ncol) col++; else { pg++; col = 0; colsPg.push(0); }
+        cy = (pg === 0 ? top0 : 20) + 24 + hH2;
       }
-      for (let q = i; q < j; q++) {
-        let x = x0 + w2[0] + w2[1];
-        const l = lin[q], yq = yy + (q - i) * rH;
-        [l.tanda, l.m3, l.mi, l.rit].forEach((c, z) => { celda(x, yq, w2[z + 2], rH, [c], l.tot, FSZ); x += w2[z + 2]; });
+      colsPg[pg] = Math.max(colsPg[pg], col + 1);
+      pos.push({ pg, col, y: cy, g }); cy += h;
+    }
+    // pasada 2: dibujar, centrando las columnas usadas en cada página
+    for (let p = 0; p < colsPg.length; p++) {
+      if (p > 0) doc.addPage();
+      const ty = p === 0 ? top0 : 20, nc = colsPg[p];
+      const xb = (pageW - nc * tw - (nc - 1) * CG) / 2;
+      titulo("Detalle por tanda — picking y armado", ty + 14);
+      for (let c = 0; c < nc; c++) {
+        let x = xb + c * (tw + CG);
+        hdr2.forEach((l, i) => { celda(x, ty + 24, w2[i], hH2, l, true, HSZ); x += w2[i]; });
       }
-      yy += n * rH;
-      i = j;
+      for (const q0 of pos.filter((o) => o.pg === p)) {
+        const [i, j] = q0.g, n = j - i, x0c = xb + q0.col * (tw + CG), y0 = q0.y;
+        celda(x0c, y0, w2[0], n * rH, [lin[i].nombre], true, FSZ);
+        let a = i;
+        while (a < j) {
+          let b2 = a;
+          while (b2 < j && lin[b2].tarea === lin[a].tarea) b2++;
+          celda(x0c + w2[0], y0 + (a - i) * rH, w2[1], (b2 - a) * rH, [lin[a].tarea], false, FSZ);
+          a = b2;
+        }
+        for (let q = i; q < j; q++) {
+          let x = x0c + w2[0] + w2[1];
+          const l = lin[q], yq = y0 + (q - i) * rH;
+          [l.tanda, l.m3, l.mi, l.rit].forEach((c, z) => { celda(x, yq, w2[z + 2], rH, [c], l.tot, FSZ); x += w2[z + 2]; });
+        }
+      }
     }
   }
   return new Uint8Array(doc.output("arraybuffer") as ArrayBuffer);
