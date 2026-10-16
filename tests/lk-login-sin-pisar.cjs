@@ -37,7 +37,8 @@ chk(cuerpoEntrar.indexOf('modo === "enlace"') >= 0 &&
     "A. entrar(): primero el enlace, el cambio de clave sólo de respaldo");
 const usosUpd = (fnC.match(/updateUserById\(/g) || []).length;
 chk(usosUpd === 1, "A. un solo lugar cambia la clave (entrar), no uno por acción (hay " + usosUpd + ")");
-chk((fnC.match(/entrar\(admin,\s*userId,\s*body\.modo\)/g) || []).length === 2,
+// v31.92 (D75 tanda a) le sumo un 4.º argumento, el metodo ("bridge" / "login_otp") que queda anotado.
+chk((fnC.match(/entrar\(admin,\s*userId,\s*body\.modo\s*[,)]/g) || []).length === 2,
     "A. bridge y verify pasan por entrar() con el modo que pidió el front");
 
 // ── B/C/D/E. el espejo del panel ────────────────────────────────────────────
