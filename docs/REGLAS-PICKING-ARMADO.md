@@ -602,6 +602,16 @@ L = min(pickeado del viejo, entregado del pedido − pickeado del pedido). Idemp
 `sql/gv_stock_liquidacion_v3154.sql` (rollback al pie), centinela v31.54. Al 16/10 el 574 quedó en −1 en terminado:
 se pickearon 3 cajas (F47A, F48N, F97A) contra 2 en F50 — lo resuelve el conteo físico, no el pipeline.
 
+**v31.56 (Luis, 16/10): el código liquidado sale de la lista cuando se FACTURA el último.** *"Cuando se termine de
+facturar el último 574 (sin E, el nacional) quiero que salga de la lista y ahí queda efectivamente como
+discontinuado."* `gv_liquidado_discontinuar()` ya no mira el remito ni exige saldo total 0 (con el −1 fantasma no se
+cumplía nunca): recorre `GV_Pick_Liquidar` activo y, cuando (1) ningún depósito del viejo tiene saldo **> 0** (el
+negativo es conteo, no mercadería), y (2) cada tanda donde se pickeó el viejo está armada y **todas** sus NP con el
+código del pedido tienen `Facturacion_NP.facturado_at`, pasa la fila a `activo = false` y da de alta el viejo en
+`Articulos_Discontinuados` (libera F50 y lo saca de stock y OC). Cron 160 cada 10 min de 8 a 20 ART.
+Al 16/10 espera a F97A (armado + factura) y a las NP de F47A (LK 0263, LK 0285) y F48N (LK 0297).
+`select * from gv_liquidado_discontinuar(true);` simula. `sql/gv_liquidado_discontinuar_v3156.sql`, centinela v31.56.
+
 ## 🗄 RETIRADO — sólo revisar si se pregunta por algo ANTIGUO que no está arriba
 
 > Reglas, versiones y hallazgos que **ya no valen**. Se guardan como historia, no como instrucción.
