@@ -147,7 +147,14 @@ function scPrecio(p) {
   var esL = /^[0-9]+E?L$/.test(cod);
   var codPrecio = SC_CFG.empresa === "CH" && esL ? cod.replace(/L$/, "") : cod;
   var sk = sc.cotiza && sc.cotiza.super_key;
-  if (sk && L[sk] && L[sk][cod]) return L[sk][cod];
+  var propia = SC_CFG.empresa === "CH" && !esL ? "chef" : "lk";
+  if (sk && L[sk] && L[sk][cod]) {
+    var s = L[sk][cod];
+    if (s.uxb) return s;
+    // Precio de super sin UxB propia: la de su empresa (gv_uxb_de), si no 1. Igual que la PPP.
+    var u = L[propia] && L[propia][codPrecio];
+    return { precio_unit: s.precio_unit, uxb: (u && u.uxb) || 1 };
+  }
   if ((SC_CFG.empresa !== "CH" || esL) && L.lk && L.lk[codPrecio]) return L.lk[codPrecio];
   if (SC_CFG.empresa === "CH" && L.chef && L.chef[codPrecio]) return L.chef[codPrecio];
   return null;
@@ -317,7 +324,8 @@ async function scLoadCotiza(cod) {
   var listas = {};
   (d.precios || []).forEach(function (x) {
     var l = (listas[x.lista] = listas[x.lista] || {});
-    l[scNormCod(x.cod)] = { precio_unit: Number(x.precio_unit), uxb: Number(x.uxb) || 1 };
+    // uxb null = el super no tiene UxB propia (se resuelve en scPrecio).
+    l[scNormCod(x.cod)] = { precio_unit: Number(x.precio_unit), uxb: x.uxb == null ? null : Number(x.uxb) || 1 };
   });
   if (!Object.keys(listas).length) throw new Error("Gestión no devolvió listas de precios");
   return { dto_vol: Number(d.dto_vol) || 0, super_key: d.super_key || null, listas: listas };
