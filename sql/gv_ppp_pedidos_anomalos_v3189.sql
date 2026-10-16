@@ -13,6 +13,12 @@
    3. cajas_uxb  — el mismo chequeo que muestra la página al cargar (cajasHintHtml): cajas múltiplo
                    del uxb (uxb > 1). SÓLO CARTEL en la PPP, no se contacta.
 
+   v31.93 (Luis, 16/10, D1-D3):
+   D1 cajas_uxb sólo si el cliente NUNCA pidió tanto de ese artículo (antes: 100 de 476 NP, 21 %).
+   D2 cliente con historial que pide un artículo que nunca compró → regla em (proporcional a su pedido).
+   D3 historial con promedio ≥ 5 cj → anómalo si pide más que ×2 de su pedido más grande de ese artículo
+      (anomalo_hist_max_factor = 2).
+
    Historia de pedidos (igual que gv_isis_estad_pedidos_disruptivos, v26.20): pedidos web
    (lk_pedidos_match, un pedido = order_id o su pedido_origen) y, antes de que existiera la web de
    esa empresa, las facturas de ISIS (una factura = un pedido). Sin cancelados, anulados ni clientes
@@ -39,6 +45,7 @@ insert into public."PPP_Web_Config" (clave, valor, descripcion, actualizado) val
   ('anomalo_hist_factor',      5,  'Pedidos anómalos: anómalo si pide más que promedio × esto (5 = 500 %)', now()),
   ('anomalo_em_factor',        5,  'Pedidos anómalos (cliente con pocos pedidos): peso en el pedido / peso en la Est. Madre (5 = 500 %)', now()),
   ('anomalo_em_piso_cajas',   10,  'Pedidos anómalos (Est. Madre): mínimo de cajas de la línea para marcarla', now()),
+  ('anomalo_hist_max_factor',  2,  'Pedidos anómalos (D3): con promedio ≥ hist_prom_max, anómalo si pide más que su pedido más grande × esto', now()),
   ('anomalo_uxb_activo',       1,  'Pedidos anómalos: 1 = marcar en la PPP las cajas múltiplo del uxb (sólo cartel)', now())
 on conflict (clave) do nothing;
 
@@ -87,6 +94,7 @@ with par as (
          coalesce((select valor from "PPP_Web_Config" where clave='anomalo_hist_min_pedidos'), 3) hmin,
          coalesce((select valor from "PPP_Web_Config" where clave='anomalo_hist_prom_max'), 5)    hprom,
          coalesce((select valor from "PPP_Web_Config" where clave='anomalo_hist_factor'), 5)      hfac,
+         coalesce((select valor from "PPP_Web_Config" where clave='anomalo_hist_max_factor'), 2)  hmaxf,
          coalesce((select valor from "PPP_Web_Config" where clave='anomalo_em_factor'), 5)        efac,
          coalesce((select valor from "PPP_Web_Config" where clave='anomalo_em_piso_cajas'), 10)   episo,
          coalesce((select valor from "PPP_Web_Config" where clave='anomalo_uxb_activo'), 1) = 1   uxb_on),
@@ -150,7 +158,7 @@ np_ as (select o.empresa, o.order_id, count(distinct hp.pedido)::int nped
                       and hp.fecha < o.fped and hp.fecha >= o.fped - interval '12 months'
          group by 1, 2),
 /* historia del artículo para ese cliente */
-na as (select c.empresa, c.order_id, c.np_idx, c.art, count(h.pedido)::int nart, avg(h.cajas) prom
+na as (select c.empresa, c.order_id, c.np_idx, c.art, count(h.pedido)::int nart, avg(h.cajas) prom, max(h.cajas) mx
          from c left join h on h.empresa = c.empresa and h.cli = c.cli and h.cod = c.art
                            and h.fecha < c.fped and h.fecha >= c.fped - interval '12 months'
         group by 1, 2, 3, 4),
@@ -159,7 +167,7 @@ ux as (select regexp_replace(btrim(u.cod), '^0+(?=.)', '') base, max(u.uxb) uxb 
 em0 as (select s.cod, coalesce(nullif(pr.proy_cajas_mes, 0), s.proy_cajas_mes, 0) em
           from stocks_carga_rapida s left join stocks_carga_rapida pr on pr.cod = s.familia_principal),
 y as (
-  select c.*, np_.nped, na.nart, na.prom, ux.uxb, nullif(coalesce(e1.em, e2.em), 0) em
+  select c.*, np_.nped, na.nart, na.prom, na.mx, ux.uxb, nullif(coalesce(e1.em, e2.em), 0) em
     from c
     join np_ on np_.empresa = c.empresa and np_.order_id = c.order_id
     join na on na.empresa = c.empresa and na.order_id = c.order_id and na.np_idx = c.np_idx and na.art = c.art
@@ -183,22 +191,34 @@ select r.empresa, r.order_id, r.np_idx, r.np, gv_ppp_web_np_label(r.empresa, r.n
   from r, par
  where r.nped >= par.hmin and r.nart > 0 and r.prom < par.hprom and r.cajas > r.prom * par.hfac
 union all
+/* D3 (Luis, 16/10): promedio de 5 cj o más → tope = ×2 del pedido más grande que hizo ESE cliente de ESE artículo */
 select r.empresa, r.order_id, r.np_idx, r.np, gv_ppp_web_np_label(r.empresa, r.np), r.cli, r.razon_social, r.fecha_entrega,
-       r.art, r.cajas, 'em', round(r.peso, 2), par.efac, r.nped,
-       format('Pidió %s cj de %s = %s %% del pedido; en la Est. Madre ese artículo pesa %s %% de lo que pidió (%s cj/mes). Desbalance ×%s (tope ×%s). Cliente con %s pedido%s previo%s',
-              r.cajas, r.art, round(100 * r.cajas / r.tot), replace(round(100 * r.em / r.emtot, 1)::text, '.', ','), r.em, replace(round(r.peso, 1)::text, '.', ','), par.efac,
-              r.nped, case when r.nped = 1 then '' else 's' end, case when r.nped = 1 then '' else 's' end),
+       r.art, r.cajas, 'historial'::text, r.mx, r.mx * par.hmaxf, r.nped,
+       format('Pidió %s cj de %s; su pedido más grande de ese artículo fue de %s cj (promedio %s cj, %s pedidos con el artículo). Tope ×%s = %s cj',
+              r.cajas, r.art, replace(round(r.mx, 1)::float8::text, '.', ','), replace(round(r.prom, 1)::text, '.', ','), r.nart, par.hmaxf, replace(round(r.mx * par.hmaxf, 1)::float8::text, '.', ',')),
        true
   from r, par
- where r.nped < par.hmin and r.peso >= par.efac and r.cajas >= par.episo
+ where r.nped >= par.hmin and r.nart > 0 and r.prom >= par.hprom and r.cajas > r.mx * par.hmaxf
+union all
+select r.empresa, r.order_id, r.np_idx, r.np, gv_ppp_web_np_label(r.empresa, r.np), r.cli, r.razon_social, r.fecha_entrega,
+       r.art, r.cajas, 'em', round(r.peso, 2), par.efac, r.nped,
+       format('Pidió %s cj de %s = %s %% del pedido; en la Est. Madre ese artículo pesa %s %% de lo que pidió (%s cj/mes). Desbalance ×%s (tope ×%s). Cliente con %s pedido%s previo%s%s',
+              r.cajas, r.art, round(100 * r.cajas / r.tot), replace(round(100 * r.em / r.emtot, 1)::text, '.', ','), r.em, replace(round(r.peso, 1)::text, '.', ','), par.efac,
+              r.nped, case when r.nped = 1 then '' else 's' end, case when r.nped = 1 then '' else 's' end,
+              case when r.nped >= par.hmin then ', nunca pidió este artículo' else '' end),
+       true
+  from r, par
+ where (r.nped < par.hmin or r.nart = 0) and r.peso >= par.efac and r.cajas >= par.episo   /* D2: artículo nuevo de un cliente con historial */
 union all
 select r.empresa, r.order_id, r.np_idx, r.np, gv_ppp_web_np_label(r.empresa, r.np), r.cli, r.razon_social, r.fecha_entrega,
        r.art, r.cajas, 'cajas_uxb', r.uxb, null::numeric, r.nped,
-       format('Pidió %s cj de %s y la caja trae %s u.: ¿quiso decir %s cj (%s unidades)?',
-              r.cajas, r.art, round(r.uxb), round(r.cajas / r.uxb), r.cajas),
+       format('Pidió %s cj de %s y la caja trae %s u.: ¿quiso decir %s cj (%s unidades)? %s',
+              r.cajas, r.art, round(r.uxb), round(r.cajas / r.uxb), r.cajas,
+              case when r.mx is null then 'Nunca lo pidió.' else 'Su máximo fue ' || replace(round(r.mx, 1)::float8::text, '.', ',') || ' cj.' end),
        false
   from r, par
- where par.uxb_on and r.uxb > 1 and r.cajas >= r.uxb and mod(r.cajas, r.uxb) = 0;
+ where par.uxb_on and r.uxb > 1 and r.cajas >= r.uxb and mod(r.cajas, r.uxb) = 0
+   and coalesce(r.mx, 0) < r.cajas;   /* D1 (Luis, 16/10): sólo si el cliente nunca pidió tanto de ese artículo */
 $function$;
 revoke all on function public.gv_ppp_anomalos_calc(date) from public, anon, authenticated;
 
@@ -320,5 +340,6 @@ select cron.schedule('gv-ppp-anomalos', '8-59/10 * * * *',
 -- 8) centinela: las tres reglas no se pueden perder ------------------------------------------
 insert into "GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version, activo) values
 ('gv_ppp_anomalos_calc','funcion','r\.prom < par\.hprom and r\.cajas > r\.prom \* par\.hfac','pedido anomalo por historial: cliente con 3+ pedidos y promedio del articulo < 5 cj -> anomalo si pide mas que promedio x5 (contactar)','Luis','v31.89',true),
-('gv_ppp_anomalos_calc','funcion','r\.nped < par\.hmin and r\.peso >= par\.efac','pedido anomalo por Est. Madre: cliente con menos de 3 pedidos y desbalance del articulo vs la E.M. >= x5 (contactar)','Luis','v31.89',true),
-('gv_ppp_anomalos_calc','funcion','mod\(r\.cajas, r\.uxb\) = 0','pedido anomalo cajas multiplo del uxb (mismo chequeo que la pagina): solo cartel en la PPP, no se contacta','Luis','v31.89',true);
+('gv_ppp_anomalos_calc','funcion','r\.nped < par\.hmin or r\.nart = 0\) and r\.peso >= par\.efac','pedido anomalo por Est. Madre: cliente con menos de 3 pedidos y desbalance del articulo vs la E.M. >= x5 (contactar)','Luis','v31.89',true),
+('gv_ppp_anomalos_calc','funcion','coalesce\(r\.mx, 0\) < r\.cajas','cajas multiplo del uxb SOLO si el cliente nunca pidio tanto de ese articulo (D1). solo cartel, no se contacta','Luis','v31.93',true),
+('gv_ppp_anomalos_calc','funcion','r\.prom >= par\.hprom and r\.cajas > r\.mx \* par\.hmaxf','pedido anomalo D3: promedio del articulo >= 5 cj -> anomalo si pide mas que x2 de su pedido mas grande de ese articulo (contactar)','Luis','v31.93',true);

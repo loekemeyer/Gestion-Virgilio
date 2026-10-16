@@ -169,15 +169,19 @@ Cada línea de una NP que espera en la PPP (fecha de hoy en adelante o todavía 
 
 | regla | cuándo | qué pasa |
 |---|---|---|
-| **historial** | cliente con **3 o más pedidos** en 12 meses y promedio del artículo **< 5 cj** | anómalo si pide **más que promedio × 5** → **contacta el bot** |
-| **em** | cliente con **menos de 3 pedidos** | peso del artículo en el pedido / peso en la **Est. Madre** (`proy_cajas_mes`, secundario → su principal, dual por empresa) **≥ ×5** y **≥ 10 cj** → **contacta el bot** |
-| **cajas_uxb** | cajas múltiplo del uxb (uxb > 1): el mismo aviso que ve el cliente en la página (`cajasHintHtml`) | **sólo el cartel** en la PPP |
+| **historial** | cliente con **3 o más pedidos** en 12 meses: promedio del artículo **< 5 cj** → tope promedio × 5 · promedio **≥ 5 cj** → tope ×2 de su pedido más grande | pasa el tope → **contacta el bot** |
+| **em** | cliente con **menos de 3 pedidos**, o con historial pidiendo un artículo **que nunca compró** | peso del artículo en el pedido / peso en la **Est. Madre** (`proy_cajas_mes`, secundario → su principal, dual por empresa) **≥ ×5** y **≥ 10 cj** → **contacta el bot** |
+| **cajas_uxb** | cajas múltiplo del uxb (uxb > 1), el aviso de la página (`cajasHintHtml`), **y el cliente nunca pidió tanto** | **sólo el cartel** en la PPP |
 
 - **Historia** = la de los pedidos disruptivos (v26.20): pedidos web y, antes de la web de esa empresa, facturas ISIS
   (una factura = un pedido). Sin cancelados, anulados ni clientes de prueba.
 - **Parámetros en `PPP_Web_Config`** (`anomalo_hist_min_pedidos` 3 · `anomalo_hist_prom_max` 5 · `anomalo_hist_factor` 5 ·
   `anomalo_em_factor` 5 · `anomalo_em_piso_cajas` 10 · `anomalo_uxb_activo` 1): cambiarlos es un `update`, no un deploy.
-- **Literal, a propósito**: con historial, un artículo que el cliente nunca compró o que promedia ≥ 5 cj **no se evalúa**.
+- **D1-D3 (Luis, 16/10, v31.93)**:
+  - **D1** `cajas_uxb` sólo si el cliente **nunca pidió tanto** de ese artículo (su máximo < lo pedido). Bajó de 100 a ~39 NP en 6 semanas.
+  - **D2** cliente con historial que pide un artículo que **nunca compró** → regla `em`, proporcional a su pedido.
+  - **D3** historial con promedio **≥ 5 cj** → anómalo si pide **más que ×2 de su pedido más grande** de ese artículo
+    (`anomalo_hist_max_factor` = 2).
 - **Pantalla**: `⚠ PEDIDOS ANÓMALOS: X` (X = NP del día) a la IZQUIERDA de la fila del día, afuera de la tabla
   (`_pgaAnomGutter`); en el celular, sin margen, queda adentro de la fila. Tocarlo abre NP · artículo · cajas · regla ·
   motivo · «Bot: a contactar» / «Sólo aviso». La NP lleva `⚠ anómalo` (`· bot` si contacta).
