@@ -1,0 +1,15 @@
+-- Camino GP2 -> GV (Luis, 16/10/2026: "De GP2 a GV debería estar ese vínculo también").
+-- Trigger zz_gv_desde_gp2_ajuste (AFTER INSERT en "GP2".movimiento, corre después de trg_movimiento_aplicar):
+-- un movimiento tipo 'ajuste' sobre un depósito «en Virgilio» (ubicacion.tipo='virgilio_sector' o id 57) que NO
+-- sea del espejo ("Espejo Virgilio…") ni de Reactivar baja a public."Movimientos_Stock" como ajuste de insumos
+-- (ref 'GP2 mov <id>'), en la unidad del insumo de Virgilio (Kg / Bolsas×25 / Cajones÷uni_x_cajon / Uni /
+-- Paquetes÷25 / Kg×kg_x_uni). La diferencia se mide contra el espejo (antes − objetivo), así que el espejo
+-- GV->GP2 que dispara ese insert da 'ok': no hay rebote.
+-- Destino con varios códigos de Virgilio por componente: una BAJA sale del de más saldo, una SUBA va al de igual
+-- código que GP2. Los traslados de la tablet ('traslado', 'recepcion_virgilio') NO bajan: la mercadería se recibe
+-- físicamente en GV y se contaría dos veces.
+-- Probado 16/10 en transacción deshecha: N°13 −10 kg en GP2 -> GV 1682 -> 1672; B13 −765 u -> B13 Malas −1 cajón;
+-- +1530 u -> B13 +2 cajones; espejo 'ok'; traslado no baja. Centinela 'v-gp2-a-gv'. Log en GV_GP2_Espejo_Log
+-- (resultado 'GP2->GV: …').
+-- La definición viva es la fuente: select pg_get_functiondef('public.gv_desde_gp2_ajuste()'::regprocedure);
+-- Rollback: alter table "GP2".movimiento disable trigger zz_gv_desde_gp2_ajuste;

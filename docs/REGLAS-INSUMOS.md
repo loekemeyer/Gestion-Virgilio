@@ -488,6 +488,9 @@ al entregar ni «cerrar el círculo» por empresa.**
   `uni_x_cajon = 1` (GP2 muestra **cajones**, la descripción lo dice). Son 27; los importados (337P, CB01, H201Lever)
   quedan afuera porque el espejo no copia importados. Sólo V·EBA entra en `v_nivel_stock` (ubicación 57) con consumo
   y máximo 0: no genera OC.
+- ⚠⚠ **16/10 (Luis): el vínculo es de IDA Y VUELTA.** GV → GP2 es el espejo de siempre; **GP2 → GV**: un **ajuste**
+  hecho en GP2 sobre un depósito «… en Virgilio» baja a GV como ajuste de insumos (`zz_gv_desde_gp2_ajuste`, ref
+  `GP2 mov <id>`). Los traslados de la tablet NO bajan (se reciben físicamente en GV). `sql/gv_desde_gp2_ajuste_v3143.sql`.
 - ⚠⚠ **16/10 (Luis): DiscVnnn es la regla.** Confirmar discontinuo un insumo con stock (Stock General de GP2 →
   Virgilio, botón «Discontinuo» o «sin pareja») crea solo el componente **`DiscV` + 3 dígitos** con la **descripción de
   GV** (`Insumos.nombre`), vinculado: GP2 ve el stock en vivo. Reactivar lo desvincula y lo deja en 0; renombrar en GV
