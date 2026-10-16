@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.84">
+<link rel="stylesheet" href="gv-ui.css?v=31.85">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6509,7 +6509,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.84"></script>
+<script type="module" src="recepcion.js?v=31.85"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10857,7 +10857,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.84";
+const APP_VERSION = "v31.85";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -14779,7 +14779,8 @@ window.pkExcPosVariasOk = pkExcPosVariasOk; window.pkExcPosSkip = pkExcPosSkip;
    Paso art·EXC sin ninguna posición (gv_excedente_posicion lo da con sector NULL: p. ej. un ajuste que
    entró sin ubicación): 1) ¿qué posición dice el cartel? 2) «Andá a P13 — ¿está?». Sí → se pickea ahí y el
    PKC lleva la posición en el 8º campo (trg_gv_exc_pick_pos → GV_Excedente_Ubic_Declarada: desde ahí la
-   vista ubica ese saldo en P13). No está → 0 del excedente (faltante, como «Sin stock»).
+   vista ubica ese saldo en P13). No está → 0 del excedente (faltante, como «Sin stock») y el PKC lleva «-P13»:
+   v31.85 (Luis) sale en la landing del admin junto a los conteos; ✓ da ese excedente por vacío.
    Sin botón para saltear (mismo criterio que D1). sql/gv_excedente_cartel_v3182.sql · tests/pk-excedente-cartel.cjs */
 function pkExcSinPos(it) {
   if (!it || !it.isExc || it.manualExc) return false;
@@ -14788,7 +14789,9 @@ function pkExcSinPos(it) {
 function pkExcCartelCampo(art) {
   if (!_pk || !_pk.excCartel) return "";
   const c = _pk.excCartel[String(art).toUpperCase()];
-  return (c && c.ok === true && c.u) ? String(c.u).replace(/[^A-Z0-9Ñ]/gi, "") : "";
+  if (!c || !c.u || c.ok == null) return "";
+  // v31.85: «No está» viaja como «-P13» → aviso al admin (gv_exc_noesta_pendientes)
+  return (c.ok === false ? "-" : "") + String(c.u).replace(/[^A-Z0-9Ñ]/gi, "");
 }
 function pkExcCartelCardHtml(it, c, nav) {
   const cod = escapeHtml(_padCod(codBase(it.art)));
@@ -65115,7 +65118,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.84"></script>
+<script src="importacion.js?v=31.85"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -65330,23 +65333,70 @@ function showSelector() {
    (contó 50, se pickearon 30 → 20). ✓ = ajusta la góndola (Movimientos_Stock 'ajuste', ref CONTEO PICKING,
    «Stock ajustado por conteo durante picking»); ✕ = rechaza. Los dos sacan la fila. Sin diferencias, no se dibuja. */
 let _cgRows = [];
+/* v31.85 (Luis, 16/10): EXCEDENTE QUE NO ESTABA. En el picking, el excedente sin posición registrada lleva al
+   operario a la posición del cartel; si dice «No está», sale acá, debajo de los conteos (misma lógica: el sistema
+   dice que hay y el operario no lo encuentra). ✓ = gv_exc_noesta_resolver(id, true): ajuste en 'excedente' por el
+   saldo SIN posición del código (ref EXCEDENTE NO ESTA) → queda vacío; ✕ = rechazado, no toca stock.
+   sql/gv_excedente_noesta_v3185.sql · tests/exc-noesta-admin.cjs */
+let _enRows = [], _enErr = false;
+async function enLoad() {
+  const sbx = window.sb;
+  let r;
+  try { r = await sbx.rpc("gv_exc_noesta_pendientes"); } catch (e) { r = { error: e }; }
+  _enErr = !!(r && r.error);
+  _enRows = (!_enErr && r && Array.isArray(r.data)) ? r.data : [];
+}
+async function enResolver(i, vaciar) {
+  const x = _enRows[i]; if (!x) return;
+  const caj = Math.round(Number(x.cajas_sin_pos) || 0);
+  const msg = vaciar
+    ? "Dar por vacío el excedente de " + x.cod + " (" + caj + " cajas sin posición)?\n(queda como «Excedente no encontrado»)"
+    : "Rechazar el aviso de " + x.cod + "? El stock no se toca.";
+  if (!confirm(msg)) return;
+  let r;
+  try { r = await window.sb.rpc("gv_exc_noesta_resolver", { p_id: x.id, p_vaciar: !!vaciar }); } catch (e) { r = { error: e }; }
+  if (r && r.error) { alert("No se pudo: " + (r.error.message || r.error) + "\nNo se tocó nada, probá de nuevo."); return; }
+  if (r && r.data && r.data.ok === false && r.data.motivo !== "ya_resuelto") { alert("No se pudo: " + r.data.motivo); return; }
+  await cgLoad();
+}
+window.enResolver = enResolver;
 async function cgLoad() {
   const box = document.getElementById("cgAside"); if (!box) return;
   const sbx = window.sb;
   if (!sbx || typeof sbx.rpc !== "function") { if (!cgLoad._re) { cgLoad._re = 1; setTimeout(cgLoad, 2500); } return; }
+  try { await enLoad(); } catch (_e) { _enErr = true; _enRows = []; }   // v31.85
   let r;
   try { r = await sbx.rpc("gv_conteo_picking_pendientes"); } catch (e) { r = { error: e }; }
   if (r && r.error) {
     box.style.display = "";
-    box.innerHTML = '<div class="cg-h">Conteos de góndola</div><div class="cg-l3">No se pudieron leer los conteos.</div>';
+    box.innerHTML = '<div class="cg-h">Conteos de góndola</div><div class="cg-l3">No se pudieron leer los conteos.</div>' + enHtml();
     return;
   }
   _cgRows = (r && r.data) || [];
   cgRender();
 }
+function enHtml() {
+  if (_enErr) return '<div class="cg-h" style="margin-top:8px">Excedente que no estaba</div><div class="cg-l3">No se pudieron leer.</div>';
+  if (!_enRows.length) return "";
+  const n = function (v) { return Math.round(Number(v) || 0).toLocaleString("es-AR"); };
+  return '<div class="cg-h" style="margin-top:8px">Excedente que no estaba (' + _enRows.length + ')</div>' +
+    _enRows.map(function (x, i) {
+      const f = x.ts ? new Date(x.ts) : null;
+      const cuando = f ? (String(f.getDate()).padStart(2, "0") + "/" + String(f.getMonth() + 1).padStart(2, "0") + " " + String(f.getHours()).padStart(2, "0") + ":" + String(f.getMinutes()).padStart(2, "0")) : "";
+      return '<div class="cg-it">' +
+        '<div class="cg-l1">' + escapeHtml(_padCod(x.cod || "")) + ' · ' + escapeHtml(x.sector || "—") + '</div>' +
+        '<div class="cg-l2">No estaba · sist. <b>' + n(x.cajas_sin_pos) + '</b> cj sin posición</div>' +
+        '<div class="cg-l3">' + escapeHtml(x.nombre || ("leg. " + (x.legajo || "?"))) + ' · ' + cuando + (x.tanda ? " · " + escapeHtml(x.tanda) : "") + '</div>' +
+        '<div class="cg-btns"><button class="cg-ok" title="Dar el excedente por vacío" onclick="enResolver(' + i + ',true)">✓</button>' +
+        '<button class="cg-no" title="Rechazar (no toca el stock)" onclick="enResolver(' + i + ',false)">✕</button></div>' +
+        '</div>';
+    }).join("");
+}
 function cgRender() {
   const box = document.getElementById("cgAside"); if (!box) return;
-  if (!_cgRows.length) { box.style.display = "none"; box.innerHTML = ""; return; }
+  const en = enHtml();   // v31.85
+  if (!_cgRows.length && !en) { box.style.display = "none"; box.innerHTML = ""; return; }
+  if (!_cgRows.length) { box.style.display = ""; box.innerHTML = en; return; }
   const n = function (v) { return Math.round(Number(v) || 0).toLocaleString("es-AR"); };
   box.style.display = "";
   box.innerHTML = '<div class="cg-h">Conteos de góndola en picking (' + _cgRows.length + ')</div>' +
@@ -65362,7 +65412,7 @@ function cgRender() {
         '<div class="cg-btns"><button class="cg-ok" title="Ajustar la góndola a lo contado" onclick="cgResolver(' + i + ',true)">✓</button>' +
         '<button class="cg-no" title="Rechazar el conteo (no toca el stock)" onclick="cgResolver(' + i + ',false)">✕</button></div>' +
         '</div>';
-    }).join("");
+    }).join("") + en;
 }
 async function cgResolver(i, ajustar) {
   const x = _cgRows[i]; if (!x) return;
@@ -65375,7 +65425,7 @@ async function cgResolver(i, ajustar) {
   try { r = await window.sb.rpc("gv_conteo_picking_resolver", { p_cid: x.client_id, p_ajustar: !!ajustar }); } catch (e) { r = { error: e }; }
   if (r && r.error) { alert("No se pudo: " + (r.error.message || r.error) + "\nNo se tocó nada, probá de nuevo."); return; }
   if (r && r.data && r.data.ok === false && r.data.motivo !== "ya_resuelto") { alert("No se pudo: " + r.data.motivo); return; }
-  cgLoad();
+  await cgLoad();
 }
 window.cgLoad = cgLoad; window.cgResolver = cgResolver;   // los onclick del cuadro viven en el global
 
@@ -68519,15 +68569,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.84"></script>
-<script src="hotsale.js?v=31.84"></script>
-<script src="estadisticas.js?v=31.84"></script>
-<script src="ads.js?v=31.84"></script>
-<script src="plantel.js?v=31.84"></script>
+<script src="cobranzas.js?v=31.85"></script>
+<script src="hotsale.js?v=31.85"></script>
+<script src="estadisticas.js?v=31.85"></script>
+<script src="ads.js?v=31.85"></script>
+<script src="plantel.js?v=31.85"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.84"></script>
+<script src="analisis.js?v=31.85"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.84"></script>
+<script src="ayuda.js?v=31.85"></script>
 
 </body>
 </html>

@@ -119,6 +119,22 @@ excedente (en que gondola dice el cartel que esta y que, cuando llegue ahi, conf
 
 `sql/gv_excedente_cartel_v3182.sql` · `tests/pk-excedente-cartel.cjs` · centinela de `gv_excedente_posicion`.
 
+### v31.85 (Luis, 16/10): «No está» → aviso en la landing del admin; ✓ lo da por vacío
+
+*"Que sale como notificacion en el admin como cuando un conteo difiere con lo que el sistema tiene… Si el admin lo
+aprueba, esa gondola se marca como vacia."*
+
+- El PKC del «No está» lleva `-P13` en el 8º campo → `trg_gv_exc_pick_pos` lo deja `pendiente` en `GV_Excedente_NoEsta`
+  (una fila por tanda + código; si después el operario confirma que sí está, pasa a `anulado`).
+- Sale en el cuadro de conteos de la landing (`#cgAside`), sección «Excedente que no estaba»: código · posición · cajas
+  sin posición. **✓** = `gv_exc_noesta_resolver(id, true)`: ajuste en `excedente` por el saldo **sin posición** del
+  código (ref `EXCEDENTE NO ESTA`, «Excedente no encontrado: … el admin lo da por vacío»); lo que tiene posición
+  registrada no se toca. **✕** = rechazado, no toca stock. Sólo supervisor (`es_supervisor_virgilio`).
+- Probado el 16/10 en transacción abortada: 066 con 3 cajas sin posición → ✓ → quedan P21 79 · P22 52 · P23 56 · P24 48
+  = 235 = stock.
+
+`sql/gv_excedente_noesta_v3185.sql` · `tests/exc-noesta-admin.cjs`.
+
 ## ⚠ REGLA: LAS TABLAS QUE VALEN — góndola, racks y empresa del artículo
 
 **Luis, 2026-09-17:** *"fijate que estés usando las tablas actualizadas de `gv_` y escribí en
