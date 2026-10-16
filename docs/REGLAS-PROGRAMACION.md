@@ -162,6 +162,35 @@ Es el objetivo contra el que se mide cualquier cambio de armado. Textual:
 
 ---
 
+## ⚠ REGLA (Luis, 2026-10-16, v31.89): PEDIDOS ANÓMALOS — cartel en el día de la PPP y contacto por el bot
+
+**Luis:** *"notamos que cada tanto hay un pedido anómalo como el LK0364 que pidió 48 cajas de 525E"* (uxb 24: quiso 2).
+Cada línea de una NP que espera en la PPP (fecha de hoy en adelante o todavía sin fecha) se mide con tres reglas:
+
+| regla | cuándo | qué pasa |
+|---|---|---|
+| **historial** | cliente con **3 o más pedidos** en 12 meses y promedio del artículo **< 5 cj** | anómalo si pide **más que promedio × 5** → **contacta el bot** |
+| **em** | cliente con **menos de 3 pedidos** | peso del artículo en el pedido / peso en la **Est. Madre** (`proy_cajas_mes`, secundario → su principal, dual por empresa) **≥ ×5** y **≥ 10 cj** → **contacta el bot** |
+| **cajas_uxb** | cajas múltiplo del uxb (uxb > 1): el mismo aviso que ve el cliente en la página (`cajasHintHtml`) | **sólo el cartel** en la PPP |
+
+- **Historia** = la de los pedidos disruptivos (v26.20): pedidos web y, antes de la web de esa empresa, facturas ISIS
+  (una factura = un pedido). Sin cancelados, anulados ni clientes de prueba.
+- **Parámetros en `PPP_Web_Config`** (`anomalo_hist_min_pedidos` 3 · `anomalo_hist_prom_max` 5 · `anomalo_hist_factor` 5 ·
+  `anomalo_em_factor` 5 · `anomalo_em_piso_cajas` 10 · `anomalo_uxb_activo` 1): cambiarlos es un `update`, no un deploy.
+- **Literal, a propósito**: con historial, un artículo que el cliente nunca compró o que promedia ≥ 5 cj **no se evalúa**.
+- **Pantalla**: `⚠ PEDIDOS ANÓMALOS: X` (X = NP del día) a la IZQUIERDA de la fila del día, afuera de la tabla
+  (`_pgaAnomGutter`); en el celular, sin margen, queda adentro de la fila. Tocarlo abre NP · artículo · cajas · regla ·
+  motivo · «Bot: a contactar» / «Sólo aviso». La NP lleva `⚠ anómalo` (`· bot` si contacta).
+- **Backend**: `GV_Pedido_Anomalo` (una fila por NP + artículo + regla, RLS sin policies) ← cron **167 `gv-ppp-anomalos`**
+  (`8-59/10`, anti-solape) → `gv_ppp_anomalos_detectar()`. Lo pendiente que deja de dar (pedido corregido) pasa a
+  `sin_efecto` solo. La PPP lee `gv_ppp_anomalos_lista` (supervisor).
+- **Bot** (GestOpClientes, Pablo): `gv_pedido_anomalo_bot_pendientes()` (un renglón por pedido, sólo `contactar`) y
+  `gv_pedido_anomalo_bot_marcar(ids, 'contactado'|'confirmado'|'corregido'|'descartado', nota)`. Manda por `wa_outbox`
+  de LK: la llave `wa_envio_automatico` decide (vasectomía). Hasta que el bot lo lea, el pedido sólo se ve en la PPP.
+- Medido el 16/10 sobre 476 NP (entregas desde el 06/09): historial 18 líneas, em 9, **cajas_uxb 176 líneas en 100 NP (21 %)**.
+- No confundir con `detectar_pedidos_anomalos` de LK (cron 20, por monto en $ → `Alertas_Pedidos_Web`): sigue igual.
+- `sql/gv_ppp_pedidos_anomalos_v3189.sql` · 3 filas en `GV_Reglas_Centinela` · `tests/ppp-anomalos.cjs`.
+
 ## ⚠ REGLA: borrar un pedido = borrarlo de TODOS lados (todos los repos/proyectos)
 
 Cuando el usuario pida **borrar un pedido**, borrarlo de **todos los lugares donde ese pedido

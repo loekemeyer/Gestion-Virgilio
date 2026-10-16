@@ -23,6 +23,8 @@ node() {
   return 0
 }
 
+echo "== ppp-anomalos (v31.89: PEDIDOS ANÓMALOS: X a la izquierda del día, detalle y pastilla de NP) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-anomalos.cjs
 echo "== pk-liquidar-574 / 636 (v31.69: la liquidacion cambia la NP, el picking no se parte) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-liquidar-574.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-liquidar-636.cjs
