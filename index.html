@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.46">
+<link rel="stylesheet" href="gv-ui.css?v=31.48">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6473,7 +6473,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.46"></script>
+<script type="module" src="recepcion.js?v=31.48"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10818,7 +10818,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.46";
+const APP_VERSION = "v31.48";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17176,7 +17176,7 @@ function artNombre(cod, fb) {
 // (artNombre) la saca del mismo lado aunque no haya llamado a loadArtNombres antes.
 setTimeout(function () { try { loadArtNombres(); } catch (_e) {} }, 1500);
 /* v11.39 — MARCA/LÍNEA (LK/CH), fuente ÚNICA: vista Supabase `vista_marca_articulo`
-   (prioridad OC_Maximos.linea → Articulos_Cajas.Marca). El sufijo del propio código
+   (v31.48: = GV_Articulo_Empresa_Cache, o sea gv_empresa_de_articulo; ya no OC_Maximos ni Articulos_Cajas). El sufijo del propio código
    (" LK"/" CH"/" LOKE") manda por encima (código dual empresa-split). Reemplaza las
    cadenas de resolución sueltas que había por pantalla (regla: fuente única). */
 let _artMarcas = null;
@@ -17331,8 +17331,9 @@ async function ocLoadLineas() {
   if (_ocLineas) return _ocLineas;
   const m = {};
   try {
-    (await supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod,linea&activo=eq.true")).forEach(function (x) {
-      const k = _ocgNorm(x.cod), l = String(x.linea == null ? "" : x.linea).toUpperCase().trim();
+    // v31.48 — la línea sale de la fuente única (vista_marca_articulo = gv_empresa_de_articulo), no de OC_Maximos.
+    (await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_marca_articulo", "select=cod,marca")).forEach(function (x) {
+      const k = _ocgNorm(x.cod), l = String(x.marca == null ? "" : x.marca).toUpperCase().trim();
       if (k && l && !m[k]) m[k] = l;
     });
   } catch (_e) {}
@@ -23613,14 +23614,15 @@ async function stkOpenCajasPedidasArt(codEnc) {
      Medido en el 321 el 18/09: pendiente = 2 NP / 3 cajas de ISIS + **13 NP / 194 cajas de
      la web**. El pop-up mostraba las 3 y la columna decía 198. */
   try { base = await fetch(SUPABASE_URL + "/rest/v1/gv_demanda_pedidos?articulo=in.(" + _codCands + ")&select=pedido,cajas,articulo,origen&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
-  const pedByNp = {}, cliByNp = {}, origenByNp = {};
+  const pedByNp = {}, cliByNp = {}, origenByNp = {}, recByNp = {};
   /* `gv_demanda_pedidos` no trae `cliente`, así que el fallback de Razón Social para las NP que
      NO están en ninguna programación (v12.22) se pide aparte, de la base de ISIS. Best-effort:
      si falla, esas filas quedan con "—" como antes de la v12.22. */
   try {
-    const _cli = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos?articulo=in.(" + _codCands + ")&select=pedido,cliente&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    const _cli = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos?articulo=in.(" + _codCands + ")&select=pedido,cliente,fecha&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
     _cli.forEach(function (x) {
       const np = String(x.pedido || "").trim().replace(/\.0+$/, ""); if (!np || cliByNp[np]) return;
+      if (x.fecha && !recByNp[np]) recByNp[np] = String(x.fecha).slice(0, 10);   // v31.48: fecha del pedido (ISIS sin programar)
       const c = String(x.cliente || "").trim(); if (c) cliByNp[np] = c;
     });
   } catch (_e) {}
@@ -23667,8 +23669,8 @@ async function stkOpenCajasPedidasArt(codEnc) {
        (gv_ppp_programacion_diaria, o sea con los overrides ya aplicados, + PPP_Web_Programacion)
        y trae la razón social. Sin esto las NP web salían todas como "⚠ sin programar", que era
        falso: están programadas, sólo que en la otra tabla. */
-    const prog = await fetch(SUPABASE_URL + "/rest/v1/gv_np_prog_info?np=in.(" + nps.map(encodeURIComponent).join(",") + ")&select=np,tanda,razon_social,fecha_entrega&limit=8000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
-    prog.forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !npInfo[np]) npInfo[np] = { tanda: String(x.tanda || "").trim().toUpperCase(), rs: String(x.razon_social || "").trim(), fecha: _stkFmtFechaNP(x.fecha_entrega), fechaIso: String(x.fecha_entrega || "").slice(0, 10) }; });
+    const prog = await fetch(SUPABASE_URL + "/rest/v1/gv_np_prog_info?np=in.(" + nps.map(encodeURIComponent).join(",") + ")&select=np,tanda,razon_social,fecha_entrega,fecha_recep&limit=8000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    prog.forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !npInfo[np]) npInfo[np] = { tanda: String(x.tanda || "").trim().toUpperCase(), rs: String(x.razon_social || "").trim(), fecha: _stkFmtFechaNP(x.fecha_entrega), fechaIso: String(x.fecha_entrega || "").slice(0, 10), recep: String(x.fecha_recep || "").slice(0, 10) }; });
   } catch (_e) {}
   /* v30.21 (13/10, Dorinka F77A) — el ✓ de 📦Pick / 🧾Arm SE LEE EN VIVO, no de _stk.movs.
      _stk.movs es una FOTO que se carga al abrir Stock y NO se refresca por realtime (sólo los
@@ -23705,7 +23707,7 @@ async function stkOpenCajasPedidasArt(codEnc) {
   const round1 = function (n) { return Math.round(n * 10) / 10; };
   nps.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
   const totP = round1(nps.reduce(function (s, np) { return s + pedByNp[np]; }, 0));
-  const rowsArr = nps.map(function (np) { const info = npInfo[np] || {}, t = info.tanda || ""; return { np: np, tanda: t, rs: info.rs || cliByNp[np] || "", fecha: info.fecha || "", fechaIso: info.fechaIso || "", origen: origenByNp[np] || "", sinProg: !npInfo[np], pidio: round1(pedByNp[np]), pickeado: !!(t && pickTandas[t]), separado: !!(t && sepTandas[t]) }; });
+  const rowsArr = nps.map(function (np) { const info = npInfo[np] || {}, t = info.tanda || ""; return { np: np, tanda: t, rs: info.rs || cliByNp[np] || "", fecha: info.fecha || "", fechaIso: info.fechaIso || "", recep: info.recep || recByNp[np] || "", origen: origenByNp[np] || "", sinProg: !npInfo[np], pidio: round1(pedByNp[np]), pickeado: !!(t && pickTandas[t]), separado: !!(t && sepTandas[t]) }; });
   /* v19.65 — ordenado por DÍA DE ENTREGA (las sin fecha al final), que es lo que se mira acá:
      "para qué día están las que quedan". Antes iba por número de NP, que con las web mezcladas
      no dice nada. */
@@ -23730,7 +23732,7 @@ async function stkOpenCajasPedidasArt(codEnc) {
     var spCell = r.separado ? '<span style="color:#1e40af;font-weight:800">✓' + stkSigBadge(stkSigla(sepByTanda[r.tanda]), "#1e40af") + '</span>' : '<span style="color:#94a3b8">—</span>';
     // v19.65 — badge WEB: con las dos fuentes juntas hay que poder ver de dónde viene cada NP.
     var webCell = r.origen === "web" ? ' <span title="Pedido de la página" style="display:inline-block;background:#0369a1;color:#fff;border-radius:4px;padding:0 4px;font-size:11px;font-weight:800;vertical-align:middle">WEB</span>' : '';
-    return '<tr' + (r.sinProg ? ' style="background:#fffbeb"' : '') + '><td class="cp-np"><b>' + escapeHtml(r.np) + '</b>' + (r.sinProg ? ' <span title="En la base de pedidos pero SIN programar en el PPP" style="cursor:help">⚠️</span>' : '') + webCell + (r.tanda ? ' <small style="color:#64748b">' + escapeHtml(r.tanda) + '</small>' : '') + (r.fecha ? '<br><small style="color:#64748b">📅 ' + escapeHtml(r.fecha) + '</small>' : '') + '</td><td class="cp-rs" title="' + escapeHtml(r.rs || "") + '">' + escapeHtml(r.rs || "—") + '</td><td class="num"><b>' + r.pidio + '</b></td><td style="text-align:center">' + pkCell + '</td><td style="text-align:center">' + spCell + '</td></tr>';
+    return '<tr' + (r.sinProg ? ' style="background:#fffbeb"' : '') + '><td class="cp-np"><b>' + escapeHtml(r.np) + '</b>' + (r.sinProg ? ' <span title="En la base de pedidos pero SIN programar en el PPP" style="cursor:help">⚠️</span>' : '') + webCell + (r.tanda ? ' <small style="color:#64748b">' + escapeHtml(r.tanda) + '</small>' : '') + /* v31.48 (Luis): fecha en que se HIZO el pedido, arriba de la de entrega */ (r.recep ? '<br><small style="color:#64748b" title="Fecha en que se hizo el pedido">🛒 Pedido ' + escapeHtml(_stkFmtFechaNP(r.recep)) + '</small>' : '') + (r.fecha ? '<br><small style="color:#64748b" title="Fecha de entrega">📅 Entrega ' + escapeHtml(r.fecha) + '</small>' : '') + '</td><td class="cp-rs" title="' + escapeHtml(r.rs || "") + '">' + escapeHtml(r.rs || "—") + '</td><td class="num"><b>' + r.pidio + '</b></td><td style="text-align:center">' + pkCell + '</td><td style="text-align:center">' + spCell + '</td></tr>';
   }).join("") + '</tbody>';
   h += '<tfoot><tr style="font-weight:800;border-top:2px solid #334155"><td colspan="2">TOTAL (' + nps.length + ' NP)</td><td class="num">' + totP + '</td><td></td><td></td></tr></tfoot></table></div>';
   if (body) body.innerHTML = h;
@@ -23746,9 +23748,9 @@ function stkCajasPedidasExport() {
   let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#92400E;color:#fff;text-align:left;}</style></head><body>';
   html += '<h3>Cajas pedidas — ' + esc(cod) + ' — Producción Virgilio (' + esc(fecha) + ')</h3>';
   // v19.65 — columna Origen (ISIS / WEB): el detalle ahora junta las dos fuentes.
-  html += '<table><tr><th>NP</th><th>Origen</th><th>Tanda</th><th>Fecha</th><th>Razon Social</th><th>Pidio (cajas)</th><th>Pickeado</th><th>Separado</th></tr>';
-  rows.forEach(function (r) { html += '<tr><td>' + esc(r.np) + '</td><td>' + esc(String(r.origen || "").toUpperCase()) + '</td><td>' + esc(r.tanda) + '</td><td>' + esc(r.fecha || "") + '</td><td>' + esc(r.rs) + '</td><td>' + (Number(r.pidio) || 0) + '</td><td>' + (r.pickeado ? "SI" : "no") + '</td><td>' + (r.separado ? "SI" : "no") + '</td></tr>'; });
-  html += '<tr><td><b>TOTAL (' + rows.length + ' NP)</b></td><td></td><td></td><td></td><td></td><td><b>' + (Math.round(total * 10) / 10) + '</b></td><td></td><td></td></tr>';
+  html += '<table><tr><th>NP</th><th>Origen</th><th>Tanda</th><th>Fecha pedido</th><th>Fecha entrega</th><th>Razon Social</th><th>Pidio (cajas)</th><th>Pickeado</th><th>Separado</th></tr>';
+  rows.forEach(function (r) { html += '<tr><td>' + esc(r.np) + '</td><td>' + esc(String(r.origen || "").toUpperCase()) + '</td><td>' + esc(r.tanda) + '</td><td>' + esc(r.recep ? _stkFmtFechaNP(r.recep) : "") + '</td><td>' + esc(r.fecha || "") + '</td><td>' + esc(r.rs) + '</td><td>' + (Number(r.pidio) || 0) + '</td><td>' + (r.pickeado ? "SI" : "no") + '</td><td>' + (r.separado ? "SI" : "no") + '</td></tr>'; });
+  html += '<tr><td><b>TOTAL (' + rows.length + ' NP)</b></td><td></td><td></td><td></td><td></td><td></td><td><b>' + (Math.round(total * 10) / 10) + '</b></td><td></td><td></td></tr>';
   html += '</table></body></html>';
   try {
     const blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
@@ -64573,7 +64575,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.46"></script>
+<script src="importacion.js?v=31.48"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67895,15 +67897,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.46"></script>
-<script src="hotsale.js?v=31.46"></script>
-<script src="estadisticas.js?v=31.46"></script>
-<script src="ads.js?v=31.46"></script>
-<script src="plantel.js?v=31.46"></script>
+<script src="cobranzas.js?v=31.48"></script>
+<script src="hotsale.js?v=31.48"></script>
+<script src="estadisticas.js?v=31.48"></script>
+<script src="ads.js?v=31.48"></script>
+<script src="plantel.js?v=31.48"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.46"></script>
+<script src="analisis.js?v=31.48"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.46"></script>
+<script src="ayuda.js?v=31.48"></script>
 
 </body>
 </html>
