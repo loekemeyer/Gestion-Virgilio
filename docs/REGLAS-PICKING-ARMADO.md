@@ -577,7 +577,43 @@ vacías) · `node tests/arm-mesa-inicio.cjs` (corre la pantalla: el AP con mesa 
 encola AUI, el cuadro que explota **no** traba el asistente) · `node tests/mon-tv.cjs`.
 `sql/gv_armado_mesa_aui_v2990.sql` (rollback al pie).
 
+## 🟥 REGLA (Luis, 2026-10-16, v31.69): «PIDIÓ X → PICKEAR Y» SE HACE CAMBIANDO LA NP — se pickea, arma y factura Y
+
+**Luis:** *"Cuando se carga el pedido en el sistema, se tiene que cargar como Y. Se pickea Y. Se factura Y. Si ves el
+809 por ejemplo, le metió 8 cajas de un pedido de 809E para que pickee nacional … se arma 809, se factura 809E. Esto
+está mal."* Y sobre los primarios/nacionales: *"esto es contra pedido. Una vez hay pedidos que, en teoría,
+comprometen el resto del stock, se cambia a normal"*.
+
+**El armado escribe Entregas con el código de la NP y el Excel ISIS sale de Entregas.** Todo camino que cambie sólo
+el picking (corrArt, PK_LIQUIDAR_EN) factura el código pedido. Por eso ya no existe ninguno:
+
+| regla | antes | desde v31.69 |
+|---|---|---|
+| panel 🔀 Corregir códigos y cupo de sustituto (`Correcciones_Pedido`) | sólo picking | trigger `zz_gv_correccion_cambia_np` cambia la NP web (la de ISIS sigue por el ERP) |
+| liquidación 574E→574, 636E→636, 635E→635 (`GV_Pick_Liquidar`) | `PK_LIQUIDAR_EN` partía el picking | `gv_web_np_liquidar()` (cron `gv-np-liquidar`, `4-59/5 9-23`) cambia la NP |
+| secundario sin stock, 809 nacional | ya cambiaban la NP | igual |
+
+- **Una sola puerta**: `gv_np_cambiar_codigo(empresa, order_id, np_idx, origen, destino, cajas_mover)` escribe
+  `GV_NP_Cambio_Codigo` y la línea de `PPP_Web_Base`. Convierte por UxB (636E de 24 u = 2 cajas de 636 de 12 u;
+  338 de 24 u = 2 cajas de 941E) y puede PARTIR la línea (574: 1 + 574E: 14, con `cajas_resto`). No toca NP armada
+  ni facturada.
+- **Contra pedido**: la liquidación asigna el viejo sólo hasta lo que queda (góndola + excedente) menos lo que ya
+  piden NP sin pickear; cubierto eso, las NP nuevas quedan como vinieron. Sólo tandas sin empezar ni pickear.
+- **La Edge Function `gv-ppp-web-tandas-diarias` v47** respeta `cajas_resto` al rearmar la foto (antes pasaba la
+  línea entera aunque el cambio fuera parcial; afectaba también al resto del sec-auto v28.59).
+- `gv_stock_liquidacion_imputar`: L = min(pickeado del viejo − **entregado del viejo**, …): lo que el armado ya dice
+  con el código viejo no se imputa de nuevo. `gv_liquidado_discontinuar`: la NP puede llevar el viejo o el pedido.
+- `PK_LIQUIDAR_EN` queda vacío **a propósito**; `PK_LIQ_PARES` sólo lo usa Completar pedido (v31.64).
+- Corregido el 16/10 (backup `zz_backups."GV_Backup_NPSust_*_20261016"`): **CH 0063** (F48M, armada) 809E→809 en NP y
+  Entregas · **LK 0438** (F97A) 574: 1 + 574E: 14 · **LK 0347** (F48Q) 338: 1 → 941E: 2.
+- Ya facturadas con el código cambiado (quedan como están): LK 0285, LK 0263 (F47A) y LK 0297 (F48N), 1 caja de 574
+  cada tanda facturada como 574E; LK 0291, LK 0307, LK 0327 (panel: se pickeó 945E/941E y se facturó 332/338).
+- `select * from gv_web_np_liquidar(true);` simula. `sql/gv_np_sustituto_v3162.sql` (los marcadores de la base dicen `v31.62-…`: llave, no cambiar), `tests/pk-liquidar-574.cjs`,
+  `tests/pk-liquidar-636.cjs`.
+
 ## REGLA (Luis, 2026-10-14, v30.29): LIQUIDAR un código viejo dentro del picking de su reemplazo
+
+> ⚠ **v31.69: la liquidación ya NO se hace en el picking** — ver la regla de arriba. Lo de abajo es cómo era.
 
 `PK_LIQUIDAR_EN` (index.html): `"574E" → 574 LK, F50`. Mientras el 574 tenga saldo terminado > 0
 (`vista_saldos_stock`), el picking que pida 574E levanta primero las cajas del 574 (paso propio, su
@@ -653,6 +689,8 @@ El 634E (no existe) se apagó a mano en `products` de Chef. `sql/gv_pick_liquida
 - v26.67: «el puntaje 1-10 de picking sigue sin las tandas frenadas». Retirado en la v26.74 (D17).
 
 ## ⚠ REGLA (Luis, 2026-10-13, v30.24): CUPO DE SUSTITUTO — las próximas 9 cajas de 809E de Chef se pickean del 809 nacional
+
+> ⚠ **v31.69**: la corrección del cupo ahora CAMBIA LA NP (trigger `zz_gv_correccion_cambia_np`). «La NP y la factura siguen en 809E» era el error: CH 0063 se facturaba 809E con 809 pickeado.
 
 **Luis:** *"las próximas 9 cajas que entren de pedidos para la 809E de chef manden al que pickea a pickear esas 9 de 809 nacional"*.
 

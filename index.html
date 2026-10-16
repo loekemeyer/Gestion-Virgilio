@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.69">
+<link rel="stylesheet" href="gv-ui.css?v=31.70">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6498,7 +6498,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.69"></script>
+<script type="module" src="recepcion.js?v=31.70"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10843,7 +10843,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.69";
+const APP_VERSION = "v31.70";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13481,11 +13481,17 @@ const PICK_UBIC_DUAL = {
    v31.54: el par va TAMBIÉN en la tabla GV_Pick_Liquidar (Supabase): con ella
    gv_stock_liquidacion_imputar (cron 68) imputa en el stock el viejo al código del
    pedido después del armado; sin la fila, el armado devuelve el viejo a góndola. */
-const PK_LIQUIDAR_EN = {
-  "574E": { cod: "574", emp: "LK", sector: "F50", nota: "Corta Queso nacional — se liquida" },
-  // v31.60 (Luis, 16/10): 636E / 635E de Chef se pickean del nacional hasta liquidarlo.
-  "636E": { cod: "636", emp: "CH", sector: "M36", nota: "Espátula Calada nacional — se liquida" },
-  "635E": { cod: "635", emp: "CH", sector: "M35", nota: "Espátula Lisa nacional — se liquida" }
+/* v31.69 (Luis, 16/10): VACÃO A PROPÃSITO. "PidiÃ³ X â pickear Y" ya no se resuelve en el picking:
+   pickeaba 574 y la NP seguÃ­a en 574E, asÃ­ que el armado y la factura salÃ­an con el cÃ³digo pedido.
+   Ahora gv_web_np_liquidar (cron gv-np-liquidar) CAMBIA LA NP (GV_NP_Cambio_Codigo) y el picking pide
+   el viejo porque la NP lo dice. Los pares siguen en GV_Pick_Liquidar. No volver a llenar este mapa. */
+const PK_LIQUIDAR_EN = {};
+/* Los pares de la liquidaciÃ³n (los mismos que GV_Pick_Liquidar). SÃ³lo los usa Completar pedido
+   (pkLiqPedidoDe, v31.64): un faltante del viejo se completa con el cÃ³digo del pedido. */
+const PK_LIQ_PARES = {
+  "574E": { cod: "574", emp: "LK" },
+  "636E": { cod: "636", emp: "CH" },
+  "635E": { cod: "635", emp: "CH" }
 };
 function pkNpEsLoeke(np) { return empresaDeNp(np) === "LK"; }
 /* Dado el código dual (ya resuelto por equivalencia) y las NPs de la tanda, suma cuántas
@@ -32394,8 +32400,8 @@ async function cpLoadFaltantes() {
 function pkLiqPedidoDe(cod, np) {
   try {
     const c = codBase(String(cod || "")).toUpperCase();
-    for (const ped of Object.keys(PK_LIQUIDAR_EN)) {
-      const v = PK_LIQUIDAR_EN[ped];
+    for (const ped of Object.keys(PK_LIQ_PARES)) {
+      const v = PK_LIQ_PARES[ped];
       if (v.cod === c && (!np || empresaDeNp(np) === v.emp)) return ped;
     }
   } catch (_e) {}
@@ -64849,7 +64855,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.69"></script>
+<script src="importacion.js?v=31.70"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -68171,15 +68177,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.69"></script>
-<script src="hotsale.js?v=31.69"></script>
-<script src="estadisticas.js?v=31.69"></script>
-<script src="ads.js?v=31.69"></script>
-<script src="plantel.js?v=31.69"></script>
+<script src="cobranzas.js?v=31.70"></script>
+<script src="hotsale.js?v=31.70"></script>
+<script src="estadisticas.js?v=31.70"></script>
+<script src="ads.js?v=31.70"></script>
+<script src="plantel.js?v=31.70"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.69"></script>
+<script src="analisis.js?v=31.70"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.69"></script>
+<script src="ayuda.js?v=31.70"></script>
 
 </body>
 </html>

@@ -737,13 +737,16 @@ async function procesarEmpresa(
   // pedido de la página sigue diciendo el secundario: sin esto cada corrida lo volvía a poner
   // y el podado sacaba el principal. Si la tabla no se puede leer NO se escribe la foto
   // ("no pude leer" no es "no hay cambios": escribirla igual deshace los cambios hechos).
-  const cambio = new Map<string, { dest: string; factor: number }>();
-  const rCam = await vg(`/rest/v1/GV_NP_Cambio_Codigo?select=order_id,np_idx,cod_origen,cod_destino,factor` +
+  // v47 (v31.62, Luis 16/10): el cambio puede ser PARCIAL (liquidar el 574: 1 caja de 574 + el resto de
+  // 574E). cajas_resto = cajas del origen que quedan como estaban; sin mirarlo se pasaba la línea entera.
+  const cambio = new Map<string, { dest: string; factor: number; corig: number; resto: number | null }>();
+  const rCam = await vg(`/rest/v1/GV_NP_Cambio_Codigo?select=order_id,np_idx,cod_origen,cod_destino,factor,cajas_origen,cajas_resto` +
     `&empresa=eq.${emp}&limit=20000`);
   if (rCam.ok) {
-    for (const c of await rCam.json() as { order_id: number; np_idx: number; cod_origen: string; cod_destino: string; factor: number }[]) {
+    for (const c of await rCam.json() as { order_id: number; np_idx: number; cod_origen: string; cod_destino: string; factor: number; cajas_origen: number | null; cajas_resto: number | null }[]) {
       cambio.set(`${c.order_id}|${c.np_idx}|${String(c.cod_origen ?? "").trim().toUpperCase()}`,
-        { dest: String(c.cod_destino ?? "").trim(), factor: Number(c.factor) || 1 });
+        { dest: String(c.cod_destino ?? "").trim(), factor: Number(c.factor) || 1,
+          corig: Number(c.cajas_origen) || 0, resto: c.cajas_resto == null ? null : Number(c.cajas_resto) || 0 });
     }
   } else if (rCam.status !== 404) {
     throw new Error(`GV_NP_Cambio_Codigo: HTTP ${rCam.status} — no se reescribió la foto de picking ` +
@@ -765,7 +768,14 @@ async function procesarEmpresa(
       // en Chef el trigger sin_l_chef guarda algunos códigos sin la L: se prueba también así
       const cm = cambio.get(`${k}|${up}`) ??
         (emp === "chef" ? cambio.get(`${k}|${up.replace(/([0-9E])L$/, "$1")}`) : undefined);
-      if (cm && cm.dest) { a = cm.dest; cj = cj * cm.factor; }
+      if (cm && cm.dest && cm.resto != null && cm.resto > 0) {
+        // parcial: pasan (cajas_origen − resto) cajas del origen, como mucho lo que hoy trae el pedido
+        const mov = Math.min(cj, Math.max(0, cm.corig - cm.resto));
+        const d = Math.round(mov * cm.factor * 1000) / 1000;
+        if (d > 0) porArt[cm.dest] = (porArt[cm.dest] ?? 0) + d;
+        cj = cj - mov;
+        if (cj <= 0) continue;
+      } else if (cm && cm.dest) { a = cm.dest; cj = cj * cm.factor; }
       porArt[a] = (porArt[a] ?? 0) + cj;
     }
     for (const a of Object.keys(porArt).sort()) {
