@@ -18,6 +18,7 @@ CREATE OR REPLACE VIEW public.vista_control_remitos AS
         ), ccn_raw AS (
          SELECT split_part("Registros_Produccion_Virgilio".texto, '|'::text, 1) AS np_raw,
             upper(TRIM(BOTH FROM COALESCE(split_part("Registros_Produccion_Virgilio".texto, '|'::text, 2), ''::text))) AS tanda,
+            NULLIF(btrim(split_part("Registros_Produccion_Virgilio".texto, '|'::text, 3)), ''::text) AS camionero,   -- v31.33: fletero, 3er campo del CCN
             "Registros_Produccion_Virgilio".ts_cliente,
             row_number() OVER (PARTITION BY (TRIM(BOTH FROM split_part("Registros_Produccion_Virgilio".texto, '|'::text, 1))) ORDER BY "Registros_Produccion_Virgilio".ts_cliente) AS rn_first,
             row_number() OVER (PARTITION BY (TRIM(BOTH FROM split_part("Registros_Produccion_Virgilio".texto, '|'::text, 1))) ORDER BY "Registros_Produccion_Virgilio".ts_cliente DESC) AS rn_last
@@ -47,7 +48,8 @@ CREATE OR REPLACE VIEW public.vista_control_remitos AS
                 END) AS tanda,
             -- v25.95-ciclo: la carga vigente es la primera DESPUÉS de la última vuelta (FSS)
             min(ccn_raw.ts_cliente) FILTER (WHERE ccn_raw.ts_cliente > COALESCE(fp.fss_prev, '-infinity'::timestamp with time zone)) AS first_load,
-            max(ccn_raw.ts_cliente) AS last_ccn
+            max(ccn_raw.ts_cliente) AS last_ccn,
+            max(ccn_raw.camionero) FILTER (WHERE ccn_raw.rn_last = 1) AS fletero   -- v31.33: el fletero de la última carga
            FROM ccn_raw
              LEFT JOIN fss_prev fp ON fp.np = regexp_replace(TRIM(BOTH FROM ccn_raw.np_raw), '\.0+$'::text, ''::text)
           GROUP BY (regexp_replace(TRIM(BOTH FROM ccn_raw.np_raw), '\.0+$'::text, ''::text))
@@ -98,7 +100,8 @@ CREATE OR REPLACE VIEW public.vista_control_remitos AS
     COALESCE(pm.rs, em.rs, ''::text) AS rs,
     EXTRACT(epoch FROM now() - c.first_load) > (30 * 3600)::numeric AS vencido,
     t.clase,
-    cj.cajas
+    cj.cajas,
+    c.fletero
    FROM ccn c
      LEFT JOIN tal t ON t.np = c.np
      LEFT JOIN crn ON crn.np = c.np

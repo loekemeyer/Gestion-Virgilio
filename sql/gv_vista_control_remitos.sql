@@ -23,7 +23,8 @@ with (security_invoker = true) as
     v.vencido,
     v.clase,
     v.cajas,
-    rm.remito
+    rm.remito,
+    v.fletero
    FROM vista_control_remitos v
      LEFT JOIN LATERAL ( SELECT btrim(COALESCE(p.cod_cliente, ''::text)) AS cod_cliente,
             COALESCE(p.razon_social, ''::text) AS razon_social
