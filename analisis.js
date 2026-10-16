@@ -446,7 +446,7 @@ function _anTablaHtml(L) {
       '<td style="color:' + td.col + ';font-weight:800">' + td.txt + '</td><td></td><td></td></tr></tfoot>';
   } else { h += '</tbody>'; }
   h += '</table></div>' +
-    '<div style="font-size:12px;color:var(--gv-ink-2);margin-top:6px;line-height:1.35">El «Real» de cada código es desde que confirmó el anterior (incluye la caminata, no descuenta pausas), así que este total NO cierra con el «real» de la fase, que sí resta pausas y huecos y suma la cola.</div>' +
+    '<div style="font-size:var(--gv-fs-sm);color:var(--gv-ink-2);margin-top:6px;line-height:1.35">El «Real» de cada código es desde que confirmó el anterior (incluye la caminata, no descuenta pausas), así que este total NO cierra con el «real» de la fase, que sí resta pausas y huecos y suma la cola.</div>' +
     '</details>';
   return h;
 }
