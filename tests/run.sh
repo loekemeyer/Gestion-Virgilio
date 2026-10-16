@@ -78,6 +78,8 @@ node tests/toggle-anular.cjs
 node tests/botonera-tm-historial.cjs
 node tests/alerta-inactivo.cjs
 node tests/noprod-cancelacion.cjs
+echo "== cp-liquidado-574 (v31.64: Completar pedido completa con 574E el faltante del 574 liquidado) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cp-liquidado-574.cjs
 
 _resumen() {
   echo ""

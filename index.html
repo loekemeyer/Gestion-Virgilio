@@ -32350,7 +32350,21 @@ async function cpLoadFaltantes() {
     if (rc.ok) (await rc.json()).forEach(function (x) { canSet[String(x.np || "").trim().toUpperCase()] = 1; });
   } catch (_e) {}
   return rows.filter(function (e) { return Number(e.cajas_falto) > 0 && !facSet[String(e.np).trim()] && !_entregaAnulada(e) && !canSet[String(e.np).trim().toUpperCase()]; })
-    .map(function (e) { e._cod_orig = e.cod_art; e.cod_art = codEmpSplit(corrArt(e.cod_art, e.np, corrMap), e.np); return e; });
+    .map(function (e) { e._cod_orig = e.cod_art; e.cod_art = codEmpSplit(pkLiqPedidoDe(corrArt(e.cod_art, e.np, corrMap), e.np), e.np); return e; });
+}
+/* v31.64 (Luis, 16/10): un faltante del código LIQUIDADO (574) se completa con el código
+   del pedido (574E): el 574 se terminó y queda discontinuado. Hoy el armado ya guarda el
+   faltante sobre la línea 574E (faltMap pela la E), así que esto es la red por si llega
+   una fila con el código viejo. Sólo cambia la empresa del par (574 de LK). */
+function pkLiqPedidoDe(cod, np) {
+  try {
+    const c = codBase(String(cod || "")).toUpperCase();
+    for (const ped of Object.keys(PK_LIQUIDAR_EN)) {
+      const v = PK_LIQUIDAR_EN[ped];
+      if (v.cod === c && (!np || empresaDeNp(np) === v.emp)) return ped;
+    }
+  } catch (_e) {}
+  return cod;
 }
 /* Tandas PICKEADAS con faltantes pero SIN armar todavía (no tienen filas en
    Entregas_Virgilio) → sus faltantes aún NO llegaron al CP. Se listan como aviso
