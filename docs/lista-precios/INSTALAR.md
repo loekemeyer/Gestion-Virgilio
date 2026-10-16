@@ -54,8 +54,11 @@ La foto que hay hoy en la base (07/09) se armó distinto; comparar contra ella m
 
 ## Actualizar a v32.09 (libro entero, 16/10)
 
-Desde v32.09 la macro sube **todas las hojas** al guardar (cualquier hoja tocada), no sólo la Lista de
-Precios. La base ya está lista (`sql/gp2_planilla_todas_hojas_v3209.sql`, aplicado el 16/10).
+Desde v32.09/v32.10 la macro sube **todas las hojas** al guardar (cualquier hoja tocada), no sólo la Lista
+de Precios: la Lista siempre, y de las demás **sólo las que cambiaron** desde el último envío (el primer
+guardado después de abrir el Excel manda las 62, ~24 MB, partidas en envíos de 700 KB). Lo que hay que
+consultar es `"GP2".v_planilla_actual` (última versión de cada hoja). La base ya está lista
+(`sql/gp2_planilla_todas_hojas_v3209.sql`, aplicado el 16/10).
 
 1. Alt+F11 → abrir el módulo de la macro (en el Excel del server se llama **Módulo1**).
 2. **Anotar aparte la línea `Private Const LP_TOKEN ...`** (el token no está en el repo).

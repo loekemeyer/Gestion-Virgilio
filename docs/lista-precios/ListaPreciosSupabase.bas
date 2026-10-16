@@ -30,8 +30,9 @@ Private Const TANDA_MAX As Long = 700000             ' caracteres por envio de l
 ' -----------------------------------------------------------------------------
 
 Private mTocada As Boolean
+Private mUltimo As Object     ' hoja -> JSON enviado la ultima vez (mientras el Excel esta abierto)
 
-' Llamar desde ThisWorkbook.Workbook_SheetChange (cualquier hoja marca: se sube el libro entero)
+' Llamar desde ThisWorkbook.Workbook_SheetChange (cualquier hoja marca; se suben las hojas que cambiaron)
 Public Sub LPMarcarHoja(ByVal Sh As Object)
     mTocada = True
 End Sub
@@ -107,34 +108,75 @@ fallo:
     LPSubir = "Error: " & Err.Description
 End Function
 
-' ---- todas las hojas menos la Lista de Precios, en tandas de TANDA_MAX caracteres ----
+' ---- las demas hojas que CAMBIARON desde el ultimo envio (la 1ra vez que se abre el Excel: todas).
+'      Chicas: juntas en tandas de TANDA_MAX. Grandes: partidas por filas (la 1ra parte reemplaza,
+'      las siguientes agregan). La base guarda solo lo que llega; GP2.v_planilla_actual arma el libro.
 Private Function SubirOtrasHojas(ByVal snap As String) As String
-    Dim ws As Worksheet, j As String, tanda As String, nH As Long, nE As Long, r As String
+    Dim ws As Worksheet, filas() As String, k As Long, j As String, nom As String
+    Dim tanda As String, enTanda As New Collection, jsTanda As New Collection
+    Dim parte As String, primera As Boolean, i As Long
+    Dim nH As Long, nE As Long, r As String, cambia As Boolean
+    If mUltimo Is Nothing Then Set mUltimo = CreateObject("Scripting.Dictionary")
+
     For Each ws In ThisWorkbook.Worksheets
         If ws.Name <> HOJA Then
-            j = HojaJson(ws)
-            If Len(j) > 0 Then
+            k = HojaFilas(ws, filas)
+            If k > 0 Then j = "[" & Join(filas, ",") & "]" Else j = "[]"
+            nom = ws.Name
+            cambia = True
+            If mUltimo.Exists(nom) Then cambia = (mUltimo(nom) <> j)
+        Else
+            cambia = False
+        End If
+        If cambia Then
+            nH = nH + 1
+            If Len(j) <= TANDA_MAX Then
                 If Len(tanda) > 0 And Len(tanda) + Len(j) > TANDA_MAX Then
-                    r = PostHojas(snap, tanda)
+                    r = PostHojas(snap, tanda, True)
                     If r <> "" Then SubirOtrasHojas = r: Exit Function
+                    Recordar enTanda, jsTanda
                     tanda = "": nE = nE + 1
                 End If
                 If Len(tanda) > 0 Then tanda = tanda & ","
-                tanda = tanda & """" & JsonEsc(ws.Name) & """:" & j
-                nH = nH + 1
+                tanda = tanda & """" & JsonEsc(nom) & """:" & j
+                enTanda.Add nom: jsTanda.Add j
+            Else
+                parte = "": primera = True
+                For i = 1 To k
+                    If Len(parte) > 0 And Len(parte) + Len(filas(i)) > TANDA_MAX Then
+                        r = PostHojas(snap, """" & JsonEsc(nom) & """:[" & parte & "]", primera)
+                        If r <> "" Then SubirOtrasHojas = r: Exit Function
+                        nE = nE + 1: parte = "": primera = False
+                    End If
+                    If Len(parte) > 0 Then parte = parte & ","
+                    parte = parte & filas(i)
+                Next i
+                If Len(parte) > 0 Then
+                    r = PostHojas(snap, """" & JsonEsc(nom) & """:[" & parte & "]", primera)
+                    If r <> "" Then SubirOtrasHojas = r: Exit Function
+                    nE = nE + 1
+                End If
+                mUltimo(nom) = j
             End If
         End If
     Next ws
     If Len(tanda) > 0 Then
-        r = PostHojas(snap, tanda)
+        r = PostHojas(snap, tanda, True)
         If r <> "" Then SubirOtrasHojas = r: Exit Function
+        Recordar enTanda, jsTanda
         nE = nE + 1
     End If
-    SubirOtrasHojas = "OK " & nH & " hojas en " & nE & " envios"
+    SubirOtrasHojas = "OK " & nH & " hojas cambiadas en " & nE & " envios"
 End Function
 
+Private Sub Recordar(enTanda As Collection, jsTanda As Collection)
+    Dim i As Long
+    For i = 1 To enTanda.Count: mUltimo(enTanda(i)) = jsTanda(i): Next i
+    For i = enTanda.Count To 1 Step -1: enTanda.Remove i: jsTanda.Remove i: Next i
+End Sub
+
 ' ---- un envio a planilla_hojas_cargar; devuelve "" si salio bien ----
-Private Function PostHojas(ByVal snap As String, ByVal hojasJson As String) As String
+Private Function PostHojas(ByVal snap As String, ByVal hojasJson As String, ByVal reemplazar As Boolean) As String
     On Error GoTo fallo
     Dim http As Object, resp As String
     Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
@@ -144,7 +186,9 @@ Private Function PostHojas(ByVal snap As String, ByVal hojasJson As String) As S
     http.setRequestHeader "Authorization", "Bearer " & SUPA_KEY
     http.setRequestHeader "Content-Type", "application/json"
     http.setRequestHeader "Content-Profile", "GP2"
-    http.send "{""p_snapshot_id"":" & snap & ",""p_token"":""" & LP_TOKEN & """,""p_filas"":{" & hojasJson & "}}"
+    http.send "{""p_snapshot_id"":" & snap & ",""p_token"":""" & LP_TOKEN & """" & _
+              ",""p_reemplazar"":" & IIf(reemplazar, "true", "false") & _
+              ",""p_filas"":{" & hojasJson & "}}"
     resp = http.responseText
     If http.Status = 200 And InStr(resp, """ok"": true") + InStr(resp, """ok"":true") > 0 Then
         PostHojas = ""
@@ -156,8 +200,9 @@ fallo:
     PostHojas = "Error: " & Err.Description
 End Function
 
-' ---- una hoja cualquiera: [[fila,{valores},null,{formulas}], ...] hasta la ultima celda con algo ----
-Private Function HojaJson(ws As Worksheet) As String
+' ---- una hoja cualquiera: filas() = "[fila,{valores},null,{formulas}]" hasta la ultima celda con algo.
+'      Devuelve cuantas filas con datos hay (0 = hoja vacia).
+Private Function HojaFilas(ws As Worksheet, filas() As String) As Long
     Dim ultF As Range, ultC As Range, rng As Range
     Set ultF = ws.Cells.Find("*", , xlFormulas, , xlByRows, xlPrevious)
     If ultF Is Nothing Then Exit Function
@@ -174,7 +219,7 @@ Private Function HojaJson(ws As Worksheet) As String
 
     Dim nF As Long, nC As Long, r As Long, c As Long, k As Long
     nF = UBound(v2, 1): nC = UBound(v2, 2)
-    Dim filas() As String, celdas() As String, forms() As String
+    Dim celdas() As String, forms() As String
     Dim nCel As Long, nFor As Long, col As String, txt As String, f As String
     ReDim filas(1 To nF): ReDim celdas(1 To nC): ReDim forms(1 To nC)
 
@@ -205,7 +250,7 @@ Private Function HojaJson(ws As Worksheet) As String
     Next r
     If k = 0 Then Exit Function
     ReDim Preserve filas(1 To k)
-    HojaJson = "[" & Join(filas, ",") & "]"
+    HojaFilas = k
 End Function
 
 ' ---- valor de celda: fechas en ISO, numeros con PUNTO, el resto como texto ----
