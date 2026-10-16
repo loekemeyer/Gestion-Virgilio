@@ -131,8 +131,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const html = stkBodyStocks();
     const fila = (html.match(/<tr[^>]*>(?:(?!<\/tr>)[\s\S])*stk-cod[\s\S]*?<\/tr>/) || [""])[0];
     out.filaHay = fila.indexOf("100") >= 0;
-    out.pedidasGuion = /background:#fffbeb;color:#92400e">—<\/td>/.test(fila);
-    out.sinCeldaVacia = !/background:#fffbeb;color:#92400e"><\/td>/.test(fila);
+    // (Luis, 16/10) la celda en — ahora es tocable (abre el Histórico): lleva onclick/title, se mide el «—» de la celda ámbar
+    out.pedidasGuion = /background:#fffbeb;color:#92400e"[^>]*>—<\/td>/.test(fila);
+    out.sinCeldaVacia = !/background:#fffbeb;color:#92400e"[^>]*><\/td>/.test(fila);
     return out;
   });
 

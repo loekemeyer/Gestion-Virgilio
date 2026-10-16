@@ -52,12 +52,20 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.falto = /color:#b91c1c[^>]*>4</.test(h);
     out.total = h.indexOf("TOTAL (2 NP)") >= 0 && h.indexOf(">11<") >= 0 && h.indexOf(">7<") >= 0;
     out.volverHoy = (stkCajasPedTab("hoy"), hoy.style.display !== "none" && hist.style.display === "none");
+    // (Luis, 16/10) celda en «—» (sin pendiente): abre directo en Histórico
+    const fetch0 = window.fetch;
+    window.fetch = function (url) { url = String(url); if (url.indexOf("gv_demanda_pedidos") >= 0) return J([]); return fetch0(url); };
+    await stkOpenCajasPedidasArt(encodeURIComponent("982E LK"), "hist");
+    const hist2 = document.getElementById("stkCpHist");
+    for (let i = 0; i < 40 && !hist2.dataset.ok; i++) await new Promise(function (res) { setTimeout(res, 50); });
+    out.abreHistSinPend = hist2.style.display !== "none" && document.getElementById("stkCpHoy").style.display === "none" && hist2.innerHTML.indexOf("LK 0166") >= 0;
+    window.fetch = fetch0;
     // sup:<mail> → Admin
     const chip = _stkQuienChip({ legajo: "sup:loekemeyer.n8n@gmail.com", tipo: "ajuste" });
     out.admin = chip.indexOf(">Admin<") >= 0 && chip.indexOf("@gmail.com</") < 0 && chip.indexOf("sup:") < 0;
     return out;
   });
-  const pass = r.tabs && r.abreHoy && r.visible && r.urlSinAnuladas && r.filas === 4 && r.dedupe && r.empresa && r.orden && r.rs && r.fechaPedido && r.falto && r.total && r.volverHoy && r.admin && errs.length === 0;
+  const pass = r.tabs && r.abreHoy && r.visible && r.urlSinAnuladas && r.filas === 4 && r.dedupe && r.empresa && r.orden && r.rs && r.fechaPedido && r.falto && r.total && r.volverHoy && r.admin && r.abreHistSinPend && errs.length === 0;
   console.log("cajped-historico:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();

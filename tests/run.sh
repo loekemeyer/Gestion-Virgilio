@@ -512,6 +512,8 @@ echo "== cajped-historico (Luis 16/10: Cajas pedidas con pestañas Hoy / Histór
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cajped-historico.cjs
 echo "== stk-tabla-ancho-contenido (Luis 16/10: tablas de Stock y Compras al ancho del dato, headers centrados, dato 14 px) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-tabla-ancho-contenido.cjs
+echo "== falt-grilla-gvui (Luis 16/10, D1: Faltantes x día con GV-UI §5 — dato 14+, encabezados centrados, sticky medido) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/falt-grilla-gvui.cjs
 
 echo "== TODO OK =="
 

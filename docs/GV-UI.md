@@ -242,6 +242,12 @@ tabla ancha `.mva-tbl.wide` queda con sus anchos fijos** (`<colgroup>` medido, `
 y la regla v24.32 de `docs/REGLAS-IMPORTACION.md`): sólo cambió el encabezado (12 → 13 px, #334155, centrado); su letra
 de 15 px no escala, porque las columnas están medidas en px para ese tamaño.
 
+**Y a la grilla Faltantes x día** (`.falt-tbl`, Luis 16/10, «D1 sí»): dato `clamp(14px, 0.85vw, 17px)`, encabezados
+centrados `clamp(13px, 0.72vw, 15px)`, sin 📅 🖨 🔎 ⇄ ⏳ 🔮 (queda 🔴 = faltó al armar, que es estado y tiene su
+leyenda), pie en una línea. **El sticky de la 2.ª fila de encabezados ya no supone 17 px**: `_faltStickyFix()` mide
+el alto real de la 1.ª fila (la de la «S» de súper) después de dibujar y en cada `resize`. Lo sostiene
+`tests/falt-grilla-gvui.cjs`.
+
 **Botones que son sólo ícono (📦 📥 ✏️ ⚙): QUEDAN — decisión cerrada** (Luis, 16/10/2026: *"esos dejalos"*). No se
 proponen pasar a texto ni se marcan como hallazgo en un pase de diseño.
 

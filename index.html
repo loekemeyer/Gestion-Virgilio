@@ -5988,6 +5988,27 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   border-radius:6px; font-size:11px; font-weight:700; color:#3b82f6; cursor:pointer; }
 .falt-sim-bar button:hover { background:#dbeafe; }
 .falt-foot { margin-top:6px; font-size:11px; color:#94a3b8; }
+/* (Luis, 16/10/2026, «D1 sí» — docs/GV-UI.md §5) Faltantes x día: dato >= 14 px que escala con la pantalla,
+   encabezados centrados y oscuros, sin la letra de 9-12 px. Va acá abajo para pisar lo de arriba.
+   La 2.ª fila de encabezados (días) ya no depende de un top fijo: _faltStickyFix() la pega midiendo el alto
+   real de la 1.ª fila (el top:17px de arriba queda de respaldo). La 1.ª fila (la «S» de súper) conserva su
+   alto fijo de 17 px, así que el tamaño de letra no la mueve. */
+.falt-tbl { font-size:clamp(14px,0.85vw,17px); }
+.falt-tbl th { font-size:clamp(13px,0.72vw,15px); color:#fff; }
+.falt-tbl th.falt-cod, .falt-tbl th.falt-desc, .falt-tbl th.falt-fab { text-align:center; }
+.falt-tbl thead tr:first-child th.falt-dia { font-size:12px; }
+.falt-tbl td.falt-fab { font-size:inherit; color:#4b5563; }
+.falt-tbl td.falt-desc { max-width:clamp(170px,11vw,240px); }
+.falt-tbl td.falt-fab { max-width:clamp(110px,8vw,150px); }
+.falt-tbl th.falt-dia, .falt-tbl td.falt-cell, .falt-tbl td.num { padding-left:5px; padding-right:5px; }
+.falt-tbl .falt-real { display:block; font-size:12px; font-weight:800; color:#b91c1c; line-height:1.1; }
+.falt-tbl td.falt-crit .falt-real { color:#fff; }
+.falt-fbtn { font-size:clamp(13px,0.75vw,15px); color:#334155; }
+.falt-search { font-size:14px; }
+.falt-sum-i { font-size:14px; }
+.falt-sum-i b { font-size:16px; }
+.falt-sim-bar { font-size:14px; }
+.falt-foot { font-size:14px; color:#475569; }
 
 /* v21.97 pop-up de dia ocupado */
 #aprDoOv{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:16px}
@@ -21745,7 +21766,7 @@ function stkBodyStocks() {
       else _famTag = ' <span title="SECUNDARIO — no deben entrar pedidos acá. El principal es ' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '." style="color:#1e40af;font-size:10px;font-weight:800;">⇄' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '</span>';
     }
     const _proy = _proyOf(a.cod);
-    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>' + '<td class="num stk-pick-cell" style="background:#faf5ff;color:' + (_proy > 0.05 ? '#6d28d9' : '#c4b5fd') + ';cursor:pointer" onclick="event.stopPropagation();stkShowProyVentas(\'' + encodeURIComponent(a.cod) + '\',' + (Math.round((_proy || 0) * 100) / 100) + ')" title="Tocá para ver de dónde surge (ventas facturadas de los últimos 6 meses)">' + (_proy > 0.05 ? Math.round(_proy) : '—') + '</td>' + '<td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="' + escapeHtml(_stkPedTitle(_pn, _ped)) + '"><b>' + fmtCajas(_pn ? _pn.tot : _ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e">—</td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
+    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>' + '<td class="num stk-pick-cell" style="background:#faf5ff;color:' + (_proy > 0.05 ? '#6d28d9' : '#c4b5fd') + ';cursor:pointer" onclick="event.stopPropagation();stkShowProyVentas(\'' + encodeURIComponent(a.cod) + '\',' + (Math.round((_proy || 0) * 100) / 100) + ')" title="Tocá para ver de dónde surge (ventas facturadas de los últimos 6 meses)">' + (_proy > 0.05 ? Math.round(_proy) : '—') + '</td>' + '<td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="' + escapeHtml(_stkPedTitle(_pn, _ped)) + '"><b>' + fmtCajas(_pn ? _pn.tot : _ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : /* (Luis, 16/10) sin pendiente igual se abre: va directo a la pestaña Histórico */ '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\',\'hist\')" title="Sin pedidos pendientes. Tocá para ver el histórico">—</td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
     cols.forEach(function (c) {
       const v = (c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0));
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
@@ -23610,7 +23631,7 @@ function _stkArtCands(codB) {
   out.slice().forEach(function (c) { push(c + "L"); });
   return out;
 }
-async function stkOpenCajasPedidasArt(codEnc) {
+async function stkOpenCajasPedidasArt(codEnc, tab) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc), codN = _stkNormCod(codBase(cod));
   // v8.89: desconcatenación — buscar por código base en la base de picking y filtrar por marca
@@ -23624,6 +23645,7 @@ async function stkOpenCajasPedidasArt(codEnc) {
   const _cpShell = document.getElementById("stkPopBody") || null;
   if (_cpShell) _cpShell.innerHTML = '<div class="stkpop-filters" style="justify-content:center;margin-bottom:12px"><button class="stkpop-fb on" id="stkCpTabHoy" style="font-size:clamp(14px,1vw,18px);padding:7px 18px" onclick="stkCajasPedTab(\'hoy\')">Hoy</button><button class="stkpop-fb" id="stkCpTabHist" style="font-size:clamp(14px,1vw,18px);padding:7px 18px" onclick="stkCajasPedTab(\'hist\')">Histórico</button></div><div id="stkCpHoy"></div><div id="stkCpHist" style="display:none"></div>';
   _stkCpCtx = null;
+  if (tab === "hist") stkCajasPedTab("hist");   // celda en —: abre en el Histórico (se carga cuando está el contexto)
   const body = document.getElementById("stkCpHoy") || document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando pedidos…</div>';
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   let base = [];
@@ -24828,12 +24850,12 @@ function stkBodyFaltante() {
     '<span class="falt-sum-i"><b style="color:#b91c1c;">' + sumNQ + '</b> en quiebre esta sem</span>' +
     '<span class="falt-sum-i"><b>' + sumCajS1 + '</b> cajas faltan (S1)</span>' +
     '<span class="falt-sum-i"><b>' + sumNQ2 + '</b> quiebre próx sem</span>' +
-    (sumCambio > 0 ? '<span class="falt-sum-i" style="color:#1e40af;">⇄ <b style="color:#1e40af;">' + sumCambio + '</b> con cambio NP</span>' : '') +
-    ((F.enCurso || 0) > 0 ? '<span class="falt-sum-i" style="color:#1e40af;" title="Tandas que se están pickeando ahora (empezaron pero no cerraron). Su faltante se confirma al terminar el picking.">⏳ <b style="color:#1e40af;">' + F.enCurso + '</b> en picking</span>' : '') +
+    (sumCambio > 0 ? '<span class="falt-sum-i" style="color:#1e40af;"><b style="color:#1e40af;">' + sumCambio + '</b> con cambio NP</span>' : '') +
+    ((F.enCurso || 0) > 0 ? '<span class="falt-sum-i" style="color:#1e40af;" title="Tandas que se están pickeando ahora (empezaron pero no cerraron). Su faltante se confirma al terminar el picking."><b style="color:#1e40af;">' + F.enCurso + '</b> en picking</span>' : '') +
     '</div>';
   // Barra de simulación si hay NPs con cantidad ajustada
   if (nExcl > 0) {
-    h += '<div class="falt-sim-bar">🔮 Simulación: ' + nExcl + ' NP' + (nExcl > 1 ? "s" : "") +
+    h += '<div class="falt-sim-bar">Simulación: ' + nExcl + ' NP' + (nExcl > 1 ? "s" : "") +
       ' con cantidad ajustada ' +
       '<button onclick="stkFaltResetSim()">Limpiar</button></div>';
   }
@@ -24843,10 +24865,10 @@ function stkBodyFaltante() {
     '<button class="falt-fbtn' + (F.soloQuiebre ? " on" : "") + '" onclick="stkFaltSoloQuiebre()" title="Mostrar solo los artículos que tienen faltante">' + (F.soloQuiebre ? "☑" : "☐") + ' Solo quiebre</button>' +
     (F.colFiltro ? '<button class="falt-fbtn on" onclick="stkFaltColFiltro(\'' + F.colFiltro + '\')" title="Viendo solo la columna. Tocá para quitar el filtro (o tocá otro header para cambiarlo).">✕ Filtro: ' + escapeHtml(_faltColLabel(F.colFiltro)) + '</button>' : '') +
     '<button class="falt-fbtn' + (F.sinE ? " on" : "") + '" onclick="stkFaltSinE()" title="Ocultar códigos importados (E) que no tienen equivalente nacional para reponer. Mantiene los 94xE y las familias con nacional (574E/590E/809E CH/etc.).">' + (F.sinE ? "☑" : "☐") + ' Sin E</button>' +
-    '<button class="falt-fbtn' + (F.verDias ? " on" : "") + '" onclick="stkFaltVerDias()" title="Mostrar el detalle día por día (agrega las columnas de cada día — puede necesitar scroll lateral).">' + (F.verDias ? "☑" : "☐") + ' 📅 Ver días</button>' +
-    '<button class="falt-fbtn" onclick="stkFaltImprimir()" title="Imprimir el módulo tal como está filtrado (reporte para el gerente). Abajo aclara qué NO se está mostrando.">🖨 Imprimir</button>' +
+    '<button class="falt-fbtn' + (F.verDias ? " on" : "") + '" onclick="stkFaltVerDias()" title="Mostrar el detalle día por día (agrega las columnas de cada día — puede necesitar scroll lateral).">' + (F.verDias ? "☑" : "☐") + ' Ver días</button>' +
+    '<button class="falt-fbtn" onclick="stkFaltImprimir()" title="Imprimir el módulo tal como está filtrado (reporte para el gerente). Abajo aclara qué NO se está mostrando.">Imprimir</button>' +
     '</div>' +
-    '<input class="falt-search" type="text" inputmode="numeric" enterkeyhint="search" autocomplete="off" placeholder="🔎 Buscar código" value="' +
+    '<input class="falt-search" type="text" inputmode="numeric" enterkeyhint="search" autocomplete="off" placeholder="Buscar código" value="' +
     escapeHtml(F.search || "") + '" oninput="stkFaltSearch(this.value)">' +
     '</div>';
   // v8.36 — cartel de ayuda quitado (pedido del usuario)
@@ -24923,7 +24945,7 @@ function stkBodyFaltante() {
     // v8.38 — columna "Sin fecha": faltante de pedidos sin fecha PPP / pasada (clickeable)
     var _sf = a.faltSinFecha || 0;
     var _sfReal = Math.round(_rw.sinfecha || 0);   // v9.46 — faltó al armar con salida ya pasada
-    var _sfBadge = _sfReal > 0 ? '<span style="display:block;font-size:9px;font-weight:800;color:#b91c1c;line-height:1.1;" title="Faltó al armar (real): ' + _sfReal + ' caja(s) con salida ya pasada.">🔴' + _sfReal + '</span>' : '';
+    var _sfBadge = _sfReal > 0 ? '<span class="falt-real" title="Faltó al armar (real): ' + _sfReal + ' caja(s) con salida ya pasada.">🔴' + _sfReal + '</span>' : '';
     var _sfCls = _sf === 0 ? "falt-ok" : _sf <= 10 ? "falt-warn" : _sf <= 50 ? "falt-bad" : "falt-crit";
     h += (_sf > 0 || _sfReal > 0)
       ? '<td class="num falt-cell ' + _sfCls + '" style="font-weight:800;cursor:pointer;" onclick="stkFaltDrillSinF(\'' + a.key + '\',event)" title="' + _sf + ' cajas de pedidos SIN fecha PPP (o con fecha pasada) que el stock no alcanza a cubrir. Tocá para ver las NPs.">' + (_sf > 0 ? _sf : "—") + _sfBadge + '</td>'
@@ -24964,7 +24986,8 @@ function stkBodyFaltante() {
   });
 
   h += '</tbody></table></div>';
-  h += '<div class="falt-foot">' + arts.length + ' artículos con demanda. Stock = stock TOTAL (todos los depósitos). Total Pedidos = todas las cajas pedidas hasta facturar. Falt S1/S2/Resto = proyección (solo lo aún sin pickear) + lo que faltó al armar (🔴).</div>';
+  h += '<div class="falt-foot">' + arts.length + ' artículos con demanda</div>';
+  setTimeout(_faltStickyFix, 0);   // (Luis 16/10) pega la fila de días debajo de la de la «S», midiendo
   return h;
 }
 /* v9.85 — texto de lo que el filtro actual DEJA AFUERA (observación para el reporte impreso). */
@@ -25055,7 +25078,7 @@ function _faltCelda(falt, esSem, cod, fecha, esPrimer, winKey, real) {
   if (esPrimer) cls += " falt-primer";
   var titAttr = esPrimer ? ' title="Primer día de quiebre"' : '';
   // v9.44 — realFalt (faltó al armar) del día: badge roja debajo del número de proyección.
-  var realBadge = realN > 0 ? '<span style="display:block;font-size:9px;font-weight:800;color:#b91c1c;line-height:1.1;" title="Faltó al armar (real): ' + realN + ' caja(s) que salen cortas este día. Ya está armado — no es proyección.">🔴' + realN + '</span>' : '';
+  var realBadge = realN > 0 ? '<span class="falt-real" title="Faltó al armar (real): ' + realN + ' caja(s) que salen cortas este día. Ya está armado — no es proyección.">🔴' + realN + '</span>' : '';
   return '<td class="' + cls + '"' + (esSem ? ' style="font-weight:800"' : '') + titAttr + click + '>' + (v > 0 ? v : "—") + realBadge + '</td>';
 }
 function stkFaltSoloQuiebre() {
@@ -25077,13 +25100,25 @@ function _faltColVal(a, key) {
 function _faltColLabel(key) {
   return key === "s1" ? "Falt S1" : key === "s2" ? "Falt S2" : key === "resto" ? "Resto" : key === "sinfecha" ? "Sin fecha" : key;
 }
+/* (Luis, 16/10/2026) — la 2.ª fila del encabezado (días) va sticky DEBAJO de la 1.ª: el top se mide en vez de
+   suponer 17 px, así un cambio de letra o una celda con rowspan más alta no la deja tapando la «S». */
+function _faltStickyFix() {
+  try {
+    document.querySelectorAll(".falt-tbl").forEach(function (t) {
+      var r = t.tHead && t.tHead.rows; if (!r || r.length < 2) return;
+      var h = r[0].getBoundingClientRect().height; if (!(h > 0)) return;
+      for (var k = 0; k < r[1].cells.length; k++) r[1].cells[k].style.top = h + "px";
+    });
+  } catch (_e) {}
+}
+try { window.addEventListener("resize", function () { _faltStickyFix(); }); } catch (_e) {}
 function _faltSemTh(F, rs, key, label, tip) {
   var on = F.colFiltro === key;
-  return '<th class="falt-sem"' + rs + ' style="cursor:pointer;' + (on ? 'background:#bfdbfe;color:#1e3a8a;' : '') + '" onclick="stkFaltColFiltro(\'' + key + '\')" title="Tocá para ver SOLO ' + tip + '">' + label + (on ? ' 🔎' : '') + '</th>';
+  return '<th class="falt-sem"' + rs + ' style="cursor:pointer;' + (on ? 'background:#bfdbfe;color:#1e3a8a;' : '') + '" onclick="stkFaltColFiltro(\'' + key + '\')" title="Tocá para ver SOLO ' + tip + '">' + label + (on ? ' ✓' : '') + '</th>';
 }
 function _faltDiaTh(F, d, hoy, sub) {
   var esHoy = d === hoy, on = F.colFiltro === d;
-  return '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" style="cursor:pointer;' + (on ? 'background:#bfdbfe;color:#1e3a8a;' : '') + '" onclick="stkFaltColFiltro(\'' + d + '\')" title="' + d + (sub || "") + ' — tocá para ver solo este día">' + _faltDiaSem(d) + '<br>' + _faltFechaCorta(d) + (on ? ' 🔎' : '') + '</th>';
+  return '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" style="cursor:pointer;' + (on ? 'background:#bfdbfe;color:#1e3a8a;' : '') + '" onclick="stkFaltColFiltro(\'' + d + '\')" title="' + d + (sub || "") + ' — tocá para ver solo este día">' + _faltDiaSem(d) + '<br>' + _faltFechaCorta(d) + (on ? ' ✓' : '') + '</th>';
 }
 function stkFaltColFiltro(key) {
   if (!_stk || !_stk.falt) return;
