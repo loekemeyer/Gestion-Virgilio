@@ -316,6 +316,13 @@ escribir codigo nuevo con la clave legacy.**
 > 2. **Supabase con instrucciones destructivas** (`delete` / `drop` / `truncate`, aun dentro del cuerpo de una función):
 >    la herramienta avisa *"Destructive statements may require the user to confirm"*. Se esquiva con
 >    `execute replace($s$…QQB…$s$, 'QQB', 'DE'||'LETE')` y `create or replace trigger` en vez de `drop` + `create`.
+> 3. **Un `;` DENTRO DE UN TEXTO en un `update`** (medido 16/10/2026, cierre de tarea de Planify): la llamada **no
+>    muestra cartel, se cuelga 60 s** y vuelve `MCP server "Supabase" tool "execute_sql" timed out after 60s`, sin
+>    tocar nada. La base no tiene la culpa: el mismo `update` corre en 1,8 ms en `explain analyze`. Mismo texto sin
+>    el `;` → corre en el acto. Un `select` con `;` adentro de un literal (ej. `cerrar_problema(p_correccion=>'a; b')`)
+>    no se cuelga. [Probable] el connector parte el SQL por `;` para decidir si pide confirmación y el pedazo cortado
+>    queda como "pedir confirmación", que en la sesión remota nadie ve. **Regla: en notas de Planify y cualquier
+>    texto de un `update`, separar con ` · ` en vez de `;`** (o `chr(59)` si el `;` tiene que quedar).
 >
 > Lo de abajo es la historia del 18/09, cuando el connector sí venía en `always_ask`.
 

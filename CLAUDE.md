@@ -108,7 +108,8 @@ Preferencias del dueño (Elías, 28/09/2026). El porqué y la historia de cada p
   al usuario que los apruebe ni que los ponga en Always allow**. El cartel sólo sale por (a) el guardián de reglas
   protegidas (`claude-reglas-guard.cjs`, a propósito) o (b) Supabase cuando el texto trae `delete` / `drop` /
   `truncate`: armarlo con `execute replace($s$…QQB…$s$, 'QQB', 'DE'||'LETE')` y usar `create or replace trigger` en vez
-  de `drop` + `create`. Detalle y cómo medirlo: `docs/REGLAS-SUPABASE.md`.
+  de `drop` + `create`. ⚠ **Un `;` dentro de un texto en un `update` (ej. la nota de Planify) cuelga la llamada 60 s
+  sin cartel** (16/10): separar con ` · `. Detalle y cómo medirlo: `docs/REGLAS-SUPABASE.md`.
 - ⚠⚠ **Excepción Chef** (`nkhzocgdpwtgrmwleihr`): no está en el connector y no se conecta. El SQL se le pasa a Luis
   completo en el chat y después se le pide el `select` de verificación.
 
