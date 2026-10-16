@@ -219,3 +219,54 @@ select cron.alter_job(55, command := 'REFRESH MATERIALIZED VIEW CONCURRENTLY vis
 
 `sql/gv_refresh_stock_si_cambio_v2105.sql`, `tests/stock-refresh-si-cambio.cjs`, §3.mi.
 
+
+## ⚠⚠ REGLA (Luis, 2026-10-16, v31.62): Stocks EN VIVO — nada vuelve atrás, las pedidas sólo si cambió, realtime para el supervisor
+
+**Luis:** *"arregla el cron, dale"* · *"el tema es evitar que se llegue a timeout porque tenga que ver tablas
+completas, si se puede hacer que solo busque cambios, golazo"* · *"si la tabla se ve en realtime, aun mejor"*.
+
+**Lo que se midió** (16/10, ajuste de conteo del 936E de 11 a 12 cajas en góndola):
+
+| qué | cómo estaba | por qué |
+|---|---|---|
+| realtime de la pantalla | **no le llegaba a nadie logueado** | `stocks_carga_rapida` tenía SELECT sólo para `anon`; el supervisor escucha con `authenticated` (count = 0) |
+| saldos | volvían atrás hasta 2 min (936E 12 → 11 → 12) | el cron 57 copiaba la matview sin refrescarla, pisando lo que el trigger ya había dejado bien |
+| saldos de madrugada | viejos de 2:00 a 7:59 | el 55 no corre en esa franja y el 57 sí |
+| cajas pedidas | ≤ 2 min | sólo viajaban por la matview |
+| neto del tooltip | **lo de cuando se abrió Stocks** | `gv_stock_pedidas_neto` (0:01) se leía una vez |
+| cada pasada del refresco | reescribía las 396 filas, y `fc_sin_salida` a 0 y de vuelta | ~800 eventos de realtime por pasada, una vez prendido |
+
+**Lo que se hizo** (`sql/gv_stock_vivo_v3162.sql`, `tests/stock-vivo-v3162.cjs`):
+
+1. **Política `auth_read_stocks_carga_rapida`** (SELECT para `authenticated`). `anon` ya leía todo: no abre nada.
+2. **`refresh_stocks_carga_rapida` no pisa lo movido**: un código con un movimiento `creado` después del último
+   refresco de la matview (`GV_Stock_Refresh_Estado.refrescado_en`) conserva lo del trigger. Probado en
+   transacción abortada: +1 al 936E → trigger 13, matview 12, refresco nuevo deja **13** (el viejo dejaba 12).
+3. **Escribe sólo las filas que cambian** (`IS DISTINCT FROM` en los dos UPDATE). Medido: sin cambios reales,
+   **0 filas** escritas, 0,23 s.
+4. **Pedidas "sólo si cambió"**: secuencia `gv_stock_pedidas_sucio_seq` (nextval no bloquea a nadie) que suben
+   triggers `zz_gv_pedvivo*` en las 11 tablas de pedidos/tandas/cierres y en `Registros_Produccion_Virgilio`
+   (sólo **TP y EP**: 151 tandas con PKC en 30 días, ninguna sin EP; 11 TP+EP por día contra 103 PKC).
+   `PPP_Web_Base` se reescribe entera por sync (6,3 M updates): su UPDATE dispara sólo si cambia
+   `np_label / articulo / cajas`. El job **`gv-stock-pedidas-vivo` (cada 30 s)** lee la secuencia: igual →
+   sale en **0,005 s**; distinta → calcula `gv_stock_pedidas_neto` (0:01) y escribe en `stocks_carga_rapida`
+   `cajas_pedidas` + las columnas `ped_*` **sólo de las filas que cambiaron**. Piso: 10 min. Lock 5768 con TRY.
+5. **`cajas_pedidas` es del job mientras esté sano** (`GV_Stock_Pedidas_Estado.calculado_en` < 15 min); si se
+   cae, el refresco vuelve a copiarla de la matview (fail-open).
+6. **Importación** (`gv_importados_stock_dep`) lee las pedidas de `stocks_carga_rapida`: el mismo número y el
+   mismo atraso que Stocks.
+7. **Pantalla**: el UPDATE de realtime parchea la celda y el tooltip (`_stkPedNetoEntrada`) y redibuja **una vez
+   por ráfaga** (600 ms). Si la carga trae `ped_vivo_en`, no se lee la vista del neto; el merge con la matview no
+   pisa las pedidas vivas.
+
+⚠ **La secuencia se arranca UNA vez** (`select nextval(...)`): recién creada, el primer `nextval` deja
+`last_value` en 1 y el job no ve el cambio. Pasó al probarlo.
+
+**Chequeo:**
+```sql
+select * from public."GV_Stock_Pedidas_Estado";        -- calculado_en reciente, saltos subiendo
+select public.gv_stock_pedidas_vivo(true);               -- forzar un cálculo
+```
+**Rollback:** `select cron.unschedule('gv-stock-pedidas-vivo');` y reponer las definiciones de
+`zz_backups."GV_Backup_funcdef_20261016_stockvivo"` (la tabla antes del cambio:
+`zz_backups."GV_Backup_stocks_carga_rapida_20261016"`).

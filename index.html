@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.61">
+<link rel="stylesheet" href="gv-ui.css?v=31.62">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6477,7 +6477,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.61"></script>
+<script type="module" src="recepcion.js?v=31.62"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10822,7 +10822,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.61";
+const APP_VERSION = "v31.62";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17392,7 +17392,7 @@ async function openStockAdmin(soloConteo) {
 
   try {
     // v10.41: Cargar stocks_carga_rapida primero (fast) y renderizar instant
-    var saldosRapido = (_stk && _stk.viewRows && _stk.viewRows.length > 0) ? _stk.viewRows : await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock,fc_sin_salida").catch(function(){ return []; });
+    var saldosRapido = (_stk && _stk.viewRows && _stk.viewRows.length > 0) ? _stk.viewRows : await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock,fc_sin_salida,ped_neto,ped_con_tp,ped_en_curso,ped_familia,ped_es_secundario,ped_fam_con_tp,ped_fam_en_curso,ped_fam_miembros,ped_vivo_en").catch(function(){ return []; });
 
     // v10.41: Inicializar _stk con stocks_carga_rapida para renderizar instant
     var _demFromView_Rápido = {};
@@ -17414,7 +17414,12 @@ async function openStockAdmin(soloConteo) {
        así la tabla se dibuja ya con el total (lo de siempre) y se redibuja cuando llega. Si la
        lectura falla o tarda, la pantalla queda como la v24.03 — no hay ningún await de por medio
        que la pueda colgar (regla v19.44). */
-    stkFetchPedidasNeto().then(function (_m) {
+    /* v31.62 (Luis, 16/10) — el neto viaja en la MISMA fila de stocks_carga_rapida (job
+       gv_stock_pedidas_vivo, ≤ 30 s, y por realtime): si la carga ya lo trae, la lectura de la
+       vista (≈ 0:01) sobra. Sin el dato (job caído o tabla vieja) se lee la vista como siempre. */
+    var _pnFila = _stkPedNetoDeFilas(saldosRapido);
+    if (_pnFila) _stk.pedNeto = _pnFila;
+    (_pnFila ? Promise.resolve(null) : stkFetchPedidasNeto()).then(function (_m) {
       if (!_m || !_stk) return;
       _stk.pedNeto = _m;
       try { stkRender(); } catch (_e) {}
@@ -17480,7 +17485,8 @@ async function openStockAdmin(soloConteo) {
       (_stk.viewRows || []).forEach(function (r) {
         var vr = _vistaMap[_ocgNorm(r.cod)];
         if (vr) {
-          r.cajas_pedidas = vr.cajas_pedidas;
+          // v31.62 — con ped_vivo_en la fila trae las pedidas del job (≤ 30 s): la matview es MÁS vieja
+          if (r.ped_vivo_en == null) r.cajas_pedidas = vr.cajas_pedidas;
           r.proy_cajas_mes = vr.proy_cajas_mes;
           r.capacidad_gondola = vr.capacidad_gondola;
           // v19.77 - NO pisar la descripcion: stocks_carga_rapida ya la resuelve con
@@ -17492,6 +17498,12 @@ async function openStockAdmin(soloConteo) {
           if (vr.descripcion && !r.descripcion) r.descripcion = vr.descripcion;
           if (vr.linea) r.linea = vr.linea;
         }
+      });
+      // v31.62 — y el mapa de demanda sale de esas mismas filas vivas, no de la matview
+      (_stk.viewRows || []).forEach(function (r) {
+        if (r.ped_vivo_en == null) return;
+        var k = _ocgNorm(r.cod); if (!k) return;
+        if (Number(r.cajas_pedidas) > 0) _stk.dem[k] = Number(r.cajas_pedidas); else delete _stk.dem[k];
       });
       _stk.alertas = res[13] || [];
       _stk.conteosUI.pendientes = res[14] || [];
@@ -17555,9 +17567,16 @@ function stkSubscribeRealtime() {
             else delete _stk.dem[codN];
             if (Number(nw.proy_cajas_mes) > 0) _stk.proy[codN] = Number(nw.proy_cajas_mes);
             else delete _stk.proy[codN];
+            // v31.62 — el neto del tooltip viaja en la misma fila (job gv_stock_pedidas_vivo)
+            if (nw.ped_vivo_en != null) {
+              if (!_stk.pedNeto) _stk.pedNeto = {};
+              var _pe = _stkPedNetoEntrada(nw);
+              if (_pe) _stk.pedNeto[codN] = _pe; else delete _stk.pedNeto[codN];
+            }
           }
-          updateStkBadge();
-          stkRender();
+          // v31.62 — un job escribe varias filas juntas: un solo redibujo por ráfaga (como los movs)
+          if (_stkMovsRenderT) clearTimeout(_stkMovsRenderT);
+          _stkMovsRenderT = setTimeout(function () { _stkMovsRenderT = null; if (_stk) { try { updateStkBadge(); stkRender(); } catch (_e) {} } }, 600);
         })
       /* v30.25 — mantener _stk.movs VIVO por realtime. Es la FOTO que leen TODOS los pop-ups de
          detalle (✓ Pick/Arm de Cajas pedidas, historial, estadios, saldos As-Of): se bajaba una
@@ -27906,6 +27925,23 @@ async function stkFetchPedidasNeto() {
    y ahí la celda muestra el total de siempre.
    ⚠ Es GLOBAL a propósito: la usan la tabla y el Excel, que son dos funciones distintas. Con una
    copia en cada scope los dos números se desfasarían, que es el bug que esto viene a arreglar. */
+/* v31.62 (Luis, 16/10: "si la tabla se ve en realtime, aun mejor") — la entrada del neto armada
+   desde una fila de stocks_carga_rapida (columnas ped_*, las escribe gv_stock_pedidas_vivo). Mismo
+   formato que stkFetchPedidasNeto. null = sin pedidas o sin dato vivo: la celda cae al total. */
+function _stkPedNetoEntrada(r) {
+  if (!r || r.ped_vivo_en == null || !(Number(r.cajas_pedidas) > 0)) return null;
+  return { tot: Number(r.cajas_pedidas) || 0, neto: Number(r.ped_neto) || 0, tp: Number(r.ped_con_tp) || 0,
+           curso: Number(r.ped_en_curso) || 0, fam: String(r.ped_familia || ""), sec: !!r.ped_es_secundario,
+           famTp: Number(r.ped_fam_con_tp) || 0, famCurso: Number(r.ped_fam_en_curso) || 0,
+           famN: Number(r.ped_fam_miembros) || 1 };
+}
+/* null si NINGUNA fila trae el dato vivo (job caído o carga vieja): ahí se lee la vista. */
+function _stkPedNetoDeFilas(rows) {
+  if (!Array.isArray(rows) || !rows.some(function (r) { return r && r.ped_vivo_en != null; })) return null;
+  var m = {};
+  rows.forEach(function (r) { var e = _stkPedNetoEntrada(r), k = e ? _ocgNorm(r.cod) : ""; if (k) m[k] = e; });
+  return m;
+}
 function _pedNetoOf(cod) {
   var m = (typeof _stk !== "undefined" && _stk && _stk.pedNeto) || null;
   if (!m) return null;
@@ -64763,7 +64799,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.61"></script>
+<script src="importacion.js?v=31.62"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -68085,15 +68121,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.61"></script>
-<script src="hotsale.js?v=31.61"></script>
-<script src="estadisticas.js?v=31.61"></script>
-<script src="ads.js?v=31.61"></script>
-<script src="plantel.js?v=31.61"></script>
+<script src="cobranzas.js?v=31.62"></script>
+<script src="hotsale.js?v=31.62"></script>
+<script src="estadisticas.js?v=31.62"></script>
+<script src="ads.js?v=31.62"></script>
+<script src="plantel.js?v=31.62"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.61"></script>
+<script src="analisis.js?v=31.62"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.61"></script>
+<script src="ayuda.js?v=31.62"></script>
 
 </body>
 </html>
