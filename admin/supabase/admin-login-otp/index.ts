@@ -207,11 +207,33 @@ async function sesionPorEnlace(admin: ReturnType<typeof createClient>): Promise<
   return null;
 }
 
+// D75 (Elías, 16/10/2026): toda sesión que sale de acá ya pasó el código (o el puente con el token de
+// Virgilio), así que se anota en public.admin_2fa_sesiones (session_id del token nuevo). Cuando se haga el corte
+// (tanda d), la API sólo deja actuar como admin a las sesiones anotadas. Si anotar falla, se loguea y se sigue:
+// hasta el corte nadie lee esa tabla.
+function claimsDe(jwt: string): Record<string, unknown> {
+  try {
+    const p = jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(p + "===".slice((p.length + 3) % 4)));
+  } catch (_) { return {}; }
+}
+async function anotar2fa(admin: ReturnType<typeof createClient>, accessToken: unknown, userId: string, metodo: string): Promise<boolean> {
+  const c = claimsDe(String(accessToken ?? ""));
+  const sid = typeof c.session_id === "string" ? c.session_id : "";
+  if (!sid || c.sub !== userId) { console.error("2fa: token sin session_id o de otro usuario"); return false; }
+  const r = await admin.rpc("admin_2fa_registrar", { p_session_id: sid, p_auth_user_id: userId, p_metodo: metodo });
+  if (r.error) { console.error("2fa: admin_2fa_registrar:", r.error.message); return false; }
+  return r.data === true;
+}
+
 // Entrar: primero por enlace si el front lo pide; si no se puede, password temporal (modo viejo).
-async function entrar(admin: ReturnType<typeof createClient>, userId: string, modo: unknown): Promise<Response> {
+async function entrar(admin: ReturnType<typeof createClient>, userId: string, modo: unknown, metodo: string): Promise<Response> {
   if (modo === "enlace") {
     const ses = await sesionPorEnlace(admin);
-    if (ses) return jsonResponse(ses);
+    if (ses) {
+      ses.dosfa = await anotar2fa(admin, ses.access_token, userId, metodo);
+      return jsonResponse(ses);
+    }
     console.error("enlace: cae al modo password (cierra las demás sesiones de la cuenta)");
   }
   // Password temporal aleatorio. 36 chars de UUID (122 bits) alcanzan y sobran; NO usar
@@ -220,7 +242,26 @@ async function entrar(admin: ReturnType<typeof createClient>, userId: string, mo
   const tmpPassword = crypto.randomUUID();
   const upd = await admin.auth.admin.updateUserById(userId, { password: tmpPassword });
   if (upd.error) return jsonResponse({ error: "set_password_failed", detail: upd.error.message }, 500);
-  return jsonResponse({ ok: true, email: RECIPIENT_EMAIL, tmp_password: tmpPassword, modo: "password" });
+  // D75: el login con la password temporal se hace ACÁ, para conocer su session_id y anotarlo. Los dos fronts
+  // (espejo admin y PPP de Gestión) ya aceptan access_token + refresh_token antes que tmp_password. Si el login de
+  // acá falla, se devuelve la password como siempre (esa sesión no queda anotada).
+  try {
+    const canje = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+    });
+    const li = await canje.auth.signInWithPassword({ email: RECIPIENT_EMAIL, password: tmpPassword });
+    const s = li.data && li.data.session;
+    if (!li.error && s && s.access_token && s.refresh_token) {
+      return jsonResponse({
+        ok: true, email: RECIPIENT_EMAIL, modo: "password",
+        access_token: s.access_token, refresh_token: s.refresh_token,
+        expires_in: s.expires_in, expires_at: s.expires_at,
+        dosfa: await anotar2fa(admin, s.access_token, userId, metodo),
+      });
+    }
+    console.error("password: login de acá falló:", li.error ? li.error.message : "sin sesión");
+  } catch (e) { console.error("password: excepción en el login de acá:", e); }
+  return jsonResponse({ ok: true, email: RECIPIENT_EMAIL, tmp_password: tmpPassword, modo: "password", dosfa: false });
 }
 
 async function getSecret(sb: ReturnType<typeof createClient>, name: string, fallbackEnv?: string): Promise<string> {
@@ -290,7 +331,7 @@ Deno.serve(async (req: Request) => {
       // Gate estricto: sólo el MISMO mail que el admin LK. No amplía acceso.
       if (!vemail || vemail !== RECIPIENT_EMAIL) return jsonResponse({ error: "not_authorized", detail: "email=" + vemail }, 403);
 
-      return await entrar(admin, userId, body.modo);
+      return await entrar(admin, userId, body.modo, "bridge");
     }
 
     if (action === "send") {
@@ -363,7 +404,7 @@ Deno.serve(async (req: Request) => {
       const upd = await admin.from("admin_otp_codes").update({ used: true }).eq("id", found.data.id);
       if (upd.error) return jsonResponse({ error: "db_error", detail: upd.error.message }, 500);
 
-      return await entrar(admin, userId, body.modo);
+      return await entrar(admin, userId, body.modo, "login_otp");
     }
 
     return jsonResponse({ error: "unknown_action" }, 400);
