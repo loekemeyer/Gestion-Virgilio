@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.51">
+<link rel="stylesheet" href="gv-ui.css?v=31.52">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -6473,7 +6473,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=31.51"></script>
+<script type="module" src="recepcion.js?v=31.52"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10818,7 +10818,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v31.51";
+const APP_VERSION = "v31.52";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17408,6 +17408,9 @@ async function openStockAdmin(soloConteo) {
     // La tabla usa codCanon() pero este path nunca lo cargaba → mostraba el código sin
     // ceros. Se carga en background y se re-renderiza cuando está listo (no bloquea el paint).
     loadCodCanon().then(function () { if (_stk) stkRender(); }).catch(function () {});
+    // v31.52 (Luis, 16/10) — la marca LK/CH se pide YA (371 filas) y no al final del Promise.all lento: el 938E
+    // (sin linea en la carga rápida) quedaba en — hasta que terminaba todo lo demás.
+    loadArtMarcas().then(function () { if (_stk) stkRender(); }).catch(function () {});
     stkLoadDiscSet();   // v10.50 — set de discontinuados (para el chip "🚫 Ocultar discontinuos")
 
     // v10.34: Cargar datos completos en background (sin bloquear)
@@ -64632,7 +64635,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=31.51"></script>
+<script src="importacion.js?v=31.52"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -67954,15 +67957,15 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=31.51"></script>
-<script src="hotsale.js?v=31.51"></script>
-<script src="estadisticas.js?v=31.51"></script>
-<script src="ads.js?v=31.51"></script>
-<script src="plantel.js?v=31.51"></script>
+<script src="cobranzas.js?v=31.52"></script>
+<script src="hotsale.js?v=31.52"></script>
+<script src="estadisticas.js?v=31.52"></script>
+<script src="ads.js?v=31.52"></script>
+<script src="plantel.js?v=31.52"></script>
 <!-- v29.68 (Luis, 13/10): Analisis Productivo por tanda (supervisor + legajos de GV_Analisis_Acceso) -->
-<script src="analisis.js?v=31.51"></script>
+<script src="analisis.js?v=31.52"></script>
 <!-- v29.17: chat de ayuda del operario (gv-ayuda) -->
-<script src="ayuda.js?v=31.51"></script>
+<script src="ayuda.js?v=31.52"></script>
 
 </body>
 </html>
