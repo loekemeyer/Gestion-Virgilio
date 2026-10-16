@@ -13,6 +13,8 @@ const ok = (c, m) => { console.log((c ? "✓ " : "✗ ") + m); if (!c) fail++; }
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 400, height: 800 } });
+  // v31.78: el código de la TV se apaga el 17/10; este test mide el flujo viejo con el corte corrido al futuro.
+  await p.addInitScript(() => { window.GV_CLAVE_TV_CORTE_TS = 8e15; });
   const errs = []; p.on("pageerror", (e) => errs.push(e.message));
   await p.route("**/*", (r) => (r.request().url().startsWith("file://") ? r.continue() : r.abort()));
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });

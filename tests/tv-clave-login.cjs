@@ -40,6 +40,8 @@ const OPS = [{ legajo: "104", nombre: "Jhonny Cartaya" }, { legajo: "77", nombre
 
   // (b)-(d) celular
   const p = await b.newPage({ viewport: { width: 400, height: 800 } });
+  // v31.78: el código de la TV se apaga el 17/10; este test mide el flujo viejo con el corte corrido al futuro.
+  await p.addInitScript(() => { window.GV_CLAVE_TV_CORTE_TS = 8e15; });
   const errs = []; p.on("pageerror", (e) => errs.push(e.message));
   await p.route("**/rest/v1/**", (r) => {
     const u = r.request().url();

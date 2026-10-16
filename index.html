@@ -6548,6 +6548,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <!-- Alternativa: entrar con el número de legajo (sin Google). Resuelve
          contra Empleados y guarda una sesión local que dura el día. -->
     <div class="auth-divider"><span>o</span></div>
+    <!-- v31.78 (Luis, 16/10): desde el sáb 17/10 00:01 el operario entra por RP3.0. El código de la TV se apaga
+         (también en el servidor: gv_tv_clave_validar devuelve «migrado») y lo reemplaza este botón. -->
+    <button id="loginOperarioRp" class="primary-btn" style="display:none" onclick="gvIrRp3()">Login Operario</button>
     <!-- v23.82 (Luis): el operario entra con la CLAVE que muestra la TV del depósito, después
          elige su nombre, o «+» si no está y tipea el legajo. -->
     <div id="legajoLoginRow">
@@ -65964,6 +65967,25 @@ window.promptNombreEntrevista = promptNombreEntrevista;
 /* v23.82 (Luis): antes de elegir nombre o legajo, la clave de 4 dígitos que muestra la TV
    (gv_tv_clave_validar; cambia cada minuto —v23.93— y vale la anterior). Así se entra estando en el depósito. */
 let __tvClaveOkAt = 0;
+/* v31.78 (Luis, 16/10): el sáb 17/10 a las 00:01 el ingreso con el código de la TV deja de aparecer y de andar;
+   en su lugar, «Login Operario» lleva a RP3.0. Se re-chequea cada 30 s para que la pantalla abierta cambie sola.
+   window.GV_CLAVE_TV_CORTE_TS sólo lo pisan los tests. */
+const RP3_URL = "https://rp.loeke-erp.com/";
+function _gvClaveTvApagada() {
+  const corte = (typeof window.GV_CLAVE_TV_CORTE_TS === "number") ? window.GV_CLAVE_TV_CORTE_TS : Date.parse("2026-10-17T00:01:00-03:00");
+  return Date.now() >= corte;
+}
+function _gvAplicarCorteClaveTv() {
+  const off = _gvClaveTvApagada();
+  const row = $("legajoLoginRow"), btn = $("loginOperarioRp");
+  if (row) row.style.display = off ? "none" : "";
+  if (btn) btn.style.display = off ? "" : "none";
+  return off;
+}
+window.gvIrRp3 = function () { location.href = RP3_URL; };
+document.addEventListener("DOMContentLoaded", _gvAplicarCorteClaveTv);
+if (document.readyState !== "loading") _gvAplicarCorteClaveTv();
+setInterval(_gvAplicarCorteClaveTv, 30000);
 const TV_CLAVE_VALIDA_MS = 10 * 60 * 1000;   // una vez validada, 10 min para elegir nombre/legajo
 function _tvClaveVigente() { return __tvClaveOkAt && (Date.now() - __tvClaveOkAt) < TV_CLAVE_VALIDA_MS; }
 function _tvPaso(cual) {
@@ -65987,6 +66009,7 @@ function _tvClaveError(e) {
   return "Clave incorrecta. Mirá la TV (cambia cada minuto).";
 }
 window.loginConClaveTv = async function () {
+  if (_gvAplicarCorteClaveTv()) return;
   const errEl = $("legajoLoginError"); if (errEl) errEl.textContent = "";
   const clave = String(($("tvClaveInput") || {}).value || "").replace(/\D/g, "");
   if (clave.length !== 4) { if (errEl) errEl.textContent = "Poné los 4 números de la TV."; return; }
@@ -65999,6 +66022,7 @@ window.loginConClaveTv = async function () {
     j = r.ok ? await r.json() : null;
   } catch (_e) { j = null; }
   if (!j) { if (errEl) errEl.textContent = "Sin conexión: probá de nuevo."; return; }
+  if (!j.ok && j.error === "migrado") { window.GV_CLAVE_TV_CORTE_TS = 0; _gvAplicarCorteClaveTv(); return; }
   if (!j.ok) { if (errEl) errEl.textContent = _tvClaveError(j.error); return; }
   __tvClaveOkAt = Date.now();
   const lista = $("tvNombreLista");
@@ -66019,6 +66043,7 @@ window.tvMostrarLegajoNum = function () {
   setTimeout(function () { try { $("tvLegajoNumInput").focus(); } catch (_e) {} }, 40);
 };
 window.loginConLegajoTv = async function () {
+  if (_gvAplicarCorteClaveTv()) return;
   const errEl = $("legajoLoginError"); if (errEl) errEl.textContent = "";
   if (!_tvClaveVigente()) { _tvPaso("tvClaveStep"); if (errEl) errEl.textContent = "Volvé a poner el código de la TV."; return; }
   const leg = String(($("tvLegajoNumInput") || {}).value || "").trim();
@@ -66059,6 +66084,7 @@ window.loginWithLegajo = function () { window.tvMostrarLegajo(); };
    la prueba: descuenta stock de verdad). Queda anotado en GV_Operario_Alta para que un admin
    lo valide (Configuración → Validar Operarios); al validarlo recibe su propio legajo. */
 window.loginConNombre = async function () {
+  if (_gvAplicarCorteClaveTv()) return;
   const input = $("nombreLoginInput");
   const errEl = $("legajoLoginError");
   if (errEl) errEl.textContent = "";

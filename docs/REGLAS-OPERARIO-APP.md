@@ -3,6 +3,21 @@
 > Movido de `CLAUDE.md` el 2026-10-13 (poda 3ra tanda, pedido de Luis) **sin cambiar una palabra**.
 > **Leerlo ENTERO antes de tocar algo de este tema.** Las reglas siguen valiendo igual que cuando estaban en CLAUDE.md.
 
+
+## 🟥 REGLA (Luis, 2026-10-16, v31.78): desde el sáb 17/10 00:01 el operario entra por RP3.0 — el código de la TV se apaga
+
+*"el login con ingreso por Código TV quiero que el sábado 17 a las 00:01 deje de aparecer en la landing (quede inusable)
+y lo reemplace un botón que sea Login Operario que vincule a la página de RP3.0"*.
+
+- **Front** (`index.html`, `_gvClaveTvApagada`): desde `2026-10-17T00:01:00-03:00` se oculta `#legajoLoginRow` (código,
+  nombre, legajo) y aparece **«Login Operario»** → `https://rp.loeke-erp.com/` (misma pestaña). Re-chequea cada 30 s:
+  la pantalla abierta cambia sola. `loginConClaveTv` / `loginConLegajoTv` / `loginConNombre` no hacen nada.
+- **Servidor**: `gv_tv_clave_validar` devuelve `{ok:false, error:'migrado'}` desde la misma hora, para el celular con el
+  index viejo cacheado; el index nuevo, al recibir `migrado`, muestra el botón. RP3.0 valida con su propia función
+  (`reg_prod_3_0_virgilio_operarios`): no la toca. Google (supervisores) sigue igual.
+- `sql/gv_login_operario_rp3_v3178.sql`, `tests/login-operario-rp3.cjs`. Los tests del flujo viejo corren el corte al
+  futuro con `window.GV_CLAVE_TV_CORTE_TS`.
+
 ## ⚠⚠ REGLA (Elías, 2026-10-13, v29.84): el CÓDIGO DE LA TV no se entrega a la clave pública — y se prueba de a uno cada 2 s
 
 **Elías:** *"1 hay que cambiar"* · *"no es anon, tiene que ser al enviar con el token que se obtiene de la pantalla"* ·
