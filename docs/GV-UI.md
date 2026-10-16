@@ -169,6 +169,44 @@ Lo que sí entró, porque no choca con nada, son las **cifras tabulares**
 (`font-variant-numeric: tabular-nums`, ya en `.gv-tbl`): arreglan la mitad del problema —que la
 columna baile porque el `1` es más angosto que el `8`— sin mover la alineación.
 
+### Ancho según contenido — Luis 16/10/2026
+
+**Luis, textual** (sobre el pop-up «Cajas pedidas — 936E» de Stock y Compras): *"que revise esto y
+establezca una regla. Tablas optimizadas horizontalmente (no debería haber tanto espacio entre
+columna y columna (mucho espacio en blanco entre razon social, cajas y NP). Headers centrados,
+minimo gasto de espacio horizontal, font y visual lo mas grande y clara posible. implementa cambios
+a lo largo del modulo"*.
+
+El caso: la tabla NP · Razón Social · Cajas · Pick · Arm iba a `width:100%` con `table-layout:fixed`
+dentro de una tarjeta de 760 px. Medido: 730 px de tabla para 4 datos cortos (NP 266 px, Razón
+Social 254 px), encabezado de 10 px en mayúscula `#64748b`, dato de 12 px, números a la derecha.
+Después: 559 px de tabla (NP 145, Razón Social 260 con «…», Cajas 57), encabezado 14 px `#334155`
+centrado, dato 14 px. Es la misma regla que la de Damian del 25/09 para las tablas de Claude, ahora
+para las de la app.
+
+1. **La tabla NO se estira al contenedor.** `width:auto` (o `max-content`) y `table-layout:auto`;
+   **nunca `width:100%`**. Cada columna mide su dato más largo + padding mínimo (8–10 px por lado).
+   Si sobra espacio, sobra **a la derecha de la tabla**, no repartido entre columnas. El wrapper
+   también va a su ancho (`width:fit-content; max-width:100%`) para que el borde no dibuje la caja
+   vacía.
+2. **El texto largo se corta, no ensancha.** La razón social / descripción lleva `max-width`
+   (≈ 240–260 px en escritorio, ≈ 120 px a ≤ 560 px) con `text-overflow:ellipsis` y el texto entero
+   en el `title`.
+3. **Encabezados centrados, todos**, legibles: **13–14 px**, color `#334155` o `--gv-ink-2`
+   (≥ 7:1), sin el gris lavado (`#94a3b8` = 2,56:1) y sin la mayúscula de 10–11 px (§2).
+4. **Dato ≥ 14 px** (§2). Números **centrados** con `tabular-nums` (decisión cerrada, arriba).
+5. **Mínimo gasto horizontal**: sin columnas fantasma, sin anchos fijos en `%`, sin
+   `table-layout:fixed` con columnas al `%`. La única excepción es una tabla ancha con `<colgroup>`
+   medido (Pedidos Importación, `.mva-tbl.wide`), que ya mide lo que suman sus columnas.
+6. **Pop-ups**: la tarjeta puede seguir en 760 px; la tabla de adentro no se estira con ella.
+7. **Celular (430 px)**: la tabla tiene que entrar sin scroll horizontal; se baja el padding a
+   6–7 px y el `max-width` del texto largo, **no** la letra.
+
+**Dónde vive**: `.gv-tbl.fit` + `.gv-tblwrap.fit` en `gv-ui.css` para pantallas nuevas. En Stock y
+Compras (index.html): `.mva-tbl` (todas las tablas de los pop-ups `_stkPopShell`), `.stk-tbl`,
+`.oc-tbl`, `.abast-tbl`, `.proyv-tab` / `.proyv-det`. **La grilla de Stocks** sólo cambió encabezado
+y letra: ya era `stk-tbl-fit`.
+
 ---
 
 ## 6. Estados de la pantalla

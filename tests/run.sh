@@ -506,6 +506,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== cajped-canceladas (v12.22: el pop-up Cajas pedidas descuenta NP canceladas + RS de la base) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cajped-canceladas.cjs
+echo "== stk-tabla-ancho-contenido (Luis 16/10: tablas de Stock y Compras al ancho del dato, headers centrados, dato 14 px) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-tabla-ancho-contenido.cjs
 
 echo "== TODO OK =="
 

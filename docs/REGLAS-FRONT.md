@@ -40,6 +40,10 @@ explica (📦/📅 de «no es demora»), un estado que se lee de un vistazo, el 
 el operario ya tiene memorizado. La prueba es: si el emoji se saca y no se pierde información, se
 saca.
 
+> **Tablas: ancho según contenido** (Luis, 16/10/2026): ninguna tabla se estira al 100 % del contenedor;
+> cada columna a su dato, encabezados centrados 13–14 px oscuros, dato ≥ 14 px. Regla completa y medición:
+> **`docs/GV-UI.md` §5 «Ancho según contenido — Luis 16/10/2026»**.
+
 ## 🟥🟥🟥 REGLA RECTORA DE DISEÑO «GV-UI» (Luis, 2026-10-13, v29.83): UNA PANTALLA SE LEE DE UN VISTAZO
 
 **Luis, textual:** *"quiero que agarremos una filosofía de diseño visual / front / usabilidad
