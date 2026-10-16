@@ -149,7 +149,8 @@ async function correr(b, ancho, falla) {
   ok(/r\.prom < par\.hprom and r\.cajas > r\.prom \* par\.hfac/.test(sql), "(g) el SQL perdió la regla de historial ×5");
   ok(/\(r\.nped < par\.hmin or r\.nart = 0\) and r\.peso >= par\.efac/.test(sql), "(g) el SQL perdió la regla de la Est. Madre (o D2: artículo nuevo de cliente con historial)");
   ok(/mod\(r\.cajas, r\.uxb\) = 0\s+and coalesce\(r\.mx, 0\) < r\.cajas/.test(sql), "(g) el SQL perdió la regla de cajas = uxb sólo sin respaldo en el historial (D1)");
-  ok(/r\.prom >= par\.hprom and r\.cajas > r\.mx \* par\.hmaxf/.test(sql), "(g) el SQL perdió D3: promedio ≥ 5 cj → ×2 del pedido más grande");
+  ok(/r\.prom >= par\.hprom and r\.cajas > r\.mxped \* par\.hmaxf/.test(sql), "(g) el SQL perdió D3/D5: promedio ≥ 5 cj → ×2 del pedido TOTAL más grande");
+  ok(/r\.nnuevos >= par\.lmin/.test(sql) && /'linea_nueva'/.test(sql), "(g) el SQL perdió D4: incorporación de línea en un solo aviso");
 
   if (fallas.length) { console.error("ppp-anomalos: FALLA\n - " + fallas.join("\n - ")); process.exit(1); }
   console.log("ppp-anomalos: OK (cartel por día afuera/adentro, detalle, pastilla de NP, lectura caída, reglas en el SQL)");
